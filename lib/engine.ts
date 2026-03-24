@@ -113,6 +113,10 @@ function getValue(x: string): Value {
 function evaluate(expr: string) {
   expr = trim(expr);
 
+  if (expr.startsWith('"') && expr.endsWith('"')) {
+    return expr.slice(1, -1);
+  }
+  
   if (expr.includes("+")) {
     let pos = expr.indexOf("+");
 

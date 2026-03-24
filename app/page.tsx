@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 
-import { parseLine, step, reset } from "@/lib/engine";
-import { setVariable } from "@/lib/engine";
-import { advanceLine } from "@/lib/engine";
+import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
 
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+type Value = string | number | boolean;
 
 export default function Home() {
   const [code, setCode] = useState(`X = 0
@@ -13,7 +17,7 @@ WHILE X < 3
 PRINT X
 X = X + 1
 END`);
-  type Value = string | number | boolean;
+
   const [program, setProgram] = useState<any[]>([]);
   const [variables, setVariables] = useState<Record<string, Value>>({});
   const [currentLine, setCurrentLine] = useState(0);
@@ -23,11 +27,11 @@ END`);
   const [inputVar, setInputVar] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+
   const codeLines = code.split("\n");
 
   function compile() {
-    const lines = code.split("\n");
-    const parsed = lines.map(parseLine);
+    const parsed = code.split("\n").map(parseLine);
 
     setProgram(parsed);
     reset();
@@ -35,13 +39,12 @@ END`);
     setVariables({});
     setCurrentLine(0);
     setOutput([]);
-    setStopped(false); //reset
+    setStopped(false);
     setErrorLine(null);
   }
 
   function handleStep() {
-    if (program.length === 0) return;
-    if (stopped) return;
+    if (program.length === 0 || stopped) return;
 
     setIsRunning(false);
 
@@ -67,15 +70,15 @@ END`);
 
     } catch (e: any) {
       setOutput(prev => [...prev, "ERROR: " + e.message]);
-
       setErrorLine(e.line ?? currentLine);
       setStopped(true);
     }
   }
+
   function handleSubmitInput() {
     if (!inputVar) return;
 
-    let value: string | number | boolean;
+    let value: Value;
 
     if (inputValue === "true" || inputValue === "false") {
       value = inputValue === "true";
@@ -98,12 +101,12 @@ END`);
     advanceLine();
     setCurrentLine(prev => prev + 1);
 
-    // execute program continously
-    if(isRunning) runProgram();
+    if (isRunning) runProgram();
   }
+
   function runProgram() {
     let res;
-    let newOutput: any[] = [];
+    let newOutput: string[] = [];
 
     try {
       while (true) {
@@ -125,109 +128,110 @@ END`);
       }
     } catch (e: any) {
       newOutput.push("ERROR: " + e.message);
-
       setErrorLine(e.line ?? currentLine);
       setStopped(true);
     }
 
     setOutput(prev => [...prev, ...newOutput]);
   }
+
   function handleRun() {
-      if (program.length === 0) return;
-      if (stopped) return;
+    if (program.length === 0 || stopped) return;
 
-      setIsRunning(true);
-
-      runProgram();
+    setIsRunning(true);
+    runProgram();
   }
 
   return (
-    <div style={{ display: "flex", gap: "20px", padding: "20px" }}>
-      
-      {/* code editor */}
-      <div style={{ flex: 1 }}>
-        <h2>MiniScript+ Editor</h2>
-        <textarea
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          rows={15}
-          style={{ width: "100%", fontFamily: "monospace", border: "2px solid #171717" , borderRadius: "10px", padding: "10px"}}
-        />
-        <div
-          style={{
-            marginTop: "20px",
-            background: "#0f172a",
-            padding: "10px",
-            borderRadius: "10px",
-            fontFamily: "monospace",
-            color: "white"
-          }}
-        >
-          {codeLines.map((line, index) => (
-            <div
-              key={index}
-              style={{
-                padding: "4px",
-                background:
-                  index === errorLine
-                    ? "rgba(255, 0, 0, 0.5)" // error
-                    : index === currentLine
-                    ? "rgba(59, 130, 246, 0.5)" // current line
-                    : "transparent"
-              }}
-            >
-              {index + 1}. {line}
-            </div>
-          ))}
-        </div>
+    <div className="p-6 grid grid-cols-3 gap-6">
 
-        <div style={{ marginTop: "10px", display: "flex", gap: "10px" }}>
-          <button onClick={compile}>Compile</button>
-          <button onClick={handleStep} disabled={stopped}>Step</button>
-          <button onClick={handleRun} disabled={stopped}>Run</button>
-        </div>
-      </div>
+      {/* EDITOR */}
+      <Card className="col-span-2">
+        <CardHeader>
+          <CardTitle>MiniScript+ Editor</CardTitle>
+        </CardHeader>
 
+        <CardContent className="space-y-4">
 
-      {/* debug panel */}
-      <div style={{ width: "300px" }}>
-        <h2>Variables</h2>
-        <pre>{JSON.stringify(variables, null, 2)}</pre>
-
-        <h2>Current Line</h2>
-        <p>{currentLine}</p>
-
-        <h2>Output</h2>
-        <pre
-          style={{
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            overflowWrap: "break-word",
-            maxHeight: "200px",
-            overflowY: "auto"
-          }}
-        >
-          {output.join("\n")}
-        </pre>
-        
-        {inputVar && (
-          
-        <div style={{ marginTop: "10px" }}>
-          
-          <hr />
-          <br />
-          <p>Enter value for {inputVar}:</p>
-          
-          <input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            style={{ padding: "5px", border: "2px solid #171717" , borderRadius: "10px", margin: "10px"}}
+          <Textarea
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="font-mono h-[200px]"
           />
 
-          <button onClick={handleSubmitInput}>Submit</button>
-        </div>
-      )}
-      </div>
+          {/* CODE PREVIEW */}
+          <div className="bg-slate-900 text-white rounded-md p-3 font-mono text-sm">
+            {codeLines.map((line, index) => (
+              <div
+                key={index}
+                className={`px-2 py-1 rounded
+                  ${index === errorLine ? "bg-red-500/50" :
+                    index === currentLine ? "bg-blue-500/40" :
+                    ""}`}
+              >
+                {index + 1}. {line}
+              </div>
+            ))}
+          </div>
+
+          {/* BUTTONS */}
+          <div className="flex gap-2">
+            <Button onClick={compile} variant="secondary">Compile</Button>
+            <Button onClick={handleStep} disabled={stopped}>Step</Button>
+            <Button onClick={handleRun} disabled={stopped}>Run</Button>
+          </div>
+
+        </CardContent>
+      </Card>
+
+      {/* SIDEBAR */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Debugger</CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+
+          {/* VARIABLES */}
+          <div>
+            <h3 className="font-semibold mb-1">Variables</h3>
+            <pre className="text-sm bg-muted p-2 rounded whitespace-pre-wrap break-words">
+              {JSON.stringify(variables, null, 2)}
+            </pre>
+          </div>
+
+          {/* CURRENT LINE */}
+          <div>
+            <h3 className="font-semibold">Current Line</h3>
+            <p>{currentLine}</p>
+          </div>
+
+          {/* OUTPUT */}
+          <div>
+            <h3 className="font-semibold mb-1">Output</h3>
+            <pre className="text-sm bg-muted p-2 rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
+              {output.join("\n")}
+            </pre>
+          </div>
+
+          {/* INPUT UI */}
+          {inputVar && (
+            <div className="space-y-2">
+              <p className="font-medium">Enter value for {inputVar}:</p>
+
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+              />
+
+              <Button onClick={handleSubmitInput}>
+                Submit
+              </Button>
+            </div>
+          )}
+
+        </CardContent>
+      </Card>
 
     </div>
   );
