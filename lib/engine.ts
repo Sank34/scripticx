@@ -233,12 +233,26 @@ export function step(program: any[]): StepResult {
     };
   } 
   else if (inst.type === "ASSIGN") {
-    variables[inst.var] = evaluate(inst.value);
+    try {
+      variables[inst.var] = evaluate(inst.value);
+    } catch (e: any) {
+      throw {
+        message: e.message,
+        line: currentLine
+      };
+    }
   } 
   else if (inst.type === "PRINT") {
     let val = trim(inst.value);
 
-    output = evaluate(val);
+    try {
+      output = evaluate(val);
+    } catch (e: any) {
+      throw {
+        message: e.message,
+        line: currentLine
+      };
+    }
   }
 
   else if (inst.type === "IF") {

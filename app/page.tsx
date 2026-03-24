@@ -17,6 +17,8 @@ END`);
   const [currentLine, setCurrentLine] = useState(0);
   const [output, setOutput] = useState<string[]>([]);
   const [stopped, setStopped] = useState(false);
+  const [errorLine, setErrorLine] = useState<number | null>(null);
+  const codeLines = code.split("\n");
 
   function compile() {
     const lines = code.split("\n");
@@ -29,11 +31,14 @@ END`);
     setCurrentLine(0);
     setOutput([]);
     setStopped(false); //reset
+    setErrorLine(null);
   }
 
  function handleStep() {
   if (program.length === 0) return;
     if (stopped) return;
+
+    const lineBefore = currentLine; 
 
     try {
       const result = step(program);
@@ -52,13 +57,13 @@ END`);
 
     } catch (e: any) {
       setOutput(prev => [...prev, "ERROR: " + e.message]);
+      setErrorLine(e.line ?? currentLine);
       setStopped(true);
     }
   }
 
  function handleRun() {
     if (program.length === 0) return;
-
     if (stopped) return;
 
     let res;
@@ -79,6 +84,8 @@ END`);
       }
     } catch (e: any) {
       newOutput.push("ERROR: " + e.message);
+
+      setErrorLine(e.line);
       setStopped(true);
     }
 
@@ -97,6 +104,33 @@ END`);
           rows={15}
           style={{ width: "100%", fontFamily: "monospace", border: "2px solid #171717" , borderRadius: "10px", padding: "10px"}}
         />
+        <div
+          style={{
+            marginTop: "20px",
+            background: "#0f172a",
+            padding: "10px",
+            borderRadius: "10px",
+            fontFamily: "monospace",
+            color: "white"
+          }}
+        >
+          {codeLines.map((line, index) => (
+            <div
+              key={index}
+              style={{
+                padding: "4px",
+                background:
+                  index === errorLine
+                    ? "rgba(255, 0, 0, 0.5)" // error
+                    : index === currentLine
+                    ? "rgba(59, 130, 246, 0.5)" // current line
+                    : "transparent"
+              }}
+            >
+              {index + 1}. {line}
+            </div>
+          ))}
+        </div>
 
         <div style={{ marginTop: "10px", display: "flex", gap: "10px" }}>
           <button onClick={compile}>Compile</button>
