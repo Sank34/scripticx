@@ -1,0 +1,4 @@
+INPUT X
+INPUT Y
+PRINT "X + Y ="
+PRINT X + Y

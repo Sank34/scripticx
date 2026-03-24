@@ -2,6 +2,7 @@ export type StepResult = {
   output: any;
   variables: Record<string, Value>;
   currentLine: number;
+  inputRequest?: string;
 } | null;
 
 type Value = string | number | boolean;
@@ -16,6 +17,14 @@ export function reset() {
 
 function trim(str: string) {
   return str.trim();
+}
+
+export function setVariable(name: string, value: Value) {
+  variables[name] = value;
+}
+
+export function advanceLine() {
+  currentLine++;
 }
 
 export function parseLine(line: string) {
@@ -320,24 +329,13 @@ export function step(program: any[]): StepResult {
       if (program[temp].type === "IF") break;
     }
   } else if (inst.type === "INPUT") {
-      let value = prompt(`Enter value for ${inst.var}:`);
-
-      if (value === null) {
-        throw {
-          message: "Input cancelled",
-          line: currentLine
-        };
-      }
-
-      // detect type
-      if (value === "true" || value === "false") {
-        variables[inst.var] = value === "true";
-      } else if (!isNaN(Number(value))) {
-        variables[inst.var] = Number(value);
-      } else {
-        variables[inst.var] = value;
-      }
-    }
+    return {
+      output: null,
+      variables: { ...variables },
+      currentLine,
+      inputRequest: inst.var
+    };
+  }
 
   currentLine++;
 

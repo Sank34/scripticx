@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 import { parseLine, step, reset } from "@/lib/engine";
+import { setVariable } from "@/lib/engine";
+import { advanceLine } from "@/lib/engine";
 
 
 export default function Home() {
@@ -11,13 +13,16 @@ WHILE X < 3
 PRINT X
 X = X + 1
 END`);
-
+  type Value = string | number | boolean;
   const [program, setProgram] = useState<any[]>([]);
-  const [variables, setVariables] = useState<any>({});
+  const [variables, setVariables] = useState<Record<string, Value>>({});
   const [currentLine, setCurrentLine] = useState(0);
   const [output, setOutput] = useState<string[]>([]);
   const [stopped, setStopped] = useState(false);
   const [errorLine, setErrorLine] = useState<number | null>(null);
+  const [inputVar, setInputVar] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
   const codeLines = code.split("\n");
 
   function compile() {
@@ -34,17 +39,22 @@ END`);
     setErrorLine(null);
   }
 
- function handleStep() {
-  if (program.length === 0) return;
+  function handleStep() {
+    if (program.length === 0) return;
     if (stopped) return;
 
-    const lineBefore = currentLine; 
+    setIsRunning(false);
 
     try {
       const result = step(program);
 
       if (!result) {
         setStopped(true);
+        return;
+      }
+
+      if (result.inputRequest) {
+        setInputVar(result.inputRequest);
         return;
       }
 
@@ -57,15 +67,41 @@ END`);
 
     } catch (e: any) {
       setOutput(prev => [...prev, "ERROR: " + e.message]);
+
       setErrorLine(e.line ?? currentLine);
       setStopped(true);
     }
   }
+  function handleSubmitInput() {
+    if (!inputVar) return;
 
- function handleRun() {
-    if (program.length === 0) return;
-    if (stopped) return;
+    let value: string | number | boolean;
 
+    if (inputValue === "true" || inputValue === "false") {
+      value = inputValue === "true";
+    } else if (!isNaN(Number(inputValue))) {
+      value = Number(inputValue);
+    } else {
+      value = inputValue;
+    }
+
+    setVariable(inputVar, value);
+
+    setVariables(prev => ({
+      ...prev,
+      [inputVar]: value
+    }));
+
+    setInputVar(null);
+    setInputValue("");
+
+    advanceLine();
+    setCurrentLine(prev => prev + 1);
+
+    // execute program continously
+    if(isRunning) runProgram();
+  }
+  function runProgram() {
     let res;
     let newOutput: any[] = [];
 
@@ -74,6 +110,11 @@ END`);
         res = step(program);
 
         if (!res) break;
+
+        if (res.inputRequest) {
+          setInputVar(res.inputRequest);
+          break;
+        }
 
         if (res.output !== null) {
           newOutput.push(res.output);
@@ -85,11 +126,19 @@ END`);
     } catch (e: any) {
       newOutput.push("ERROR: " + e.message);
 
-      setErrorLine(e.line);
+      setErrorLine(e.line ?? currentLine);
       setStopped(true);
     }
 
     setOutput(prev => [...prev, ...newOutput]);
+  }
+  function handleRun() {
+      if (program.length === 0) return;
+      if (stopped) return;
+
+      setIsRunning(true);
+
+      runProgram();
   }
 
   return (
@@ -139,6 +188,7 @@ END`);
         </div>
       </div>
 
+
       {/* debug panel */}
       <div style={{ width: "300px" }}>
         <h2>Variables</h2>
@@ -158,7 +208,25 @@ END`);
           }}
         >
           {output.join("\n")}
-          </pre>
+        </pre>
+        
+        {inputVar && (
+          
+        <div style={{ marginTop: "10px" }}>
+          
+          <hr />
+          <br />
+          <p>Enter value for {inputVar}:</p>
+          
+          <input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            style={{ padding: "5px", border: "2px solid #171717" , borderRadius: "10px", margin: "10px"}}
+          />
+
+          <button onClick={handleSubmitInput}>Submit</button>
+        </div>
+      )}
       </div>
 
     </div>
