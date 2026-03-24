@@ -1,0 +1,6 @@
+# comment full
+X = 5 # altcv
+PRINT X #ceva
+
+X = 5 * 5
+PRINT X

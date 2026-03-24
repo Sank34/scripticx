@@ -1,0 +1,7 @@
+X = 3 # or any integer value
+
+IF X > 5 THEN
+    PRINT "BIG"
+ELSE
+    PRINT "SMALL"
+END

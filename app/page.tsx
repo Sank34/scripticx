@@ -16,6 +16,7 @@ END`);
   const [variables, setVariables] = useState<any>({});
   const [currentLine, setCurrentLine] = useState(0);
   const [output, setOutput] = useState<string[]>([]);
+  const [stopped, setStopped] = useState(false);
 
   function compile() {
     const lines = code.split("\n");
@@ -27,36 +28,58 @@ END`);
     setVariables({});
     setCurrentLine(0);
     setOutput([]);
+    setStopped(false); //reset
   }
 
-  function handleStep() {
-    const result = step(program);
+ function handleStep() {
+  if (program.length === 0) return;
+    if (stopped) return;
 
-    if (!result) return;
+    try {
+      const result = step(program);
 
-    setVariables(result.variables);
-    setCurrentLine(result.currentLine);
+      if (!result) {
+        setStopped(true);
+        return;
+      }
 
-    if (result.output !== null) {
-      setOutput(prev => [...prev, result.output]);
+      setVariables(result.variables);
+      setCurrentLine(result.currentLine);
+
+      if (result.output !== null) {
+        setOutput(prev => [...prev, result.output]);
+      }
+
+    } catch (e: any) {
+      setOutput(prev => [...prev, "ERROR: " + e.message]);
+      setStopped(true);
     }
   }
 
-  function handleRun() {
+ function handleRun() {
+    if (program.length === 0) return;
+
+    if (stopped) return;
+
     let res;
     let newOutput: any[] = [];
 
-    while (true) {
-      res = step(program);
+    try {
+      while (true) {
+        res = step(program);
 
-      if (!res) break;
+        if (!res) break;
 
-      if (res.output !== null) {
-        newOutput.push(res.output);
+        if (res.output !== null) {
+          newOutput.push(res.output);
+        }
+
+        setVariables(res.variables);
+        setCurrentLine(res.currentLine);
       }
-
-      setVariables(res.variables);
-      setCurrentLine(res.currentLine);
+    } catch (e: any) {
+      newOutput.push("ERROR: " + e.message);
+      setStopped(true);
     }
 
     setOutput(prev => [...prev, ...newOutput]);
@@ -72,13 +95,13 @@ END`);
           value={code}
           onChange={(e) => setCode(e.target.value)}
           rows={15}
-          style={{ width: "100%", fontFamily: "monospace", border: "1px solid #171717" , borderRadius: "10px", padding: "10px"}}
+          style={{ width: "100%", fontFamily: "monospace", border: "2px solid #171717" , borderRadius: "10px", padding: "10px"}}
         />
 
         <div style={{ marginTop: "10px", display: "flex", gap: "10px" }}>
           <button onClick={compile}>Compile</button>
-          <button onClick={handleStep}>Step</button>
-          <button onClick={handleRun}>Run</button>
+          <button onClick={handleStep} disabled={stopped}>Step</button>
+          <button onClick={handleRun} disabled={stopped}>Run</button>
         </div>
       </div>
 

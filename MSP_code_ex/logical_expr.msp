@@ -1,0 +1,4 @@
+X = 3
+IF X == 5 OR X > 2 THEN
+    PRINT "OK"
+END

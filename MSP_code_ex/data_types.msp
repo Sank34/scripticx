@@ -1,0 +1,4 @@
+X = "Hello"
+Y = 5
+PRINT X + Y # Hello5 - concat
+PRINT X - Y # Type Error
