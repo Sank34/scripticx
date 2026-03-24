@@ -1,0 +1,15 @@
+X = 0
+Y = 1
+Z = 2
+WHILE X < 3
+ PRINT X
+ X = X + 1
+ Y = X + 1
+ Z = Z + 1
+END
+PRINT "X = "
+PRINT X
+PRINT "Y = "
+PRINT Y
+PRINT "Z = "
+PRINT Z

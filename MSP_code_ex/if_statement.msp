@@ -1,0 +1,7 @@
+X = 0
+IF X < 5
+X = X + 3
+END
+PRINT X
+
+// TO DO: needs fixes for if statements

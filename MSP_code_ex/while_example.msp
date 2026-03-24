@@ -1,0 +1,5 @@
+X = 0
+WHILE X < 3
+ PRINT X
+ X = X + 1
+END
