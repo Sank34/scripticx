@@ -69,6 +69,10 @@ export function parseLine(line: string) {
     inst.type = "WHILE";
     inst.condition = trim(line.substring(6));
   }
+  else if (line.startsWith("INPUT ")) {
+    inst.type = "INPUT";
+    inst.var = trim(line.substring(6));
+  }
 
   return inst;
 }
@@ -315,7 +319,25 @@ export function step(program: any[]): StepResult {
 
       if (program[temp].type === "IF") break;
     }
-  }
+  } else if (inst.type === "INPUT") {
+      let value = prompt(`Enter value for ${inst.var}:`);
+
+      if (value === null) {
+        throw {
+          message: "Input cancelled",
+          line: currentLine
+        };
+      }
+
+      // detect type
+      if (value === "true" || value === "false") {
+        variables[inst.var] = value === "true";
+      } else if (!isNaN(Number(value))) {
+        variables[inst.var] = Number(value);
+      } else {
+        variables[inst.var] = value;
+      }
+    }
 
   currentLine++;
 

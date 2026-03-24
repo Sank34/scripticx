@@ -148,7 +148,17 @@ END`);
         <p>{currentLine}</p>
 
         <h2>Output</h2>
-        <pre>{output.join("\n")}</pre>
+        <pre
+          style={{
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            overflowWrap: "break-word",
+            maxHeight: "200px",
+            overflowY: "auto"
+          }}
+        >
+          {output.join("\n")}
+          </pre>
       </div>
 
     </div>
