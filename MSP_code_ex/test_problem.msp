@@ -1,0 +1,15 @@
+INPUT X
+INPUT MX
+OK = 1
+IF X < 5 THEN
+ PRINT "Too small"
+ OK = 0
+END
+IF OK == 1 THEN
+ MX = MX + 1
+ WHILE X < MX
+  PRINT X
+  X = X + 1
+ END
+END
+PRINT "END PROGRAM"
