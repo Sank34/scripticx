@@ -19,6 +19,13 @@ function trim(str: string) {
   return str.trim();
 }
 
+function normalizeOperators(str: string) {
+  //since the font convers "<=" to the character ≤ we'll need to convert it (normalize)
+  return str
+    .replace(/≤/g, "<=")
+    .replace(/≥/g, ">=");
+}
+
 export function setVariable(name: string, value: Value) {
   variables[name] = value;
 }
@@ -59,28 +66,29 @@ export function parseLine(line: string) {
     let condition = line.substring(3).trim();
     condition = condition.replace("THEN", "").trim();
 
-    inst.condition = condition;
+    inst.condition = normalizeOperators(condition);
+  }
+  else if (line.startsWith("WHILE ")) {
+    inst.type = "WHILE";
+    inst.condition = normalizeOperators(trim(line.substring(6)));
   }
   else if (line === "ELSE") {
     inst.type = "ELSE";
   }
-  else if (line.includes("=")) {
-    inst.type = "ASSIGN";
-    let eqPos = line.indexOf("=");
-
-    inst.var = trim(line.substring(0, eqPos));
-    inst.value = trim(line.substring(eqPos + 1));
-  }
   else if (line === "END") {
     inst.type = "END";
-  }
-  else if (line.startsWith("WHILE ")) {
-    inst.type = "WHILE";
-    inst.condition = trim(line.substring(6));
   }
   else if (line.startsWith("INPUT ")) {
     inst.type = "INPUT";
     inst.var = trim(line.substring(6));
+  }
+  else if (line.includes("=")) {
+    inst.type = "ASSIGN";
+
+    let eqPos = line.indexOf("=");
+
+    inst.var = trim(line.substring(0, eqPos));
+    inst.value = trim(line.substring(eqPos + 1));
   }
 
   return inst;
@@ -116,7 +124,7 @@ function evaluate(expr: string) {
   if (expr.startsWith('"') && expr.endsWith('"')) {
     return expr.slice(1, -1);
   }
-  
+
   if (expr.includes("+")) {
     let pos = expr.indexOf("+");
 
@@ -195,7 +203,7 @@ function evaluateCondition(cond: string):boolean {
   }
 
   let pos;
-
+  cond = normalizeOperators(cond);
   if ((pos = cond.indexOf(">=")) !== -1) {
     let left = getValue(cond.substring(0, pos));
     let right = getValue(cond.substring(pos + 2));
@@ -333,6 +341,7 @@ export function step(program: any[]): StepResult {
       if (program[temp].type === "IF") break;
     }
   } else if (inst.type === "INPUT") {
+    currentLine++;
     return {
       output: null,
       variables: { ...variables },
