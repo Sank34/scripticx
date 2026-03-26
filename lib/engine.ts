@@ -5,6 +5,12 @@ export type StepResult = {
   inputRequest?: string;
 } | null;
 
+type ASTNode =
+  | { type: "number"; value: number }
+  | { type: "string"; value: string }
+  | { type: "variable"; name: string }
+  | { type: "binary"; operator: string; left: ASTNode; right: ASTNode };
+
 type Value = string | number | boolean;
 
 let variables: Record<string, Value> = {};
@@ -56,6 +62,111 @@ function splitTopLevel(expr: string, operator: string): string[] {
   if (current) result.push(current);
 
   return result;
+}
+
+function tokenize(expr: string): string[] {
+  const tokens: string[] = [];
+  let current = "";
+
+  for (let i = 0; i < expr.length; i++) {
+    const c = expr[i];
+
+    if ("+-*/()".includes(c)) {
+      if (current.trim()) tokens.push(current.trim());
+      tokens.push(c);
+      current = "";
+    } else {
+      current += c;
+    }
+  }
+
+  if (current.trim()) tokens.push(current.trim());
+
+  return tokens;
+}
+
+function parseExpression(tokens: string[]): ASTNode {
+  let pos = 0;
+
+  function parsePrimary(): ASTNode {
+    const token = tokens[pos++];
+
+    if (token === "(") {
+      const node = parseAddSub();
+      pos++; // skip )
+      return node;
+    }
+
+    if (!isNaN(Number(token))) {
+      return { type: "number", value: Number(token) };
+    }
+
+    if (token.startsWith('"') && token.endsWith('"')) {
+      return { type: "string", value: token.slice(1, -1) };
+    }
+
+    return { type: "variable", name: token };
+  }
+
+  function parseMulDiv(): ASTNode {
+    let node = parsePrimary();
+
+    while (tokens[pos] === "*" || tokens[pos] === "/") {
+      const op = tokens[pos++];
+      const right = parsePrimary();
+      node = { type: "binary", operator: op, left: node, right };
+    }
+
+    return node;
+  }
+
+  function parseAddSub(): ASTNode {
+    let node = parseMulDiv();
+
+    while (tokens[pos] === "+" || tokens[pos] === "-") {
+      const op = tokens[pos++];
+      const right = parseMulDiv();
+      node = { type: "binary", operator: op, left: node, right };
+    }
+
+    return node;
+  }
+
+  return parseAddSub();
+}
+
+function evalAST(node: ASTNode): Value {
+  if (node.type === "number") return node.value;
+  if (node.type === "string") return node.value;
+
+  if (node.type === "variable") {
+    if (variables.hasOwnProperty(node.name)) {
+      return variables[node.name];
+    }
+    throw new Error(`Variable "${node.name}" is not defined`);
+  }
+
+  const left = evalAST(node.left);
+  const right = evalAST(node.right);
+
+  switch (node.operator) {
+    case "+":
+      if (typeof left === "string" || typeof right === "string") {
+        return String(left) + String(right);
+      }
+      return (left as number) + (right as number);
+
+    case "-":
+      return (left as number) - (right as number);
+
+    case "*":
+      return (left as number) * (right as number);
+
+    case "/":
+      return (left as number) / (right as number);
+  }
+
+  throw new Error("Unknown operator");
 }
 
 export function parseLine(line: string) {
@@ -143,57 +254,9 @@ function getValue(x: string): Value {
 
 
 function evaluate(expr: string): Value {
-  expr = trim(expr);
-
-  if (expr.startsWith("(") && expr.endsWith(")")) {
-    let depth = 0;
-    let isWrapped = true;
-
-    for (let i = 0; i < expr.length; i++) {
-      if (expr[i] === "(") depth++;
-      if (expr[i] === ")") depth--;
-
-      if (depth === 0 && i < expr.length - 1) {
-        isWrapped = false;
-        break;
-      }
-    }
-
-    if (isWrapped) {
-      return evaluate(expr.slice(1, -1));
-    }
-  }
-
-  const plusParts = splitTopLevel(expr, "+");
-  if (plusParts.length > 1) {
-    const values = plusParts.map(p => evaluate(p));
-
-    if (values.some(v => typeof v === "string")) {
-      return values.map(v => String(v)).join("");
-    }
-
-    return values.reduce((a, b) => (a as number) + (b as number), 0);
-  }
-
-  const minusParts = splitTopLevel(expr, "-");
-  if (minusParts.length > 1) {
-    const values = minusParts.map(p => evaluate(p));
-    return values.reduce((a, b) => (a as number) - (b as number));
-  }
-
-  const mulParts = splitTopLevel(expr, "*");
-  if (mulParts.length > 1) {
-    const values = mulParts.map(p => evaluate(p));
-    return values.reduce((a, b) => (a as number) * (b as number));
-  }
-
-  const divParts = splitTopLevel(expr, "/");
-  if (divParts.length > 1) {
-    const values = divParts.map(p => evaluate(p));
-    return values.reduce((a, b) => (a as number) / (b as number));
-  }
-
-  return getValue(expr);
+  const tokens = tokenize(expr);
+  const ast = parseExpression(tokens);
+  return evalAST(ast);
 }
 
 function evaluateCondition(cond: string):boolean {
