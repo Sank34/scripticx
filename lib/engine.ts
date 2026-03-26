@@ -34,6 +34,30 @@ export function advanceLine() {
   currentLine++;
 }
 
+function splitTopLevel(expr: string, operator: string): string[] {
+  let result: string[] = [];
+  let current = "";
+  let depth = 0;
+
+  for (let i = 0; i < expr.length; i++) {
+    const char = expr[i];
+
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+
+    if (char === operator && depth === 0) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  if (current) result.push(current);
+
+  return result;
+}
+
 export function parseLine(line: string) {
   line = trim(line);
 
@@ -114,68 +138,59 @@ function getValue(x: string): Value {
   let num = Number(x);
   if (!isNaN(num)) return num;
 
-  throw new Error("Invalid value: " + x);
+  throw new Error(`Variable "${x}" is not defined`);
 }
 
 
-function evaluate(expr: string) {
+function evaluate(expr: string): Value {
   expr = trim(expr);
 
-  if (expr.startsWith('"') && expr.endsWith('"')) {
-    return expr.slice(1, -1);
-  }
+  if (expr.startsWith("(") && expr.endsWith(")")) {
+    let depth = 0;
+    let isWrapped = true;
 
-  if (expr.includes("+")) {
-    let pos = expr.indexOf("+");
+    for (let i = 0; i < expr.length; i++) {
+      if (expr[i] === "(") depth++;
+      if (expr[i] === ")") depth--;
 
-    let left = getValue(expr.substring(0, pos));
-    let right = getValue(expr.substring(pos + 1));
-
-    // string => concatenare
-    if (typeof left === "string" || typeof right === "string") {
-      return String(left) + String(right);
+      if (depth === 0 && i < expr.length - 1) {
+        isWrapped = false;
+        break;
+      }
     }
 
-    return (left as number) + (right as number);
+    if (isWrapped) {
+      return evaluate(expr.slice(1, -1));
+    }
   }
 
-  if (expr.includes("-")) {
-    let pos = expr.indexOf("-");
+  const plusParts = splitTopLevel(expr, "+");
+  if (plusParts.length > 1) {
+    const values = plusParts.map(p => evaluate(p));
 
-    let left = getValue(expr.substring(0, pos));
-    let right = getValue(expr.substring(pos + 1));
-
-    if (typeof left === "number" && typeof right === "number") {
-      return left - right;
+    if (values.some(v => typeof v === "string")) {
+      return values.map(v => String(v)).join("");
     }
 
-    throw new Error(`Invalid types for -: ${typeof left} and ${typeof right}`);
+    return values.reduce((a, b) => (a as number) + (b as number), 0);
   }
 
-  if (expr.includes("*")) {
-    let pos = expr.indexOf("*");
-
-    let left = getValue(expr.substring(0, pos));
-    let right = getValue(expr.substring(pos + 1));
-
-    if (typeof left === "number" && typeof right === "number") {
-      return left * right;
-    }
-
-    throw new Error(`Invalid types for *: ${typeof left} and ${typeof right}`);
+  const minusParts = splitTopLevel(expr, "-");
+  if (minusParts.length > 1) {
+    const values = minusParts.map(p => evaluate(p));
+    return values.reduce((a, b) => (a as number) - (b as number));
   }
 
-  if (expr.includes("/")) {
-    let pos = expr.indexOf("/");
+  const mulParts = splitTopLevel(expr, "*");
+  if (mulParts.length > 1) {
+    const values = mulParts.map(p => evaluate(p));
+    return values.reduce((a, b) => (a as number) * (b as number));
+  }
 
-    let left = getValue(expr.substring(0, pos));
-    let right = getValue(expr.substring(pos + 1));
-
-    if (typeof left === "number" && typeof right === "number") {
-      return left / right;
-    }
-
-    throw new Error(`Invalid types for /: ${typeof left} and ${typeof right}`);
+  const divParts = splitTopLevel(expr, "/");
+  if (divParts.length > 1) {
+    const values = divParts.map(p => evaluate(p));
+    return values.reduce((a, b) => (a as number) / (b as number));
   }
 
   return getValue(expr);
@@ -205,38 +220,38 @@ function evaluateCondition(cond: string):boolean {
   let pos;
   cond = normalizeOperators(cond);
   if ((pos = cond.indexOf(">=")) !== -1) {
-    let left = getValue(cond.substring(0, pos));
-    let right = getValue(cond.substring(pos + 2));
+    let left = evaluate(cond.substring(0, pos));
+    let right = evaluate(cond.substring(pos + 2));
     return left >= right;
   }
 
   if ((pos = cond.indexOf("<=")) !== -1) {
-    let left = getValue(cond.substring(0, pos));
-    let right = getValue(cond.substring(pos + 2));
+    let left = evaluate(cond.substring(0, pos));
+    let right = evaluate(cond.substring(pos + 2));
     return left <= right;
   }
 
   if ((pos = cond.indexOf("==")) !== -1) {
-    let left = getValue(cond.substring(0, pos));
-    let right = getValue(cond.substring(pos + 2));
+    let left = evaluate(cond.substring(0, pos));
+    let right = evaluate(cond.substring(pos + 2));
     return left === right;
   }
 
   if ((pos = cond.indexOf("!=")) !== -1) {
-    let left = getValue(cond.substring(0, pos));
-    let right = getValue(cond.substring(pos + 2));
+    let left = evaluate(cond.substring(0, pos));
+    let right = evaluate(cond.substring(pos + 2));
     return left !== right;
   }
 
   if ((pos = cond.indexOf(">")) !== -1) {
-    let left = getValue(cond.substring(0, pos));
-    let right = getValue(cond.substring(pos + 1));
+    let left = evaluate(cond.substring(0, pos));
+    let right = evaluate(cond.substring(pos + 1));
     return left > right;
   }
 
   if ((pos = cond.indexOf("<")) !== -1) {
-    let left = getValue(cond.substring(0, pos));
-    let right = getValue(cond.substring(pos + 1));
+    let left = evaluate(cond.substring(0, pos));
+    let right = evaluate(cond.substring(pos + 1));
     return left < right;
   }
 
@@ -244,6 +259,17 @@ function evaluateCondition(cond: string):boolean {
 }
 export function step(program: any[]): StepResult {
   if (currentLine >= program.length) return null;
+
+  let steps = 0;
+  const MAX_STEPS = 1000;
+
+  steps++;
+  if (steps > MAX_STEPS) {
+    throw {
+      message: "Possible infinite loop detected",
+      line: currentLine + 1
+    };
+  }
 
   let inst = program[currentLine];
   let output: any = null;
@@ -263,7 +289,7 @@ export function step(program: any[]): StepResult {
     } catch (e: any) {
       throw {
         message: e.message,
-        line: currentLine
+        line: currentLine+1
       };
     }
   } 
@@ -275,7 +301,7 @@ export function step(program: any[]): StepResult {
     } catch (e: any) {
       throw {
         message: e.message,
-        line: currentLine
+        line: currentLine+1
       };
     }
   }
