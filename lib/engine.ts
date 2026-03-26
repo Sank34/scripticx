@@ -9,16 +9,20 @@ type ASTNode =
   | { type: "number"; value: number }
   | { type: "string"; value: string }
   | { type: "variable"; name: string }
-  | { type: "binary"; operator: string; left: ASTNode; right: ASTNode };
+  | { type: "binary"; operator: string; left: ASTNode; right: ASTNode }
+  | { type: "unary"; operator: string; value: ASTNode };
 
 type Value = string | number | boolean;
 
 let variables: Record<string, Value> = {};
 let currentLine = 0;
+let steps = 0;
+const MAX_STEPS = 1000;
 
 export function reset() {
   variables = {};
   currentLine = 0;
+  steps = 0;
 }
 
 function trim(str: string) {
@@ -26,10 +30,7 @@ function trim(str: string) {
 }
 
 function normalizeOperators(str: string) {
-  //since the font convers "<=" to the character ≤ we'll need to convert it (normalize)
-  return str
-    .replace(/≤/g, "<=")
-    .replace(/≥/g, ">=");
+  return str.replace(/≤/g, "<=").replace(/≥/g, ">=");
 }
 
 export function setVariable(name: string, value: Value) {
@@ -40,47 +41,71 @@ export function advanceLine() {
   currentLine++;
 }
 
-function splitTopLevel(expr: string, operator: string): string[] {
-  let result: string[] = [];
-  let current = "";
-  let depth = 0;
-
-  for (let i = 0; i < expr.length; i++) {
-    const char = expr[i];
-
-    if (char === "(") depth++;
-    if (char === ")") depth--;
-
-    if (char === operator && depth === 0) {
-      result.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  if (current) result.push(current);
-
-  return result;
-}
-
 function tokenize(expr: string): string[] {
   const tokens: string[] = [];
-  let current = "";
+  let i = 0;
 
-  for (let i = 0; i < expr.length; i++) {
-    const c = expr[i];
+  while (i < expr.length) {
+    let c = expr[i];
 
-    if ("+-*/()".includes(c)) {
-      if (current.trim()) tokens.push(current.trim());
-      tokens.push(c);
-      current = "";
-    } else {
-      current += c;
+    if (c === " ") {
+      i++;
+      continue;
     }
-  }
 
-  if (current.trim()) tokens.push(current.trim());
+    if (i + 1 < expr.length) {
+      const two = c + expr[i + 1];
+      if (["<=", ">=", "==", "!="].includes(two)) {
+        tokens.push(two);
+        i += 2;
+        continue;
+      }
+    }
+
+    if ("+-*/()<>".includes(c)) {
+      tokens.push(c);
+      i++;
+      continue;
+    }
+
+    if (c === '"') {
+      let str = '"';
+      i++;
+
+      while (i < expr.length && expr[i] !== '"') {
+        str += expr[i];
+        i++;
+      }
+
+      str += '"';
+      i++;
+
+      tokens.push(str);
+      continue;
+    }
+
+    if (/[0-9]/.test(c)) {
+      let num = "";
+      while (i < expr.length && /[0-9]/.test(expr[i])) {
+        num += expr[i];
+        i++;
+      }
+      tokens.push(num);
+      continue;
+    }
+
+    if (/[a-zA-Z_]/.test(c)) {
+      let word = "";
+      while (i < expr.length && /[a-zA-Z0-9_]/.test(expr[i])) {
+        word += expr[i];
+        i++;
+      }
+      tokens.push(word);
+      continue;
+    }
+
+    i++;
+  }
 
   return tokens;
 }
@@ -89,13 +114,23 @@ function parseExpression(tokens: string[]): ASTNode {
   let pos = 0;
 
   function parsePrimary(): ASTNode {
-    const token = tokens[pos++];
+    const token = tokens[pos];
 
     if (token === "(") {
-      const node = parseAddSub();
-      pos++; // skip )
+      pos++; // consumă (
+
+      const node = parseOr();
+
+      if (tokens[pos] !== ")") {
+        throw new Error("Missing closing parenthesis");
+      }
+
+      pos++; // consumă )
+
       return node;
     }
+
+    pos++;
 
     if (!isNaN(Number(token))) {
       return { type: "number", value: Number(token) };
@@ -108,12 +143,24 @@ function parseExpression(tokens: string[]): ASTNode {
     return { type: "variable", name: token };
   }
 
+  function parseUnary(): ASTNode {
+    if (tokens[pos] === "NOT") {
+      pos++;
+      return {
+        type: "unary",
+        operator: "NOT",
+        value: parseUnary(),
+      };
+    }
+    return parsePrimary();
+  }
+
   function parseMulDiv(): ASTNode {
-    let node = parsePrimary();
+    let node = parseUnary();
 
     while (tokens[pos] === "*" || tokens[pos] === "/") {
       const op = tokens[pos++];
-      const right = parsePrimary();
+      const right = parseUnary();
       node = { type: "binary", operator: op, left: node, right };
     }
 
@@ -132,7 +179,45 @@ function parseExpression(tokens: string[]): ASTNode {
     return node;
   }
 
-  return parseAddSub();
+  function parseComparison(): ASTNode {
+    let node = parseAddSub();
+
+    while (
+      ["<", ">", "<=", ">=", "==", "!="].includes(tokens[pos])
+    ) {
+      const op = tokens[pos++];
+      const right = parseAddSub();
+      node = { type: "binary", operator: op, left: node, right };
+    }
+
+    return node;
+  }
+
+  function parseAnd(): ASTNode {
+    let node = parseComparison();
+
+    while (tokens[pos] === "AND") {
+      const op = tokens[pos++];
+      const right = parseComparison();
+      node = { type: "binary", operator: op, left: node, right };
+    }
+
+    return node;
+  }
+
+  function parseOr(): ASTNode {
+    let node = parseAnd();
+
+    while (tokens[pos] === "OR") {
+      const op = tokens[pos++];
+      const right = parseAnd();
+      node = { type: "binary", operator: op, left: node, right };
+    }
+
+    return node;
+  }
+
+  return parseOr();
 }
 
 function evalAST(node: ASTNode): Value {
@@ -146,82 +231,107 @@ function evalAST(node: ASTNode): Value {
     throw new Error(`Variable "${node.name}" is not defined`);
   }
 
-  const left = evalAST(node.left);
-  const right = evalAST(node.right);
-
-  switch (node.operator) {
-    case "+":
-      if (typeof left === "string" || typeof right === "string") {
-        return String(left) + String(right);
-      }
-      return (left as number) + (right as number);
-
-    case "-":
-      return (left as number) - (right as number);
-
-    case "*":
-      return (left as number) * (right as number);
-
-    case "/":
-      return (left as number) / (right as number);
+  if (node.type === "unary") {
+    const val = evalAST(node.value);
+    if (node.operator === "NOT") return !val;
   }
 
-  throw new Error("Unknown operator");
+  if (node.type === "binary") {
+    console.log("EVAL:", node.operator, node.left, node.right);
+    const left = evalAST(node.left);
+    const right = evalAST(node.right);
+
+    switch (node.operator) {
+      case "+":
+        if (typeof left === "string" || typeof right === "string") {
+          return String(left) + String(right);
+        }
+        return (left as number) + (right as number);
+
+      case "-":
+        return (left as number) - (right as number);
+
+      case "*":
+        return (left as number) * (right as number);
+
+      case "/":
+        return (left as number) / (right as number);
+
+      case ">":
+        return left > right;
+
+      case "<":
+        return left < right;
+
+      case ">=":
+        return left >= right;
+
+      case "<=":
+        return left <= right;
+
+      case "==":
+        return left === right;
+
+      case "!=":
+        return left !== right;
+
+      case "AND":
+        return Boolean(left) && Boolean(right);
+
+      case "OR":
+        return Boolean(left) || Boolean(right);
+    }
+  }
+
+  throw new Error("Unknown expression");
 }
 
 export function parseLine(line: string) {
   line = trim(line);
+  line = line.replace(":", "");
 
-  if (line.trim().startsWith("#")) {
-    return { type: "EMPTY" };
-  }
+  if (line.startsWith("#")) return { type: "EMPTY" };
 
   if (line.includes("#")) {
     line = line.split("#")[0].trim();
   }
 
-  if (line === "") {
-    return { type: "EMPTY" };
-  }
+  if (line === "") return { type: "EMPTY" };
 
   let inst: any = {
     type: "",
     var: "",
     value: "",
-    condition: ""
+    condition: "",
   };
 
   if (line.startsWith("PRINT ")) {
     inst.type = "PRINT";
     inst.value = trim(line.substring(6));
-  }
-  else if (line.startsWith("IF ")) {
+  } else if (line.startsWith("IF ")) {
     inst.type = "IF";
-
-    let condition = line.substring(3).trim();
-    condition = condition.replace("THEN", "").trim();
-
+    if (!line.includes("THEN")) {
+      // throw new Error("Missing THEN in IF statement");
+      return {
+        type: "ERROR",
+        message: "Missing THEN in IF statement"
+      }
+    }
+    let condition = line.substring(3, line.indexOf("THEN")).trim();
     inst.condition = normalizeOperators(condition);
-  }
-  else if (line.startsWith("WHILE ")) {
+  } else if (line.startsWith("WHILE ")) {
     inst.type = "WHILE";
     inst.condition = normalizeOperators(trim(line.substring(6)));
-  }
-  else if (line === "ELSE") {
+  } else if (line === "ELSE") {
     inst.type = "ELSE";
-  }
-  else if (line === "END") {
+  } else if (line === "END") {
     inst.type = "END";
-  }
-  else if (line.startsWith("INPUT ")) {
+  } else if (line.startsWith("INPUT ")) {
     inst.type = "INPUT";
     inst.var = trim(line.substring(6));
-  }
-  else if (line.includes("=")) {
+  } else if (line.includes("=")) {
     inst.type = "ASSIGN";
-
     let eqPos = line.indexOf("=");
-
     inst.var = trim(line.substring(0, eqPos));
     inst.value = trim(line.substring(eqPos + 1));
   }
@@ -229,196 +339,83 @@ export function parseLine(line: string) {
   return inst;
 }
 
-
-function getValue(x: string): Value {
-  x = trim(x);
-
-  // variable
-  if (variables.hasOwnProperty(x)) return variables[x];
-
-  // boolean
-  if (x === "true") return true;
-  if (x === "false") return false;
-
-  // string
-  if (x.startsWith('"') && x.endsWith('"')) {
-    return x.slice(1, -1);
-  }
-
-  // number
-  let num = Number(x);
-  if (!isNaN(num)) return num;
-
-  throw new Error(`Variable "${x}" is not defined`);
-}
-
-
 function evaluate(expr: string): Value {
   const tokens = tokenize(expr);
   const ast = parseExpression(tokens);
   return evalAST(ast);
 }
 
-function evaluateCondition(cond: string):boolean {
-  cond = trim(cond);
-
-  // logical operators
-
-  if (cond.startsWith("NOT ")) {
-    return !evaluateCondition(cond.substring(4));
-  }
-
-  if (cond.includes(" AND ")) {
-    let parts = cond.split(" AND ");
-
-    return parts.every(part => evaluateCondition(part));
-  }
-
-  if (cond.includes(" OR ")) {
-    let parts = cond.split(" OR ");
-
-    return parts.some(part => evaluateCondition(part));
-  }
-
-  let pos;
-  cond = normalizeOperators(cond);
-  if ((pos = cond.indexOf(">=")) !== -1) {
-    let left = evaluate(cond.substring(0, pos));
-    let right = evaluate(cond.substring(pos + 2));
-    return left >= right;
-  }
-
-  if ((pos = cond.indexOf("<=")) !== -1) {
-    let left = evaluate(cond.substring(0, pos));
-    let right = evaluate(cond.substring(pos + 2));
-    return left <= right;
-  }
-
-  if ((pos = cond.indexOf("==")) !== -1) {
-    let left = evaluate(cond.substring(0, pos));
-    let right = evaluate(cond.substring(pos + 2));
-    return left === right;
-  }
-
-  if ((pos = cond.indexOf("!=")) !== -1) {
-    let left = evaluate(cond.substring(0, pos));
-    let right = evaluate(cond.substring(pos + 2));
-    return left !== right;
-  }
-
-  if ((pos = cond.indexOf(">")) !== -1) {
-    let left = evaluate(cond.substring(0, pos));
-    let right = evaluate(cond.substring(pos + 1));
-    return left > right;
-  }
-
-  if ((pos = cond.indexOf("<")) !== -1) {
-    let left = evaluate(cond.substring(0, pos));
-    let right = evaluate(cond.substring(pos + 1));
-    return left < right;
-  }
-
-  return false;
+function evaluateCondition(cond: string): boolean {
+  return Boolean(evaluate(cond));
 }
+
 export function step(program: any[]): StepResult {
   if (currentLine >= program.length) return null;
-
-  let steps = 0;
-  const MAX_STEPS = 1000;
 
   steps++;
   if (steps > MAX_STEPS) {
     throw {
       message: "Possible infinite loop detected",
-      line: currentLine + 1
+      line: currentLine + 1,
     };
   }
 
   let inst = program[currentLine];
   let output: any = null;
 
+  if (inst.type === "ERROR") {
+    throw {
+      message: inst.message,
+      line: currentLine
+    };
+  }
   if (inst.type === "EMPTY") {
     currentLine++;
-
-    return {
-      output: null,
-      variables: { ...variables },
-      currentLine
-    };
-  } 
-  else if (inst.type === "ASSIGN") {
+    return { output: null, variables: { ...variables }, currentLine };
+  } else if (inst.type === "ASSIGN") {
     try {
       variables[inst.var] = evaluate(inst.value);
     } catch (e: any) {
-      throw {
-        message: e.message,
-        line: currentLine+1
-      };
+      throw { message: e.message, line: currentLine + 1 };
     }
-  } 
-  else if (inst.type === "PRINT") {
-    let val = trim(inst.value);
-
+  } else if (inst.type === "PRINT") {
     try {
-      output = evaluate(val);
+      output = evaluate(inst.value);
     } catch (e: any) {
-      throw {
-        message: e.message,
-        line: currentLine+1
-      };
+      throw { message: e.message, line: currentLine + 1 };
     }
-  }
-
-  else if (inst.type === "IF") {
-    let res = evaluateCondition(inst.condition);
-
-    if (!res) {
+  } else if (inst.type === "IF") {
+    if (!evaluateCondition(inst.condition)) {
       let depth = 1;
-
       while (depth > 0) {
         currentLine++;
-
         if (program[currentLine].type === "IF") depth++;
         if (program[currentLine].type === "END") depth--;
-
-        if (depth === 1 && program[currentLine].type === "ELSE") {
-          break;
-        }
+        if (depth === 1 && program[currentLine].type === "ELSE") break;
       }
     }
-  }
-  else if (inst.type === "ELSE") {
+  } else if (inst.type === "ELSE") {
     let depth = 1;
-
     while (depth > 0) {
       currentLine++;
-
       if (program[currentLine].type === "IF") depth++;
       if (program[currentLine].type === "END") depth--;
     }
-  }
-  else if (inst.type === "WHILE") {
-    let res = evaluateCondition(inst.condition);
-
-    if (!res) {
+  } else if (inst.type === "WHILE") {
+    if (!evaluateCondition(inst.condition)) {
       let depth = 1;
-
       while (depth > 0) {
         currentLine++;
-
         if (program[currentLine].type === "WHILE") depth++;
         if (program[currentLine].type === "END") depth--;
       }
     }
-  }
-
-  else if (inst.type === "END") {
+  } else if (inst.type === "END") {
     let depth = 1;
     let temp = currentLine;
 
     while (temp > 0) {
       temp--;
-
       if (program[temp].type === "END") depth++;
       else if (program[temp].type === "WHILE") depth--;
 
@@ -435,15 +432,11 @@ export function step(program: any[]): StepResult {
       output: null,
       variables: { ...variables },
       currentLine,
-      inputRequest: inst.var
+      inputRequest: inst.var,
     };
   }
 
   currentLine++;
 
-  return {
-    output,
-    variables: { ...variables },
-    currentLine
-  };
+  return { output, variables: { ...variables }, currentLine };
 }

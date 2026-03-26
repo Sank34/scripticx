@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Navbar } from "@/components/navbar";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,9 +21,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html
       lang="en"
@@ -30,7 +31,10 @@ export default function RootLayout({
     >
       <body className={`${geistSans.className} min-h-full flex flex-col`}>
         <Navbar />
+
         <main className="flex-1">{children}</main>
+
+        <Toaster position="bottom-right" richColors />
       </body>
     </html>
   );

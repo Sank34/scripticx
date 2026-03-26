@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 type Value = string | number | boolean;
 
@@ -141,6 +142,26 @@ END`);
     setIsRunning(true);
     runProgram();
   }
+  function handleSave() {
+    try {
+      const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "solution.msp";
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+
+      toast.success("Saved file!");
+    } catch (e) {
+      toast.error("Failed to save file");
+    }
+  }
 
   return (
     <div className="p-6 grid grid-cols-3 gap-6">
@@ -179,6 +200,7 @@ END`);
             <Button onClick={compile} variant="secondary">Compile</Button>
             <Button onClick={handleStep} disabled={stopped}>Step</Button>
             <Button onClick={handleRun} disabled={stopped}>Run</Button>
+            <Button onClick={handleSave} variant="outline">Save .msp</Button>
           </div>
 
         </CardContent>
