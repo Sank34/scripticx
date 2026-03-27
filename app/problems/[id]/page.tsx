@@ -2,35 +2,21 @@
 
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
-import { parseLine, step, reset } from "@/lib/engine";
-import { setVariable, advanceLine } from "@/lib/engine";
+import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
 import { useParams } from "next/navigation";
 import Editor, { useMonaco } from "@monaco-editor/react";
-import { AuthGuard } from "@/components/AuthGuard";
+import RouteGuard from "@/components/RouteGuard";
+import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, X } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 
-function ProblemContent({ user }: any) {
-
-  useEffect(() => {
-    const handler = (e: any) => {
-      if (e?.reason?.type === "cancelation") {
-        e.preventDefault();
-      }
-    };
-
-    window.addEventListener("unhandledrejection", handler);
-
-    return () => {
-      window.removeEventListener("unhandledrejection", handler);
-    };
-  }, []);
+function ProblemContent() {
+  const { user } = useAuth();
+  const { role } = useUserRole(user);
 
   const params = useParams();
   const id = params?.id;
-
-  const { role } = useUserRole(user);
 
   const [problem, setProblem] = useState<any>(null);
   const [code, setCode] = useState("");
@@ -42,13 +28,13 @@ function ProblemContent({ user }: any) {
     if (!id || typeof id !== "string") return;
 
     async function fetchProblem() {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("problems")
         .select("*")
         .eq("id", id)
         .single();
 
-      if (!error && data) {
+      if (data) {
         setProblem(data);
         setCode(data.starter_code);
       }
@@ -60,14 +46,9 @@ function ProblemContent({ user }: any) {
   }, [id]);
 
   async function runCode() {
-    if (!problem) return;
+    if (!problem || !user) return;
 
-    let results: {
-      passed: boolean;
-      expected: string;
-      got: string;
-      input: any;
-    }[] = [];
+    let results: any[] = [];
 
     for (const test of problem.test_cases) {
       let program;
@@ -75,16 +56,8 @@ function ProblemContent({ user }: any) {
       try {
         program = code.split("\n").map(parseLine);
       } catch (e: any) {
-        const msg = e?.message || JSON.stringify(e);
-        setResult(`ERROR: ${msg}`);
+        setResult(`ERROR: ${e.message}`);
         return;
-      }
-
-      for (let i = 0; i < program.length; i++) {
-        if (program[i].type === "ERROR") {
-          setResult(`ERROR (line ${i + 1}): ${program[i].message}`);
-          return;
-        }
       }
 
       reset();
@@ -111,11 +84,7 @@ function ProblemContent({ user }: any) {
           }
         }
       } catch (e: any) {
-        let msg = e?.message || JSON.stringify(e);
-
-        out.push(
-          `ERROR${e?.line ? ` (line ${e.line})` : ""}: ${msg}`
-        );
+        out.push(`ERROR: ${e.message}`);
       }
 
       const normalize = (str: string) =>
@@ -150,7 +119,7 @@ function ProblemContent({ user }: any) {
         ? Math.max(...previous.map((s) => s.score))
         : 0;
 
-    const { error } = await supabase.from("submissions").insert([
+    await supabase.from("submissions").insert([
       {
         user_id: user.id,
         problem_id: id,
@@ -158,11 +127,6 @@ function ProblemContent({ user }: any) {
         score,
       },
     ]);
-
-    if (error) {
-      console.error("Supabase error:", error);
-      return;
-    }
 
     if (score > bestPrevious) {
       const diff = score - bestPrevious;
@@ -220,7 +184,6 @@ function ProblemContent({ user }: any) {
       ],
       colors: {},
     });
-
   }, [monaco]);
 
   if (!id || typeof id !== "string" || loading) {
@@ -239,13 +202,11 @@ function ProblemContent({ user }: any) {
   return (
     <div className="h-[calc(100vh-80px)] flex">
 
-      {/* LEFT */}
       <div className="w-1/2 border-r p-6">
         <h1 className="text-2xl font-bold">{problem.title}</h1>
         <p className="text-muted-foreground">{problem.description}</p>
       </div>
 
-      {/* RIGHT */}
       <div className="w-1/2 p-6 flex flex-col gap-4">
 
         <div className="flex-1 border rounded overflow-hidden">
@@ -255,12 +216,6 @@ function ProblemContent({ user }: any) {
             theme="miniscriptplusTheme"
             value={code}
             onChange={(value) => setCode(value || "")}
-            options={{
-              minimap: { enabled: false },
-              automaticLayout: true,
-              quickSuggestions: false,
-              suggestOnTriggerCharacters: false,
-            }}
           />
         </div>
 
@@ -273,7 +228,6 @@ function ProblemContent({ user }: any) {
 
         {result && <div className="font-bold">{result}</div>}
 
-        {/* TEST RESULTS */}
         <div className="space-y-3">
           {testResults.map((r, i) => (
             <div
@@ -282,33 +236,24 @@ function ProblemContent({ user }: any) {
                 r.passed ? "border-green-500" : "border-red-500"
               }`}
             >
-              <div className="flex justify-between items-center">
-                <p className="font-semibold">Test #{i + 1}</p>
-
-                {r.passed ? (
-                  <Check className="text-green-500" size={20} />
-                ) : (
-                  <X className="text-red-500" size={20} />
-                )}
+              <div className="flex justify-between">
+                <p>Test #{i + 1}</p>
+                {r.passed ? <Check /> : <X />}
               </div>
 
-              <p className="text-sm mt-2">
-                Input: {JSON.stringify(r.input)}
-              </p>
+              <div className="text-sm mt-2">
+                <p>Input: {JSON.stringify(r.input)}</p>
 
-              {role === "admin" && !r.passed && (
-                <>
-                  <p className="text-sm mt-2 font-medium">Expected:</p>
-                  <pre className="bg-muted p-2 rounded text-sm whitespace-pre-wrap">
-                    {r.expected}
-                  </pre>
+                {!r.passed && (
+                  <>
+                    <p className="mt-2 font-medium">Expected:</p>
+                    <pre className="bg-muted p-2 rounded">{r.expected}</pre>
 
-                  <p className="text-sm mt-2 font-medium">Got:</p>
-                  <pre className="bg-muted p-2 rounded text-sm whitespace-pre-wrap">
-                    {r.got}
-                  </pre>
-                </>
-              )}
+                    <p className="mt-2 font-medium">Got:</p>
+                    <pre className="bg-muted p-2 rounded">{r.got}</pre>
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -320,8 +265,8 @@ function ProblemContent({ user }: any) {
 
 export default function ProblemPage() {
   return (
-    <AuthGuard>
-      {(user: any) => <ProblemContent user={user} />}
-    </AuthGuard>
+    <RouteGuard requireAuth>
+      <ProblemContent />
+    </RouteGuard>
   );
 }

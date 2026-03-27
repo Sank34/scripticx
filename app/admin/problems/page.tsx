@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { AuthGuard } from "@/components/AuthGuard";
-import { useUserRole } from "@/hooks/useUserRole";
+import RouteGuard from "@/components/RouteGuard";
 import { useRouter } from "next/navigation";
 
 import {
@@ -36,9 +35,8 @@ import { ProblemForm } from "@/components/admin/ProblemForm";
 
 import { toast } from "sonner";
 
-function AdminProblemsContent({ user }: any) {
+function AdminProblemsContent() {
   const router = useRouter();
-  const { role, loading: roleLoading } = useUserRole(user);
 
   const [problems, setProblems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,16 +77,9 @@ function AdminProblemsContent({ user }: any) {
     toast.success("Problem deleted");
   }
 
-  if (roleLoading) return <div className="p-6">Loading...</div>;
-
-  if (role !== "admin") {
-    return <div className="p-6">Not authorized</div>;
-  }
-
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
 
-      {/* HEADER + CREATE */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Manage Problems</h1>
 
@@ -97,7 +88,6 @@ function AdminProblemsContent({ user }: any) {
         </Button>
       </div>
 
-      {/* LIST */}
       <div className="space-y-4">
 
         {loading &&
@@ -119,7 +109,6 @@ function AdminProblemsContent({ user }: any) {
 
                 <div className="flex gap-2">
 
-                  {/* EDIT */}
                   <Button
                     variant="outline"
                     onClick={() => router.push(`/admin/problems/${p.id}`)}
@@ -127,7 +116,6 @@ function AdminProblemsContent({ user }: any) {
                     Edit
                   </Button>
 
-                  {/* DELETE */}
                   <Button
                     variant="destructive"
                     onClick={() => setDeleteId(p.id)}
@@ -143,7 +131,6 @@ function AdminProblemsContent({ user }: any) {
 
       </div>
 
-      {/* DELETE CONFIRM */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -162,7 +149,6 @@ function AdminProblemsContent({ user }: any) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* CREATE MODAL */}
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -184,8 +170,8 @@ function AdminProblemsContent({ user }: any) {
 
 export default function AdminProblemsPage() {
   return (
-    <AuthGuard>
-      {(user: any) => <AdminProblemsContent user={user} />}
-    </AuthGuard>
+    <RouteGuard requireAuth requireAdmin>
+      <AdminProblemsContent />
+    </RouteGuard>
   );
 }

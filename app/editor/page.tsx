@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import RouteGuard from "@/components/RouteGuard";
+
 import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +15,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 
 type Value = string | number | boolean;
 
-export default function Home() {
+function EditorContent() {
   const [code, setCode] = useState(`X = 0
 WHILE X < 3
 PRINT X
@@ -143,6 +145,7 @@ END`);
     setIsRunning(true);
     runProgram();
   }
+
   function handleSave() {
     try {
       const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
@@ -168,7 +171,6 @@ END`);
     <PageContainer variant="full">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-        {/* EDITOR */}
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>MiniScript+ Editor</CardTitle>
@@ -182,7 +184,6 @@ END`);
               className="font-mono h-[200px]"
             />
 
-            {/* CODE PREVIEW */}
             <div className="bg-slate-900 text-white rounded-md p-3 font-mono text-sm">
               {codeLines.map((line, index) => (
                 <div
@@ -197,7 +198,6 @@ END`);
               ))}
             </div>
 
-            {/* BUTTONS */}
             <div className="flex gap-2">
               <Button onClick={compile} variant="secondary">Compile</Button>
               <Button onClick={handleStep} disabled={stopped}>Step</Button>
@@ -208,7 +208,6 @@ END`);
           </CardContent>
         </Card>
 
-        {/* SIDEBAR */}
         <Card>
           <CardHeader>
             <CardTitle>Debugger</CardTitle>
@@ -216,7 +215,6 @@ END`);
 
           <CardContent className="space-y-4">
 
-            {/* VARIABLES */}
             <div>
               <h3 className="font-semibold mb-1">Variables</h3>
               <pre className="text-sm bg-muted p-2 rounded whitespace-pre-wrap break-words">
@@ -224,13 +222,11 @@ END`);
               </pre>
             </div>
 
-            {/* CURRENT LINE */}
             <div>
               <h3 className="font-semibold">Current Line</h3>
               <p>{currentLine}</p>
             </div>
 
-            {/* OUTPUT */}
             <div>
               <h3 className="font-semibold mb-1">Output</h3>
               <pre className="text-sm bg-muted p-2 rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
@@ -238,7 +234,6 @@ END`);
               </pre>
             </div>
 
-            {/* INPUT UI */}
             {inputVar && (
               <div className="space-y-2">
                 <p className="font-medium">Enter value for {inputVar}:</p>
@@ -259,5 +254,13 @@ END`);
 
       </div>
     </PageContainer>
+  );
+}
+
+export default function EditorPage() {
+  return (
+    <RouteGuard requireAuth>
+      <EditorContent />
+    </RouteGuard>
   );
 }

@@ -1,0 +1,41 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+
+export default function RouteGuard({
+  children,
+  requireAuth,
+  requireAdmin,
+}: {
+  children: React.ReactNode;
+  requireAuth?: boolean;
+  requireAdmin?: boolean;
+}) {
+  const { user, loading, isAdmin, isBanned } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (isBanned) {
+      router.push("/banned");
+      return;
+    }
+
+    if (requireAuth && !user) {
+      router.push("/login");
+      return;
+    }
+
+    if (requireAdmin && !isAdmin) {
+      router.push("/");
+      return;
+    }
+  }, [user, loading, isAdmin, isBanned, requireAuth, requireAdmin, router]);
+
+  if (loading) return null;
+
+  return children;
+}

@@ -39,6 +39,7 @@ export default async function PublicProfile({
   params: Promise<{ username: string }>;
 }) {
   const supabase = createServerSupabase();
+
   const { username } = await params;
 
   const { data: profile } = await supabase
@@ -134,23 +135,29 @@ export default async function PublicProfile({
 
             <div className="flex gap-4 text-sm flex-wrap">
               {profile.github && (
-                <a href={normalizeUrl(profile.github)} target="_blank" className="flex items-center gap-1">
-                  <BrandIcon icon={siGithub} />
-                  GitHub
+                <a href={normalizeUrl(profile.github)} target="_blank" rel="noopener noreferrer">
+                  <span className="flex items-center gap-1">
+                    <BrandIcon icon={siGithub} />
+                    GitHub
+                  </span>
                 </a>
               )}
 
               {profile.twitter && (
-                <a href={normalizeUrl(profile.twitter)} target="_blank" className="flex items-center gap-1">
-                  <BrandIcon icon={siX} />
-                  X
+                <a href={normalizeUrl(profile.twitter)} target="_blank" rel="noopener noreferrer">
+                  <span className="flex items-center gap-1">
+                    <BrandIcon icon={siX} />
+                    X
+                  </span>
                 </a>
               )}
 
               {profile.website && (
-                <a href={normalizeUrl(profile.website)} target="_blank" className="flex items-center gap-1">
-                  <Globe size={16} />
-                  Website
+                <a href={normalizeUrl(profile.website)} target="_blank" rel="noopener noreferrer">
+                  <span className="flex items-center gap-1">
+                    <Globe size={16} />
+                    Website
+                  </span>
                 </a>
               )}
             </div>

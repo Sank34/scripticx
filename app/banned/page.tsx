@@ -18,7 +18,7 @@ export default function BannedPage() {
       const user = data.session?.user;
 
       if (!user) {
-        router.push("/login");
+        router.replace("/login");
         return;
       }
 
@@ -29,7 +29,7 @@ export default function BannedPage() {
         .single();
 
       if (!profile?.banned) {
-        router.push("/");
+        router.replace("/");
         return;
       }
 
@@ -62,10 +62,6 @@ export default function BannedPage() {
 
           <p className="text-sm text-muted-foreground">
             Your account has been banned from using the platform.
-          </p>
-
-          <p className="text-xs text-muted-foreground">
-            If you believe this is a mistake, please contact support.
           </p>
 
           <Button

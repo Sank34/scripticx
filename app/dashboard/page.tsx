@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { AuthGuard } from "@/components/AuthGuard";
+import RouteGuard from "@/components/RouteGuard";
+import { useAuth } from "@/hooks/useAuth";
 import { Flame, Trophy, Activity } from "lucide-react";
 
 import {
@@ -20,7 +21,9 @@ import {
   AvatarFallback,
 } from "@/components/ui/avatar";
 
-function DashboardContent({ user }: any) {
+function DashboardContent() {
+  const { user } = useAuth();
+
   const [loading, setLoading] = useState(true);
 
   const [stats, setStats] = useState({
@@ -34,6 +37,8 @@ function DashboardContent({ user }: any) {
   const [feed, setFeed] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!user) return;
+
     async function fetchData() {
       const { data } = await supabase
         .from("submissions")
@@ -128,7 +133,7 @@ function DashboardContent({ user }: any) {
     fetchData();
   }, [user]);
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-40" />
@@ -365,8 +370,8 @@ function DashboardContent({ user }: any) {
 
 export default function DashboardPage() {
   return (
-    <AuthGuard>
-      {(user: any) => <DashboardContent user={user} />}
-    </AuthGuard>
+    <RouteGuard requireAuth>
+      <DashboardContent />
+    </RouteGuard>
   );
 }

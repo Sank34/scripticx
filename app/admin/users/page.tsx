@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import RouteGuard from "@/components/RouteGuard";
 import Link from "next/link";
 
 import {
@@ -40,39 +40,13 @@ import {
   AlertDialogFooter,
 } from "@/components/ui/alert-dialog";
 
-export default function AdminUsersPage() {
+function AdminUsersContent() {
   const [users, setUsers] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(false);
 
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  const router = useRouter();
-
-  async function checkAdmin() {
-    const { data } = await supabase.auth.getSession();
-    const user = data.session?.user;
-
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      router.push("/");
-      return;
-    }
-
-    setAllowed(true);
-  }
 
   async function fetchUsers() {
     const { data } = await supabase
@@ -121,14 +95,8 @@ export default function AdminUsersPage() {
   }
 
   useEffect(() => {
-    checkAdmin();
+    fetchUsers();
   }, []);
-
-  useEffect(() => {
-    if (allowed) {
-      fetchUsers();
-    }
-  }, [allowed]);
 
   useEffect(() => {
     const q = search.toLowerCase();
@@ -140,7 +108,7 @@ export default function AdminUsersPage() {
     );
   }, [search, users]);
 
-  if (!allowed || loading) {
+  if (loading) {
     return <div className="p-6">Loading...</div>;
   }
 
@@ -270,5 +238,13 @@ export default function AdminUsersPage() {
       </AlertDialog>
 
     </div>
+  );
+}
+
+export default function AdminUsersPage() {
+  return (
+    <RouteGuard requireAuth requireAdmin>
+      <AdminUsersContent />
+    </RouteGuard>
   );
 }

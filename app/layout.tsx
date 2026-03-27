@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import ProtectedLayout from "@/components/ProtectedLayout";
 import "./globals.css";
 import { Toaster } from "sonner";
 import MobileNav from "@/components/MobileNav";
@@ -40,9 +39,7 @@ export default function RootLayout({
             <AppSidebar />
 
             <main className="flex-1 w-full pb-16 md:pb-0">
-              <ProtectedLayout>
-                {children}
-              </ProtectedLayout>
+              {children}
             </main>
 
           </div>

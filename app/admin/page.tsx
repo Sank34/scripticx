@@ -1,7 +1,6 @@
 "use client";
 
-import { AuthGuard } from "@/components/AuthGuard";
-import { useUserRole } from "@/hooks/useUserRole";
+import RouteGuard from "@/components/RouteGuard";
 import { useRouter } from "next/navigation";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,15 +8,8 @@ import { Button } from "@/components/ui/button";
 
 import { Users, FileText } from "lucide-react";
 
-function AdminContent({ user }: any) {
-  const { role, loading } = useUserRole(user);
+function AdminContent() {
   const router = useRouter();
-
-  if (loading) return <div className="p-6">Loading...</div>;
-
-  if (role !== "admin") {
-    return <div className="p-6">Not authorized</div>;
-  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -72,8 +64,8 @@ function AdminContent({ user }: any) {
 
 export default function AdminPage() {
   return (
-    <AuthGuard>
-      {(user: any) => <AdminContent user={user} />}
-    </AuthGuard>
+    <RouteGuard requireAuth requireAdmin>
+      <AdminContent />
+    </RouteGuard>
   );
 }

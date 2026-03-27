@@ -3,14 +3,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useParams, useRouter } from "next/navigation";
-import { AuthGuard } from "@/components/AuthGuard";
-import { useUserRole } from "@/hooks/useUserRole";
+import RouteGuard from "@/components/RouteGuard";
 import { ProblemForm } from "@/components/admin/ProblemForm";
 import { Skeleton } from "@/components/ui/skeleton";
 
-function EditProblemContent({ user }: any) {
-  const { role, loading: roleLoading } = useUserRole(user);
-
+function EditProblemContent() {
   const params = useParams();
   const router = useRouter();
 
@@ -33,12 +30,6 @@ function EditProblemContent({ user }: any) {
 
     if (id) fetchProblem();
   }, [id]);
-
-  if (roleLoading) return <div className="p-6">Loading...</div>;
-
-  if (role !== "admin") {
-    return <div className="p-6">Not authorized</div>;
-  }
 
   if (loading) {
     return (
@@ -69,8 +60,8 @@ function EditProblemContent({ user }: any) {
 
 export default function EditProblemPage() {
   return (
-    <AuthGuard>
-      {(user: any) => <EditProblemContent user={user} />}
-    </AuthGuard>
+    <RouteGuard requireAuth requireAdmin>
+      <EditProblemContent />
+    </RouteGuard>
   );
 }

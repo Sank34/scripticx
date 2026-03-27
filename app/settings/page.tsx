@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { AuthGuard } from "@/components/AuthGuard";
+import RouteGuard from "@/components/RouteGuard";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -39,7 +40,9 @@ function normalizeUrl(url: string) {
   return url;
 }
 
-function SettingsContent({ user }: any) {
+function SettingsContent() {
+  const { user } = useAuth();
+
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -61,6 +64,8 @@ function SettingsContent({ user }: any) {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
   useEffect(() => {
+    if (!user) return;
+
     async function loadProfile() {
       const { data } = await supabase
         .from("profiles")
@@ -137,7 +142,7 @@ function SettingsContent({ user }: any) {
   }
 
   async function handleSaveCropped() {
-    if (!selectedImage || !croppedAreaPixels) return;
+    if (!selectedImage || !croppedAreaPixels || !user) return;
 
     setUploading(true);
 
@@ -181,6 +186,8 @@ function SettingsContent({ user }: any) {
   }
 
   async function removeAvatar() {
+    if (!user) return;
+
     setUploading(true);
 
     const { data: files } = await supabase.storage
@@ -207,6 +214,8 @@ function SettingsContent({ user }: any) {
   }
 
   async function updateProfile() {
+    if (!user) return;
+
     const { error } = await supabase
       .from("profiles")
       .update({
@@ -233,6 +242,8 @@ function SettingsContent({ user }: any) {
     setPassword("");
   }
 
+  if (!user) return null;
+
   const initial = (username || user.email || "U")[0]?.toUpperCase();
 
   return (
@@ -255,12 +266,7 @@ function SettingsContent({ user }: any) {
             <div className="flex items-center gap-3">
               <label className="px-3 py-2 bg-muted rounded-md cursor-pointer text-sm">
                 Upload
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleSelectImage}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" onChange={handleSelectImage} className="hidden" />
               </label>
 
               {avatar && (
@@ -294,24 +300,9 @@ function SettingsContent({ user }: any) {
           <CardTitle>Social Links</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
-            value={github}
-            onChange={(e) => setGithub(e.target.value)}
-            placeholder="https://github.com/username"
-            autoComplete="off"
-          />
-          <Input
-            value={twitter}
-            onChange={(e) => setTwitter(e.target.value)}
-            placeholder="https://x.com/username"
-            autoComplete="off"
-          />
-          <Input
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            placeholder="https://your-site.com"
-            autoComplete="off"
-          />
+          <Input value={github} onChange={(e) => setGithub(e.target.value)} />
+          <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} />
+          <Input value={website} onChange={(e) => setWebsite(e.target.value)} />
           <Button onClick={updateProfile}>Save Changes</Button>
         </CardContent>
       </Card>
@@ -321,18 +312,13 @@ function SettingsContent({ user }: any) {
           <CardTitle>Security</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="New password"
-          />
+          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
           <Button onClick={updatePassword}>Update Password</Button>
         </CardContent>
       </Card>
 
       <Dialog open={cropOpen} onOpenChange={setCropOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Avatar</DialogTitle>
           </DialogHeader>
@@ -354,33 +340,11 @@ function SettingsContent({ user }: any) {
             )}
           </div>
 
-          <div className="space-y-4">
-
-            <div>
-              <div className="flex justify-between text-sm">
-                <span>Zoom</span>
-                <span>{Math.round(zoom * 100)}%</span>
-              </div>
-              <Slider min={1} max={3} step={0.1} value={[zoom]} onValueChange={(v) => setZoom(v[0])} />
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm">
-                <span>Rotation</span>
-                <span>{rotation}°</span>
-              </div>
-              <Slider min={0} max={360} step={1} value={[rotation]} onValueChange={(v) => setRotation(v[0])} />
-            </div>
-
-          </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCropOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveCropped} disabled={uploading}>
-              {uploading ? "Saving..." : "Save"}
+            <Button onClick={handleSaveCropped}>
+              Save
             </Button>
           </DialogFooter>
-
         </DialogContent>
       </Dialog>
 
@@ -390,8 +354,8 @@ function SettingsContent({ user }: any) {
 
 export default function SettingsPage() {
   return (
-    <AuthGuard>
-      {(user: any) => <SettingsContent user={user} />}
-    </AuthGuard>
+    <RouteGuard requireAuth>
+      <SettingsContent />
+    </RouteGuard>
   );
 }

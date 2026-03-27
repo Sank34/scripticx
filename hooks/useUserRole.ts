@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -8,21 +6,18 @@ export function useUserRole(user: any) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setRole(null);
+      setLoading(false);
+      return;
+    }
 
     async function fetchRole() {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", user.id)
         .single();
-
-      if (error) {
-        console.error("ROLE ERROR:", error);
-        setRole("user");
-        setLoading(false);
-        return;
-      }
 
       setRole(data?.role || "user");
       setLoading(false);
@@ -30,8 +25,6 @@ export function useUserRole(user: any) {
 
     fetchRole();
   }, [user]);
-
-  console.log("ROLE:", role);
 
   return { role, loading };
 }

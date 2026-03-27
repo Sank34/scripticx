@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProblemsPage() {
+  const { user } = useAuth();
+
   const [filter, setFilter] = useState<
     "all" | "easy" | "medium" | "hard"
   >("all");
@@ -29,9 +32,6 @@ export default function ProblemsPage() {
       if (problemsData) {
         setProblems(problemsData);
       }
-
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
 
       if (!user) {
         setLoading(false);
@@ -59,7 +59,7 @@ export default function ProblemsPage() {
     }
 
     fetchAll();
-  }, []);
+  }, [user]);
 
   const filteredProblems = problems.filter((p) => {
     return (
@@ -108,7 +108,6 @@ export default function ProblemsPage() {
                 <Card className="hover:shadow-md transition cursor-pointer">
                   <CardContent className="p-4 flex justify-between items-center">
 
-                    {/* LEFT */}
                     <div>
                       <h2 className="text-lg font-semibold">
                         {p.title}
@@ -118,7 +117,6 @@ export default function ProblemsPage() {
                       </p>
                     </div>
 
-                    {/* RIGHT */}
                     <div className="flex gap-3 items-center">
 
                       <span className="text-sm font-medium">

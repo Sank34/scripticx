@@ -9,6 +9,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, Trash } from "lucide-react";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 export function ProblemForm({ initialData, onSuccess }: any) {
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -62,7 +70,7 @@ export function ProblemForm({ initialData, onSuccess }: any) {
           description,
           starter_code: starterCode,
           difficulty,
-          test_cases: testCases, // 🔥 IMPORTANT
+          test_cases: testCases,
         })
         .eq("id", initialData.id));
     } else {
@@ -74,7 +82,7 @@ export function ProblemForm({ initialData, onSuccess }: any) {
             description,
             starter_code: starterCode,
             difficulty,
-            test_cases: testCases, // 🔥 IMPORTANT
+            test_cases: testCases,
           },
         ]));
     }
@@ -94,7 +102,6 @@ export function ProblemForm({ initialData, onSuccess }: any) {
   return (
     <div className="space-y-6">
 
-      {/* BASIC INFO */}
       <Input
         placeholder="Title"
         value={title}
@@ -114,13 +121,21 @@ export function ProblemForm({ initialData, onSuccess }: any) {
         className="font-mono"
       />
 
-      <Input
-        placeholder="Difficulty (easy/medium/hard)"
-        value={difficulty}
-        onChange={(e) => setDifficulty(e.target.value)}
-      />
+      <div className="space-y-2">
+        <p className="text-lg font-medium">Difficulty</p>
 
-      {/* TEST CASES */}
+        <Select value={difficulty} onValueChange={setDifficulty}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select difficulty" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="easy">Easy</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="hard">Hard</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Test Cases</h2>
 
@@ -163,7 +178,6 @@ export function ProblemForm({ initialData, onSuccess }: any) {
         </Button>
       </div>
 
-      {/* SUBMIT */}
       <Button onClick={handleSubmit} disabled={loading} className="w-full">
         {loading
           ? "Saving..."

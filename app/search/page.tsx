@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
+import RouteGuard from "@/components/RouteGuard";
 
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +17,7 @@ function normalize(str: string) {
   return str.toLowerCase().trim();
 }
 
-export default function SearchPage() {
+function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -223,5 +224,13 @@ export default function SearchPage() {
       )}
 
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <RouteGuard requireAuth>
+      <SearchContent />
+    </RouteGuard>
   );
 }

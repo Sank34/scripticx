@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { AuthGuard } from "@/components/AuthGuard";
+import RouteGuard from "@/components/RouteGuard";
+import { useAuth } from "@/hooks/useAuth";
 import { Flame, Globe, Share2 } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 import { toast } from "sonner";
@@ -50,7 +51,9 @@ function isValidUrl(url: string) {
   }
 }
 
-function ProfileContent({ user }: any) {
+function ProfileContent() {
+  const { user } = useAuth();
+
   const [loading, setLoading] = useState(true);
 
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -80,6 +83,8 @@ function ProfileContent({ user }: any) {
   const [following, setFollowing] = useState(0);
 
   async function fetchData() {
+    if (!user) return;
+
     setLoading(true);
 
     const { data: profile } = await supabase
@@ -200,22 +205,17 @@ function ProfileContent({ user }: any) {
   }
 
   useEffect(() => {
-    if (!user?.id) return;
-
     fetchData();
 
-    const handler = () => {
-        fetchData();
-    };
-
+    const handler = () => fetchData();
     window.addEventListener("profile-updated", handler);
 
     return () => {
-        window.removeEventListener("profile-updated", handler);
+      window.removeEventListener("profile-updated", handler);
     };
-  }, [user?.id]);
+  }, [user]);
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-40" />
@@ -321,7 +321,7 @@ function ProfileContent({ user }: any) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle>Streak</CardTitle>
-              <Flame className="w-5 h-5 text-orange-500" />
+              <Flame className="w-10 h-10 text-orange-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{streak}</div>
@@ -413,8 +413,8 @@ function ProfileContent({ user }: any) {
 
 export default function ProfilePage() {
   return (
-    <AuthGuard>
-      {(user: any) => <ProfileContent user={user} />}
-    </AuthGuard>
+    <RouteGuard requireAuth>
+      <ProfileContent />
+    </RouteGuard>
   );
 }
