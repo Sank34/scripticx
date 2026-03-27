@@ -47,6 +47,8 @@ import {
   Settings,
   LogOut,
   PanelLeft,
+  BookOpen,
+  ChevronDown,
 } from "lucide-react";
 
 import { useEffect, useState, useRef } from "react";
@@ -61,6 +63,9 @@ export function AppSidebar() {
   const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
+
+  const [openDocs, setOpenDocs] = useState(false);
+  const [manualToggle, setManualToggle] = useState(false);
 
   const initialized = useRef(false);
 
@@ -137,6 +142,12 @@ export function AppSidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    if (pathname.startsWith("/learn") && !manualToggle) {
+      setOpenDocs(true);
+    }
+  }, [pathname]);
+
   async function logout() {
     await supabase.auth.signOut();
     window.location.href = "/login";
@@ -171,6 +182,22 @@ export function AppSidebar() {
     );
   }
 
+  function SubItem({ href, label }: any) {
+    const active = pathname === href;
+
+    return (
+      <Link href={href}>
+        <Button
+          variant={active ? "secondary" : "ghost"}
+          size="sm"
+          className="w-full justify-start pl-8 text-sm"
+        >
+          {label}
+        </Button>
+      </Link>
+    );
+  }
+
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarContent>
@@ -201,11 +228,71 @@ export function AppSidebar() {
               <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" active={pathname.startsWith("/dashboard")} />
             )}
             {user && (
-                <NavItem href="/search" icon={Search} label="Search" active={pathname.startsWith("/search")} />
+              <NavItem href="/search" icon={Search} label="Search" active={pathname.startsWith("/search")} />
             )}
             {role === "admin" && (
               <NavItem href="/admin" icon={Shield} label="Admin" active={pathname.startsWith("/admin")} />
             )}
+
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          {!collapsed && <SidebarGroupLabel>Learn</SidebarGroupLabel>}
+
+          <SidebarGroupContent className="space-y-1">
+
+            <div
+              onMouseEnter={() => {
+                if (!manualToggle) setOpenDocs(true);
+              }}
+              onMouseLeave={() => {
+                if (!manualToggle) setOpenDocs(false);
+              }}
+              className="space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <NavItem
+                  href="/learn"
+                  icon={BookOpen}
+                  label="Docs"
+                  active={pathname.startsWith("/learn")}
+                />
+
+                {!collapsed && (
+                  <button
+                    onClick={() => {
+                      setOpenDocs((prev) => !prev);
+                      setManualToggle(true);
+                    }}
+                    className="mr-2 p-1 hover:bg-muted rounded"
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${
+                        openDocs ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {!collapsed && (
+                <div
+                  className={`overflow-hidden transition-all duration-300 ${
+                    openDocs ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="ml-2 border-l pl-2 space-y-1">
+                    <SubItem href="/learn/basics" label="Basics" />
+                    <SubItem href="/learn/variables" label="Variables" />
+                    <SubItem href="/learn/loops" label="Loops" />
+                    <SubItem href="/learn/input-output" label="Input / Output" />
+                  </div>
+                </div>
+              )}
+
+            </div>
 
           </SidebarGroupContent>
         </SidebarGroup>
