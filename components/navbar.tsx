@@ -7,22 +7,87 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+} from "@/components/ui/avatar";
+
 export function Navbar() {
   const pathname = usePathname();
+
   const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
+    async function getUserAndProfile() {
+      const { data } = await supabase.auth.getUser();
+      const currentUser = data.user;
+
+      setUser(currentUser);
+
+      if (currentUser) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, username, avatar_url")
+          .eq("id", currentUser.id)
+          .maybeSingle();
+
+        setRole(profile?.role || "user");
+        setUsername(profile?.username || null);
+
+        const validAvatar =
+          profile?.avatar_url &&
+          profile.avatar_url !== "null" &&
+          profile.avatar_url.startsWith("http");
+
+        setAvatar(validAvatar ? profile.avatar_url : null);
+      }
+    }
+
+    getUserAndProfile();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (!currentUser) {
+        setRole(null);
+        setUsername(null);
+        setAvatar(null);
+      } else {
+        getUserAndProfile();
+      }
     });
 
-    return () => subscription.unsubscribe();
+    const handler = () => {
+      getUserAndProfile();
+    };
+
+    window.addEventListener("profile-updated", handler);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("profile-updated", handler);
+    };
   }, []);
 
   async function logout() {
@@ -30,15 +95,21 @@ export function Navbar() {
     location.reload();
   }
 
+  const rawName = username || user?.email || "U";
+  const displayName =
+    rawName.length > 25
+      ? rawName.slice(0, 22) + "..."
+      : rawName;
+
+  const initial = rawName[0]?.toUpperCase();
+
   return (
     <div className="border-b px-6 py-3 flex items-center justify-between">
 
-      {/* Logo */}
       <Link href="/" className="text-lg font-bold">
         Scripticx
       </Link>
 
-      {/* Navigation */}
       <div className="flex items-center gap-4">
 
         <Link href="/editor">
@@ -59,21 +130,52 @@ export function Navbar() {
           </Button>
         </Link>
 
-        {/* AUTH */}
-        {user ? (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {user.email}
-            </span>
-            <Button variant="outline" onClick={logout}>
-              Logout
+        {role === "admin" && (
+          <Link href="/admin">
+            <Button variant={pathname.startsWith("/admin") ? "default" : "ghost"}>
+              Admin
             </Button>
-          </div>
+          </Link>
+        )}
+
+        {user ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Avatar className="w-9 h-9 cursor-pointer">
+                      {avatar && <AvatarImage src={avatar} />}
+                      <AvatarFallback className="bg-muted font-semibold">
+                        {initial}
+                      </AvatarFallback>
+                    </Avatar>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">{displayName}</Link>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings">Settings</Link>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem onClick={logout}>
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TooltipTrigger>
+
+              <TooltipContent className="max-w-[200px] break-words text-center">
+                {rawName}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         ) : (
           <Link href="/login">
-            <Button variant="default">
-              Login
-            </Button>
+            <Button>Login</Button>
           </Link>
         )}
 

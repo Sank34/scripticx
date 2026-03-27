@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { PageContainer } from "@/components/layout/PageContainer";
 
 type Value = string | number | boolean;
 
@@ -164,97 +165,99 @@ END`);
   }
 
   return (
-    <div className="p-6 grid grid-cols-3 gap-6">
+    <PageContainer variant="full">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-      {/* EDITOR */}
-      <Card className="col-span-2">
-        <CardHeader>
-          <CardTitle>MiniScript+ Editor</CardTitle>
-        </CardHeader>
+        {/* EDITOR */}
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>MiniScript+ Editor</CardTitle>
+          </CardHeader>
 
-        <CardContent className="space-y-4">
+          <CardContent className="space-y-4">
 
-          <Textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="font-mono h-[200px]"
-          />
+            <Textarea
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="font-mono h-[200px]"
+            />
 
-          {/* CODE PREVIEW */}
-          <div className="bg-slate-900 text-white rounded-md p-3 font-mono text-sm">
-            {codeLines.map((line, index) => (
-              <div
-                key={index}
-                className={`px-2 py-1 rounded
-                  ${index === errorLine ? "bg-red-500/50" :
-                    index === currentLine ? "bg-blue-500/40" :
-                    ""}`}
-              >
-                {index + 1}. {line}
-              </div>
-            ))}
-          </div>
-
-          {/* BUTTONS */}
-          <div className="flex gap-2">
-            <Button onClick={compile} variant="secondary">Compile</Button>
-            <Button onClick={handleStep} disabled={stopped}>Step</Button>
-            <Button onClick={handleRun} disabled={stopped}>Run</Button>
-            <Button onClick={handleSave} variant="outline">Save .msp</Button>
-          </div>
-
-        </CardContent>
-      </Card>
-
-      {/* SIDEBAR */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Debugger</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-
-          {/* VARIABLES */}
-          <div>
-            <h3 className="font-semibold mb-1">Variables</h3>
-            <pre className="text-sm bg-muted p-2 rounded whitespace-pre-wrap break-words">
-              {JSON.stringify(variables, null, 2)}
-            </pre>
-          </div>
-
-          {/* CURRENT LINE */}
-          <div>
-            <h3 className="font-semibold">Current Line</h3>
-            <p>{currentLine}</p>
-          </div>
-
-          {/* OUTPUT */}
-          <div>
-            <h3 className="font-semibold mb-1">Output</h3>
-            <pre className="text-sm bg-muted p-2 rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
-              {output.join("\n")}
-            </pre>
-          </div>
-
-          {/* INPUT UI */}
-          {inputVar && (
-            <div className="space-y-2">
-              <p className="font-medium">Enter value for {inputVar}:</p>
-
-              <Input
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
-
-              <Button onClick={handleSubmitInput}>
-                Submit
-              </Button>
+            {/* CODE PREVIEW */}
+            <div className="bg-slate-900 text-white rounded-md p-3 font-mono text-sm">
+              {codeLines.map((line, index) => (
+                <div
+                  key={index}
+                  className={`px-2 py-1 rounded
+                    ${index === errorLine ? "bg-red-500/50" :
+                      index === currentLine ? "bg-blue-500/40" :
+                      ""}`}
+                >
+                  {index + 1}. {line}
+                </div>
+              ))}
             </div>
-          )}
 
-        </CardContent>
-      </Card>
+            {/* BUTTONS */}
+            <div className="flex gap-2">
+              <Button onClick={compile} variant="secondary">Compile</Button>
+              <Button onClick={handleStep} disabled={stopped}>Step</Button>
+              <Button onClick={handleRun} disabled={stopped}>Run</Button>
+              <Button onClick={handleSave} variant="outline">Save .msp</Button>
+            </div>
 
-    </div>
+          </CardContent>
+        </Card>
+
+        {/* SIDEBAR */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Debugger</CardTitle>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+
+            {/* VARIABLES */}
+            <div>
+              <h3 className="font-semibold mb-1">Variables</h3>
+              <pre className="text-sm bg-muted p-2 rounded whitespace-pre-wrap break-words">
+                {JSON.stringify(variables, null, 2)}
+              </pre>
+            </div>
+
+            {/* CURRENT LINE */}
+            <div>
+              <h3 className="font-semibold">Current Line</h3>
+              <p>{currentLine}</p>
+            </div>
+
+            {/* OUTPUT */}
+            <div>
+              <h3 className="font-semibold mb-1">Output</h3>
+              <pre className="text-sm bg-muted p-2 rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
+                {output.join("\n")}
+              </pre>
+            </div>
+
+            {/* INPUT UI */}
+            {inputVar && (
+              <div className="space-y-2">
+                <p className="font-medium">Enter value for {inputVar}:</p>
+
+                <Input
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                />
+
+                <Button onClick={handleSubmitInput}>
+                  Submit
+                </Button>
+              </div>
+            )}
+
+          </CardContent>
+        </Card>
+
+      </div>
+    </PageContainer>
   );
 }

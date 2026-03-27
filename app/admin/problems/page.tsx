@@ -6,13 +6,9 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
 
-
-
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +25,15 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+import { ProblemForm } from "@/components/admin/ProblemForm";
+
 import { toast } from "sonner";
 
 function AdminProblemsContent({ user }: any) {
@@ -39,6 +44,7 @@ function AdminProblemsContent({ user }: any) {
   const [loading, setLoading] = useState(true);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [openCreate, setOpenCreate] = useState(false);
 
   useEffect(() => {
     async function fetchProblems() {
@@ -82,7 +88,14 @@ function AdminProblemsContent({ user }: any) {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
 
-      <h1 className="text-3xl font-bold">Manage Problems</h1>
+      {/* HEADER + CREATE */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Manage Problems</h1>
+
+        <Button onClick={() => setOpenCreate(true)}>
+          Create Problem
+        </Button>
+      </div>
 
       {/* LIST */}
       <div className="space-y-4">
@@ -110,7 +123,7 @@ function AdminProblemsContent({ user }: any) {
                   <Button
                     variant="outline"
                     onClick={() => router.push(`/admin/problems/${p.id}`)}
-                    >
+                  >
                     Edit
                   </Button>
 
@@ -148,6 +161,22 @@ function AdminProblemsContent({ user }: any) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CREATE MODAL */}
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Problem</DialogTitle>
+          </DialogHeader>
+
+          <ProblemForm
+            onSuccess={() => {
+              setOpenCreate(false);
+              window.location.reload();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

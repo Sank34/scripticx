@@ -1,13 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; 
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { AppModal } from "@/components/ui/app-modal";
 
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+
 export default function LoginPage() {
+  const [loading, setLoading] = useState(true); 
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+
   const router = useRouter();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -16,6 +27,20 @@ export default function LoginPage() {
     description: "",
     type: "info" as "error" | "success" | "info",
   });
+
+  useEffect(() => {
+    async function checkUser() {
+      const { data } = await supabase.auth.getSession();
+
+      if (data.session) {
+        router.replace("/dashboard"); 
+      } else {
+        setLoading(false);
+      }
+    }
+
+    checkUser();
+  }, []);
 
   function showModal(
     title: string,
@@ -27,24 +52,26 @@ export default function LoginPage() {
   }
 
   async function handleLogin() {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-
-    console.log("LOGIN SESSION:", data.session);
-    console.log("LOGIN ERROR:", error);
 
     if (error) {
       showModal("Unable to sign in", error.message, "error");
       return;
     }
 
-    router.push("/dashboard");
+    router.replace("/dashboard");
   }
 
   async function handleRegister() {
-    const { error } = await supabase.auth.signUp({
+    if (!username) {
+      showModal("Error", "Username is required", "error");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -54,45 +81,105 @@ export default function LoginPage() {
       return;
     }
 
+    const user = data.user;
+
+    if (user) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          username,
+          role: "user",
+        });
+
+      if (profileError) {
+        console.error("PROFILE ERROR:", profileError);
+      }
+    }
+
     showModal(
-      "Check your email",
-      "We sent you a confirmation link.",
+      "Account created",
+      "You can now log in.",
       "success"
     );
   }
 
+  if (loading) return null;
+
   return (
-    <div className="p-6 space-y-4 max-w-sm mx-auto">
-      <h1 className="text-xl font-bold">Login</h1>
+    <div className="p-6 max-w-sm mx-auto">
 
-      <input
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="border p-2 w-full rounded-md"
-      />
+      <h1 className="text-xl font-bold mb-4">Welcome</h1>
 
-      <input
-        placeholder="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 w-full rounded-md"
-      />
+      <Tabs defaultValue="login" className="space-y-4">
 
-      <button
-        onClick={handleLogin}
-        className="bg-black text-white p-2 w-full rounded-md hover:opacity-90"
-      >
-        Login
-      </button>
+        <TabsList className="grid grid-cols-2">
+          <TabsTrigger value="login">Login</TabsTrigger>
+          <TabsTrigger value="register">Register</TabsTrigger>
+        </TabsList>
 
-      <button
-        onClick={handleRegister}
-        className="border p-2 w-full rounded-md hover:bg-muted"
-      >
-        Register
-      </button>
+        {/* LOGIN */}
+        <TabsContent value="login" className="space-y-3">
+
+          <input
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="border p-2 w-full rounded-md"
+          />
+
+          <input
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="border p-2 w-full rounded-md"
+          />
+
+          <button
+            onClick={handleLogin}
+            className="bg-black text-white p-2 w-full rounded-md hover:opacity-90"
+          >
+            Login
+          </button>
+
+        </TabsContent>
+
+        {/* REGISTER */}
+        <TabsContent value="register" className="space-y-3">
+
+          <input
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="border p-2 w-full rounded-md"
+          />
+
+          <input
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="border p-2 w-full rounded-md"
+          />
+
+          <input
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="border p-2 w-full rounded-md"
+          />
+
+          <button
+            onClick={handleRegister}
+            className="bg-black text-white p-2 w-full rounded-md hover:opacity-90"
+          >
+            Create Account
+          </button>
+
+        </TabsContent>
+
+      </Tabs>
 
       {/* MODAL */}
       <AppModal
