@@ -427,7 +427,7 @@ export function step(program: any[]): StepResult {
       if (program[temp].type === "IF") break;
     }
   } else if (inst.type === "INPUT") {
-    currentLine++;
+    // currentLine++;
     return {
       output: null,
       variables: { ...variables },

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
-import { problems } from "@/lib/problems";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,10 +17,19 @@ export default function ProblemsPage() {
 
   const [search, setSearch] = useState("");
   const [progress, setProgress] = useState<Record<string, number>>({});
+  const [problems, setProblems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchProgress() {
+    async function fetchAll() {
+      const { data: problemsData } = await supabase
+        .from("problems")
+        .select("*");
+
+      if (problemsData) {
+        setProblems(problemsData);
+      }
+
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
 
@@ -30,15 +38,18 @@ export default function ProblemsPage() {
         return;
       }
 
-      const { data } = await supabase
+      const { data: submissions } = await supabase
         .from("submissions")
         .select("problem_id, score")
         .eq("user_id", user.id);
 
       const bestScores: Record<string, number> = {};
 
-      data?.forEach((sub) => {
-        if (!bestScores[sub.problem_id] || sub.score > bestScores[sub.problem_id]) {
+      submissions?.forEach((sub) => {
+        if (
+          !bestScores[sub.problem_id] ||
+          sub.score > bestScores[sub.problem_id]
+        ) {
           bestScores[sub.problem_id] = sub.score;
         }
       });
@@ -47,7 +58,7 @@ export default function ProblemsPage() {
       setLoading(false);
     }
 
-    fetchProgress();
+    fetchAll();
   }, []);
 
   const filteredProblems = problems.filter((p) => {
@@ -97,6 +108,7 @@ export default function ProblemsPage() {
                 <Card className="hover:shadow-md transition cursor-pointer">
                   <CardContent className="p-4 flex justify-between items-center">
 
+                    {/* LEFT */}
                     <div>
                       <h2 className="text-lg font-semibold">
                         {p.title}
@@ -106,8 +118,10 @@ export default function ProblemsPage() {
                       </p>
                     </div>
 
+                    {/* RIGHT */}
                     <div className="flex gap-3 items-center">
-                      <span className="text-sm">
+
+                      <span className="text-sm font-medium">
                         {score === 100
                           ? "Solved"
                           : score
@@ -115,7 +129,18 @@ export default function ProblemsPage() {
                           : "Not started"}
                       </span>
 
-                      <Badge>{p.difficulty}</Badge>
+                      <Badge
+                        variant={
+                          p.difficulty === "easy"
+                            ? "secondary"
+                            : p.difficulty === "medium"
+                            ? "outline"
+                            : "destructive"
+                        }
+                      >
+                        {p.difficulty}
+                      </Badge>
+
                     </div>
 
                   </CardContent>

@@ -29,7 +29,12 @@ function DashboardContent({ user }: any) {
     async function fetchData() {
       const { data } = await supabase
         .from("submissions")
-        .select("*")
+        .select(`
+          *,
+          problems (
+            title
+          )
+        `)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -157,7 +162,7 @@ function DashboardContent({ user }: any) {
             >
               <div>
                 <p className="font-medium">
-                  Problem {r.problem_id}
+                  {r.problems?.title || "Unknown Problem"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(r.created_at).toLocaleString()}

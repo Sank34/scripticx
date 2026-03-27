@@ -11,19 +11,39 @@ export function AuthGuard({ children }: any) {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.push("/login");
-      } else {
-        setUser(data.user);
+    async function loadUser() {
+      const { data } = await supabase.auth.getSession();
+
+      const session = data.session;
+
+      if (!session) {
         setLoading(false);
+        router.push("/login");
+        return;
       }
-    });
+
+      setUser(session.user);
+      setLoading(false);
+    }
+
+    loadUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, [router]);
 
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
+
+  if (!user) return null;
 
   return children(user);
 }

@@ -3,72 +3,90 @@
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
 import { parseLine, step, reset } from "@/lib/engine";
-import { setVariable } from "@/lib/engine";
+import { setVariable, advanceLine } from "@/lib/engine";
 import { useParams } from "next/navigation";
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Skeleton } from "@/components/ui/skeleton";
-
-
-const problems: any = {
-  "1": {
-    title: "Sum of two numbers",
-    description: "Read X and Y and print their sum",
-    starterCode: `INPUT X
-INPUT Y
-PRINT X + Y`,
-    testCases: [
-      { input: [3, 4], output: "7" },
-      { input: [10, 2], output: "12" }
-    ]
-  },
-  "2": {
-    title: "Print numbers",
-    description: "Print numbers from 1 to 3",
-    starterCode: `X = 1
-WHILE X <= 3
-PRINT X
-X = X + 1
-END`,
-    testCases: [
-      { input: [], output: "1\n2\n3" }
-    ]
-  },
-};
+import { Check, X } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 
 function ProblemContent({ user }: any) {
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e?.reason?.type === "cancelation") {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("unhandledrejection", handler);
+
+    return () => {
+      window.removeEventListener("unhandledrejection", handler);
+    };
+  }, []);
+
   const params = useParams();
-  const rawId = params.id;
+  const id = params?.id;
 
-  const id =
-    typeof rawId === "string"
-      ? rawId
-      : Array.isArray(rawId)
-      ? rawId[0]
-      : undefined;
+  const { role } = useUserRole(user);
 
-  if (!id) {
-    return <div className="p-6">Invalid problem id</div>;
-  }
-
-  const problem = problems[id];
-
+  const [problem, setProblem] = useState<any>(null);
   const [code, setCode] = useState("");
   const [result, setResult] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (problem) {
-      setCode(problem.starterCode);
+    if (!id || typeof id !== "string") return;
+
+    async function fetchProblem() {
+      const { data, error } = await supabase
+        .from("problems")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (!error && data) {
+        setProblem(data);
+        setCode(data.starter_code);
+      }
+
+      setLoading(false);
     }
-    setLoading(false);
-  }, [problem]);
+
+    fetchProblem();
+  }, [id]);
 
   async function runCode() {
-    let results: any[] = [];
+    if (!problem) return;
 
-    for (const test of problem.testCases) {
-      const program = code.split("\n").map(parseLine);
+    let results: {
+      passed: boolean;
+      expected: string;
+      got: string;
+      input: any;
+    }[] = [];
+
+    for (const test of problem.test_cases) {
+      let program;
+
+      try {
+        program = code.split("\n").map(parseLine);
+      } catch (e: any) {
+        const msg = e?.message || JSON.stringify(e);
+        setResult(`ERROR: ${msg}`);
+        return;
+      }
+
+      for (let i = 0; i < program.length; i++) {
+        if (program[i].type === "ERROR") {
+          setResult(`ERROR (line ${i + 1}): ${program[i].message}`);
+          return;
+        }
+      }
+
       reset();
 
       let res;
@@ -84,6 +102,7 @@ function ProblemContent({ user }: any) {
             const varName = (res as any).inputRequest;
             const value = test.input[inputIndex++];
             setVariable(varName, value);
+            advanceLine();
             continue;
           }
 
@@ -92,29 +111,35 @@ function ProblemContent({ user }: any) {
           }
         }
       } catch (e: any) {
-        let msg = "Unknown error";
+        let msg = e?.message || JSON.stringify(e);
 
-        if (typeof e === "string") {
-          msg = e;
-        } else if (e?.message) {
-          msg = e.message;
-        } else {
-          msg = JSON.stringify(e);
-        }
-
-        out.push("ERROR: " + msg);
+        out.push(
+          `ERROR${e?.line ? ` (line ${e.line})` : ""}: ${msg}`
+        );
       }
 
-      results.push(out.join("\n") === test.output);
+      const normalize = (str: string) =>
+        str.trim().replace(/\r\n/g, "\n");
+
+      const got = normalize(out.join("\n"));
+      const expected = normalize(test.output);
+
+      results.push({
+        passed: got === expected,
+        expected,
+        got,
+        input: test.input,
+      });
     }
 
     const score = Math.round(
-      (results.filter(Boolean).length / results.length) * 100
+      (results.filter(r => r.passed).length / results.length) * 100
     );
 
     setResult(`Score: ${score}%`);
+    setTestResults(results);
 
-    await supabase.from("submissions").insert([
+    const { error } = await supabase.from("submissions").insert([
       {
         user_id: user.id,
         problem_id: id,
@@ -122,6 +147,10 @@ function ProblemContent({ user }: any) {
         score,
       },
     ]);
+
+    if (error) {
+      console.error("Supabase error:", error);
+    }
   }
 
   const monaco = useMonaco();
@@ -138,10 +167,13 @@ function ProblemContent({ user }: any) {
     monaco.languages.setMonarchTokensProvider("miniscriptplus", {
       tokenizer: {
         root: [
+          [/#.*/, "comment"],
           [/\b(IF|THEN|ELSE|END|WHILE|PRINT|INPUT)\b/, "keyword"],
+          [/\b(true|false)\b/, "constant"],
           [/[0-9]+/, "number"],
           [/".*?"/, "string"],
           [/<=|>=|==|!=|<|>/, "operator"],
+          [/[a-zA-Z_][a-zA-Z0-9_]*/, "identifier"],
         ],
       },
     });
@@ -149,14 +181,20 @@ function ProblemContent({ user }: any) {
     monaco.editor.defineTheme("miniscriptplusTheme", {
       base: "vs-dark",
       inherit: true,
-      rules: [{ token: "keyword", foreground: "c586c0" }],
+      rules: [
+        { token: "comment", foreground: "6A9955", fontStyle: "italic" },
+        { token: "keyword", foreground: "c586c0" },
+        { token: "number", foreground: "b5cea8" },
+        { token: "string", foreground: "ce9178" },
+        { token: "operator", foreground: "d4d4d4" },
+        { token: "constant", foreground: "569cd6" },
+      ],
       colors: {},
     });
+
   }, [monaco]);
 
-  if (!problem) return <div className="p-6">Problem not found</div>;
-
-  if (loading) {
+  if (!id || typeof id !== "string" || loading) {
     return (
       <div className="flex h-[calc(100vh-80px)]">
         <Skeleton className="w-1/2 h-full" />
@@ -165,14 +203,20 @@ function ProblemContent({ user }: any) {
     );
   }
 
+  if (!problem) {
+    return <div className="p-6">Problem not found</div>;
+  }
+
   return (
     <div className="h-[calc(100vh-80px)] flex">
 
+      {/* LEFT */}
       <div className="w-1/2 border-r p-6">
         <h1 className="text-2xl font-bold">{problem.title}</h1>
         <p className="text-muted-foreground">{problem.description}</p>
       </div>
 
+      {/* RIGHT */}
       <div className="w-1/2 p-6 flex flex-col gap-4">
 
         <div className="flex-1 border rounded overflow-hidden">
@@ -182,6 +226,12 @@ function ProblemContent({ user }: any) {
             theme="miniscriptplusTheme"
             value={code}
             onChange={(value) => setCode(value || "")}
+            options={{
+              minimap: { enabled: false },
+              automaticLayout: true,
+              quickSuggestions: false,
+              suggestOnTriggerCharacters: false,
+            }}
           />
         </div>
 
@@ -193,6 +243,47 @@ function ProblemContent({ user }: any) {
         </button>
 
         {result && <div className="font-bold">{result}</div>}
+
+        {/* TEST RESULTS */}
+        <div className="space-y-3">
+          {testResults.map((r, i) => (
+            <div
+              key={i}
+              className={`p-3 rounded border ${
+                r.passed ? "border-green-500" : "border-red-500"
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <p className="font-semibold">Test #{i + 1}</p>
+
+                {r.passed ? (
+                  <Check className="text-green-500" size={20} />
+                ) : (
+                  <X className="text-red-500" size={20} />
+                )}
+              </div>
+
+              <p className="text-sm mt-2">
+                Input: {JSON.stringify(r.input)}
+              </p>
+
+              {role === "admin" && !r.passed && (
+                <>
+                  <p className="text-sm mt-2 font-medium">Expected:</p>
+                  <pre className="bg-muted p-2 rounded text-sm whitespace-pre-wrap">
+                    {r.expected}
+                  </pre>
+
+                  <p className="text-sm mt-2 font-medium">Got:</p>
+                  <pre className="bg-muted p-2 rounded text-sm whitespace-pre-wrap">
+                    {r.got}
+                  </pre>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
       </div>
     </div>
   );

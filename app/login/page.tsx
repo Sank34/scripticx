@@ -27,10 +27,13 @@ export default function LoginPage() {
   }
 
   async function handleLogin() {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    console.log("LOGIN SESSION:", data.session);
+    console.log("LOGIN ERROR:", error);
 
     if (error) {
       showModal("Unable to sign in", error.message, "error");
