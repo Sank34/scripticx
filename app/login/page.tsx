@@ -12,6 +12,10 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(true); 
 
@@ -84,104 +88,90 @@ export default function LoginPage() {
     const user = data.user;
 
     if (user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: user.id,
-          username,
-          role: "user",
-        });
-
-      if (profileError) {
-        console.error("PROFILE ERROR:", profileError);
-      }
+      await supabase.from("profiles").upsert({
+        id: user.id,
+        username: username.toLowerCase(),
+        role: "user",
+      });
     }
 
-    showModal(
-      "Account created",
-      "You can now log in.",
-      "success"
-    );
+    showModal("Account created", "You can now log in.", "success");
   }
 
   if (loading) return null;
 
   return (
-    <div className="p-6 max-w-sm mx-auto">
+    <div className="min-h-screen flex items-center justify-center p-6">
 
-      <h1 className="text-xl font-bold mb-4">Welcome</h1>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl">
+            Welcome back
+          </CardTitle>
+        </CardHeader>
 
-      <Tabs defaultValue="login" className="space-y-4">
+        <CardContent className="space-y-4">
 
-        <TabsList className="grid grid-cols-2">
-          <TabsTrigger value="login">Login</TabsTrigger>
-          <TabsTrigger value="register">Register</TabsTrigger>
-        </TabsList>
+          <Tabs defaultValue="login" className="space-y-4">
 
-        {/* LOGIN */}
-        <TabsContent value="login" className="space-y-3">
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="register">Register</TabsTrigger>
+            </TabsList>
 
-          <input
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="border p-2 w-full rounded-md"
-          />
+            <TabsContent value="login" className="space-y-3">
 
-          <input
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border p-2 w-full rounded-md"
-          />
+              <Input
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
 
-          <button
-            onClick={handleLogin}
-            className="bg-black text-white p-2 w-full rounded-md hover:opacity-90"
-          >
-            Login
-          </button>
+              <Input
+                placeholder="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
 
-        </TabsContent>
+              <Button onClick={handleLogin} className="w-full">
+                Login
+              </Button>
 
-        {/* REGISTER */}
-        <TabsContent value="register" className="space-y-3">
+            </TabsContent>
 
-          <input
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="border p-2 w-full rounded-md"
-          />
+            <TabsContent value="register" className="space-y-3">
 
-          <input
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border p-2 w-full rounded-md"
-          />
+              <Input
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
 
-          <input
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="border p-2 w-full rounded-md"
-          />
+              <Input
+                placeholder="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
 
-          <button
-            onClick={handleRegister}
-            className="bg-black text-white p-2 w-full rounded-md hover:opacity-90"
-          >
-            Create Account
-          </button>
+              <Input
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
 
-        </TabsContent>
+              <Button onClick={handleRegister} className="w-full">
+                Create Account
+              </Button>
 
-      </Tabs>
+            </TabsContent>
 
-      {/* MODAL */}
+          </Tabs>
+
+        </CardContent>
+      </Card>
+
       <AppModal
         open={modalOpen}
         onOpenChange={setModalOpen}

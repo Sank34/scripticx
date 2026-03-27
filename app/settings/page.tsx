@@ -14,6 +14,13 @@ import {
 } from "@/components/ui/avatar";
 
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -22,16 +29,28 @@ import {
 } from "@/components/ui/dialog";
 
 import { Slider } from "@/components/ui/slider";
-
 import Cropper from "react-easy-crop";
+
+function normalizeUrl(url: string) {
+  if (!url) return "";
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    return "https://" + url;
+  }
+  return url;
+}
 
 function SettingsContent({ user }: any) {
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
+
+  const [bio, setBio] = useState("");
+  const [github, setGithub] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [website, setWebsite] = useState("");
+
   const [fileName, setFileName] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [loadingUsername, setLoadingUsername] = useState(true);
 
   const [cropOpen, setCropOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -45,18 +64,20 @@ function SettingsContent({ user }: any) {
     async function loadProfile() {
       const { data } = await supabase
         .from("profiles")
-        .select("username, avatar_url")
+        .select("username, avatar_url, bio, github, twitter, website")
         .eq("id", user.id)
         .maybeSingle();
 
       if (data?.username) setUsername(data.username);
+      if (data?.bio) setBio(data.bio);
+      if (data?.github) setGithub(data.github);
+      if (data?.twitter) setTwitter(data.twitter);
+      if (data?.website) setWebsite(data.website);
 
       const validAvatar =
-        data?.avatar_url &&
-        data.avatar_url.startsWith("http");
+        data?.avatar_url && data.avatar_url.startsWith("http");
 
       setAvatar(validAvatar ? data.avatar_url : null);
-      setLoadingUsername(false);
     }
 
     loadProfile();
@@ -66,56 +87,50 @@ function SettingsContent({ user }: any) {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
 
-    async function getCroppedImg(imageSrc: string, crop: any, rotation = 0) {
-        const image = new Image();
-        image.src = imageSrc;
+  async function getCroppedImg(imageSrc: string, crop: any, rotation = 0) {
+    const image = new Image();
+    image.src = imageSrc;
 
-        await new Promise((resolve) => (image.onload = resolve));
+    await new Promise((resolve) => (image.onload = resolve));
 
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d")!;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
 
-        const radians = (rotation * Math.PI) / 180;
+    const radians = (rotation * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(radians));
+    const sin = Math.abs(Math.sin(radians));
+    const newWidth = image.width * cos + image.height * sin;
+    const newHeight = image.width * sin + image.height * cos;
 
-        // 🔥 calc bounding box după rotație
-        const cos = Math.abs(Math.cos(radians));
-        const sin = Math.abs(Math.sin(radians));
-        const newWidth = image.width * cos + image.height * sin;
-        const newHeight = image.width * sin + image.height * cos;
+    canvas.width = newWidth;
+    canvas.height = newHeight;
 
-        canvas.width = newWidth;
-        canvas.height = newHeight;
+    ctx.translate(newWidth / 2, newHeight / 2);
+    ctx.rotate(radians);
+    ctx.drawImage(image, -image.width / 2, -image.height / 2);
 
-        // 🔥 centru + rotație
-        ctx.translate(newWidth / 2, newHeight / 2);
-        ctx.rotate(radians);
-        ctx.drawImage(image, -image.width / 2, -image.height / 2);
+    const data = ctx.getImageData(
+      crop.x,
+      crop.y,
+      crop.width,
+      crop.height
+    );
 
-        // 🔥 crop final
-        const data = ctx.getImageData(
-            crop.x,
-            crop.y,
-            crop.width,
-            crop.height
-        );
+    canvas.width = crop.width;
+    canvas.height = crop.height;
 
-        // 🔥 resize la dimensiune finală
-        canvas.width = crop.width;
-        canvas.height = crop.height;
+    ctx.putImageData(data, 0, 0);
 
-        ctx.putImageData(data, 0, 0);
-
-        return new Promise<Blob>((resolve) => {
-            canvas.toBlob((blob) => resolve(blob!), "image/png");
-        });
-    }
+    return new Promise<Blob>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob!), "image/png");
+    });
+  }
 
   function handleSelectImage(e: any) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
-
     const url = URL.createObjectURL(file);
     setSelectedImage(url);
     setCropOpen(true);
@@ -157,7 +172,6 @@ function SettingsContent({ user }: any) {
       .eq("id", user.id);
 
     setAvatar(publicUrl);
-
     window.dispatchEvent(new Event("profile-updated"));
 
     setCropOpen(false);
@@ -192,16 +206,22 @@ function SettingsContent({ user }: any) {
     toast.success("Avatar removed");
   }
 
-  async function updateUsername() {
+  async function updateProfile() {
     const { error } = await supabase
       .from("profiles")
-      .update({ username })
+      .update({
+        username,
+        bio,
+        github: normalizeUrl(github),
+        twitter: normalizeUrl(twitter),
+        website: normalizeUrl(website),
+      })
       .eq("id", user.id);
 
     if (error) return toast.error(error.message);
 
     window.dispatchEvent(new Event("profile-updated"));
-    toast.success("Username updated");
+    toast.success("Profile updated");
   }
 
   async function updatePassword() {
@@ -216,57 +236,103 @@ function SettingsContent({ user }: any) {
   const initial = (username || user.email || "U")[0]?.toUpperCase();
 
   return (
-    <div className="p-6 max-w-md mx-auto space-y-6">
+    <div className="p-6 max-w-3xl space-y-6">
 
       <h1 className="text-2xl font-bold">Settings</h1>
 
-      {/* AVATAR */}
-      <Avatar className="w-16 h-16">
-        {avatar && <AvatarImage src={avatar} />}
-        <AvatarFallback>{initial}</AvatarFallback>
-      </Avatar>
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center gap-6">
 
-      <div className="flex items-center gap-3">
-        <label className="px-3 py-2 bg-muted rounded-md cursor-pointer">
-          Choose file
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleSelectImage}
-            className="hidden"
+          <Avatar className="w-16 h-16">
+            {avatar && <AvatarImage src={avatar} />}
+            <AvatarFallback>{initial}</AvatarFallback>
+          </Avatar>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <label className="px-3 py-2 bg-muted rounded-md cursor-pointer text-sm">
+                Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSelectImage}
+                  className="hidden"
+                />
+              </label>
+
+              {avatar && (
+                <Button size="sm" variant="destructive" onClick={removeAvatar}>
+                  Remove
+                </Button>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {fileName || "No file selected"}
+            </p>
+          </div>
+
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Account</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input value={user.email} disabled />
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} />
+          <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Social Links</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            value={github}
+            onChange={(e) => setGithub(e.target.value)}
+            placeholder="https://github.com/username"
+            autoComplete="off"
           />
-        </label>
+          <Input
+            value={twitter}
+            onChange={(e) => setTwitter(e.target.value)}
+            placeholder="https://x.com/username"
+            autoComplete="off"
+          />
+          <Input
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://your-site.com"
+            autoComplete="off"
+          />
+          <Button onClick={updateProfile}>Save Changes</Button>
+        </CardContent>
+      </Card>
 
-        <span className="text-sm text-muted-foreground">
-          {fileName || "No file chosen"}
-        </span>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Security</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="New password"
+          />
+          <Button onClick={updatePassword}>Update Password</Button>
+        </CardContent>
+      </Card>
 
-      {avatar && (
-        <Button variant="destructive" onClick={removeAvatar}>
-          Remove avatar
-        </Button>
-      )}
-
-      {/* EMAIL */}
-      <Input value={user.email} disabled />
-
-      {/* USERNAME */}
-      <Input value={username} onChange={(e) => setUsername(e.target.value)} />
-      <Button onClick={updateUsername}>Save Username</Button>
-
-      {/* PASSWORD */}
-      <Input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <Button onClick={updatePassword}>Update Password</Button>
-
-      {/* MODAL */}
       <Dialog open={cropOpen} onOpenChange={setCropOpen}>
         <DialogContent className="max-w-lg">
-
           <DialogHeader>
             <DialogTitle>Edit Avatar</DialogTitle>
           </DialogHeader>
@@ -288,50 +354,28 @@ function SettingsContent({ user }: any) {
             )}
           </div>
 
-          {/* SLIDERS */}
           <div className="space-y-4">
 
             <div>
               <div className="flex justify-between text-sm">
                 <span>Zoom</span>
-                <span className="text-muted-foreground">
-                  {Math.round(zoom * 100)}%
-                </span>
+                <span>{Math.round(zoom * 100)}%</span>
               </div>
-
-              <Slider
-                min={1}
-                max={3}
-                step={0.1}
-                value={[zoom]}
-                onValueChange={(v) => setZoom(v[0])}
-              />
+              <Slider min={1} max={3} step={0.1} value={[zoom]} onValueChange={(v) => setZoom(v[0])} />
             </div>
 
             <div>
               <div className="flex justify-between text-sm">
                 <span>Rotation</span>
-                <span className="text-muted-foreground">
-                  {rotation}°
-                </span>
+                <span>{rotation}°</span>
               </div>
-
-              <Slider
-                min={0}
-                max={360}
-                step={1}
-                value={[rotation]}
-                onValueChange={(v) => setRotation(v[0])}
-              />
+              <Slider min={0} max={360} step={1} value={[rotation]} onValueChange={(v) => setRotation(v[0])} />
             </div>
 
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCropOpen(false)}>
-              Cancel
-            </Button>
-
+            <Button variant="outline" onClick={() => setCropOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveCropped} disabled={uploading}>
               {uploading ? "Saving..." : "Save"}
             </Button>

@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import {
+  Trophy,
   Code,
   List,
   LayoutDashboard,
@@ -224,11 +225,20 @@ export function AppSidebar() {
             />
 
             <NavItem
-              href="/dashboard"
-              icon={LayoutDashboard}
-              label="Dashboard"
-              active={pathname === "/dashboard"}
+                href="/leaderboard"
+                icon={Trophy}
+                label="Leaderboard"
+                active={pathname === "/leaderboard"}
             />
+
+            {user && (
+                <NavItem
+                    href="/dashboard"
+                    icon={LayoutDashboard}
+                    label="Dashboard"
+                    active={pathname === "/dashboard"}
+                />
+            )}
 
             {role === "admin" && (
               <NavItem

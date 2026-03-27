@@ -13,6 +13,11 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+} from "@/components/ui/avatar";
 
 function DashboardContent({ user }: any) {
   const [loading, setLoading] = useState(true);
@@ -24,6 +29,7 @@ function DashboardContent({ user }: any) {
   });
 
   const [recent, setRecent] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -67,6 +73,14 @@ function DashboardContent({ user }: any) {
       setStats({ solved, total, average });
       setRecent(data.slice(0, 5));
 
+      const { data: users } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, total_score")
+        .order("total_score", { ascending: false })
+        .limit(5);
+
+      setLeaderboard(users || []);
+
       setLoading(false);
     }
 
@@ -93,7 +107,6 @@ function DashboardContent({ user }: any) {
   return (
     <div className="p-6 space-y-6">
 
-      {/* HEADER */}
       <div>
         <h1 className="text-3xl font-bold">
           Welcome back
@@ -103,7 +116,6 @@ function DashboardContent({ user }: any) {
         </p>
       </div>
 
-      {/* STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
         <Card>
@@ -141,7 +153,59 @@ function DashboardContent({ user }: any) {
 
       </div>
 
-      {/* RECENT */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Leaderboard</CardTitle>
+          <a
+            href="/leaderboard"
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            View all
+          </a>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+
+          {leaderboard.length === 0 && (
+            <p className="text-muted-foreground text-sm">
+              No data yet.
+            </p>
+          )}
+
+          {leaderboard.map((u, i) => (
+            <div
+              key={u.id}
+              className="flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+
+                <span className="text-sm font-medium w-5">
+                  #{i + 1}
+                </span>
+
+                <Avatar className="w-7 h-7">
+                  {u.avatar_url && <AvatarImage src={u.avatar_url} />}
+                  <AvatarFallback>
+                    {u.username?.[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+
+                <span className="text-sm">
+                  {u.username}
+                </span>
+
+              </div>
+
+              <span className="text-sm font-semibold">
+                {u.total_score || 0}
+              </span>
+
+            </div>
+          ))}
+
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Recent Submissions</CardTitle>

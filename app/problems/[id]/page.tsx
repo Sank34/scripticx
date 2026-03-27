@@ -139,6 +139,17 @@ function ProblemContent({ user }: any) {
     setResult(`Score: ${score}%`);
     setTestResults(results);
 
+    const { data: previous } = await supabase
+      .from("submissions")
+      .select("score")
+      .eq("user_id", user.id)
+      .eq("problem_id", id);
+
+    const bestPrevious =
+      previous?.length
+        ? Math.max(...previous.map((s) => s.score))
+        : 0;
+
     const { error } = await supabase.from("submissions").insert([
       {
         user_id: user.id,
@@ -150,6 +161,24 @@ function ProblemContent({ user }: any) {
 
     if (error) {
       console.error("Supabase error:", error);
+      return;
+    }
+
+    if (score > bestPrevious) {
+      const diff = score - bestPrevious;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("total_score")
+        .eq("id", user.id)
+        .single();
+
+      await supabase
+        .from("profiles")
+        .update({
+          total_score: (profile?.total_score || 0) + diff,
+        })
+        .eq("id", user.id);
     }
   }
 

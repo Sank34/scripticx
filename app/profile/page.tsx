@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { AuthGuard } from "@/components/AuthGuard";
-import { Flame } from "lucide-react";
+import { Flame, Globe, Share2 } from "lucide-react";
+import { siGithub, siX } from "simple-icons";
+import { toast } from "sonner";
+
 import {
   Card,
   CardContent,
@@ -14,6 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 import {
   Avatar,
@@ -21,11 +25,40 @@ import {
   AvatarFallback,
 } from "@/components/ui/avatar";
 
+function BrandIcon({ icon }: { icon: any }) {
+  return (
+    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
+      <path d={icon.path} />
+    </svg>
+  );
+}
+
+function normalizeUrl(url: string) {
+  if (!url) return "";
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    return "https://" + url;
+  }
+  return url;
+}
+
+function isValidUrl(url: string) {
+  try {
+    new URL(normalizeUrl(url));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function ProfileContent({ user }: any) {
   const [loading, setLoading] = useState(true);
 
   const [avatar, setAvatar] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [bio, setBio] = useState("");
+  const [github, setGithub] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [website, setWebsite] = useState("");
 
   const [stats, setStats] = useState({
     solved: 0,
@@ -48,11 +81,15 @@ function ProfileContent({ user }: any) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("username, avatar_url")
+      .select("username, avatar_url, bio, github, twitter, website")
       .eq("id", user.id)
       .maybeSingle();
 
     setUsername(profile?.username || null);
+    setBio(profile?.bio || "");
+    setGithub(profile?.github || "");
+    setTwitter(profile?.twitter || "");
+    setWebsite(profile?.website || "");
 
     const validAvatar =
       profile?.avatar_url &&
@@ -144,13 +181,9 @@ function ProfileContent({ user }: any) {
 
   useEffect(() => {
     fetchData();
-
     const handler = () => fetchData();
     window.addEventListener("profile-updated", handler);
-
-    return () => {
-      window.removeEventListener("profile-updated", handler);
-    };
+    return () => window.removeEventListener("profile-updated", handler);
   }, [user]);
 
   if (loading) {
@@ -168,21 +201,62 @@ function ProfileContent({ user }: any) {
 
   const initial = (username || user.email || "U")[0]?.toUpperCase();
 
+  const handleShare = () => {
+    const url = `${window.location.origin}/u/${username || user.id}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Profile link copied!");
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
 
-      <div className="flex items-center gap-4">
-        <Avatar className="w-16 h-16">
-          {avatar && <AvatarImage src={avatar} />}
-          <AvatarFallback>{initial}</AvatarFallback>
-        </Avatar>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar className="w-16 h-16">
+            {avatar && <AvatarImage src={avatar} />}
+            <AvatarFallback>{initial}</AvatarFallback>
+          </Avatar>
 
-        <div>
-          <h1 className="text-2xl font-bold">
-            {username || user.email.split("@")[0]}
-          </h1>
-          <p className="text-muted-foreground">{user.email}</p>
+          <div>
+            <h1 className="text-2xl font-bold">
+              {username || user.email.split("@")[0]}
+            </h1>
+            <p className="text-muted-foreground">{user.email}</p>
+
+            {bio && (
+              <p className="text-sm text-muted-foreground mt-2 max-w-xl">
+                {bio}
+              </p>
+            )}
+
+            <div className="flex gap-4 mt-2 text-sm flex-wrap">
+              {github && isValidUrl(github) && (
+                <a href={normalizeUrl(github)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                  <BrandIcon icon={siGithub} />
+                  GitHub
+                </a>
+              )}
+
+              {twitter && isValidUrl(twitter) && (
+                <a href={normalizeUrl(twitter)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                  <BrandIcon icon={siX} />
+                  X
+                </a>
+              )}
+
+              {website && isValidUrl(website) && (
+                <a href={normalizeUrl(website)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                  <Globe size={16} />
+                  Website
+                </a>
+              )}
+            </div>
+          </div>
         </div>
+
+        <Button variant="outline" size="icon" onClick={handleShare}>
+          <Share2 size={16} />
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -212,17 +286,12 @@ function ProfileContent({ user }: any) {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-2xl font-medium">
-                Streak
-                </CardTitle>
-                <Flame className="w-10 h-10 text-orange-500" />
+              <CardTitle>Streak</CardTitle>
+              <Flame className="w-5 h-5 text-orange-500" />
             </CardHeader>
-
             <CardContent>
-                <div className="text-3xl font-bold">{streak}</div>
-                <p className="text-xs text-muted-foreground">
-                days active
-                </p>
+              <div className="text-3xl font-bold">{streak}</div>
+              <p className="text-xs text-muted-foreground">days active</p>
             </CardContent>
           </Card>
 
@@ -251,11 +320,8 @@ function ProfileContent({ user }: any) {
                   No favorites yet.
                 </p>
               )}
-
               {favorites.map((f, i) => (
-                <p key={i} className="text-sm">
-                  {f}
-                </p>
+                <p key={i} className="text-sm">{f}</p>
               ))}
             </CardContent>
           </Card>
@@ -279,14 +345,9 @@ function ProfileContent({ user }: any) {
 
             <CardContent className="space-y-3">
               {recent.map((r, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between items-center border-b pb-2"
-                >
+                <div key={i} className="flex justify-between items-center border-b pb-2">
                   <div>
-                    <p className="font-medium">
-                      {r.problems?.title}
-                    </p>
+                    <p className="font-medium">{r.problems?.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(r.created_at).toLocaleString()}
                     </p>
