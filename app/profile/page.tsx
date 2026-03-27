@@ -76,12 +76,15 @@ function ProfileContent({ user }: any) {
   const [streak, setStreak] = useState(0);
   const [favorites, setFavorites] = useState<string[]>([]);
 
+  const [followers, setFollowers] = useState(0);
+  const [following, setFollowing] = useState(0);
+
   async function fetchData() {
     setLoading(true);
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("username, avatar_url, bio, github, twitter, website")
+      .select("id, username, avatar_url, bio, github, twitter, website")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -97,6 +100,23 @@ function ProfileContent({ user }: any) {
       profile.avatar_url.startsWith("http");
 
     setAvatar(validAvatar ? profile.avatar_url : null);
+
+    const profileId = profile?.id;
+
+    if (profileId) {
+      const { count: followersCount } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", profileId);
+
+      const { count: followingCount } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", profileId);
+
+      setFollowers(followersCount || 0);
+      setFollowing(followingCount || 0);
+    }
 
     const { data } = await supabase
       .from("submissions")
@@ -180,11 +200,20 @@ function ProfileContent({ user }: any) {
   }
 
   useEffect(() => {
+    if (!user?.id) return;
+
     fetchData();
-    const handler = () => fetchData();
+
+    const handler = () => {
+        fetchData();
+    };
+
     window.addEventListener("profile-updated", handler);
-    return () => window.removeEventListener("profile-updated", handler);
-  }, [user]);
+
+    return () => {
+        window.removeEventListener("profile-updated", handler);
+    };
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -222,6 +251,11 @@ function ProfileContent({ user }: any) {
               {username || user.email.split("@")[0]}
             </h1>
             <p className="text-muted-foreground">{user.email}</p>
+
+            <div className="flex gap-4 mt-1 text-sm">
+              <span><b>{followers}</b> followers</span>
+              <span><b>{following}</b> following</span>
+            </div>
 
             {bio && (
               <p className="text-sm text-muted-foreground mt-2 max-w-xl">

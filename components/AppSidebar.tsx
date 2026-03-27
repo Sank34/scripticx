@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
 import {
   Sidebar,
   SidebarContent,
@@ -38,6 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import {
+  Search,
   Trophy,
   Code,
   List,
@@ -49,12 +49,11 @@ import {
   PanelLeft,
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 export function AppSidebar() {
   const pathname = usePathname();
-
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
 
@@ -63,14 +62,19 @@ export function AppSidebar() {
   const [username, setUsername] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const initialized = useRef(false);
 
-    async function init() {
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    let active = true;
+
+    async function load() {
       const { data } = await supabase.auth.getSession();
       const currentUser = data.session?.user ?? null;
 
-      if (!mounted) return;
+      if (!active) return;
 
       setUser(currentUser);
 
@@ -82,7 +86,7 @@ export function AppSidebar() {
         .eq("id", currentUser.id)
         .maybeSingle();
 
-      if (!mounted) return;
+      if (!active) return;
 
       setRole(profile?.role || "user");
       setUsername(profile?.username || null);
@@ -94,7 +98,7 @@ export function AppSidebar() {
       setAvatar(validAvatar ? profile.avatar_url : null);
     }
 
-    init();
+    load();
 
     const {
       data: { subscription },
@@ -128,19 +132,13 @@ export function AppSidebar() {
     });
 
     return () => {
-      mounted = false;
+      active = false;
       subscription.unsubscribe();
     };
   }, []);
 
   async function logout() {
     await supabase.auth.signOut();
-
-    setUser(null);
-    setRole(null);
-    setUsername(null);
-    setAvatar(null);
-
     window.location.href = "/login";
   }
 
@@ -175,23 +173,12 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r">
-
       <SidebarContent>
 
-        {/* HEADER */}
         <div className="flex items-center justify-between px-3 py-3">
+          {!collapsed && <span className="font-bold text-lg">Scripticx</span>}
 
-          {!collapsed && (
-            <span className="font-bold text-lg">
-              Scripticx
-            </span>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-          >
+          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
             <PanelLeft
               size={18}
               className={`transition-transform ${
@@ -199,54 +186,25 @@ export function AppSidebar() {
               }`}
             />
           </Button>
-
         </div>
 
-        {/* NAV */}
         <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
-          )}
+          {!collapsed && <SidebarGroupLabel>Platform</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
 
-            <NavItem
-              href="/editor"
-              icon={Code}
-              label="Editor"
-              active={pathname === "/editor"}
-            />
-
-            <NavItem
-              href="/problems"
-              icon={List}
-              label="Problems"
-              active={pathname === "/problems"}
-            />
-
-            <NavItem
-                href="/leaderboard"
-                icon={Trophy}
-                label="Leaderboard"
-                active={pathname === "/leaderboard"}
-            />
+            <NavItem href="/editor" icon={Code} label="Editor" active={pathname.startsWith("/editor")} />
+            <NavItem href="/problems" icon={List} label="Problems" active={pathname.startsWith("/problems")} />
+            <NavItem href="/leaderboard" icon={Trophy} label="Leaderboard" active={pathname.startsWith("/leaderboard")} />
 
             {user && (
-                <NavItem
-                    href="/dashboard"
-                    icon={LayoutDashboard}
-                    label="Dashboard"
-                    active={pathname === "/dashboard"}
-                />
+              <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" active={pathname.startsWith("/dashboard")} />
             )}
-
+            {user && (
+                <NavItem href="/search" icon={Search} label="Search" active={pathname.startsWith("/search")} />
+            )}
             {role === "admin" && (
-              <NavItem
-                href="/admin"
-                icon={Shield}
-                label="Admin"
-                active={pathname.startsWith("/admin")}
-              />
+              <NavItem href="/admin" icon={Shield} label="Admin" active={pathname.startsWith("/admin")} />
             )}
 
           </SidebarGroupContent>
@@ -254,18 +212,12 @@ export function AppSidebar() {
 
       </SidebarContent>
 
-      {/* FOOTER */}
       <SidebarFooter className="p-3">
-
         {user ? (
           <DropdownMenu>
 
             <DropdownMenuTrigger asChild>
-              <div
-                className={`flex items-center gap-3 cursor-pointer hover:bg-muted/70 p-2 rounded-md transition ${
-                  collapsed ? "justify-center" : ""
-                }`}
-              >
+              <div className={`flex items-center gap-3 cursor-pointer hover:bg-muted/70 p-2 rounded-md transition ${collapsed ? "justify-center" : ""}`}>
                 <Avatar className="w-8 h-8">
                   {avatar && <AvatarImage src={avatar} />}
                   <AvatarFallback>{initial}</AvatarFallback>
@@ -281,7 +233,6 @@ export function AppSidebar() {
 
             <DropdownMenuContent align="end" className="w-56">
 
-              {/* USER HEADER */}
               <DropdownMenuLabel className="flex items-center gap-3 py-3">
                 <Avatar className="w-9 h-9">
                   {avatar && <AvatarImage src={avatar} />}
@@ -289,9 +240,7 @@ export function AppSidebar() {
                 </Avatar>
 
                 <div className="flex flex-col leading-tight">
-                  <span className="font-medium">
-                    {username || "User"}
-                  </span>
+                  <span className="font-medium">{username || "User"}</span>
                   <span className="text-xs text-muted-foreground truncate max-w-[140px]">
                     {user.email}
                   </span>
@@ -316,10 +265,7 @@ export function AppSidebar() {
 
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem
-                onClick={logout}
-                className="flex items-center gap-2 text-red-500"
-              >
+              <DropdownMenuItem onClick={logout} className="flex items-center gap-2 text-red-500">
                 <LogOut size={16} />
                 Log out
               </DropdownMenuItem>
@@ -334,9 +280,7 @@ export function AppSidebar() {
             </Button>
           </Link>
         )}
-
       </SidebarFooter>
-
     </Sidebar>
   );
 }

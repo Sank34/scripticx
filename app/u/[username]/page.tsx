@@ -1,4 +1,5 @@
-import { supabase } from "@/lib/supabase";
+import { createServerSupabase } from "@/lib/supabaseServer";
+import PublicProfileHeader from "@/components/PublicProfileHeader";
 
 import {
   Card,
@@ -37,6 +38,7 @@ export default async function PublicProfile({
 }: {
   params: Promise<{ username: string }>;
 }) {
+  const supabase = createServerSupabase();
   const { username } = await params;
 
   const { data: profile } = await supabase
@@ -44,7 +46,6 @@ export default async function PublicProfile({
     .select("*")
     .eq("username", username)
     .maybeSingle();
-//   console.log(profile);
 
   if (!profile) {
     return (
@@ -69,28 +70,18 @@ export default async function PublicProfile({
   const best: Record<string, any> = {};
   const days = new Set<string>();
 
-  let easy = 0,
-    medium = 0,
-    hard = 0;
-
   submissions?.forEach((sub) => {
     const day = new Date(sub.created_at).toDateString();
     days.add(day);
 
     if (!best[sub.problem_id] || sub.score > best[sub.problem_id].score) {
       best[sub.problem_id] = sub;
-
-      const diff = sub.problems?.difficulty;
-      if (diff === "easy") easy++;
-      if (diff === "medium") medium++;
-      if (diff === "hard") hard++;
     }
   });
 
   const scores = Object.values(best).map((s: any) => s.score);
 
   const solved = scores.filter((s) => s === 100).length;
-  const total = Object.keys(best).length;
   const average =
     scores.length > 0
       ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
@@ -116,58 +107,53 @@ export default async function PublicProfile({
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
 
-      <div className="flex items-center gap-4">
-        <Avatar className="w-16 h-16">
-          {profile.avatar_url && (
-            <AvatarImage src={profile.avatar_url} />
-          )}
-          <AvatarFallback>{initial}</AvatarFallback>
-        </Avatar>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-4">
+          <Avatar className="w-16 h-16">
+            {profile.avatar_url && (
+              <AvatarImage src={profile.avatar_url} />
+            )}
+            <AvatarFallback>{initial}</AvatarFallback>
+          </Avatar>
 
-        <div>
-          <h1 className="text-2xl font-bold">
-            {profile.username}
-          </h1>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-bold">
+              {profile.username}
+            </h1>
 
-          {profile.bio && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {profile.bio}
-            </p>
-          )}
+            <PublicProfileHeader
+              profileId={profile.id}
+              profileUsername={profile.username}
+            />
 
-          <div className="flex gap-4 mt-2 text-sm flex-wrap">
-            {profile.github && (
-              <a
-                href={normalizeUrl(profile.github)}
-                target="_blank"
-                className="flex items-center gap-1 hover:opacity-70"
-              >
-                <BrandIcon icon={siGithub} />
-                GitHub
-              </a>
+            {profile.bio && (
+              <p className="text-sm text-muted-foreground">
+                {profile.bio}
+              </p>
             )}
 
-            {profile.twitter && (
-              <a
-                href={normalizeUrl(profile.twitter)}
-                target="_blank"
-                className="flex items-center gap-1 hover:opacity-70"
-              >
-                <BrandIcon icon={siX} />
-                X
-              </a>
-            )}
+            <div className="flex gap-4 text-sm flex-wrap">
+              {profile.github && (
+                <a href={normalizeUrl(profile.github)} target="_blank" className="flex items-center gap-1">
+                  <BrandIcon icon={siGithub} />
+                  GitHub
+                </a>
+              )}
 
-            {profile.website && (
-              <a
-                href={normalizeUrl(profile.website)}
-                target="_blank"
-                className="flex items-center gap-1 hover:opacity-70"
-              >
-                <Globe size={16} />
-                Website
-              </a>
-            )}
+              {profile.twitter && (
+                <a href={normalizeUrl(profile.twitter)} target="_blank" className="flex items-center gap-1">
+                  <BrandIcon icon={siX} />
+                  X
+                </a>
+              )}
+
+              {profile.website && (
+                <a href={normalizeUrl(profile.website)} target="_blank" className="flex items-center gap-1">
+                  <Globe size={16} />
+                  Website
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -211,22 +197,15 @@ export default async function PublicProfile({
 
         <CardContent className="space-y-3">
           {submissions?.slice(0, 5).map((r: any, i: number) => (
-            <div
-              key={i}
-              className="flex justify-between items-center border-b pb-2"
-            >
+            <div key={i} className="flex justify-between items-center border-b pb-2">
               <div>
-                <p className="font-medium">
-                  {r.problems?.title}
-                </p>
+                <p className="font-medium">{r.problems?.title}</p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(r.created_at).toLocaleString()}
                 </p>
               </div>
 
-              <Badge>
-                {r.score}%
-              </Badge>
+              <Badge>{r.score}%</Badge>
             </div>
           ))}
         </CardContent>

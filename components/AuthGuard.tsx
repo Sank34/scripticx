@@ -13,12 +13,22 @@ export function AuthGuard({ children }: any) {
   useEffect(() => {
     async function loadUser() {
       const { data } = await supabase.auth.getSession();
-
       const session = data.session;
 
       if (!session) {
         setLoading(false);
         router.push("/login");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("banned")
+        .eq("id", session.user.id)
+        .single();
+
+      if (profile?.banned) {
+        router.push("/banned");
         return;
       }
 
@@ -40,7 +50,7 @@ export function AuthGuard({ children }: any) {
   }, [router]);
 
   if (loading) {
-    return <div className="p-6">Loading...</div>;
+    return null;
   }
 
   if (!user) return null;

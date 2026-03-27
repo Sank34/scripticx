@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+import { Users, FileText } from "lucide-react";
+
 function AdminContent({ user }: any) {
   const { role, loading } = useUserRole(user);
   const router = useRouter();
@@ -24,10 +26,13 @@ function AdminContent({ user }: any) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-        {/* PROBLEMS */}
         <Card className="cursor-pointer hover:shadow-md transition">
           <CardContent className="p-6 space-y-4">
-            <h2 className="text-xl font-semibold">Problems</h2>
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-500" />
+              <h2 className="text-xl font-semibold">Problems</h2>
+            </div>
+
             <p className="text-sm text-muted-foreground">
               Create, edit and manage problems
             </p>
@@ -38,15 +43,24 @@ function AdminContent({ user }: any) {
           </CardContent>
         </Card>
 
-        {/* FUTURE */}
-        <Card className="opacity-60">
+        <Card className="cursor-pointer hover:shadow-md transition border-green-500/30">
           <CardContent className="p-6 space-y-4">
-            <h2 className="text-xl font-semibold">Users</h2>
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-green-500" />
+              <h2 className="text-xl font-semibold">Users</h2>
+            </div>
+
             <p className="text-sm text-muted-foreground">
-              Manage users (coming soon)
+              Manage users, roles and bans
             </p>
 
-            <Button disabled>Coming soon</Button>
+            <Button
+              variant="default"
+              className="bg-green-500 hover:bg-green-600"
+              onClick={() => router.push("/admin/users")}
+            >
+              Manage Users
+            </Button>
           </CardContent>
         </Card>
 

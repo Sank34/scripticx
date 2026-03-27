@@ -17,6 +17,7 @@ import {
 
 import { Crown, Medal, Trophy } from "lucide-react";
 
+
 export default function LeaderboardPage() {
   const [users, setUsers] = useState<any[]>([]);
 
