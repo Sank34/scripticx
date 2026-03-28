@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
-import { Flame, Globe, Share2 } from "lucide-react";
+import { Flame, Globe, Share2, Trophy, Check, Rocket, Brain } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 import { toast } from "sonner";
 
@@ -81,6 +81,16 @@ function ProfileContent() {
 
   const [followers, setFollowers] = useState(0);
   const [following, setFollowing] = useState(0);
+
+  const [achievements, setAchievements] = useState<any[]>([]);
+
+  const iconMap: any = {
+    trophy: Trophy,
+    flame: Flame,
+    check: Check,
+    rocket: Rocket,
+    brain: Brain,
+  };
 
   async function fetchData() {
     if (!user) return;
@@ -195,6 +205,17 @@ function ProfileContent() {
       .slice(0, 3)
       .map(([k]) => k);
 
+    const { data: ach } = await supabase
+      .from("user_achievements")
+      .select(`
+        achievement:achievements (
+          title,
+          icon
+        )
+      `)
+      .eq("user_id", user.id);
+
+    setAchievements(ach || []);
     setStats({ solved, total, average });
     setRecent(data.slice(0, 5));
     setDifficulty({ easy, medium, hard });
@@ -365,10 +386,15 @@ function ProfileContent() {
               <CardTitle>Achievements</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2 flex-wrap">
-              {stats.solved >= 1 && <Badge>First Solve 🎉</Badge>}
-              {stats.solved >= 5 && <Badge>5 Solved 🚀</Badge>}
-              {stats.solved >= 10 && <Badge>Pro Solver 🧠</Badge>}
-              {streak >= 3 && <Badge>3 Day Streak 🔥</Badge>}
+              {achievements.map((a, i) => {
+                const Icon = iconMap[a.achievement.icon];
+                return (
+                  <div key={i} className="flex items-center gap-2 px-3 py-1 rounded bg-muted text-sm">
+                    {Icon && <Icon size={14} />}
+                    {a.achievement.title}
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 

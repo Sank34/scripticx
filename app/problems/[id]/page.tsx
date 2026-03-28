@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, X } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
+import { checkAchievements } from "@/lib/achievements";
 
 function ProblemContent() {
   const { user } = useAuth();
@@ -144,6 +145,8 @@ function ProblemContent() {
         })
         .eq("id", user.id);
     }
+
+    await checkAchievements(user.id, score);
   }
 
   const monaco = useMonaco();

@@ -117,7 +117,7 @@ function parseExpression(tokens: string[]): ASTNode {
     const token = tokens[pos];
 
     if (token === "(") {
-      pos++; // consumă (
+      pos++; // (
 
       const node = parseOr();
 
@@ -125,7 +125,7 @@ function parseExpression(tokens: string[]): ASTNode {
         throw new Error("Missing closing parenthesis");
       }
 
-      pos++; // consumă )
+      pos++; // )
 
       return node;
     }

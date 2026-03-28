@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import {
+  MessageSquare,
   Search,
   Trophy,
   Code,
@@ -219,11 +220,14 @@ export function AppSidebar() {
           {!collapsed && <SidebarGroupLabel>Platform</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
-
-            <NavItem href="/editor" icon={Code} label="Editor" active={pathname.startsWith("/editor")} />
+            { user && (
+              <NavItem href="/editor" icon={Code} label="Editor" active={pathname.startsWith("/editor")} />
+            )}
             <NavItem href="/problems" icon={List} label="Problems" active={pathname.startsWith("/problems")} />
             <NavItem href="/leaderboard" icon={Trophy} label="Leaderboard" active={pathname.startsWith("/leaderboard")} />
-
+            {user && (
+              <NavItem href="/feed" icon={MessageSquare} label="Feed" active={pathname.startsWith("/feed")} />
+            )}
             {user && (
               <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" active={pathname.startsWith("/dashboard")} />
             )}
@@ -298,7 +302,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
       </SidebarContent>
-
+      <div className="border-b mt-4" />
       <SidebarFooter className="p-3">
         {user ? (
           <DropdownMenu>

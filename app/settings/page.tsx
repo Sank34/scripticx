@@ -290,7 +290,7 @@ function SettingsContent() {
         </CardHeader>
         <CardContent className="space-y-3">
           <Input value={user.email} disabled />
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} />
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
           <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" />
         </CardContent>
       </Card>
@@ -300,12 +300,13 @@ function SettingsContent() {
           <CardTitle>Social Links</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input value={github} onChange={(e) => setGithub(e.target.value)} />
-          <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} />
-          <Input value={website} onChange={(e) => setWebsite(e.target.value)} />
-          <Button onClick={updateProfile}>Save Changes</Button>
+          <Input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="Github Profile" />
+          <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="Twitter (X) Profile"/>
+          <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Website" autoComplete="off"/>
+          
         </CardContent>
       </Card>
+      <Button onClick={updateProfile}>Save Profile Changes</Button>
 
       <Card>
         <CardHeader>
@@ -313,9 +314,10 @@ function SettingsContent() {
         </CardHeader>
         <CardContent className="space-y-3">
           <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <Button onClick={updatePassword}>Update Password</Button>
+          
         </CardContent>
       </Card>
+      <Button onClick={updatePassword}>Update Password</Button>
 
       <Dialog open={cropOpen} onOpenChange={setCropOpen}>
         <DialogContent>

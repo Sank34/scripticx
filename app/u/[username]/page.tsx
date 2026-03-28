@@ -16,7 +16,7 @@ import {
   AvatarFallback,
 } from "@/components/ui/avatar";
 
-import { Flame, Globe } from "lucide-react";
+import { Flame, Globe, Trophy, Check, Rocket, Brain } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 
 function BrandIcon({ icon }: { icon: any }) {
@@ -67,6 +67,24 @@ export default async function PublicProfile({
     `)
     .eq("user_id", profile.id)
     .order("created_at", { ascending: false });
+
+  const { data: achievements } = await supabase
+    .from("user_achievements")
+    .select(`
+      achievement:achievements (
+        title,
+        icon
+      )
+    `)
+    .eq("user_id", profile.id);
+
+  const iconMap: any = {
+    trophy: Trophy,
+    flame: Flame,
+    check: Check,
+    rocket: Rocket,
+    brain: Brain,
+  };
 
   const best: Record<string, any> = {};
   const days = new Set<string>();
@@ -196,6 +214,23 @@ export default async function PublicProfile({
         </Card>
 
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Achievements</CardTitle>
+        </CardHeader>
+        <CardContent className="flex gap-2 flex-wrap">
+          {achievements?.map((a: any, i: number) => {
+            const Icon = iconMap[a.achievement.icon];
+            return (
+              <div key={i} className="flex items-center gap-2 px-3 py-1 rounded bg-muted text-sm">
+                {Icon && <Icon size={14} />}
+                {a.achievement.title}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
