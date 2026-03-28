@@ -33,6 +33,43 @@ function normalizeUrl(url: string) {
   return url;
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: { username: string } | Promise<{ username: string }>;
+}) {
+  const supabase = createServerSupabase();
+
+  const resolvedParams = await params;
+  const username = resolvedParams.username;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("username, bio, avatar_url")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (!profile) {
+    return {
+      title: "User not found",
+    };
+  }
+
+  const title = `${profile.username} on ScripticX`;
+  const description =
+    profile.bio || `Check out ${profile.username}'s profile on ScripticX`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: profile.avatar_url ? [profile.avatar_url] : [],
+    },
+  };
+}
+
 export default async function PublicProfile({
   params,
 }: {
@@ -77,6 +114,13 @@ export default async function PublicProfile({
       )
     `)
     .eq("user_id", profile.id);
+
+  const { data: posts } = await supabase
+    .from("posts")
+    .select("id, content, image_url, created_at")
+    .eq("user_id", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(3);
 
   const iconMap: any = {
     trophy: Trophy,
@@ -229,6 +273,41 @@ export default async function PublicProfile({
               </div>
             );
           })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Posts</CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          {posts?.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No posts yet.
+            </p>
+          )}
+
+          {posts?.map((p: any) => (
+            <a key={p.id} href={`/post/${p.id}`} className="block mb-3 last:mb-0">
+              <div className="p-3 border rounded hover:bg-muted/50 transition cursor-pointer">
+                <p className="text-sm line-clamp-2">
+                  {p.content}
+                </p>
+
+                {p.image_url && (
+                  <img
+                    src={p.image_url}
+                    className="mt-2 rounded max-h-[120px] w-full object-cover"
+                  />
+                )}
+
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(p.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </a>
+          ))}
         </CardContent>
       </Card>
 

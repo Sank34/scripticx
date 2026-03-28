@@ -106,7 +106,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center text-2xl">
-            Welcome back
+            Welcome
           </CardTitle>
         </CardHeader>
 
