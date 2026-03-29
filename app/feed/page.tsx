@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
 
 import {
   Card,
@@ -30,6 +32,23 @@ import Link from "next/link";
 
 function FeedContent() {
   const { user } = useAuth();
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+
+    if (value) return value;
+
+    // fallback to English
+    let fallback: any = translations["en"];
+    for (const k of keys) fallback = fallback?.[k];
+
+    return fallback || key;
+  };
 
   const [posts, setPosts] = useState<any[]>([]);
   const [content, setContent] = useState("");
@@ -113,7 +132,6 @@ function FeedContent() {
       setLiked(likedMap);
     }
 
-    // Fetch following list
     const { data: followingData } = await supabase
       .from("follows")
       .select("following_id")
@@ -162,7 +180,7 @@ function FeedContent() {
   async function handleShare(postId: string) {
     const url = `${window.location.origin}/post/${postId}`;
     await navigator.clipboard.writeText(url);
-    toast.success("Link copied!");
+    toast.success(t("feed.linkCopied"));
   }
 
   useEffect(() => {
@@ -188,7 +206,7 @@ function FeedContent() {
 
       if (uploadError) {
         // console.error("Upload error:", uploadError);
-        toast.error("Image upload failed");
+        toast.error(t("feed.imageUploadFailed"));
       }
 
       if (!uploadError) {
@@ -215,7 +233,7 @@ function FeedContent() {
     setPosting(false);
 
     if (error) {
-      toast.error("Failed to post");
+      toast.error(t("feed.failedToPost"));
       return;
     }
 
@@ -224,7 +242,7 @@ function FeedContent() {
     setShowCode(false);
     setImage(null);
     fetchPosts();
-    toast.success("Posted!");
+    toast.success(t("feed.posted"));
     setOpen(false);
   }
 
@@ -245,7 +263,7 @@ function FeedContent() {
       });
 
       setSuggested((prev) => [...prev, suggested.find((u) => u.id === userId)].filter(Boolean));
-      toast.success("Unfollowed");
+      toast.success(t("feed.unfollowed"));
     } else {
       await supabase.from("follows").insert({
         follower_id: user.id,
@@ -254,7 +272,7 @@ function FeedContent() {
 
       setFollowing((prev) => new Set(prev).add(userId));
       setSuggested((prev) => prev.filter((u) => u.id !== userId));
-      toast.success("Followed!");
+      toast.success(t("feed.followed"));
     }
   }
 
@@ -263,14 +281,14 @@ function FeedContent() {
 
       <div>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Feed</h1>
+          <h1 className="text-2xl font-bold">{t("feed.title")}</h1>
           <span className="text-sm text-muted-foreground">
-            {posts.length} posts
+            {posts.length} {t("feed.posts")}
           </span>
         </div>
 
         <p className="text-sm text-muted-foreground mt-1">
-          Discover what others are building with MiniScript+ 
+          {t("feed.subtitle")}
         </p>
 
         <div className="border-b mt-4" />
@@ -280,17 +298,17 @@ function FeedContent() {
         <CardContent>
           <div className="flex items-center justify-between">
             <p className="text-muted-foreground">
-              What's on your mind?
+              {t("feed.whatsOnYourMind")}
             </p>
 
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
-                <Button>Create Post</Button>
+                <Button>{t("feed.createPost")}</Button>
               </DialogTrigger>
 
               <DialogContent className="!p-0">
                 <div className="p-5 space-y-4">
-                  <DialogTitle className="mt-0">Create Post</DialogTitle>
+                  <DialogTitle className="mt-0">{t("feed.createPost")}</DialogTitle>
 
                   <div className="flex items-center gap-3">
                     <Avatar>
@@ -308,7 +326,7 @@ function FeedContent() {
                   </div>
 
                   <Textarea
-                    placeholder="What's on your mind?"
+                    placeholder={t("feed.whatsOnYourMind")}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     className="min-h-[120px]"
@@ -320,13 +338,13 @@ function FeedContent() {
                       className="flex items-center gap-2 text-sm hover:opacity-80"
                     >
                       <Code2 size={16} />
-                      {showCode ? "Remove code" : "Add code"}
+                      {showCode ? t("feed.removeCode") : t("feed.addCode")}
                     </button>
                   </div>
 
                   {showCode && (
                     <Textarea
-                      placeholder="Paste your code here..."
+                      placeholder={t("feed.pasteCode")}
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
                       className="min-h-[140px] font-mono mt-2"
@@ -345,14 +363,14 @@ function FeedContent() {
                       document.getElementById("image-upload")?.click();
                     }}
                   >
-                    <p className="text-sm font-medium">Drag & drop an image here</p>
+                    <p className="text-sm font-medium">{t("feed.dragDrop")}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      or click to browse
+                      {t("feed.orClick")}
                     </p>
 
                     {image && (
                       <p className="mt-3 text-xs text-muted-foreground">
-                        Selected: {image.name}
+                        {t("feed.selected")}: {image.name}
                       </p>
                     )}
 
@@ -371,7 +389,7 @@ function FeedContent() {
                       disabled={posting}
                       className="w-full"
                     >
-                      {posting ? "Posting..." : "Post"}
+                      {posting ? t("feed.posting") : t("feed.post")}
                     </Button>
                   </div>
                 </div>
@@ -383,11 +401,11 @@ function FeedContent() {
 
       <Card>
         <CardContent className="space-y-3">
-          <p className="text-sm font-medium">Suggested users</p>
+          <p className="text-sm font-medium">{t("feed.suggestedUsers")}</p>
 
           {suggested.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No suggestions yet.
+              {t("feed.noSuggestions")}
             </p>
           )}
 
@@ -412,7 +430,7 @@ function FeedContent() {
                 variant={following.has(u.id) ? "secondary" : "default"}
                 onClick={() => followUser(u.id)}
               >
-                {following.has(u.id) ? "Unfollow" : "Follow"}
+                {following.has(u.id) ? t("feed.unfollow") : t("feed.follow")}
               </Button>
             </div>
           ))}
@@ -426,7 +444,7 @@ function FeedContent() {
 
       {!loading && posts.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
-          No posts yet. Be the first to share something!
+          {t("feed.noPosts")}
         </div>
       )}
 
@@ -518,7 +536,7 @@ function FeedContent() {
                 className="flex items-center gap-1 hover:opacity-80"
               >
                 <Share2 size={16} />
-                <span>Share</span>
+                <span>{t("feed.share")}</span>
               </button>
             </div>
           </Card>

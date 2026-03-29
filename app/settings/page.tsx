@@ -31,6 +31,8 @@ import {
 
 import { Slider } from "@/components/ui/slider";
 import Cropper from "react-easy-crop";
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
 
 function normalizeUrl(url: string) {
   if (!url) return "";
@@ -42,6 +44,21 @@ function normalizeUrl(url: string) {
 
 function SettingsContent() {
   const { user } = useAuth();
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+
+    if (value) return value;
+
+    let fallback: any = translations["en"];
+    for (const k of keys) fallback = fallback?.[k];
+
+    return fallback || key;
+  };
 
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -182,7 +199,7 @@ function SettingsContent() {
     setCropOpen(false);
     setUploading(false);
 
-    toast.success("Avatar updated");
+    toast.success(t("settings.avatar.updated"));
   }
 
   async function removeAvatar() {
@@ -210,7 +227,7 @@ function SettingsContent() {
     window.dispatchEvent(new Event("profile-updated"));
 
     setUploading(false);
-    toast.success("Avatar removed");
+    toast.success(t("settings.avatar.removed"));
   }
 
   async function updateProfile() {
@@ -230,7 +247,7 @@ function SettingsContent() {
     if (error) return toast.error(error.message);
 
     window.dispatchEvent(new Event("profile-updated"));
-    toast.success("Profile updated");
+    toast.success(t("settings.toast.profileUpdated"));
   }
 
   async function updatePassword() {
@@ -238,7 +255,7 @@ function SettingsContent() {
 
     if (error) return toast.error(error.message);
 
-    toast.success("Password updated");
+    toast.success(t("settings.toast.passwordUpdated"));
     setPassword("");
   }
 
@@ -247,13 +264,13 @@ function SettingsContent() {
   const initial = (username || user.email || "U")[0]?.toUpperCase();
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
 
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
+          <CardTitle>{t("settings.profile")}</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center gap-6">
 
@@ -265,19 +282,19 @@ function SettingsContent() {
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <label className="px-3 py-2 bg-muted rounded-md cursor-pointer text-sm">
-                Upload
+                {t("settings.upload")}
                 <input type="file" accept="image/*" onChange={handleSelectImage} className="hidden" />
               </label>
 
               {avatar && (
                 <Button size="sm" variant="destructive" onClick={removeAvatar}>
-                  Remove
+                  {t("settings.remove")}
                 </Button>
               )}
             </div>
 
             <p className="text-xs text-muted-foreground">
-              {fileName || "No file selected"}
+              {fileName || t("settings.noFile")}
             </p>
           </div>
 
@@ -286,43 +303,43 @@ function SettingsContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Account</CardTitle>
+          <CardTitle>{t("settings.account")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input value={user.email} disabled />
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
-          <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" />
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("settings.username")} />
+          <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder={t("settings.bio")} />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Social Links</CardTitle>
+          <CardTitle>{t("settings.social")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="Github Profile" />
-          <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="Twitter (X) Profile"/>
-          <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="Website" autoComplete="off"/>
+          <Input value={github} onChange={(e) => setGithub(e.target.value)} placeholder={t("settings.github")} />
+          <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder={t("settings.twitter")}/>
+          <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder={t("settings.website")} autoComplete="off"/>
           
         </CardContent>
       </Card>
-      <Button onClick={updateProfile}>Save Profile Changes</Button>
+      <Button onClick={updateProfile}>{t("settings.saveProfile")}</Button>
 
       <Card>
         <CardHeader>
-          <CardTitle>Security</CardTitle>
+          <CardTitle>{t("settings.security")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
           
         </CardContent>
       </Card>
-      <Button onClick={updatePassword}>Update Password</Button>
+      <Button onClick={updatePassword}>{t("settings.updatePassword")}</Button>
 
       <Dialog open={cropOpen} onOpenChange={setCropOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Avatar</DialogTitle>
+            <DialogTitle>{t("settings.avatar.edit")}</DialogTitle>
           </DialogHeader>
 
           <div className="relative h-[300px] w-full bg-black">
@@ -344,7 +361,7 @@ function SettingsContent() {
 
           <DialogFooter>
             <Button onClick={handleSaveCropped}>
-              Save
+              {t("settings.avatar.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

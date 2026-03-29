@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Ban } from "lucide-react";
@@ -11,6 +14,19 @@ import { Ban } from "lucide-react";
 export default function BannedPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+
+    for (const k of keys) {
+      value = value?.[k];
+    }
+
+    return value || key;
+  };
 
   useEffect(() => {
     async function check() {
@@ -57,18 +73,18 @@ export default function BannedPage() {
           </div>
 
           <h1 className="text-2xl font-bold text-red-600">
-            Account Suspended
+            {t("banned.title")}
           </h1>
 
           <p className="text-sm text-muted-foreground">
-            Your account has been banned from using the platform.
+            {t("banned.description")}
           </p>
 
           <Button
             onClick={logout}
             className="mt-2 bg-red-500 hover:bg-red-600"
           >
-            Logout
+            {t("banned.logout")}
           </Button>
 
         </CardContent>

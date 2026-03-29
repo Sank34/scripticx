@@ -11,9 +11,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Check, X } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 import { checkAchievements } from "@/lib/achievements";
+import { useLanguage } from "@/components/LanguageProvider";
+import { getLocalized } from "@/lib/getLocalized";
 
 function ProblemContent() {
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const { role } = useUserRole(user);
 
   const params = useParams();
@@ -57,7 +60,7 @@ function ProblemContent() {
       try {
         program = code.split("\n").map(parseLine);
       } catch (e: any) {
-        setResult(`ERROR: ${e.message}`);
+        setResult(`${t("problemPage.result.error")}: ${e.message}`);
         return;
       }
 
@@ -85,7 +88,7 @@ function ProblemContent() {
           }
         }
       } catch (e: any) {
-        out.push(`ERROR: ${e.message}`);
+        out.push(`${t("problemPage.result.error")}: ${e.message}`);
       }
 
       const normalize = (str: string) =>
@@ -106,7 +109,7 @@ function ProblemContent() {
       (results.filter(r => r.passed).length / results.length) * 100
     );
 
-    setResult(`Score: ${score}%`);
+    setResult(`${t("problemPage.result.score")}: ${score}%`);
     setTestResults(results);
 
     const { data: previous } = await supabase
@@ -199,15 +202,19 @@ function ProblemContent() {
   }
 
   if (!problem) {
-    return <div className="p-6">Problem not found</div>;
+    return <div className="p-6">{t("problemPage.notFound")}</div>;
   }
 
   return (
     <div className="h-[calc(100vh-80px)] flex">
 
       <div className="w-1/2 border-r p-6">
-        <h1 className="text-2xl font-bold">{problem.title}</h1>
-        <p className="text-muted-foreground">{problem.description}</p>
+        <h1 className="text-2xl font-bold">
+          {getLocalized(problem.title_i18n, locale)}
+        </h1>
+        <p className="text-muted-foreground">
+          {getLocalized(problem.description_i18n, locale)}
+        </p>
       </div>
 
       <div className="w-1/2 p-6 flex flex-col gap-4">
@@ -226,7 +233,7 @@ function ProblemContent() {
           onClick={runCode}
           className="px-4 py-2 bg-black text-white rounded"
         >
-          Submit
+          {t("problemPage.actions.submit")}
         </button>
 
         {result && <div className="font-bold">{result}</div>}
@@ -240,19 +247,19 @@ function ProblemContent() {
               }`}
             >
               <div className="flex justify-between">
-                <p>Test #{i + 1}</p>
+                <p>{t("problemPage.tests.test")} #{i + 1}</p>
                 {r.passed ? <Check /> : <X />}
               </div>
 
               <div className="text-sm mt-2">
-                <p>Input: {JSON.stringify(r.input)}</p>
+                <p>{t("problemPage.tests.input")}: {JSON.stringify(r.input)}</p>
 
                 {!r.passed && (
                   <>
-                    <p className="mt-2 font-medium">Expected:</p>
+                    <p className="mt-2 font-medium">{t("problemPage.tests.expected")}:</p>
                     <pre className="bg-muted p-2 rounded">{r.expected}</pre>
 
-                    <p className="mt-2 font-medium">Got:</p>
+                    <p className="mt-2 font-medium">{t("problemPage.tests.got")}:</p>
                     <pre className="bg-muted p-2 rounded">{r.got}</pre>
                   </>
                 )}

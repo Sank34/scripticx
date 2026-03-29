@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import Link from "next/link";
 
+import { useLanguage } from "@/components/LanguageProvider";
+
 import {
   Card,
   CardContent,
@@ -41,6 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 function AdminUsersContent() {
+  const { t } = useLanguage();
   const [users, setUsers] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +112,7 @@ function AdminUsersContent() {
   }, [search, users]);
 
   if (loading) {
-    return <div className="p-6">Loading...</div>;
+    return <div className="p-6">{t("admin.users.page.loading")}</div>;
   }
 
   return (
@@ -117,14 +120,14 @@ function AdminUsersContent() {
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
-          Manage Users
+          {t("admin.users.page.manageTitle")}
         </h1>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search users..."
+          placeholder={t("admin.users.page.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -134,7 +137,7 @@ function AdminUsersContent() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {filtered.length} users
+            {filtered.length} {t("admin.users.page.usersCount")}
           </CardTitle>
         </CardHeader>
 
@@ -170,7 +173,7 @@ function AdminUsersContent() {
 
                     {u.banned && (
                       <Badge variant="destructive">
-                        banned
+                        {t("admin.users.page.badges.banned")}
                       </Badge>
                     )}
                   </div>
@@ -221,17 +224,17 @@ function AdminUsersContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete this user?
+              {t("admin.users.page.dialog.deleteTitle")}
             </AlertDialogTitle>
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("admin.users.page.dialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteUser(deleteId!)}
               className="bg-red-500 hover:bg-red-600"
             >
-              Delete
+              {t("admin.users.page.dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

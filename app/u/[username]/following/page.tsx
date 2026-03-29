@@ -1,5 +1,7 @@
 import { createServerSupabase } from "@/lib/supabaseServer";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { translations } from "@/lib/i18n";
 
 import {
   Card,
@@ -20,6 +22,17 @@ export default async function FollowingPage({
   params: Promise<{ username: string }>;
 }) {
   const supabase = createServerSupabase();
+
+  const cookieStore = await cookies();
+  const locale = (cookieStore.get("locale")?.value as "en" | "ro") || "en";
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+    return value || key;
+  };
+
   const { username } = await params;
 
   const { data: profile } = await supabase
@@ -29,7 +42,7 @@ export default async function FollowingPage({
     .single();
 
   if (!profile) {
-    return <div className="p-6">User not found</div>;
+    return <div className="p-6">{t("publicProfile.notFound")}</div>;
   }
 
   const { data: follows } = await supabase
@@ -48,13 +61,13 @@ export default async function FollowingPage({
     <div className="p-6 max-w-3xl mx-auto space-y-6">
 
       <h1 className="text-2xl font-bold">
-        Following
+        {t("social.following.title")}
       </h1>
 
       <Card>
         <CardHeader>
           <CardTitle>
-            {follows?.length || 0} following
+            {t("social.following.count").replace("{count}", String(follows?.length || 0))}
           </CardTitle>
         </CardHeader>
 

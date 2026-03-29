@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
 import { Search, Trophy, ArrowUpRight, UserX } from "lucide-react";
+import { useLanguage } from "@/components/LanguageProvider";
 
 function normalize(str: string) {
   return str.toLowerCase().trim();
@@ -19,6 +20,7 @@ function normalize(str: string) {
 
 function SearchContent() {
   const router = useRouter();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
 
   const initialQuery = searchParams.get("q") || "";
@@ -100,7 +102,7 @@ function SearchContent() {
         <Input
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Search users..."
+          placeholder={t("search.placeholder")}
           className="pl-10"
         />
       </form>
@@ -109,7 +111,7 @@ function SearchContent() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-yellow-500" />
-            <p className="font-medium">Top Users</p>
+            <p className="font-medium">{t("search.topUsers")}</p>
           </div>
 
           <div className="space-y-2">
@@ -135,7 +137,7 @@ function SearchContent() {
                     <div>
                       <p className="font-medium">{u.username}</p>
                       <p className="text-xs text-muted-foreground">
-                        {u.total_score || 0} pts
+                        {u.total_score || 0} {t("search.points")}
                       </p>
                     </div>
                   </div>
@@ -150,7 +152,7 @@ function SearchContent() {
 
       {!query && recent.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Recent searches</p>
+          <p className="text-sm text-muted-foreground">{t("search.recent")}</p>
           <div className="flex gap-2 flex-wrap">
             {recent.map((r, i) => (
               <Badge
@@ -179,7 +181,7 @@ function SearchContent() {
           {!loading && results.length === 0 && (
             <div className="text-center py-10 text-muted-foreground space-y-2">
               <UserX className="mx-auto w-6 h-6" />
-              <p>No users found</p>
+              <p>{t("search.noResults")}</p>
             </div>
           )}
 
@@ -209,7 +211,7 @@ function SearchContent() {
                     )}
 
                     <p className="text-xs text-muted-foreground">
-                      {u.total_score || 0} pts
+                      {u.total_score || 0} {t("search.points")}
                     </p>
                   </div>
 

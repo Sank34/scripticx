@@ -10,9 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/components/LanguageProvider";
+import { getLocalized } from "@/lib/getLocalized";
 
 export default function ProblemsPage() {
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
 
   const [filter, setFilter] = useState<
     "all" | "easy" | "medium" | "hard"
@@ -64,18 +67,18 @@ export default function ProblemsPage() {
   const filteredProblems = problems.filter((p) => {
     return (
       (filter === "all" || p.difficulty === filter) &&
-      (p.title.toLowerCase().includes(search.toLowerCase()) ||
-        p.description.toLowerCase().includes(search.toLowerCase()))
+      (getLocalized(p.title_i18n, locale).toLowerCase().includes(search.toLowerCase()) ||
+        getLocalized(p.description_i18n, locale).toLowerCase().includes(search.toLowerCase()))
     );
   });
 
   return (
     <div className="p-6 space-y-6">
 
-      <h1 className="text-3xl font-bold">Problems</h1>
+      <h1 className="text-3xl font-bold">{t("problems.title")}</h1>
 
       <Input
-        placeholder="Search problems..."
+        placeholder={t("problems.searchPlaceholder")}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -87,7 +90,7 @@ export default function ProblemsPage() {
             variant={filter === f ? "default" : "outline"}
             onClick={() => setFilter(f as any)}
           >
-            {f}
+            {t(`problems.filters.${f}`)}
           </Button>
         ))}
       </div>
@@ -110,10 +113,10 @@ export default function ProblemsPage() {
 
                     <div>
                       <h2 className="text-lg font-semibold">
-                        {p.title}
+                        {getLocalized(p.title_i18n, locale)}
                       </h2>
                       <p className="text-sm text-muted-foreground">
-                        {p.description}
+                        {getLocalized(p.description_i18n, locale)}
                       </p>
                     </div>
 
@@ -121,10 +124,10 @@ export default function ProblemsPage() {
 
                       <span className="text-sm font-medium">
                         {score === 100
-                          ? "Solved"
+                          ? t("problems.status.solved")
                           : score
                           ? `${score}%`
-                          : "Not started"}
+                          : t("problems.status.notStarted")}
                       </span>
 
                       <Badge
@@ -136,7 +139,7 @@ export default function ProblemsPage() {
                             : "destructive"
                         }
                       >
-                        {p.difficulty}
+                        {t(`problems.filters.${p.difficulty}`)}
                       </Badge>
 
                     </div>

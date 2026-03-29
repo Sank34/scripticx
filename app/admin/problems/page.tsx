@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useRouter } from "next/navigation";
+import { getLocalized } from "@/lib/getLocalized";
+import { useLanguage } from "@/components/LanguageProvider";
 
 import {
   Card,
@@ -37,6 +39,7 @@ import { toast } from "sonner";
 
 function AdminProblemsContent() {
   const router = useRouter();
+  const { locale, t } = useLanguage();
 
   const [problems, setProblems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,24 +70,24 @@ function AdminProblemsContent() {
       .eq("id", deleteId);
 
     if (error) {
-      toast.error("Failed to delete problem");
+      toast.error(t("admin.problems.toast.deleteError"));
       return;
     }
 
     setProblems((prev) => prev.filter((p) => p.id !== deleteId));
     setDeleteId(null);
 
-    toast.success("Problem deleted");
+    toast.success(t("admin.problems.toast.deleted"));
   }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
 
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Manage Problems</h1>
+        <h1 className="text-3xl font-bold">{t("admin.problems.manageTitle")}</h1>
 
         <Button onClick={() => setOpenCreate(true)}>
-          Create Problem
+          {t("admin.problems.create")}
         </Button>
       </div>
 
@@ -101,9 +104,11 @@ function AdminProblemsContent() {
               <CardContent className="p-4 flex justify-between items-center">
 
                 <div>
-                  <h2 className="font-semibold text-lg">{p.title}</h2>
+                  <h2 className="font-semibold text-lg">
+                    {getLocalized(p.title_i18n, locale)}
+                  </h2>
                   <p className="text-sm text-muted-foreground">
-                    {p.description}
+                    {getLocalized(p.description_i18n, locale)}
                   </p>
                 </div>
 
@@ -113,14 +118,14 @@ function AdminProblemsContent() {
                     variant="outline"
                     onClick={() => router.push(`/admin/problems/${p.id}`)}
                   >
-                    Edit
+                    {t("admin.problems.edit")}
                   </Button>
 
                   <Button
                     variant="destructive"
                     onClick={() => setDeleteId(p.id)}
                   >
-                    Delete
+                    {t("admin.problems.delete")}
                   </Button>
 
                 </div>
@@ -134,16 +139,16 @@ function AdminProblemsContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete problem?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.problems.dialog.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone.
+              {t("admin.problems.dialog.deleteDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("admin.problems.dialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
-              Delete
+              {t("admin.problems.dialog.confirmDelete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -152,7 +157,7 @@ function AdminProblemsContent() {
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Problem</DialogTitle>
+            <DialogTitle>{t("admin.problems.dialog.createTitle")}</DialogTitle>
           </DialogHeader>
 
           <ProblemForm

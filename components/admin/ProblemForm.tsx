@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, Trash } from "lucide-react";
+import { useLanguage } from "@/components/LanguageProvider";
 
 import {
   Select,
@@ -18,8 +19,24 @@ import {
 } from "@/components/ui/select";
 
 export function ProblemForm({ initialData, onSuccess }: any) {
-  const [title, setTitle] = useState(initialData?.title || "");
-  const [description, setDescription] = useState(initialData?.description || "");
+  const { t } = useLanguage();
+
+  const [languages, setLanguages] = useState<string[]>(
+    initialData?.title_i18n
+      ? Object.keys(initialData.title_i18n)
+      : ["en"]
+  );
+
+  const [activeLang, setActiveLang] = useState<string>(languages[0]);
+
+  const [title_i18n, setTitleI18n] = useState<any>(
+    initialData?.title_i18n || { en: "" }
+  );
+
+  const [description_i18n, setDescriptionI18n] = useState<any>(
+    initialData?.description_i18n || { en: "" }
+  );
+
   const [starterCode, setStarterCode] = useState(initialData?.starter_code || "");
   const [difficulty, setDifficulty] = useState(initialData?.difficulty || "easy");
 
@@ -30,6 +47,43 @@ export function ProblemForm({ initialData, onSuccess }: any) {
   );
 
   const [loading, setLoading] = useState(false);
+
+  function updateTitle(lang: string, value: string) {
+    setTitleI18n((prev: any) => ({ ...prev, [lang]: value }));
+  }
+
+  function updateDescription(lang: string, value: string) {
+    setDescriptionI18n((prev: any) => ({ ...prev, [lang]: value }));
+  }
+
+  function addLanguage(lang: string) {
+    if (languages.includes(lang)) return;
+    setLanguages([...languages, lang]);
+    setActiveLang(lang);
+  }
+
+  function removeLanguage(lang: string) {
+    if (languages.length === 1) return;
+
+    const updatedLangs = languages.filter((l) => l !== lang);
+    setLanguages(updatedLangs);
+
+    setTitleI18n((prev: any) => {
+      const copy = { ...prev };
+      delete copy[lang];
+      return copy;
+    });
+
+    setDescriptionI18n((prev: any) => {
+      const copy = { ...prev };
+      delete copy[lang];
+      return copy;
+    });
+
+    if (activeLang === lang) {
+      setActiveLang(updatedLangs[0]);
+    }
+  }
 
   function addTestCase() {
     setTestCases([...testCases, { input: [], output: "" }]);
@@ -58,6 +112,19 @@ export function ProblemForm({ initialData, onSuccess }: any) {
   }
 
   async function handleSubmit() {
+    const hasTitle = Object.values(title_i18n || {}).some(
+      (v: any) => typeof v === "string" && v.trim()
+    );
+
+    const hasDescription = Object.values(description_i18n || {}).some(
+      (v: any) => typeof v === "string" && v.trim()
+    );
+
+    if (!hasTitle || !hasDescription) {
+      toast.error(t("admin.problems.form.validation.required"));
+      return;
+    }
+
     setLoading(true);
 
     let error;
@@ -66,8 +133,8 @@ export function ProblemForm({ initialData, onSuccess }: any) {
       ({ error } = await supabase
         .from("problems")
         .update({
-          title,
-          description,
+          title_i18n,
+          description_i18n,
           starter_code: starterCode,
           difficulty,
           test_cases: testCases,
@@ -78,8 +145,8 @@ export function ProblemForm({ initialData, onSuccess }: any) {
         .from("problems")
         .insert([
           {
-            title,
-            description,
+            title_i18n,
+            description_i18n,
             starter_code: starterCode,
             difficulty,
             test_cases: testCases,
@@ -90,11 +157,15 @@ export function ProblemForm({ initialData, onSuccess }: any) {
     setLoading(false);
 
     if (error) {
-      toast.error("Failed to save problem");
+      toast.error(t("admin.problems.form.toast.saveError"));
       return;
     }
 
-    toast.success(initialData ? "Problem updated" : "Problem created");
+    toast.success(
+      initialData
+        ? t("admin.problems.form.toast.updated")
+        : t("admin.problems.form.toast.created")
+    );
 
     onSuccess?.();
   }
@@ -102,31 +173,67 @@ export function ProblemForm({ initialData, onSuccess }: any) {
   return (
     <div className="space-y-6">
 
-      <Input
-        placeholder="Title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
+      <div className="space-y-3">
+        <div className="flex gap-2 flex-wrap">
+          {languages.map((lang) => (
+            <Button
+              key={lang}
+              size="sm"
+              variant={activeLang === lang ? "default" : "outline"}
+              onClick={() => setActiveLang(lang)}
+            >
+              {lang.toUpperCase()}
+            </Button>
+          ))}
+
+          <Select onValueChange={(val) => addLanguage(val)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder={t("admin.problems.form.addLanguage")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="ro">Română</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {languages.length > 1 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => removeLanguage(activeLang)}
+          >
+            {t("admin.problems.form.deleteLanguage")} {activeLang.toUpperCase()}
+          </Button>
+        )}
+
+        <Input
+          placeholder={`${t("admin.problems.form.title")} (${activeLang})`}
+          value={title_i18n[activeLang] || ""}
+          onChange={(e) => updateTitle(activeLang, e.target.value)}
+        />
+
+        <Textarea
+          placeholder={`${t("admin.problems.form.description")} (${activeLang})`}
+          value={description_i18n[activeLang] || ""}
+          onChange={(e) => updateDescription(activeLang, e.target.value)}
+        />
+      </div>
 
       <Textarea
-        placeholder="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-
-      <Textarea
-        placeholder="Starter code"
+        placeholder={t("admin.problems.form.starterCode")}
         value={starterCode}
         onChange={(e) => setStarterCode(e.target.value)}
         className="font-mono"
       />
 
       <div className="space-y-2">
-        <p className="text-lg font-medium">Difficulty</p>
+        <p className="text-lg font-medium">
+          {t("admin.problems.form.difficulty")}
+        </p>
 
         <Select value={difficulty} onValueChange={setDifficulty}>
           <SelectTrigger>
-            <SelectValue placeholder="Select difficulty" />
+            <SelectValue placeholder={t("admin.problems.form.selectDifficulty")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="easy">Easy</SelectItem>
@@ -137,7 +244,9 @@ export function ProblemForm({ initialData, onSuccess }: any) {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Test Cases</h2>
+        <h2 className="text-lg font-semibold">
+          {t("admin.problems.form.testCases")}
+        </h2>
 
         {testCases.map((test: any, index: number) => (
           <Card key={index}>
@@ -156,13 +265,13 @@ export function ProblemForm({ initialData, onSuccess }: any) {
               </div>
 
               <Input
-                placeholder='Input (ex: [3] or [1,2])'
+                placeholder={t("admin.problems.form.inputPlaceholder")}
                 defaultValue={JSON.stringify(test.input)}
                 onChange={(e) => updateInput(index, e.target.value)}
               />
 
               <Textarea
-                placeholder="Expected Output"
+                placeholder={t("admin.problems.form.expectedOutput")}
                 defaultValue={test.output}
                 onChange={(e) => updateOutput(index, e.target.value)}
                 className="font-mono"
@@ -174,16 +283,24 @@ export function ProblemForm({ initialData, onSuccess }: any) {
 
         <Button onClick={addTestCase} variant="secondary" className="w-full">
           <Plus size={16} className="mr-2" />
-          Add Test Case
+          {t("admin.problems.form.addTestCase")}
         </Button>
       </div>
 
-      <Button onClick={handleSubmit} disabled={loading} className="w-full">
+      <Button
+        onClick={handleSubmit}
+        disabled={
+          loading ||
+          !Object.values(title_i18n || {}).some((v: any) => v?.trim?.()) ||
+          !Object.values(description_i18n || {}).some((v: any) => v?.trim?.())
+        }
+        className="w-full"
+      >
         {loading
-          ? "Saving..."
+          ? t("admin.problems.form.submit.saving")
           : initialData
-          ? "Update Problem"
-          : "Create Problem"}
+          ? t("admin.problems.form.submit.update")
+          : t("admin.problems.form.submit.create")}
       </Button>
 
     </div>

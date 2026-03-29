@@ -25,6 +25,8 @@ import {
   AvatarImage,
   AvatarFallback,
 } from "@/components/ui/avatar";
+import { useLanguage } from "@/components/LanguageProvider";
+import { getLocalized } from "@/lib/getLocalized";
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -53,6 +55,7 @@ function isValidUrl(url: string) {
 
 function ProfileContent() {
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
 
   const [loading, setLoading] = useState(true);
 
@@ -138,7 +141,7 @@ function ProfileContent() {
       .select(`
         *,
         problems (
-          title,
+          title_i18n,
           difficulty
         )
       `)
@@ -197,7 +200,8 @@ function ProfileContent() {
 
     const count: Record<string, number> = {};
     data.forEach((d) => {
-      count[d.problems?.title] = (count[d.problems?.title] || 0) + 1;
+      const title = getLocalized(d.problems?.title_i18n, locale);
+      count[title] = (count[title] || 0) + 1;
     });
 
     const fav = Object.entries(count)
@@ -254,7 +258,7 @@ function ProfileContent() {
   const handleShare = () => {
     const url = `${window.location.origin}/u/${username || user.id}`;
     navigator.clipboard.writeText(url);
-    toast.success("Profile link copied!");
+    toast.success(t("profile.shareCopied"));
   };
 
   return (
@@ -274,8 +278,8 @@ function ProfileContent() {
             <p className="text-muted-foreground">{user.email}</p>
 
             <div className="flex gap-4 mt-1 text-sm">
-              <span><b>{followers}</b> followers</span>
-              <span><b>{following}</b> following</span>
+              <span><b>{followers}</b> {t("profile.followers")}</span>
+              <span><b>{following}</b> {t("profile.following")}</span>
             </div>
 
             {bio && (
@@ -320,18 +324,18 @@ function ProfileContent() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Stats</CardTitle>
+              <CardTitle>{t("profile.stats.title")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p>Solved: {stats.solved}</p>
-              <p>Attempted: {stats.total}</p>
-              <p>Average: {stats.average}%</p>
+              <p>{t("profile.stats.solved")}: {stats.solved}</p>
+              <p>{t("profile.stats.attempted")}: {stats.total}</p>
+              <p>{t("profile.stats.average")}: {stats.average}%</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Success Rate</CardTitle>
+              <CardTitle>{t("profile.successRate")}</CardTitle>
             </CardHeader>
             <CardContent>
               <Progress value={successRate} />
@@ -341,12 +345,14 @@ function ProfileContent() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle>Streak</CardTitle>
+              <CardTitle>{t("profile.streak.title")}</CardTitle>
               <Flame className="w-10 h-10 text-orange-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{streak}</div>
-              <p className="text-xs text-muted-foreground">days active</p>
+              <p className="text-xs text-muted-foreground">
+                {t("profile.streak.days")}
+              </p>
             </CardContent>
           </Card>
 
@@ -356,23 +362,23 @@ function ProfileContent() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Difficulty Distribution</CardTitle>
+              <CardTitle>{t("profile.difficulty.title")}</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Badge variant="secondary">Easy {difficulty.easy}</Badge>
-              <Badge variant="default">Medium {difficulty.medium}</Badge>
-              <Badge variant="destructive">Hard {difficulty.hard}</Badge>
+              <Badge variant="secondary">{t("profile.difficulty.easy")} {difficulty.easy}</Badge>
+              <Badge variant="default">{t("profile.difficulty.medium")} {difficulty.medium}</Badge>
+              <Badge variant="destructive">{t("profile.difficulty.hard")} {difficulty.hard}</Badge>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Favorite Problems</CardTitle>
+              <CardTitle>{t("profile.favorites.title")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {favorites.length === 0 && (
                 <p className="text-muted-foreground text-sm">
-                  No favorites yet.
+                  {t("profile.favorites.empty")}
                 </p>
               )}
               {favorites.map((f, i) => (
@@ -383,7 +389,7 @@ function ProfileContent() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Achievements</CardTitle>
+              <CardTitle>{t("profile.achievements.title")}</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-2 flex-wrap">
               {achievements.map((a, i) => {
@@ -400,14 +406,16 @@ function ProfileContent() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Submissions</CardTitle>
+              <CardTitle>{t("profile.recent.title")}</CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-3">
               {recent.map((r, i) => (
                 <div key={i} className="flex justify-between items-center border-b pb-2">
                   <div>
-                    <p className="font-medium">{r.problems?.title}</p>
+                    <p className="font-medium">
+                      {getLocalized(r.problems?.title_i18n, locale)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(r.created_at).toLocaleString()}
                     </p>

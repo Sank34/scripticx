@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
@@ -50,15 +50,19 @@ import {
   PanelLeft,
   BookOpen,
   ChevronDown,
+  Globe,
 } from "lucide-react";
 
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
+  const { t, setLocale, locale } = useLanguage();
+  const router = useRouter();
 
   const [user, setUser] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -217,32 +221,32 @@ export function AppSidebar() {
         </div>
 
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel>Platform</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel>{t("sidebar.platform")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             { user && (
-              <NavItem href="/editor" icon={Code} label="Editor" active={pathname.startsWith("/editor")} />
+              <NavItem href="/editor" icon={Code} label={t("nav.editor")} active={pathname.startsWith("/editor")} />
             )}
-            <NavItem href="/problems" icon={List} label="Problems" active={pathname.startsWith("/problems")} />
-            <NavItem href="/leaderboard" icon={Trophy} label="Leaderboard" active={pathname.startsWith("/leaderboard")} />
+            <NavItem href="/problems" icon={List} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
+            <NavItem href="/leaderboard" icon={Trophy} label={t("nav.leaderboard")} active={pathname.startsWith("/leaderboard")} />
             {user && (
-              <NavItem href="/feed" icon={MessageSquare} label="Feed" active={pathname.startsWith("/feed")} />
-            )}
-            {user && (
-              <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" active={pathname.startsWith("/dashboard")} />
+              <NavItem href="/feed" icon={MessageSquare} label={t("nav.feed")} active={pathname.startsWith("/feed")} />
             )}
             {user && (
-              <NavItem href="/search" icon={Search} label="Search" active={pathname.startsWith("/search")} />
+              <NavItem href="/dashboard" icon={LayoutDashboard} label={t("nav.dashboard")} active={pathname.startsWith("/dashboard")} />
+            )}
+            {user && (
+              <NavItem href="/search" icon={Search} label={t("nav.search")} active={pathname.startsWith("/search")} />
             )}
             {role === "admin" && (
-              <NavItem href="/admin" icon={Shield} label="Admin" active={pathname.startsWith("/admin")} />
+              <NavItem href="/admin" icon={Shield} label={t("nav.admin")} active={pathname.startsWith("/admin")} />
             )}
 
           </SidebarGroupContent>
         </SidebarGroup>
 
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel>Learn</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel>{t("sidebar.learn")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
 
@@ -259,7 +263,7 @@ export function AppSidebar() {
                 <NavItem
                   href="/learn"
                   icon={BookOpen}
-                  label="Docs"
+                  label={t("nav.docs")}
                   active={pathname.startsWith("/learn")}
                 />
 
@@ -288,10 +292,10 @@ export function AppSidebar() {
                   }`}
                 >
                   <div className="ml-2 border-l pl-2 space-y-1">
-                    <SubItem href="/learn/basics" label="Basics" />
-                    <SubItem href="/learn/variables" label="Variables" />
-                    <SubItem href="/learn/loops" label="Loops" />
-                    <SubItem href="/learn/input-output" label="Input / Output" />
+                    <SubItem href="/learn/basics" label={t("learn.basics")} />
+                    <SubItem href="/learn/variables" label={t("learn.variables")} />
+                    <SubItem href="/learn/loops" label={t("learn.loops")} />
+                    <SubItem href="/learn/input-output" label={t("learn.inputOutput")} />
                   </div>
                 </div>
               )}
@@ -331,7 +335,7 @@ export function AppSidebar() {
                 </Avatar>
 
                 <div className="flex flex-col leading-tight">
-                  <span className="font-medium">{username || "User"}</span>
+                  <span className="font-medium">{username || t("user.user")}</span>
                   <span className="text-xs text-muted-foreground truncate max-w-[140px]">
                     {user.email}
                   </span>
@@ -343,22 +347,54 @@ export function AppSidebar() {
               <DropdownMenuItem asChild>
                 <Link href="/profile" className="flex items-center gap-2">
                   <User size={16} />
-                  Profile
+                  {t("user.profile")}
                 </Link>
               </DropdownMenuItem>
 
               <DropdownMenuItem asChild>
                 <Link href="/settings" className="flex items-center gap-2">
                   <Settings size={16} />
-                  Settings
+                  {t("user.settings")}
                 </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Globe size={16} />
+                  {t("user.language")}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    onClick={() => {
+                      setLocale("en");
+                      document.cookie = "locale=en; path=/";
+                      router.refresh();
+                    }}
+                    className={`px-2 py-0.5 rounded ${locale === "en" ? "bg-muted" : "hover:bg-muted/50"}`}
+                  >
+                    EN
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLocale("ro");
+                      document.cookie = "locale=ro; path=/";
+                      router.refresh();
+                    }}
+                    className={`px-2 py-0.5 rounded ${locale === "ro" ? "bg-muted" : "hover:bg-muted/50"}`}
+                  >
+                    RO
+                  </button>
+                </div>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
 
               <DropdownMenuItem onClick={logout} className="flex items-center gap-2 text-red-500">
                 <LogOut size={16} />
-                Log out
+                {t("user.logout")}
               </DropdownMenuItem>
 
             </DropdownMenuContent>
@@ -367,7 +403,7 @@ export function AppSidebar() {
         ) : (
           <Link href="/login">
             <Button className="w-full">
-              {collapsed ? "→" : "Login"}
+              {collapsed ? ">" : t("user.login")}
             </Button>
           </Link>
         )}

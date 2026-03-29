@@ -20,6 +20,8 @@ import PostComments from "@/components/PostComments";
 import { Heart, MessageCircle, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
 
 function ClientPost({
   params,
@@ -31,6 +33,21 @@ function ClientPost({
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
   const [commentsCount, setCommentsCount] = useState(0);
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+
+    if (value) return value;
+
+    let fallback: any = translations["en"];
+    for (const k of keys) fallback = fallback?.[k];
+
+    return fallback || key;
+  };
 
   useEffect(() => {
     async function load() {
@@ -107,11 +124,11 @@ function ClientPost({
     if (!post) return;
     const url = `${window.location.origin}/post/${post.id}`;
     await navigator.clipboard.writeText(url);
-    toast.success("Link copied!");
+    toast.success(t("post.linkCopied"));
   }
 
   if (!post) {
-    return <div className="p-6">Loading...</div>;
+    return <div className="p-6">{t("post.loading")}</div>;
   }
 
   return (
@@ -132,7 +149,7 @@ function ClientPost({
           <div>
             <Link href={`/u/${profile?.username}`}>
               <p className="font-medium hover:underline">
-                {profile?.username || "User"}
+                {profile?.username || t("post.userFallback")}
               </p>
             </Link>
 
@@ -189,7 +206,7 @@ function ClientPost({
               size={16}
               className="transition-transform duration-150 active:scale-125"
             />
-            <span>Share</span>
+            <span>{t("post.share")}</span>
           </button>
         </div>
       </Card>

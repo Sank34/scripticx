@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,7 +11,24 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function BasicsPage() {
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+
+    for (const k of keys) value = value?.[k];
+    if (value) return value;
+
+    let fallback: any = translations["en"];
+    for (const k of keys) fallback = fallback?.[k];
+    return fallback || key;
+  };
+
   return (
     <div className="space-y-6">
 
@@ -26,9 +45,9 @@ export default function BasicsPage() {
       </Breadcrumb> */}
 
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold">Basics</h1>
+        <h1 className="text-4xl font-bold">{t("learn.basicsPage.title")}</h1>
         <p className="text-muted-foreground">
-          Learn the fundamental building blocks of MiniScript+.
+          {t("learn.basicsPage.subtitle")}
         </p>
       </div>
 
@@ -36,9 +55,9 @@ export default function BasicsPage() {
         <CardContent className="p-6 space-y-6">
 
           <div>
-            <h2 className="text-xl font-semibold">Statements</h2>
+            <h2 className="text-xl font-semibold">{t("learn.basicsPage.sections.statements.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              A program is made of statements executed from top to bottom.
+              {t("learn.basicsPage.sections.statements.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -48,9 +67,9 @@ PRINT "World"`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Variables</h2>
+            <h2 className="text-xl font-semibold">{t("learn.basicsPage.sections.variables.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Variables store values that you can use later.
+              {t("learn.basicsPage.sections.variables.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -60,9 +79,9 @@ PRINT X`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Math Operations</h2>
+            <h2 className="text-xl font-semibold">{t("learn.basicsPage.sections.math.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              You can perform calculations using operators.
+              {t("learn.basicsPage.sections.math.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -73,9 +92,9 @@ PRINT B`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Conditions</h2>
+            <h2 className="text-xl font-semibold">{t("learn.basicsPage.sections.conditions.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Use IF statements to control program flow.
+              {t("learn.basicsPage.sections.conditions.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">

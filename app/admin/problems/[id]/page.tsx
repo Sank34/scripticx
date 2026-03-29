@@ -6,10 +6,12 @@ import { useParams, useRouter } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
 import { ProblemForm } from "@/components/admin/ProblemForm";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/components/LanguageProvider";
 
 function EditProblemContent() {
   const params = useParams();
   const router = useRouter();
+  const { t } = useLanguage();
 
   const id = params?.id;
 
@@ -41,13 +43,15 @@ function EditProblemContent() {
   }
 
   if (!problem) {
-    return <div className="p-6">Problem not found</div>;
+    return <div className="p-6">{t("admin.problems.editPage.notFound")}</div>;
   }
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
 
-      <h1 className="text-2xl font-bold">Edit Problem</h1>
+      <h1 className="text-2xl font-bold">
+        {t("admin.problems.editPage.title")}
+      </h1>
 
       <ProblemForm
         initialData={problem}

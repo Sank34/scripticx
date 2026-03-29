@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { Flame, Trophy, Activity } from "lucide-react";
+import { getLocalized } from "@/lib/getLocalized";
+import { useLanguage } from "@/components/LanguageProvider";
 
 import {
   Card,
@@ -23,6 +25,7 @@ import {
 
 function DashboardContent() {
   const { user } = useAuth();
+  const { locale, t } = useLanguage();
 
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +48,7 @@ function DashboardContent() {
         .select(`
           *,
           problems (
-            title
+            title_i18n
           )
         `)
         .eq("user_id", user.id)
@@ -100,7 +103,7 @@ function DashboardContent() {
             created_at,
             user_id,
             problem_id,
-            problems (title)
+            problems (title_i18n)
           `)
           .in("user_id", ids)
           .order("created_at", { ascending: false })
@@ -155,7 +158,7 @@ function DashboardContent() {
 
       <div>
         <h1 className="text-3xl font-bold">
-          Welcome back
+          {t("dashboard.title")}
         </h1>
         <p className="text-muted-foreground">
           {user.email}
@@ -168,7 +171,7 @@ function DashboardContent() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Flame className="w-4 h-4 text-orange-500" />
-              Solved
+              {t("dashboard.stats.solved")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -180,7 +183,7 @@ function DashboardContent() {
 
         <Card className="border-blue-500/30">
           <CardHeader>
-            <CardTitle>Problems Attempted</CardTitle>
+            <CardTitle>{t("dashboard.stats.score")}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-blue-500">
@@ -191,7 +194,7 @@ function DashboardContent() {
 
         <Card className="border-purple-500/30">
           <CardHeader>
-            <CardTitle>Average Score</CardTitle>
+            <CardTitle>{t("dashboard.stats.streak")}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-500">
@@ -206,13 +209,13 @@ function DashboardContent() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-yellow-500" />
-            Leaderboard
+            {t("leaderboard.title")}
           </CardTitle>
           <a
             href="/leaderboard"
             className="text-sm text-muted-foreground hover:underline"
           >
-            View all
+            {t("common.viewAll")}
           </a>
         </CardHeader>
 
@@ -220,7 +223,7 @@ function DashboardContent() {
 
           {leaderboard.length === 0 && (
             <p className="text-muted-foreground text-sm">
-              No data yet.
+              {t("dashboard.states.empty")}
             </p>
           )}
 
@@ -262,7 +265,7 @@ function DashboardContent() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-orange-500" />
-            Activity Feed
+            {t("dashboard.sections.activity")}
           </CardTitle>
         </CardHeader>
 
@@ -270,7 +273,7 @@ function DashboardContent() {
 
           {feed.length === 0 && (
             <p className="text-muted-foreground text-sm">
-              No activity yet.
+              {t("dashboard.states.empty")}
             </p>
           )}
 
@@ -295,17 +298,25 @@ function DashboardContent() {
                   <span className="font-medium text-sm">
                     {item.profile?.username}
                   </span>
-                </a>
 
-                <span className="text-sm text-muted-foreground">
-                  solved
-                </span>
+                  {locale === "en" && (
+                    <span className="text-sm text-muted-foreground">
+                      {t("dashboard.activity.solvedPrefix")}
+                    </span>
+                  )}
+
+                  {locale === "ro" && (
+                    <span className="text-sm text-muted-foreground">
+                      {t("dashboard.activity.solvedMiddle")}
+                    </span>
+                  )}
+                </a>
 
                 <a
                   href={`/problems/${item.problem_id}`}
                   className="text-sm font-medium hover:underline"
                 >
-                  {item.problems?.title}
+                  {getLocalized(item.problems?.title_i18n, locale)}
                 </a>
 
               </div>
@@ -322,14 +333,14 @@ function DashboardContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Submissions</CardTitle>
+          <CardTitle>{t("dashboard.sections.recent")}</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-3">
 
           {recent.length === 0 && (
             <p className="text-muted-foreground">
-              No submissions yet.
+              {t("dashboard.states.empty")}
             </p>
           )}
 
@@ -340,7 +351,7 @@ function DashboardContent() {
             >
               <div>
                 <p className="font-medium">
-                  {r.problems?.title || "Unknown Problem"}
+                  {getLocalized(r.problems?.title_i18n, locale) || t("dashboard.states.unknownProblem")}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(r.created_at).toLocaleString()}

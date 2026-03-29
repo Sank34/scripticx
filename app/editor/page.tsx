@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { useLanguage } from "@/components/LanguageProvider";
 
 import {
   Tooltip,
@@ -38,6 +39,7 @@ type Value = string | number | boolean;
 
 function EditorContent() {
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -207,15 +209,18 @@ END`);
 
       URL.revokeObjectURL(url);
 
-      toast.success("Saved file!");
+      toast.success(t("editor.toast.savedFile"));
     } catch (e) {
-      toast.error("Failed to save file");
+      toast.error(t("editor.toast.saveError"));
     }
   }
 
   async function saveSnippet(silent = false) {
     if (!user) return;
-
+    if (!code.trim()) {
+      if (!silent) toast.error("Code cannot be empty");
+      return;
+    }
     setSaving(true);
 
     let data, error;
@@ -257,11 +262,11 @@ END`);
     setSaving(false);
 
     if (error) {
-      toast.error("Failed to save snippet");
+      toast.error(t("editor.toast.snippetSaveError"));
       return;
     }
 
-    if (!silent) toast.success("Snippet saved");
+    if (!silent) toast.success(t("editor.toast.snippetSaved"));
     setSnippets(prev => {
       const exists = prev.some(s => s.id === data.id);
       if (exists) {
@@ -285,22 +290,7 @@ END`);
     const url = `${window.location.origin}/editor/${idToUse}`;
     await navigator.clipboard.writeText(url);
 
-    toast.success("Link copied!");
-  }
-
-  async function loadSnippet(id: string) {
-    const { data } = await supabase
-      .from("snippets")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (data) {
-      setCode(data.code);
-      setTitle(data.title || "");
-      setDescription(data.description || "");
-      setSavedId(data.id);
-    }
+    toast.success(t("editor.toast.copied"));
   }
 
   async function deleteSnippet(id: string) {
@@ -310,7 +300,7 @@ END`);
       .eq("id", id);
 
     if (error) {
-      toast.error("Failed to delete snippet");
+      toast.error(t("editor.toast.deleteError"));
       return;
     }
 
@@ -320,8 +310,22 @@ END`);
       setSavedId(null);
     }
 
-    toast.success("Snippet deleted");
+    toast.success(t("editor.toast.deleted"));
   }
+  async function loadSnippet(id: string) {
+  const { data } = await supabase
+    .from("snippets")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (data) {
+    setCode(data.code);
+    setTitle(data.title || "");
+    setDescription(data.description || "");
+    setSavedId(data.id);
+  }
+}
 
   function createNewSnippet() {
     setSavedId(null);
@@ -336,19 +340,19 @@ END`);
 
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>MiniScript+ Editor</CardTitle>
+            <CardTitle>{t("editor.title")}</CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-4 flex flex-col h-full">
 
             <Input
-              placeholder="Title"
+              placeholder={t("editor.placeholderTitle")}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
 
             <Textarea
-              placeholder="Description"
+              placeholder={t("editor.placeholderDescription")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -385,7 +389,7 @@ END`);
                         <Plus size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>New snippet</TooltipContent>
+                    <TooltipContent>{t("editor.actions.newSnippet")}</TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
@@ -394,7 +398,7 @@ END`);
                         <Bug size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Compile code</TooltipContent>
+                    <TooltipContent>{t("editor.actions.compile")}</TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
@@ -403,7 +407,7 @@ END`);
                         <StepForward size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Step execution</TooltipContent>
+                    <TooltipContent>{t("editor.actions.step")}</TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
@@ -412,7 +416,7 @@ END`);
                         <Play size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Run program</TooltipContent>
+                    <TooltipContent>{t("editor.actions.run")}</TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
@@ -421,7 +425,7 @@ END`);
                         <FileDown size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Download .msp</TooltipContent>
+                    <TooltipContent>{t("editor.actions.download")}</TooltipContent>
                   </Tooltip>
 
                   <Tooltip>
@@ -431,7 +435,7 @@ END`);
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {savedId ? "Update snippet" : "Save snippet"}
+                      {savedId ? t("editor.actions.update") : t("editor.actions.save")}
                     </TooltipContent>
                   </Tooltip>
 
@@ -441,7 +445,7 @@ END`);
                         <Share2 size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Share snippet</TooltipContent>
+                    <TooltipContent>{t("editor.actions.share")}</TooltipContent>
                   </Tooltip>
 
                 </div>
@@ -455,25 +459,25 @@ END`);
 
           <Card>
             <CardHeader>
-              <CardTitle>Debugger</CardTitle>
+              <CardTitle>{t("editor.debugger.title")}</CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4">
 
               <div>
-                <h3 className="font-semibold mb-1">Variables</h3>
+                <h3 className="font-semibold mb-1">{t("editor.debugger.variables")}</h3>
                 <pre className="text-sm bg-muted p-2 rounded whitespace-pre-wrap break-words">
                   {JSON.stringify(variables, null, 2)}
                 </pre>
               </div>
 
               <div>
-                <h3 className="font-semibold">Current Line</h3>
+                <h3 className="font-semibold">{t("editor.debugger.currentLine")}</h3>
                 <p>{currentLine}</p>
               </div>
 
               <div>
-                <h3 className="font-semibold mb-1">Output</h3>
+                <h3 className="font-semibold mb-1">{t("editor.debugger.output")}</h3>
                 <pre className="text-sm bg-muted p-2 rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
                   {output.join("\n")}
                 </pre>
@@ -481,7 +485,9 @@ END`);
 
               {inputVar && (
                 <div className="space-y-2">
-                  <p className="font-medium">Enter value for {inputVar}:</p>
+                  <p className="font-medium">
+                    {t("editor.debugger.input")} {inputVar}:
+                  </p>
 
                   <Input
                     value={inputValue}
@@ -489,7 +495,7 @@ END`);
                   />
 
                   <Button onClick={handleSubmitInput}>
-                    Submit
+                    {t("editor.debugger.submit")}
                   </Button>
                 </div>
               )}
@@ -499,7 +505,7 @@ END`);
 
           <Card>
             <CardHeader>
-              <CardTitle>My Snippets</CardTitle>
+              <CardTitle>{t("editor.snippets.title")}</CardTitle>
             </CardHeader>
 
             <CardContent className="max-h-[300px] overflow-y-auto space-y-2">
@@ -507,7 +513,7 @@ END`);
 
                 {snippets.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No snippets yet
+                    {t("editor.snippets.empty")}
                   </p>
                 )}
 
@@ -521,7 +527,7 @@ END`);
                       className="cursor-pointer flex-1"
                     >
                       <p className="font-medium text-sm">
-                        {s.title || "Untitled"}
+                        {s.title || t("editor.snippets.untitled")}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(s.created_at).toLocaleString()}
@@ -538,7 +544,7 @@ END`);
                             <Pencil size={14} />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Edit snippet</TooltipContent>
+                        <TooltipContent>{t("editor.snippets.edit")}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -550,7 +556,7 @@ END`);
                             <Trash2 size={14} />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Delete snippet</TooltipContent>
+                        <TooltipContent>{t("editor.snippets.delete")}</TooltipContent>
                       </Tooltip>
                     </div>
                   </div>

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,7 +11,24 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function VariablesPage() {
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+
+    for (const k of keys) value = value?.[k];
+    if (value) return value;
+
+    let fallback: any = translations["en"];
+    for (const k of keys) fallback = fallback?.[k];
+    return fallback || key;
+  };
+
   return (
     <div className="space-y-6">
 {/* 
@@ -26,9 +45,9 @@ export default function VariablesPage() {
       </Breadcrumb> */}
 
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold">Variables</h1>
+        <h1 className="text-4xl font-bold">{t("learn.variablesPage.title")}</h1>
         <p className="text-muted-foreground">
-          Variables store values that can be used and modified throughout your program.
+          {t("learn.variablesPage.subtitle")}
         </p>
       </div>
 
@@ -36,9 +55,9 @@ export default function VariablesPage() {
         <CardContent className="p-6 space-y-6">
 
           <div>
-            <h2 className="text-xl font-semibold">What is a Variable?</h2>
+            <h2 className="text-xl font-semibold">{t("learn.variablesPage.sections.what.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              A variable is a named container that holds a value.
+              {t("learn.variablesPage.sections.what.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -47,9 +66,9 @@ export default function VariablesPage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Using Variables</h2>
+            <h2 className="text-xl font-semibold">{t("learn.variablesPage.sections.using.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Once a variable is created, you can use it in expressions.
+              {t("learn.variablesPage.sections.using.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -59,9 +78,9 @@ PRINT X`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Updating Variables</h2>
+            <h2 className="text-xl font-semibold">{t("learn.variablesPage.sections.updating.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              You can change the value of a variable anytime.
+              {t("learn.variablesPage.sections.updating.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -72,15 +91,15 @@ PRINT X`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Variable Types</h2>
+            <h2 className="text-xl font-semibold">{t("learn.variablesPage.sections.types.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              MiniScript+ supports different types of values:
+              {t("learn.variablesPage.sections.types.text")}
             </p>
 
             <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1 mt-2">
-              <li>Numbers → 10, 3.14</li>
-              <li>Strings → "Hello"</li>
-              <li>Booleans → true, false</li>
+              {t("learn.variablesPage.sections.types.bullets").map((item: string, i: number) => (
+                <li key={i}>{item}</li>
+              ))}
             </ul>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -91,9 +110,9 @@ C = true`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Naming Variables</h2>
+            <h2 className="text-xl font-semibold">{t("learn.variablesPage.sections.naming.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Variable names should be clear and meaningful.
+              {t("learn.variablesPage.sections.naming.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -102,7 +121,7 @@ name = "Alex"`}
             </pre>
 
             <p className="text-xs text-muted-foreground mt-2">
-              Avoid using spaces or special characters.
+              {t("learn.variablesPage.sections.naming.note")}
             </p>
           </div>
 

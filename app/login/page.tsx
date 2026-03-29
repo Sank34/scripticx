@@ -16,6 +16,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(true); 
 
@@ -24,6 +27,19 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
 
   const router = useRouter();
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+
+    for (const k of keys) {
+      value = value?.[k];
+    }
+
+    return value || key;
+  };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState({
@@ -62,7 +78,7 @@ export default function LoginPage() {
     });
 
     if (error) {
-      showModal("Unable to sign in", error.message, "error");
+      showModal(t("login.modal.loginErrorTitle"), error.message, "error");
       return;
     }
 
@@ -71,7 +87,7 @@ export default function LoginPage() {
 
   async function handleRegister() {
     if (!username) {
-      showModal("Error", "Username is required", "error");
+      showModal(t("common.error"), t("login.modal.usernameRequired"), "error");
       return;
     }
 
@@ -81,7 +97,7 @@ export default function LoginPage() {
     });
 
     if (error) {
-      showModal("Unable to sign up", error.message, "error");
+      showModal(t("login.modal.registerErrorTitle"), error.message, "error");
       return;
     }
 
@@ -95,7 +111,11 @@ export default function LoginPage() {
       });
     }
 
-    showModal("Account created", "You can now log in.", "success");
+    showModal(
+      t("login.modal.accountCreatedTitle"),
+      t("login.modal.accountCreatedDescription"),
+      "success"
+    );
   }
 
   if (loading) return null;
@@ -106,7 +126,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center text-2xl">
-            Welcome
+            {t("login.title")}
           </CardTitle>
         </CardHeader>
 
@@ -115,27 +135,27 @@ export default function LoginPage() {
           <Tabs defaultValue="login" className="space-y-4">
 
             <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="login">{t("login.tabs.login")}</TabsTrigger>
+              <TabsTrigger value="register">{t("login.tabs.register")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login" className="space-y-3">
 
               <Input
-                placeholder="Email"
+                placeholder={t("login.email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
 
               <Input
-                placeholder="Password"
+                placeholder={t("login.password")}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
 
               <Button onClick={handleLogin} className="w-full">
-                Login
+                {t("login.loginButton")}
               </Button>
 
             </TabsContent>
@@ -143,26 +163,26 @@ export default function LoginPage() {
             <TabsContent value="register" className="space-y-3">
 
               <Input
-                placeholder="Email"
+                placeholder={t("login.email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
 
               <Input
-                placeholder="Password"
+                placeholder={t("login.password")}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
 
               <Input
-                placeholder="Username"
+                placeholder={t("login.username")}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
 
               <Button onClick={handleRegister} className="w-full">
-                Create Account
+                {t("login.registerButton")}
               </Button>
 
             </TabsContent>

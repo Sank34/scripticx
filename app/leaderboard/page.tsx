@@ -17,8 +17,11 @@ import {
 
 import { Crown, Medal, Trophy } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function LeaderboardPage() {
+  const { t } = useLanguage();
+
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,9 +51,11 @@ export default function LeaderboardPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-8">
 
       <div>
-        <h1 className="text-3xl font-bold">Leaderboard</h1>
+        <h1 className="text-3xl font-bold">
+          {t("leaderboard.title")}
+        </h1>
         <p className="text-muted-foreground">
-          Top users ranked by total score
+          {t("leaderboard.description")}
         </p>
       </div>
 
@@ -83,7 +88,7 @@ export default function LeaderboardPage() {
                       {top3[1].username}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {top3[1].total_score || 0} pts
+                      {top3[1].total_score || 0} {t("leaderboard.points")}
                     </p>
                   </CardContent>
                 </Card>
@@ -107,7 +112,7 @@ export default function LeaderboardPage() {
                       {top3[0].username}
                     </p>
                     <p className="text-sm">
-                      {top3[0].total_score || 0} pts
+                      {top3[0].total_score || 0} {t("leaderboard.points")}
                     </p>
                   </CardContent>
                 </Card>
@@ -131,7 +136,7 @@ export default function LeaderboardPage() {
                       {top3[2].username}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {top3[2].total_score || 0} pts
+                      {top3[2].total_score || 0} {t("leaderboard.points")}
                     </p>
                   </CardContent>
                 </Card>
@@ -171,7 +176,7 @@ export default function LeaderboardPage() {
                   </div>
 
                   <span className="font-semibold">
-                    {user.total_score || 0}
+                    {user.total_score || 0} {t("leaderboard.points")}
                   </span>
                 </Link>
               ))}

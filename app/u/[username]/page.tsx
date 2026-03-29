@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import PublicProfileHeader from "@/components/PublicProfileHeader";
 
@@ -18,6 +19,9 @@ import {
 
 import { Flame, Globe, Trophy, Check, Rocket, Brain } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
+
+import { getLocalized } from "@/lib/getLocalized";
+import { translations } from "@/lib/i18n";
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -77,6 +81,15 @@ export default async function PublicProfile({
 }) {
   const supabase = createServerSupabase();
 
+  const cookieStore = await cookies();
+  const locale = (cookieStore.get("locale")?.value as "en" | "ro") || "en";
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+    return value || key;
+  };
+
   const { username } = await params;
 
   const { data: profile } = await supabase
@@ -88,7 +101,7 @@ export default async function PublicProfile({
   if (!profile) {
     return (
       <div className="p-6">
-        <h1 className="text-xl font-bold">User not found</h1>
+        <h1 className="text-xl font-bold">{t("publicProfile.notFound")}</h1>
       </div>
     );
   }
@@ -98,7 +111,7 @@ export default async function PublicProfile({
     .select(`
       *,
       problems (
-        title,
+        title_i18n,
         difficulty
       )
     `)
@@ -231,7 +244,7 @@ export default async function PublicProfile({
 
         <Card>
           <CardHeader>
-            <CardTitle>Solved</CardTitle>
+            <CardTitle>{t("publicProfile.stats.solved")}</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold">
             {solved}
@@ -240,7 +253,7 @@ export default async function PublicProfile({
 
         <Card>
           <CardHeader>
-            <CardTitle>Average</CardTitle>
+            <CardTitle>{t("publicProfile.stats.average")}</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold">
             {average}%
@@ -249,7 +262,7 @@ export default async function PublicProfile({
 
         <Card>
           <CardHeader className="flex flex-row justify-between items-center">
-            <CardTitle>Streak</CardTitle>
+            <CardTitle>{t("publicProfile.stats.streak")}</CardTitle>
             <Flame className="w-5 h-5 text-orange-500" />
           </CardHeader>
           <CardContent className="text-2xl font-bold">
@@ -261,7 +274,7 @@ export default async function PublicProfile({
 
       <Card>
         <CardHeader>
-          <CardTitle>Achievements</CardTitle>
+          <CardTitle>{t("publicProfile.achievements")}</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-2 flex-wrap">
           {achievements?.map((a: any, i: number) => {
@@ -278,13 +291,13 @@ export default async function PublicProfile({
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Posts</CardTitle>
+          <CardTitle>{t("publicProfile.posts.title")}</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-3">
           {posts?.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No posts yet.
+              {t("publicProfile.posts.empty")}
             </p>
           )}
 
@@ -313,14 +326,16 @@ export default async function PublicProfile({
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Submissions</CardTitle>
+          <CardTitle>{t("publicProfile.submissions.title")}</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-3">
           {submissions?.slice(0, 5).map((r: any, i: number) => (
             <div key={i} className="flex justify-between items-center border-b pb-2">
               <div>
-                <p className="font-medium">{r.problems?.title}</p>
+                <p className="font-medium">
+                  {getLocalized(r.problems?.title_i18n, locale)}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(r.created_at).toLocaleString()}
                 </p>

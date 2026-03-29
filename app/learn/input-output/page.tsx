@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,7 +11,24 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function InputOutputPage() {
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+
+    for (const k of keys) value = value?.[k];
+    if (value) return value;
+
+    let fallback: any = translations["en"];
+    for (const k of keys) fallback = fallback?.[k];
+    return fallback || key;
+  };
+
   return (
     <div className="space-y-6">
 
@@ -26,9 +45,9 @@ export default function InputOutputPage() {
       </Breadcrumb> */}
 
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold">Input / Output</h1>
+        <h1 className="text-4xl font-bold">{t("learn.inputOutputPage.title")}</h1>
         <p className="text-muted-foreground">
-          Programs interact with users through input and output.
+          {t("learn.inputOutputPage.subtitle")}
         </p>
       </div>
 
@@ -36,9 +55,9 @@ export default function InputOutputPage() {
         <CardContent className="p-6 space-y-6">
 
           <div>
-            <h2 className="text-xl font-semibold">Output (PRINT)</h2>
+            <h2 className="text-xl font-semibold">{t("learn.inputOutputPage.sections.output.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Use PRINT to display values or text.
+              {t("learn.inputOutputPage.sections.output.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -48,7 +67,7 @@ PRINT 10`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Using Variables in Output</h2>
+            <h2 className="text-xl font-semibold">{t("learn.inputOutputPage.sections.variables.title")}</h2>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 5
@@ -57,9 +76,9 @@ PRINT X`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Input (INPUT)</h2>
+            <h2 className="text-xl font-semibold">{t("learn.inputOutputPage.sections.input.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              INPUT allows the program to receive a value from the user.
+              {t("learn.inputOutputPage.sections.input.text")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -69,7 +88,7 @@ PRINT X`}
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Example</h2>
+            <h2 className="text-xl font-semibold">{t("learn.inputOutputPage.sections.example.title")}</h2>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`INPUT A
@@ -78,34 +97,34 @@ PRINT A + B`}
             </pre>
 
             <p className="text-sm text-muted-foreground mt-2">
-              The program asks for two values and prints their sum.
+              {t("learn.inputOutputPage.sections.example.text")}
             </p>
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">How INPUT works</h2>
+            <h2 className="text-xl font-semibold">{t("learn.inputOutputPage.sections.how.title")}</h2>
             <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1 mt-2">
-              <li>The program pauses and waits for input</li>
-              <li>The value is stored in a variable</li>
-              <li>Execution continues after input is provided</li>
+              {t("learn.inputOutputPage.sections.how.bullets").map((item: string, i: number) => (
+                <li key={i}>{item}</li>
+              ))}
             </ul>
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Types of Input</h2>
+            <h2 className="text-xl font-semibold">{t("learn.inputOutputPage.sections.types.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              The input value can be:
+              {t("learn.inputOutputPage.sections.types.text")}
             </p>
 
             <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1 mt-2">
-              <li>Number → 10</li>
-              <li>Text → Hello</li>
-              <li>Boolean → true / false</li>
+              {t("learn.inputOutputPage.sections.types.bullets").map((item: string, i: number) => (
+                <li key={i}>{item}</li>
+              ))}
             </ul>
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold">Common Mistake</h2>
+            <h2 className="text-xl font-semibold">{t("learn.inputOutputPage.sections.mistake.title")}</h2>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`INPUT X
@@ -113,7 +132,7 @@ PRINT X + 1`}
             </pre>
 
             <p className="text-xs text-muted-foreground mt-2">
-              Make sure the input is a number if you want to perform math.
+              {t("learn.inputOutputPage.sections.mistake.note")}
             </p>
           </div>
 

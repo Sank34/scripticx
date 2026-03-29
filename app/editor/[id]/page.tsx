@@ -23,8 +23,10 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, ExternalLink, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function EditorSnippetPage() {
+  const { t } = useLanguage();
   const [data, setData] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
 
@@ -58,7 +60,7 @@ export default function EditorSnippetPage() {
   }, [id]);
 
   if (!data) {
-    return <div className="p-6">Snippet not found</div>;
+    return <div className="p-6">{t("snippetPage.notFound")}</div>;
   }
 
   const initial = profile?.username?.[0]?.toUpperCase() || "U";
@@ -66,9 +68,9 @@ export default function EditorSnippetPage() {
   async function handleCopyCode() {
     try {
       await navigator.clipboard.writeText(data.code);
-      toast.success("Code copied!");
+      toast.success(t("snippetPage.toast.codeCopied"));
     } catch {
-      toast.error("Failed to copy code");
+      toast.error(t("snippetPage.toast.copyError"));
     }
   }
 
@@ -76,9 +78,9 @@ export default function EditorSnippetPage() {
     try {
       const url = `${window.location.origin}/editor/${data.id}`;
       await navigator.clipboard.writeText(url);
-      toast.success("Link copied!");
+      toast.success(t("snippetPage.toast.linkCopied"));
     } catch {
-      toast.error("Failed to copy link");
+      toast.error(t("snippetPage.toast.linkError"));
     }
   }
 
@@ -87,11 +89,11 @@ export default function EditorSnippetPage() {
 
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">
-          {data.title || "Untitled"}
+          {data.title || t("snippetPage.untitled")}
         </h1>
 
         <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
-          <Badge variant="secondary">Public</Badge>
+          <Badge variant="secondary">{t("snippetPage.public")}</Badge>
           <span>
             {new Date(data.created_at).toLocaleString()}
           </span>
@@ -113,11 +115,11 @@ export default function EditorSnippetPage() {
               href={`/u/${profile?.username}`}
               className="font-semibold hover:underline"
             >
-              {profile?.username || "Unknown"}
+              {profile?.username || t("snippetPage.unknownUser")}
             </Link>
 
             <p className="text-xs text-muted-foreground">
-              Shared a snippet
+              {t("snippetPage.shared")}
             </p>
           </div>
         </div>
@@ -130,7 +132,7 @@ export default function EditorSnippetPage() {
             onClick={handleCopyCode}
           >
             <Copy size={14} className="mr-2" />
-            Copy
+            {t("snippetPage.actions.copy")}
           </Button>
 
           <Button
@@ -139,13 +141,13 @@ export default function EditorSnippetPage() {
             onClick={handleCopyLink}
           >
             <Share2 size={14} className="mr-2" />
-            Share
+            {t("snippetPage.actions.share")}
           </Button>
 
           <Link href="/editor">
             <Button size="sm">
               <ExternalLink size={14} className="mr-2" />
-              Open Editor
+              {t("snippetPage.actions.openEditor")}
             </Button>
           </Link>
 
@@ -161,7 +163,7 @@ export default function EditorSnippetPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Code</CardTitle>
+          <CardTitle>{t("snippetPage.code.title")}</CardTitle>
         </CardHeader>
 
         <CardContent>
