@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import {
+  SquareTerminal,
   MessageSquare,
   Search,
   Trophy,
@@ -226,6 +227,9 @@ export function AppSidebar() {
           <SidebarGroupContent className="space-y-1">
             { user && (
               <NavItem href="/editor" icon={Code} label={t("nav.editor")} active={pathname.startsWith("/editor")} />
+            )}
+            {user && (
+              <NavItem href="/livecode" icon={SquareTerminal} label={"Live Code"} active={pathname.startsWith("/livecode") || pathname.startsWith("/live") } />
             )}
             <NavItem href="/problems" icon={List} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
             <NavItem href="/leaderboard" icon={Trophy} label={t("nav.leaderboard")} active={pathname.startsWith("/leaderboard")} />

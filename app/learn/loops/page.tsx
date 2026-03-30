@@ -82,10 +82,10 @@ END`}
             <h2 className="text-xl font-semibold">{t("learn.loopsPage.sections.example.title")}</h2>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
-{`X = 0        // start
-WHILE X < 3   // check condition
-PRINT X       // output
-X = X + 1     // update
+{`X = 0        # start
+WHILE X < 3   # check condition
+PRINT X       # output
+X = X + 1     # update
 END`}
             </pre>
 

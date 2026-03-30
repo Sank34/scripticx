@@ -478,6 +478,9 @@ export const translations = {
         count: "{count} following",
       },
     },
+    live: {
+      shareCopied: "Link copied!",
+    },
     admin: {
       title: "Admin Panel",
       problems: {
@@ -939,6 +942,9 @@ export const translations = {
         solvedPrefix: "",
         solvedMiddle: "a rezolvat problema",
       },
+    },
+    live: {
+      shareCopied: "Link copiat!",
     },
     feed: {
       posts: "postări",
