@@ -73,6 +73,9 @@ export function AppSidebar() {
   const [openDocs, setOpenDocs] = useState(false);
   const [manualToggle, setManualToggle] = useState(false);
 
+  const [openExamples, setOpenExamples] = useState(false);
+  const [manualToggleExamples, setManualToggleExamples] = useState(false);
+
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -151,6 +154,10 @@ export function AppSidebar() {
   useEffect(() => {
     if (pathname.startsWith("/learn") && !manualToggle) {
       setOpenDocs(true);
+    }
+
+    if (pathname.startsWith("/examples") && !manualToggleExamples) {
+      setOpenExamples(true);
     }
   }, [pathname]);
 
@@ -304,6 +311,57 @@ export function AppSidebar() {
                 </div>
               )}
 
+            </div>
+
+            <div
+              onMouseEnter={() => {
+                if (!manualToggleExamples) setOpenExamples(true);
+              }}
+              onMouseLeave={() => {
+                if (!manualToggleExamples) setOpenExamples(false);
+              }}
+              className="space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <NavItem
+                  href="/examples"
+                  icon={BookOpen}
+                  label="Examples"
+                  active={pathname.startsWith("/examples")}
+                />
+
+                {!collapsed && (
+                  <button
+                    onClick={() => {
+                      setOpenExamples((prev) => !prev);
+                      setManualToggleExamples(true);
+                    }}
+                    className="mr-2 p-1 hover:bg-muted rounded"
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform ${
+                        openExamples ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {!collapsed && (
+                <div
+                  className={`overflow-hidden transition-all duration-300 ${
+                    openExamples ? "max-h-60 opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="ml-2 border-l pl-2 space-y-1">
+                    <SubItem href="/examples/basics" label="Basics" />
+                    <SubItem href="/examples/loops" label="Loops" />
+                    <SubItem href="/examples/conditions" label="Conditions" />
+                    <SubItem href="/examples/algorithms" label="Algorithms" />
+                  </div>
+                </div>
+              )}
             </div>
 
           </SidebarGroupContent>
