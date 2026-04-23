@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/tooltip";
 
 import {
+  School,
   SquareTerminal,
   MessageSquare,
   Search,
@@ -251,6 +252,9 @@ export function AppSidebar() {
             )}
             {role === "admin" && (
               <NavItem href="/admin" icon={Shield} label={t("nav.admin")} active={pathname.startsWith("/admin")} />
+            )}
+            {user && (
+              <NavItem href="/classes" icon={School} label={"Classes"} active={pathname.startsWith("/classes")} />
             )}
 
           </SidebarGroupContent>

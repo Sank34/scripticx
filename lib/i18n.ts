@@ -643,13 +643,13 @@ export const translations = {
       docs: "Documentație",
       pages: {
         introduction: "Introducere",
-        basics: "Bază",
+        basics: "Elemente de Bază",
         variables: "Variabile",
         loops: "Bucle",
         io: "Intrare / Ieșire",
       },
 
-      basics: "Bază",
+      basics: "Elemente de Bază",
       variables: "Variabile",
       loops: "Bucle",
       inputOutput: "Intrare / Ieșire",
@@ -676,7 +676,7 @@ export const translations = {
         },
       },
       basicsPage: {
-        title: "Bază",
+        title: "Elemente de Bază",
         subtitle: "Învață elementele fundamentale ale MiniScript+.",
         sections: {
           statements: {

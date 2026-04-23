@@ -17,7 +17,7 @@ type Value = string | number | boolean;
 let variables: Record<string, Value> = {};
 let currentLine = 0;
 let steps = 0;
-const MAX_STEPS = 1000;
+const MAX_STEPS = 1000; 
 
 export function reset() {
   variables = {};
@@ -28,7 +28,7 @@ export function reset() {
 function trim(str: string) {
   return str.trim();
 }
-
+//TO DO: add normalization for !=, == 
 function normalizeOperators(str: string) {
   return str.replace(/≤/g, "<=").replace(/≥/g, ">=");
 }
