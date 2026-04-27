@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function AssignmentPage() {
   const router = useRouter();
   const params = useParams();
@@ -30,6 +33,15 @@ export default function AssignmentPage() {
   const [viewOpen, setViewOpen] = useState(false);
   const [activeSubmission, setActiveSubmission] = useState<any>(null);
   const [activeProblemIndex, setActiveProblemIndex] = useState(0);
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+    return value || key;
+  };
 
   useEffect(() => {
     load();
@@ -149,11 +161,11 @@ export default function AssignmentPage() {
   }
 
   if (loading) {
-    return <div className="p-6">Loading...</div>;
+    return <div className="p-6">{t("classes.assignment.loading")}</div>;
   }
 
   if (!assignment) {
-    return <div className="p-6">Assignment not found</div>;
+    return <div className="p-6">{t("classes.assignment.notFound")}</div>;
   }
 
   const isPastDeadline =
@@ -186,19 +198,19 @@ export default function AssignmentPage() {
               >
                 {allSolved
                   ? isPastDeadline
-                    ? "Submitted (Late)"
-                    : "Submitted"
+                    ? t("classes.assignment.status.submittedLate")
+                    : t("classes.assignment.status.submitted")
                   : isPastDeadline
-                  ? "Late"
-                  : "In progress"}
+                  ? t("classes.assignment.status.late")
+                  : t("classes.assignment.status.inProgress")}
               </Badge>
             );
           })()}
         </div>
         <p className="text-sm text-muted-foreground">
           {assignment.deadline
-            ? "Deadline: " + new Date(assignment.deadline).toLocaleString()
-            : "No deadline"}
+            ? t("classes.assignment.deadlineLabel") + " " + new Date(assignment.deadline).toLocaleString()
+            : t("classes.assignment.noDeadline")}
         </p>
       </div>
 
@@ -206,7 +218,7 @@ export default function AssignmentPage() {
       {assignment.description && (
         <Card>
           <CardHeader>
-            <CardTitle>Description</CardTitle>
+            <CardTitle>{t("classes.assignment.description")}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             {assignment.description}
@@ -216,12 +228,11 @@ export default function AssignmentPage() {
 
       {/* Problems */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Problems</h2>
-        {/* <p className="text-xs text-muted-foreground">Debug: {problems.length} problems loaded</p> */}
+        <h2 className="text-xl font-semibold">{t("classes.assignment.problems.title")}</h2>
 
         {problems.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            No problems attached
+            {t("classes.assignment.problems.empty")}
           </p>
         )}
 
@@ -229,7 +240,7 @@ export default function AssignmentPage() {
           <Card key={p.id}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <span>Problem {i + 1}: {p.title}</span>
+                <span>{t("classes.assignment.problems.problemPrefix")} {i + 1}: {p.title}</span>
                 {submissions.some((s) => s.problem_id === p.id && s.user_id === userId) && (
                   (() => {
                     const isPastDeadline =
@@ -242,7 +253,7 @@ export default function AssignmentPage() {
                           isPastDeadline ? "bg-red-500" : "bg-green-500"
                         }`}
                       >
-                        {isPastDeadline ? "Solved (Late)" : "Solved"}
+                        {isPastDeadline ? t("classes.assignment.status.solvedLate") : t("classes.assignment.status.solved")}
                       </span>
                     );
                   })()
@@ -269,7 +280,7 @@ export default function AssignmentPage() {
                       router.push(`/classes/${classId}/assignments/${assignmentId}/solve/${p.id}`)
                     }
                   >
-                    {isSolved ? "Solved" : "Solve"}
+                    {isSolved ? t("classes.assignment.status.solved") : t("classes.assignment.problems.solve")}
                   </Button>
                 );
               })()}
@@ -283,7 +294,7 @@ export default function AssignmentPage() {
     {isTeacher && (
       <Card>
         <CardHeader>
-          <CardTitle>Submissions</CardTitle>
+          <CardTitle>{t("classes.assignment.submissions.title")}</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-2">
@@ -337,11 +348,11 @@ export default function AssignmentPage() {
                     >
                       {allSolved
                         ? isLate
-                          ? "Submitted (Late)"
-                          : "Submitted"
+                          ? t("classes.assignment.status.submittedLate")
+                          : t("classes.assignment.status.submitted")
                         : userSubs.length > 0
-                        ? "In progress"
-                        : "Not submitted"}
+                        ? t("classes.assignment.status.inProgress")
+                        : t("classes.assignment.status.notSubmitted")}
                     </span>
                   )}
 
@@ -355,7 +366,7 @@ export default function AssignmentPage() {
                         setViewOpen(true);
                       }}
                     >
-                      View
+                      {t("classes.assignment.submissions.view")}
                     </Button>
                   )}
                 </div>
@@ -369,7 +380,7 @@ export default function AssignmentPage() {
     <Dialog open={viewOpen} onOpenChange={setViewOpen}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Submission</DialogTitle>
+          <DialogTitle>{t("classes.assignment.submissions.dialogTitle")}</DialogTitle>
         </DialogHeader>
 
         {/* Problems selector */}
@@ -393,7 +404,7 @@ export default function AssignmentPage() {
             (s) =>
               s.user_id === activeSubmission?.user_id &&
               s.problem_id === problems[activeProblemIndex]?.id
-          )?.code || "No code"}
+          )?.code || t("classes.assignment.submissions.noCode")}
         </div>
       </DialogContent>
     </Dialog>

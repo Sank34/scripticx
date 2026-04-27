@@ -13,6 +13,7 @@ import { Plus, Clock, Activity } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useLanguage } from "@/components/LanguageProvider";
 
 export default function LiveCodePage() {
   const [loading, setLoading] = useState(true);
@@ -25,6 +26,7 @@ export default function LiveCodePage() {
   const [invites, setInvites] = useState<any[]>([]);
 
   const router = useRouter();
+  const { t } = useLanguage();
 
   async function fetchParticipants(currentRooms: any[]) {
     const roomIds = currentRooms.map(r => r.id);
@@ -174,7 +176,7 @@ export default function LiveCodePage() {
       .from("live_rooms")
       .insert({
         owner_id: userId,
-        name: sessionName || "Untitled Session",
+        name: sessionName || t("livecode.dialog.untitled"),
         status: "active"
       })
       .select()
@@ -223,15 +225,15 @@ export default function LiveCodePage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Live Coding</h1>
+          <h1 className="text-3xl font-bold">{t("livecode.title")}</h1>
           <p className="text-muted-foreground">
-            Collaborate in real-time coding sessions
+            {t("livecode.subtitle")}
           </p>
         </div>
 
         <Button onClick={() => setOpen(true)} className="flex items-center gap-2">
           <Plus size={16} />
-          Create Session
+          {t("livecode.createSession")}
         </Button>
       </div>
 
@@ -239,7 +241,7 @@ export default function LiveCodePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>Total Sessions</CardTitle>
+            <CardTitle>{t("livecode.stats.total")}</CardTitle>
             <Activity className="w-4 h-4" />
           </CardHeader>
           <CardContent className="text-2xl font-bold">
@@ -249,7 +251,7 @@ export default function LiveCodePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>Active</CardTitle>
+            <CardTitle>{t("livecode.stats.active")}</CardTitle>
             <Activity className="w-4 h-4 text-green-500" />
           </CardHeader>
           <CardContent className="text-2xl font-bold">
@@ -259,7 +261,7 @@ export default function LiveCodePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle>Past</CardTitle>
+            <CardTitle>{t("livecode.stats.past")}</CardTitle>
             <Clock className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="text-2xl font-bold">
@@ -283,13 +285,13 @@ export default function LiveCodePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Active Sessions</CardTitle>
+                <CardTitle>{t("livecode.sessions.activeTitle")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 p-1">
                   {activeRooms.length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      No active sessions
+                      {t("livecode.sessions.noActive")}
                     </p>
                   )}
 
@@ -301,7 +303,7 @@ export default function LiveCodePage() {
                     >
                       <CardContent className="flex items-center justify-between p-4">
                         <div>
-                          <p className="font-medium">{room.name || "Session"}</p>
+                          <p className="font-medium">{room.name || t("livecode.sessions.fallbackName")}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(room.created_at).toLocaleString()}
                           </p>
@@ -337,9 +339,9 @@ export default function LiveCodePage() {
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {room.owner_id === userId ? "Owner" : "Member"}
+                            {room.owner_id === userId ? t("livecode.roles.owner") : t("livecode.roles.member")}
                           </span>
-                          <span className="text-sm text-green-500">Active</span>
+                          <span className="text-sm text-green-500">{t("livecode.status.active")}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -350,13 +352,13 @@ export default function LiveCodePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Past Sessions</CardTitle>
+                <CardTitle>{t("livecode.sessions.pastTitle")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 p-1">
                   {pastRooms.length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      No past sessions
+                      {t("livecode.sessions.noPast")}
                     </p>
                   )}
 
@@ -368,7 +370,7 @@ export default function LiveCodePage() {
                     >
                       <CardContent className="flex items-center justify-between p-4">
                         <div>
-                          <p className="font-medium">{room.name || "Session"}</p>
+                          <p className="font-medium">{room.name || t("livecode.sessions.fallbackName")}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(room.created_at).toLocaleString()}
                           </p>
@@ -382,9 +384,9 @@ export default function LiveCodePage() {
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {room.owner_id === userId ? "Owner" : "Member"}
+                            {room.owner_id === userId ? t("livecode.roles.owner") : t("livecode.roles.member")}
                           </span>
-                          <span className="text-sm text-muted-foreground">Closed</span>
+                          <span className="text-sm text-muted-foreground">{t("livecode.status.closed")}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -398,13 +400,13 @@ export default function LiveCodePage() {
           <div className="h-fit">
             <Card className="sticky top-6">
               <CardHeader>
-                <CardTitle>Pending Invites</CardTitle>
+                <CardTitle>{t("livecode.invites.title")}</CardTitle>
               </CardHeader>
 
               <CardContent className="space-y-3">
                 {invites.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No pending invites
+                    {t("livecode.invites.empty")}
                   </p>
                 )}
 
@@ -425,14 +427,14 @@ export default function LiveCodePage() {
 
                         <div className="flex gap-2">
                           <Button size="sm" onClick={() => acceptInvite(inv.room_id)}>
-                            Accept
+                            {t("livecode.invites.accept")}
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => declineInvite(inv.room_id)}
                           >
-                            Decline
+                            {t("livecode.invites.decline")}
                           </Button>
                         </div>
                       </div>
@@ -449,18 +451,18 @@ export default function LiveCodePage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Session</DialogTitle>
+            <DialogTitle>{t("livecode.dialog.title")}</DialogTitle>
           </DialogHeader>
 
           <Input
-            placeholder="Session name"
+            placeholder={t("livecode.dialog.placeholder")}
             value={sessionName}
             onChange={(e) => setSessionName(e.target.value)}
           />
 
           <DialogFooter>
             <Button onClick={createRoom} disabled={!userId || creating}>
-              {creating ? "Creating..." : "Create"}
+              {creating ? t("livecode.dialog.creating") : t("livecode.dialog.create")}
             </Button>
           </DialogFooter>
         </DialogContent>

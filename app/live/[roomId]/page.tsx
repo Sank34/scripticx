@@ -86,7 +86,7 @@ export default function LiveRoomPage() {
         .maybeSingle();
 
       if (existing) {
-        toast.error(existing.status === "accepted" ? "User already in session" : "User already invited");
+        toast.error(existing.status === "accepted" ? t("live.toast.userInSession") : t("live.toast.userInvited"));
         return;
       }
 
@@ -99,13 +99,13 @@ export default function LiveRoomPage() {
         });
 
       if (error) {
-        toast.error("Failed to send invite");
+        toast.error(t("live.toast.inviteFailed"));
         return;
       }
 
-      toast.success("Invite sent");
+      toast.success(t("live.toast.inviteSent"));
     } catch (e) {
-      toast.error("Unexpected error");
+      toast.error(t("live.toast.error"));
     }
   }
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -641,10 +641,10 @@ export default function LiveRoomPage() {
       <div className="lg:col-span-2 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Live Session</h1>
+            <h1 className="text-2xl font-bold">{t("live.sessionTitle")}</h1>
             <div className="text-sm text-muted-foreground mt-1">
               <span className="font-medium text-foreground">
-                {room.name || "Untitled Session"}
+                {room.name || t("live.untitledSession")}
               </span>
               <span> - </span>
               <span className="font-mono">{room.id}</span>
@@ -658,18 +658,18 @@ export default function LiveRoomPage() {
               className="flex items-center gap-2"
             >
               <Share2 size={16} />
-              Share
+              {t("live.share")}
             </Button>
 
             {isOwner && room.status === "active" && (
               <Button variant="secondary" onClick={() => setInviteOpen(true)}>
-                Invite
+                {t("live.invite")}
               </Button>
             )}
 
             {isOwner && room.status === "active" && (
               <Button variant="destructive" onClick={closeSession}>
-                End Session
+                {t("live.endSession")}
               </Button>
             )}
           </div>
@@ -677,7 +677,7 @@ export default function LiveRoomPage() {
 
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
-            {participants.length} online
+            {participants.length} {t("live.online")}
           </span>
 
           <div className="flex items-center gap-2">
@@ -745,7 +745,7 @@ export default function LiveRoomPage() {
 
                         <div>
                           <div className="font-medium">
-                            {p.username} {isMe && "(You)"}
+                            {p.username} {isMe && t("live.you")}
                           </div>
                         </div>
                       </div>
@@ -775,21 +775,21 @@ export default function LiveRoomPage() {
 
         {room.status === "closed" && (
           <div className="text-sm text-muted-foreground">
-            This session has ended. You can view the code but cannot edit.
+            {t("live.sessionEnded")}
           </div>
         )}
 
         <div className="space-y-3">
 
         <div className="flex gap-2">
-          <Button onClick={runCode}>Run</Button>
-          <Button variant="secondary" onClick={stepCode}>Step</Button>
-          <Button variant="outline" onClick={clearOutput}>Clear</Button>
+          <Button onClick={runCode}>{t("live.run")}</Button>
+          <Button variant="secondary" onClick={stepCode}>{t("live.step")}</Button>
+          <Button variant="outline" onClick={clearOutput}>{t("live.clear")}</Button>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Editor</CardTitle>
+            <CardTitle>{t("live.editor")}</CardTitle>
           </CardHeader>
           <CardContent className="min-w-0 overflow-hidden">
             <div className="border rounded overflow-hidden min-w-0 max-w-full">
@@ -824,11 +824,11 @@ export default function LiveRoomPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Debugger</CardTitle>
+            <CardTitle>{t("live.debugger")}</CardTitle>
           </CardHeader>
           <CardContent className="min-w-0 overflow-hidden">
             <div className="bg-black text-green-400 font-mono text-sm p-3 rounded h-40 overflow-auto">
-              {output.length === 0 && <div className="opacity-50">No output</div>}
+              {output.length === 0 && <div className="opacity-50">{t("live.noOutput")}</div>}
               {output.map((line, i) => (
                 <div key={i}>{line}</div>
               ))}
@@ -836,14 +836,14 @@ export default function LiveRoomPage() {
             {/* Input UI */}
             {waitingInput && (
               <div className="border rounded-lg p-3 mt-2 flex gap-2 items-center">
-                <span className="text-sm">Input {waitingInput}:</span>
+                <span className="text-sm">{t("live.inputPrompt")} {waitingInput}:</span>
                 <input
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   className="flex-1 px-2 py-1 border rounded text-sm"
-                  placeholder="Enter value..."
+                  placeholder={t("live.inputPlaceholder")}
                 />
-                <Button size="sm" onClick={submitInput}>OK</Button>
+                <Button size="sm" onClick={submitInput}>{t("live.ok")}</Button>
               </div>
             )}
           </CardContent>
@@ -856,7 +856,7 @@ export default function LiveRoomPage() {
 
         {/* User Panel */}
         <div className="border rounded-lg p-3">
-          <div className="text-sm font-medium mb-3">Users</div>
+          <div className="text-sm font-medium mb-3">{t("live.users")}</div>
 
           <div className="space-y-2">
             {(() => {
@@ -906,7 +906,7 @@ export default function LiveRoomPage() {
 
                       {isOwnerUser && (
                         <span className="text-[10px] px-2 py-[2px] bg-primary text-white rounded">
-                          Owner
+                          {t("live.owner")}
                         </span>
                       )}
                     </div>
@@ -929,7 +929,7 @@ export default function LiveRoomPage() {
         {room.status === "active" && (
         <div className="flex flex-col border rounded-lg overflow-hidden h-[400px]">
           <div className="p-3 border-b text-sm font-medium">
-            Chat
+            {t("live.chat")}
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {messages.map((m) => {
@@ -986,14 +986,14 @@ export default function LiveRoomPage() {
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type a message..."
+              placeholder={t("live.messagePlaceholder")}
               className="flex-1 text-sm px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               onKeyDown={(e) => {
                 if (e.key === "Enter") sendMessage();
               }}
             />
             <Button size="sm" onClick={sendMessage} className="px-3">
-              Send
+              {t("live.send")}
             </Button>
           </div>
         </div>
@@ -1064,12 +1064,12 @@ export default function LiveRoomPage() {
     <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Invite Users</DialogTitle>
+          <DialogTitle>{t("live.inviteTitle")}</DialogTitle>
         </DialogHeader>
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search users..."
+          placeholder={t("live.searchPlaceholder")}
         />
         <div className="max-h-72 overflow-y-auto space-y-2 mt-2">
           {users
@@ -1099,7 +1099,7 @@ export default function LiveRoomPage() {
                     disabled={isAlreadyInSession}
                     onClick={() => inviteUser(u.id)}
                   >
-                    {isAlreadyInSession ? "In session" : "Invite"}
+                    {isAlreadyInSession ? t("live.inSession") : t("live.inviteButton")}
                   </Button>
                 </div>
               );

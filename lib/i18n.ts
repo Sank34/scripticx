@@ -14,6 +14,8 @@ export const translations = {
       search: "Search",
       admin: "Admin",
       docs: "Docs",
+      examples: "Examples",
+      classes: "Classes",
     },
 
     learn: {
@@ -234,6 +236,7 @@ export const translations = {
         deleted: "Snippet deleted",
       }
     },
+
     snippetPage: {
       notFound: "Snippet not found",
       untitled: "Untitled",
@@ -258,6 +261,7 @@ export const translations = {
         linkError: "Failed to copy link",
       }
     },
+
     problems: {
       title: "Problems",
       searchPlaceholder: "Search problems...",
@@ -274,6 +278,7 @@ export const translations = {
         notStarted: "Not started",
       }
     },
+
     problemPage: {
       notFound: "Problem not found",
 
@@ -293,11 +298,13 @@ export const translations = {
         got: "Got",
       }
     },
+
     leaderboard: {
       title: "Leaderboard",
       description: "Top users ranked by total score",
       points: "pts",
     },
+
     dashboard: {
       title: "Dashboard",
       overview: "Overview",
@@ -320,6 +327,7 @@ export const translations = {
         solvedMiddle: "",
       },
     },
+
     feed: {
       selected: "Selected",
       posts: "posts",
@@ -386,6 +394,7 @@ export const translations = {
         unfollowed: "Unfollowed",
       },
     },
+
     post: {
       loading: "Loading...",
       share: "Share",
@@ -396,6 +405,7 @@ export const translations = {
       writeComment: "Write a comment...",
       send: "Send",
     },
+
     search: {
       placeholder: "Search users...",
       topUsers: "Top Users",
@@ -443,6 +453,7 @@ export const translations = {
         title: "Recent Submissions",
       },
     },
+
     publicProfile: {
       notFound: "User not found",
 
@@ -468,6 +479,7 @@ export const translations = {
         description: "Check out {username}'s profile on ScripticX",
       },
     },
+
     social: {
       followers: {
         title: "Followers",
@@ -478,9 +490,287 @@ export const translations = {
         count: "{count} following",
       },
     },
+
     live: {
       shareCopied: "Link copied!",
+
+      sessionTitle: "Live Session",
+      untitledSession: "Untitled Session",
+      share: "Share",
+      invite: "Invite",
+      endSession: "End Session",
+
+      online: "online",
+      you: "(You)",
+
+      sessionEnded: "This session has ended. You can view the code but cannot edit.",
+
+      run: "Run",
+      step: "Step",
+      clear: "Clear",
+      editor: "Editor",
+
+      debugger: "Debugger",
+      noOutput: "No output",
+      inputPrompt: "Input",
+      inputPlaceholder: "Enter value...",
+      ok: "OK",
+
+      users: "Users",
+      owner: "Owner",
+
+      chat: "Chat",
+      messagePlaceholder: "Type a message...",
+      send: "Send",
+
+      inviteTitle: "Invite Users",
+      searchPlaceholder: "Search users...",
+      inSession: "In session",
+      inviteButton: "Invite",
+
+      toast: {
+        userInSession: "User already in session",
+        userInvited: "User already invited",
+        inviteFailed: "Failed to send invite",
+        inviteSent: "Invite sent",
+        error: "Unexpected error",
+      },
     },
+
+    livecode: {
+      title: "Live Coding",
+      subtitle: "Collaborate in real-time coding sessions",
+      createSession: "Create Session",
+
+      stats: {
+        total: "Total Sessions",
+        active: "Active",
+        past: "Past",
+      },
+
+      sessions: {
+        activeTitle: "Active Sessions",
+        pastTitle: "Past Sessions",
+        noActive: "No active sessions",
+        noPast: "No past sessions",
+        fallbackName: "Session",
+      },
+
+      roles: {
+        owner: "Owner",
+        member: "Member",
+      },
+
+      status: {
+        active: "Active",
+        closed: "Closed",
+      },
+
+      invites: {
+        title: "Pending Invites",
+        empty: "No pending invites",
+        accept: "Accept",
+        decline: "Decline",
+      },
+
+      dialog: {
+        title: "Create Session",
+        placeholder: "Session name",
+        creating: "Creating...",
+        create: "Create",
+        untitled: "Untitled Session",
+      },
+    },
+
+    examples: {
+      basics: {
+        title: "Basics",
+        subtitle: "Simple examples to understand how the language works",
+        run: "Run",
+        print: {
+          title: "Printing text",
+          description: "Use PRINT to display messages.",
+        },
+        variables: {
+          title: "Variables",
+          description: "Store values in variables and print them.",
+        },
+        math: {
+          title: "Math operations",
+          description: "You can perform calculations using operators.",
+        },
+        conditions: {
+          title: "Conditions",
+          description: "Use IF statements to control program flow.",
+        },
+      },
+      loops: {
+        title: "Loops",
+        subtitle: "Learn how to repeat actions using loops",
+        run: "Run",
+        while: {
+          title: "While loop",
+          description: "A WHILE loop runs as long as the condition is true.",
+        },
+        sum: {
+          title: "Sum from 1 to N",
+          description: "Calculate the sum of numbers from 1 to N.",
+        },
+        countdown: {
+          title: "Countdown",
+          description: "Loop backwards from a number to zero.",
+        },
+        inputLoop: {
+          title: "Loop with input",
+          description: "Ask the user for input multiple times.",
+        },
+      },
+      conditions: {
+        title: "Conditions",
+        subtitle: "Control your program using IF statements",
+        run: "Run",
+        simpleIf: {
+          title: "Simple IF",
+          description: "Execute code only if a condition is true.",
+        },
+        ifElse: {
+          title: "IF / ELSE",
+          description: "Choose between two paths.",
+        },
+        evenOdd: {
+          title: "Even or Odd",
+          description: "Check if a number is even or odd.",
+        },
+        maxTwo: {
+          title: "Max of two numbers",
+          description: "Find the larger number between two values.",
+        },
+      },
+      algorithms: {
+        title: "Algorithms",
+        subtitle: "Solve classic problems using logic and loops",
+        run: "Run",
+        prime: {
+          title: "Prime number check",
+          description: "Check if a number is prime.",
+        },
+        fibonacci: {
+          title: "Fibonacci sequence",
+          description: "Generate the first N Fibonacci numbers.",
+        },
+        gcd: {
+          title: "Greatest Common Divisor (GCD)",
+          description: "Find the GCD of two numbers using subtraction.",
+        },
+        findMax: {
+          title: "Find maximum (manual)",
+          description: "Simulate finding the maximum from values.",
+        },
+      },
+    },
+
+    classes: {
+      title: "Classes",
+      subtitle: "Manage and join your coding classes",
+      createClass: "Create Class",
+      loading: "Loading...",
+      noClasses: "No classes yet",
+
+      roles: {
+        teacher: "Teacher",
+        student: "Student",
+      },
+
+      join: {
+        title: "Join with code",
+        placeholder: "Enter invite code",
+        button: "Join",
+      },
+
+      dialog: {
+        createTitle: "Create Class",
+        classNamePlaceholder: "Class name",
+        create: "Create",
+      },
+
+      detail: {
+        teacherLabel: "Teacher:",
+        inviteCodeLabel: "Invite code:",
+        newAssignment: "New Assignment",
+
+        assignments: {
+          titleTeacher: "Assignments (Given to students)",
+          titleStudent: "Assignments (To complete)",
+          emptyTeacher: "No assignments created yet",
+          emptyStudent: "No assignments assigned to you",
+          noDeadline: "No deadline",
+          open: "Open",
+        },
+
+        members: "Members",
+
+        invite: {
+          title: "Invite",
+          shareText: "Share this code to invite students:",
+        },
+
+        createAssignment: {
+          title: "Create Assignment",
+          problemSelected: "problem selected",
+          problemsSelected: "problems selected",
+          selectProblem: "Select a problem",
+          searchProblem: "Search problem...",
+          noProblemsFound: "No problems found",
+          titlePlaceholder: "Title",
+          descriptionPlaceholder: "Description",
+          pickDeadline: "Pick a deadline",
+          create: "Create",
+        },
+      },
+
+      assignment: {
+        loading: "Loading...",
+        notFound: "Assignment not found",
+        deadlineLabel: "Deadline:",
+        noDeadline: "No deadline",
+        description: "Description",
+
+        status: {
+          submittedLate: "Submitted (Late)",
+          submitted: "Submitted",
+          late: "Late",
+          inProgress: "In progress",
+          notSubmitted: "Not submitted",
+          solvedLate: "Solved (Late)",
+          solved: "Solved",
+        },
+
+        problems: {
+          title: "Problems",
+          empty: "No problems attached",
+          problemPrefix: "Problem",
+          solve: "Solve",
+        },
+
+        submissions: {
+          title: "Submissions",
+          view: "View",
+          noCode: "No code",
+          dialogTitle: "Submission",
+        },
+      },
+
+      solve: {
+        loading: "Loading...",
+        subtitle: "Solve the problem and submit your solution",
+        problemFallback: "Problem",
+        noDescription: "No problem description",
+        yourSolution: "Your Solution",
+        submitted: "Submitted!",
+        submit: "Submit",
+      },
+    },
+
     admin: {
       title: "Admin Panel",
       problems: {
@@ -559,6 +849,7 @@ export const translations = {
         },
       },
     },
+
     login: {
       title: "Welcome",
       tabs: {
@@ -578,6 +869,7 @@ export const translations = {
         accountCreatedDescription: "You can now log in.",
       }
     },
+
     settings: {
       title: "Settings",
 
@@ -612,11 +904,13 @@ export const translations = {
         passwordUpdated: "Password updated",
       }
     },
+
     banned: {
       title: "Account Suspended",
       description: "Your account has been banned from using the platform.",
       logout: "Logout",
     },
+
     common: {
       viewAll: "View all",
     },
@@ -637,6 +931,8 @@ export const translations = {
       search: "Căutare",
       admin: "Admin",
       docs: "Documentație",
+      examples: "Exemple",
+      classes: "Clase",
     },
 
     learn: {
@@ -857,6 +1153,7 @@ export const translations = {
         deleted: "Snippet șters",
       }
     },
+
     snippetPage: {
       notFound: "Snippet-ul nu a fost găsit",
       untitled: "Fără titlu",
@@ -881,6 +1178,7 @@ export const translations = {
         linkError: "Eroare la copiere link",
       }
     },
+
     problems: {
       title: "Probleme",
       searchPlaceholder: "Caută probleme...",
@@ -897,6 +1195,7 @@ export const translations = {
         notStarted: "Neînceput",
       }
     },
+
     problemPage: {
       notFound: "Problema nu a fost găsită",
 
@@ -916,11 +1215,13 @@ export const translations = {
         got: "Obținut",
       }
     },
+
     leaderboard: {
       title: "Clasament",
       description: "Cei mai buni utilizatori după scor total",
       points: "pct",
     },
+
     dashboard: {
       title: "Panou",
       overview: "Prezentare",
@@ -943,9 +1244,7 @@ export const translations = {
         solvedMiddle: "a rezolvat problema",
       },
     },
-    live: {
-      shareCopied: "Link copiat!",
-    },
+
     feed: {
       posts: "postări",
       selected: "Selectat",
@@ -1012,6 +1311,7 @@ export const translations = {
         unfollowed: "Nu mai urmărești",
       },
     },
+
     post: {
       loading: "Se încarcă...",
       share: "Distribuie",
@@ -1022,6 +1322,7 @@ export const translations = {
       writeComment: "Scrie un comentariu...",
       send: "Trimite",
     },
+
     search: {
       placeholder: "Caută utilizatori...",
       topUsers: "Top utilizatori",
@@ -1069,6 +1370,7 @@ export const translations = {
         title: "Submisii recente",
       },
     },
+
     publicProfile: {
       notFound: "Utilizator negăsit",
 
@@ -1094,6 +1396,7 @@ export const translations = {
         description: "Vezi profilul lui {username} pe ScripticX",
       },
     },
+
     social: {
       followers: {
         title: "Urmăritori",
@@ -1104,6 +1407,287 @@ export const translations = {
         count: "{count} urmăriți",
       },
     },
+
+    live: {
+      shareCopied: "Link copiat!",
+
+      sessionTitle: "Sesiune live",
+      untitledSession: "Sesiune fără titlu",
+      share: "Distribuie",
+      invite: "Invită",
+      endSession: "Încheie sesiunea",
+
+      online: "online",
+      you: "(Tu)",
+
+      sessionEnded: "Această sesiune s-a încheiat. Poți vedea codul, dar nu îl poți edita.",
+
+      run: "Rulează",
+      step: "Pas",
+      clear: "Șterge",
+      editor: "Editor",
+
+      debugger: "Debugger",
+      noOutput: "Niciun output",
+      inputPrompt: "Input",
+      inputPlaceholder: "Introdu valoarea...",
+      ok: "OK",
+
+      users: "Utilizatori",
+      owner: "Proprietar",
+
+      chat: "Chat",
+      messagePlaceholder: "Scrie un mesaj...",
+      send: "Trimite",
+
+      inviteTitle: "Invită utilizatori",
+      searchPlaceholder: "Caută utilizatori...",
+      inSession: "În sesiune",
+      inviteButton: "Invită",
+
+      toast: {
+        userInSession: "Utilizatorul este deja în sesiune",
+        userInvited: "Utilizatorul a fost deja invitat",
+        inviteFailed: "Eroare la trimiterea invitației",
+        inviteSent: "Invitație trimisă",
+        error: "Eroare neașteptată",
+      },
+    },
+
+    livecode: {
+      title: "Programare live",
+      subtitle: "Colaborează în sesiuni de programare în timp real",
+      createSession: "Creează sesiune",
+
+      stats: {
+        total: "Total sesiuni",
+        active: "Active",
+        past: "Anterioare",
+      },
+
+      sessions: {
+        activeTitle: "Sesiuni active",
+        pastTitle: "Sesiuni anterioare",
+        noActive: "Nicio sesiune activă",
+        noPast: "Nicio sesiune anterioară",
+        fallbackName: "Sesiune",
+      },
+
+      roles: {
+        owner: "Proprietar",
+        member: "Membru",
+      },
+
+      status: {
+        active: "Activ",
+        closed: "Închis",
+      },
+
+      invites: {
+        title: "Invitații în așteptare",
+        empty: "Nicio invitație în așteptare",
+        accept: "Acceptă",
+        decline: "Refuză",
+      },
+
+      dialog: {
+        title: "Creează sesiune",
+        placeholder: "Numele sesiunii",
+        creating: "Se creează...",
+        create: "Creează",
+        untitled: "Sesiune fără titlu",
+      },
+    },
+
+    examples: {
+      basics: {
+        title: "Elemente de bază",
+        subtitle: "Exemple simple pentru a înțelege cum funcționează limbajul",
+        run: "Rulează",
+        print: {
+          title: "Afișarea textului",
+          description: "Folosește PRINT pentru a afișa mesaje.",
+        },
+        variables: {
+          title: "Variabile",
+          description: "Stochează valori în variabile și afișează-le.",
+        },
+        math: {
+          title: "Operații matematice",
+          description: "Poți efectua calcule folosind operatori.",
+        },
+        conditions: {
+          title: "Condiții",
+          description: "Folosește instrucțiuni IF pentru a controla fluxul programului.",
+        },
+      },
+      loops: {
+        title: "Bucle",
+        subtitle: "Învață cum să repeți acțiuni folosind bucle",
+        run: "Rulează",
+        while: {
+          title: "Bucla While",
+          description: "O buclă WHILE rulează cât timp condiția este adevărată.",
+        },
+        sum: {
+          title: "Suma de la 1 la N",
+          description: "Calculează suma numerelor de la 1 la N.",
+        },
+        countdown: {
+          title: "Numărătoare inversă",
+          description: "Buclă de la un număr înapoi la zero.",
+        },
+        inputLoop: {
+          title: "Buclă cu input",
+          description: "Cere utilizatorului input de mai multe ori.",
+        },
+      },
+      conditions: {
+        title: "Condiții",
+        subtitle: "Controlează programul folosind instrucțiuni IF",
+        run: "Rulează",
+        simpleIf: {
+          title: "IF simplu",
+          description: "Execută cod doar dacă o condiție este adevărată.",
+        },
+        ifElse: {
+          title: "IF / ELSE",
+          description: "Alege între două căi.",
+        },
+        evenOdd: {
+          title: "Par sau impar",
+          description: "Verifică dacă un număr este par sau impar.",
+        },
+        maxTwo: {
+          title: "Maximul a două numere",
+          description: "Găsește numărul mai mare dintre două valori.",
+        },
+      },
+      algorithms: {
+        title: "Algoritmi",
+        subtitle: "Rezolvă probleme clasice folosind logică și bucle",
+        run: "Rulează",
+        prime: {
+          title: "Verificare număr prim",
+          description: "Verifică dacă un număr este prim.",
+        },
+        fibonacci: {
+          title: "Șirul Fibonacci",
+          description: "Generează primele N numere Fibonacci.",
+        },
+        gcd: {
+          title: "Cel mai mare divizor comun (CMMDC)",
+          description: "Găsește CMMDC a două numere prin scădere.",
+        },
+        findMax: {
+          title: "Găsirea maximului (manual)",
+          description: "Simulează găsirea valorii maxime dintr-un set de valori.",
+        },
+      },
+    },
+
+    classes: {
+      title: "Clase",
+      subtitle: "Gestionează și alătură-te claselor de programare",
+      createClass: "Creează clasă",
+      loading: "Se încarcă...",
+      noClasses: "Nicio clasă încă",
+
+      roles: {
+        teacher: "Profesor",
+        student: "Elev",
+      },
+
+      join: {
+        title: "Alătură-te cu cod",
+        placeholder: "Introdu codul de invitație",
+        button: "Alătură-te",
+      },
+
+      dialog: {
+        createTitle: "Creează clasă",
+        classNamePlaceholder: "Numele clasei",
+        create: "Creează",
+      },
+
+      detail: {
+        teacherLabel: "Profesor:",
+        inviteCodeLabel: "Cod de invitație:",
+        newAssignment: "Temă nouă",
+
+        assignments: {
+          titleTeacher: "Teme (Atribuite elevilor)",
+          titleStudent: "Teme (De rezolvat)",
+          emptyTeacher: "Nicio temă creată încă",
+          emptyStudent: "Nicio temă atribuită",
+          noDeadline: "Fără termen limită",
+          open: "Deschide",
+        },
+
+        members: "Membri",
+
+        invite: {
+          title: "Invitație",
+          shareText: "Distribuie acest cod pentru a invita elevi:",
+        },
+
+        createAssignment: {
+          title: "Creează temă",
+          problemSelected: "problemă selectată",
+          problemsSelected: "probleme selectate",
+          selectProblem: "Selectează o problemă",
+          searchProblem: "Caută problemă...",
+          noProblemsFound: "Nicio problemă găsită",
+          titlePlaceholder: "Titlu",
+          descriptionPlaceholder: "Descriere",
+          pickDeadline: "Alege termenul limită",
+          create: "Creează",
+        },
+      },
+
+      assignment: {
+        loading: "Se încarcă...",
+        notFound: "Tema nu a fost găsită",
+        deadlineLabel: "Termen limită:",
+        noDeadline: "Fără termen limită",
+        description: "Descriere",
+
+        status: {
+          submittedLate: "Trimis (întârziat)",
+          submitted: "Trimis",
+          late: "Întârziat",
+          inProgress: "În progres",
+          notSubmitted: "Netrimis",
+          solvedLate: "Rezolvat (întârziat)",
+          solved: "Rezolvat",
+        },
+
+        problems: {
+          title: "Probleme",
+          empty: "Nicio problemă atașată",
+          problemPrefix: "Problema",
+          solve: "Rezolvă",
+        },
+
+        submissions: {
+          title: "Submisii",
+          view: "Vezi",
+          noCode: "Niciun cod",
+          dialogTitle: "Submisie",
+        },
+      },
+
+      solve: {
+        loading: "Se încarcă...",
+        subtitle: "Rezolvă problema și trimite soluția ta",
+        problemFallback: "Problemă",
+        noDescription: "Nicio descriere a problemei",
+        yourSolution: "Soluția ta",
+        submitted: "Trimis!",
+        submit: "Trimite",
+      },
+    },
+
     admin: {
       title: "Panou Admin",
       problems: {
@@ -1182,6 +1766,7 @@ export const translations = {
         },
       },
     },
+
     login: {
       title: "Bine ai venit",
       tabs: {
@@ -1201,6 +1786,7 @@ export const translations = {
         accountCreatedDescription: "Te poți autentifica acum.",
       }
     },
+
     settings: {
       title: "Setări",
 
@@ -1235,11 +1821,13 @@ export const translations = {
         passwordUpdated: "Parolă actualizată",
       }
     },
+
     banned: {
       title: "Cont suspendat",
       description: "Contul tău a fost blocat și nu mai poate folosi platforma.",
       logout: "Deconectare",
     },
+
     common: {
       viewAll: "Vezi tot",
     },

@@ -254,7 +254,7 @@ export function AppSidebar() {
               <NavItem href="/admin" icon={Shield} label={t("nav.admin")} active={pathname.startsWith("/admin")} />
             )}
             {user && (
-              <NavItem href="/classes" icon={School} label={"Classes"} active={pathname.startsWith("/classes")} />
+              <NavItem href="/classes" icon={School} label={t("nav.classes")} active={pathname.startsWith("/classes")} />
             )}
 
           </SidebarGroupContent>
@@ -330,7 +330,7 @@ export function AppSidebar() {
                 <NavItem
                   href="/examples"
                   icon={BookOpen}
-                  label="Examples"
+                  label={t("nav.examples")}
                   active={pathname.startsWith("/examples")}
                 />
 
@@ -359,10 +359,10 @@ export function AppSidebar() {
                   }`}
                 >
                   <div className="ml-2 border-l pl-2 space-y-1">
-                    <SubItem href="/examples/basics" label="Basics" />
-                    <SubItem href="/examples/loops" label="Loops" />
-                    <SubItem href="/examples/conditions" label="Conditions" />
-                    <SubItem href="/examples/algorithms" label="Algorithms" />
+                    <SubItem href="/examples/basics" label={t("examples.basics.title")} />
+                    <SubItem href="/examples/loops" label={t("examples.loops.title")} />
+                    <SubItem href="/examples/conditions" label={t("examples.conditions.title")} />
+                    <SubItem href="/examples/algorithms" label={t("examples.algorithms.title")} />
                   </div>
                 </div>
               )}

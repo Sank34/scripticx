@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 
 import { Plus, Users, Link as LinkIcon } from "lucide-react";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function ClassesPage() {
   const router = useRouter();
   const [classes, setClasses] = useState<any[]>([]);
@@ -20,6 +23,15 @@ export default function ClassesPage() {
   const [name, setName] = useState("");
 
   const [joinCode, setJoinCode] = useState("");
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+    return value || key;
+  };
 
   useEffect(() => {
     load();
@@ -122,46 +134,43 @@ export default function ClassesPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Classes</h1>
+          <h1 className="text-3xl font-bold">{t("classes.title")}</h1>
           <p className="text-muted-foreground">
-            Manage and join your coding classes
+            {t("classes.subtitle")}
           </p>
         </div>
 
         <Button onClick={() => setOpen(true)} className="flex gap-2">
           <Plus size={16} />
-          Create Class
+          {t("classes.createClass")}
         </Button>
       </div>
 
-      {/* Join */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LinkIcon size={16} />
-            Join with code
+            {t("classes.join.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex gap-2">
           <Input
-            placeholder="Enter invite code"
+            placeholder={t("classes.join.placeholder")}
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value)}
           />
-          <Button onClick={joinClass}>Join</Button>
+          <Button onClick={joinClass}>{t("classes.join.button")}</Button>
         </CardContent>
       </Card>
 
-      {/* Classes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading && <div>Loading...</div>}
+        {loading && <div>{t("classes.loading")}</div>}
 
         {!loading && classes.length === 0 && (
           <p className="text-muted-foreground text-sm">
-            No classes yet
+            {t("classes.noClasses")}
           </p>
         )}
 
@@ -186,7 +195,7 @@ export default function ClassesPage() {
                     ? "bg-primary text-white"
                     : "bg-muted text-muted-foreground"
                 }`}>
-                  {cls.role === "teacher" ? "Teacher" : "Student"}
+                  {cls.role === "teacher" ? t("classes.roles.teacher") : t("classes.roles.student")}
                 </span>
               </div>
             </CardContent>
@@ -194,21 +203,20 @@ export default function ClassesPage() {
         ))}
       </div>
 
-      {/* Create Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Class</DialogTitle>
+            <DialogTitle>{t("classes.dialog.createTitle")}</DialogTitle>
           </DialogHeader>
 
           <Input
-            placeholder="Class name"
+            placeholder={t("classes.dialog.classNamePlaceholder")}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
 
           <DialogFooter>
-            <Button onClick={createClass}>Create</Button>
+            <Button onClick={createClass}>{t("classes.dialog.create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

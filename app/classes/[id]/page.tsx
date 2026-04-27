@@ -15,6 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 
 import { Users, Plus, Link as LinkIcon } from "lucide-react";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function ClassPage() {
   const router = useRouter();
   const params = useParams();
@@ -39,6 +42,15 @@ export default function ClassPage() {
   const [problemOpen, setProblemOpen] = useState(false);
 
   const [userId, setUserId] = useState<string | null>(null);
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+    return value || key;
+  };
 
   useEffect(() => {
     load();
@@ -76,11 +88,8 @@ export default function ClassPage() {
       classError = res.error;
     }
 
-    // console.log("CLASS DATA:", classData, classError);
-
     if (classData) setCls(classData);
 
-    // access control: must be teacher or member
     const isTeacher = user?.id === classData?.teacher_id;
 
     const { data: memberCheck } = await supabase
@@ -97,13 +106,10 @@ export default function ClassPage() {
       return;
     }
 
-
     const { data: memberRows } = await supabase
       .from("class_members")
       .select("user_id, role")
       .eq("class_id", classData?.id);
-
-    // console.log("MEMBERS:", memberRows);
 
     if (!memberRows || memberRows.length === 0) {
       setMembers([]);
@@ -137,8 +143,6 @@ export default function ClassPage() {
       .select("*")
       .eq("class_id", classData?.id)
       .order("created_at", { ascending: false });
-
-    // console.log("SESSIONS:", sessionData);
 
     setSessions(sessionData || []);
 
@@ -181,7 +185,6 @@ export default function ClassPage() {
       deadline: assignmentDeadline || null,
     };
 
-    // try multi-problem first
     payload.problem_ids = selectedProblems.map((p) => p.id);
 
     let { data, error } = await supabase
@@ -190,7 +193,6 @@ export default function ClassPage() {
       .select()
       .single();
 
-    // fallback if column doesn't exist
     if (error) {
       console.error("Assignment insert error (multi):", error);
 
@@ -256,22 +258,21 @@ export default function ClassPage() {
   }
 
   const teacherName =
-    members.find((m) => m.role === "teacher")?.username || "Teacher";
+    members.find((m) => m.role === "teacher")?.username || t("classes.roles.teacher");
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
 
-      {/* Hero Header */}
       <div className="relative rounded-2xl overflow-hidden border bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 text-white p-6 flex items-end justify-between">
         <div className="space-y-2">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            {cls ? cls.name : "Class"}
+            {cls ? cls.name : t("classes.roles.teacher")}
           </h1>
           <p className="text-sm text-white/70">
-            Teacher: {teacherName}
+            {t("classes.detail.teacherLabel")} {teacherName}
           </p>
           <p className="text-xs text-white/50">
-            Invite code:
+            {t("classes.detail.inviteCodeLabel")}
           </p>
           <div className="inline-block px-3 py-1 rounded-md bg-white/10 backdrop-blur text-sm font-mono">
             {cls?.invite_code || "—"}
@@ -285,7 +286,7 @@ export default function ClassPage() {
               className="bg-white text-black hover:bg-white/90"
             >
               <Plus size={16} />
-              New Assignment
+              {t("classes.detail.newAssignment")}
             </Button>
           )}
         </div>
@@ -293,22 +294,23 @@ export default function ClassPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Sessions and Assignments */}
         <div className="lg:col-span-2 space-y-4">
 
           <Card>
             <CardHeader>
               <CardTitle>
                 {userId && cls?.teacher_id === userId
-                  ? "Assignments (Given to students)"
-                  : "Assignments (To complete)"}
+                  ? t("classes.detail.assignments.titleTeacher")
+                  : t("classes.detail.assignments.titleStudent")}
               </CardTitle>
             </CardHeader>
-          <CardContent className="space-y-2 max-h-80 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <CardContent className="space-y-2 max-h-80 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {assignments.length === 0 && (
-                <p className="text-sm text-muted-foreground">{userId && cls?.teacher_id === userId
-                  ? "No assignments created yet"
-                  : "No assignments assigned to you"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {userId && cls?.teacher_id === userId
+                    ? t("classes.detail.assignments.emptyTeacher")
+                    : t("classes.detail.assignments.emptyStudent")}
+                </p>
               )}
 
               {assignments.map((a) => (
@@ -316,7 +318,7 @@ export default function ClassPage() {
                   <div>
                     <p className="font-medium">{a.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {a.deadline ? new Date(a.deadline).toLocaleString() : "No deadline"}
+                      {a.deadline ? new Date(a.deadline).toLocaleString() : t("classes.detail.assignments.noDeadline")}
                     </p>
                   </div>
 
@@ -326,42 +328,20 @@ export default function ClassPage() {
                       router.push(`/classes/${cls?.id}/assignments/${a.id}`)
                     }
                   >
-                    Open
+                    {t("classes.detail.assignments.open")}
                   </Button>
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          {/* <Card>
-            <CardHeader>
-              <CardTitle>Sessions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-80 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {sessions.length === 0 && (
-                <p className="text-sm text-muted-foreground">No sessions yet</p>
-              )}
-
-              {sessions.map((s) => (
-                <div key={s.id} className="border rounded p-3 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{s.title}</p>
-                    <p className="text-xs text-muted-foreground">{s.status}</p>
-                  </div>
-
-                  <Button size="sm">Open</Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card> */}
         </div>
 
-        {/* Members */}
         <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users size={16} /> Members
+                <Users size={16} /> {t("classes.detail.members")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 max-h-80 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -387,12 +367,12 @@ export default function ClassPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <LinkIcon size={16} /> Invite
+                <LinkIcon size={16} /> {t("classes.detail.invite.title")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Share this code to invite students:
+                {t("classes.detail.invite.shareText")}
               </p>
               <div className="mt-2 font-mono text-sm bg-muted p-2 rounded">
                 {cls?.invite_code || "—"}
@@ -403,30 +383,10 @@ export default function ClassPage() {
 
       </div>
 
-      {/* Create session dialog */}
-      {/* <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Session</DialogTitle>
-          </DialogHeader>
-
-          <Input
-            placeholder="Session name"
-            value={sessionName}
-            onChange={(e) => setSessionName(e.target.value)}
-          />
-
-          <DialogFooter>
-            <Button onClick={createSession}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog> */}
-
-      {/* Create assignment dialog */}
       <Dialog open={openAssignment} onOpenChange={setOpenAssignment}>
         <DialogContent className="overflow-visible">
           <DialogHeader>
-            <DialogTitle>Create Assignment</DialogTitle>
+            <DialogTitle>{t("classes.detail.createAssignment.title")}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">
@@ -438,10 +398,15 @@ export default function ClassPage() {
                 >
                   {selectedProblems.length > 0 ? (
                     <span className="truncate">
-                      {selectedProblems.length} problem{selectedProblems.length > 1 ? "s" : ""} selected
+                      {selectedProblems.length}{" "}
+                      {selectedProblems.length > 1
+                        ? t("classes.detail.createAssignment.problemsSelected")
+                        : t("classes.detail.createAssignment.problemSelected")}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground">Select a problem</span>
+                    <span className="text-muted-foreground">
+                      {t("classes.detail.createAssignment.selectProblem")}
+                    </span>
                   )}
                 </Button>
               </PopoverTrigger>
@@ -449,7 +414,7 @@ export default function ClassPage() {
               <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-lg shadow-lg border">
                 <Command className="pt-1" loop>
                   <CommandInput
-                    placeholder="Search problem..."
+                    placeholder={t("classes.detail.createAssignment.searchProblem")}
                     value={problemQuery}
                     className="h-10 text-sm"
                     onValueChange={(value) => {
@@ -472,7 +437,7 @@ export default function ClassPage() {
                   />
 
                   <CommandList className="mt-1">
-                    <CommandEmpty>No problems found</CommandEmpty>
+                    <CommandEmpty>{t("classes.detail.createAssignment.noProblemsFound")}</CommandEmpty>
 
                     {problems.map((p) => (
                       <CommandItem
@@ -522,13 +487,13 @@ export default function ClassPage() {
             )}
 
             <Input
-              placeholder="Title"
+              placeholder={t("classes.detail.createAssignment.titlePlaceholder")}
               value={assignmentTitle}
               onChange={(e) => setAssignmentTitle(e.target.value)}
             />
 
             <Input
-              placeholder="Description"
+              placeholder={t("classes.detail.createAssignment.descriptionPlaceholder")}
               value={assignmentDescription}
               onChange={(e) => setAssignmentDescription(e.target.value)}
             />
@@ -538,7 +503,7 @@ export default function ClassPage() {
                 <Button variant="outline" className="w-full justify-start text-left font-normal">
                   {assignmentDeadline
                     ? format(new Date(assignmentDeadline), "PPP")
-                    : "Pick a deadline"}
+                    : t("classes.detail.createAssignment.pickDeadline")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -559,7 +524,7 @@ export default function ClassPage() {
           </div>
 
           <DialogFooter>
-            <Button onClick={createAssignment}>Create</Button>
+            <Button onClick={createAssignment}>{t("classes.detail.createAssignment.create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -28,9 +28,9 @@ export default function BasicsPage() {
 
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold">Basics</h1>
+        <h1 className="text-4xl font-bold">{t("examples.basics.title")}</h1>
         <p className="text-muted-foreground">
-          Simple examples to understand how the language works
+          {t("examples.basics.subtitle")}
         </p>
       </div>
 
@@ -39,9 +39,9 @@ export default function BasicsPage() {
 
           {/* PRINT */}
           <div>
-            <h2 className="text-xl font-semibold">Printing text</h2>
+            <h2 className="text-xl font-semibold">{t("examples.basics.print.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Use PRINT to display messages.
+              {t("examples.basics.print.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -56,15 +56,15 @@ PRINT "World"`}
                 router.push(`/editor?code=${encodeURIComponent(`PRINT "Hello"\nPRINT "World"`)}`)
               }
             >
-              Run
+              {t("examples.basics.run")}
             </Button>
           </div>
 
           {/* VARIABLES */}
           <div>
-            <h2 className="text-xl font-semibold">Variables</h2>
+            <h2 className="text-xl font-semibold">{t("examples.basics.variables.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Store values in variables and print them.
+              {t("examples.basics.variables.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -79,15 +79,15 @@ PRINT X`}
                 router.push(`/editor?code=${encodeURIComponent(`X = 5\nPRINT X`)}`)
               }
             >
-              Run
+              {t("examples.basics.run")}
             </Button>
           </div>
 
           {/* MATH */}
           <div>
-            <h2 className="text-xl font-semibold">Math operations</h2>
+            <h2 className="text-xl font-semibold">{t("examples.basics.math.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              You can perform calculations using operators.
+              {t("examples.basics.math.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -103,15 +103,15 @@ PRINT B`}
                 router.push(`/editor?code=${encodeURIComponent(`A = 5 + 3\nB = A * 2\nPRINT B`)}`)
               }
             >
-              Run
+              {t("examples.basics.run")}
             </Button>
           </div>
 
           {/* CONDITIONS */}
           <div>
-            <h2 className="text-xl font-semibold">Conditions</h2>
+            <h2 className="text-xl font-semibold">{t("examples.basics.conditions.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Use IF statements to control program flow.
+              {t("examples.basics.conditions.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -128,7 +128,7 @@ END`}
                 router.push(`/editor?code=${encodeURIComponent(`X = 10\nIF X > 5 THEN\nPRINT "Big"\nEND`)}`)
               }
             >
-              Run
+              {t("examples.basics.run")}
             </Button>
           </div>
 

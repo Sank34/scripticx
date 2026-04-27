@@ -4,28 +4,42 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
+import { useLanguage } from "@/components/LanguageProvider";
+import { translations } from "@/lib/i18n";
+
 export default function ConditionsPage() {
   const router = useRouter();
+
+  const { locale } = useLanguage();
+
+  const t = (key: string) => {
+    const keys = key.split(".");
+    let value: any = translations[locale];
+    for (const k of keys) value = value?.[k];
+    if (value) return value;
+
+    let fallback: any = translations["en"];
+    for (const k of keys) fallback = fallback?.[k];
+    return fallback || key;
+  };
 
   return (
     <div className="space-y-6">
 
-      {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold">Conditions</h1>
+        <h1 className="text-4xl font-bold">{t("examples.conditions.title")}</h1>
         <p className="text-muted-foreground">
-          Control your program using IF statements
+          {t("examples.conditions.subtitle")}
         </p>
       </div>
 
       <Card>
         <CardContent className="p-6 space-y-6">
 
-          {/* SIMPLE IF */}
           <div>
-            <h2 className="text-xl font-semibold">Simple IF</h2>
+            <h2 className="text-xl font-semibold">{t("examples.conditions.simpleIf.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Execute code only if a condition is true.
+              {t("examples.conditions.simpleIf.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -42,15 +56,14 @@ END`}
                 router.push(`/editor?code=${encodeURIComponent(`X = 10\nIF X > 5 THEN\nPRINT "Big"\nEND`)}`)
               }
             >
-              Run
+              {t("examples.conditions.run")}
             </Button>
           </div>
 
-          {/* IF ELSE */}
           <div>
-            <h2 className="text-xl font-semibold">IF / ELSE</h2>
+            <h2 className="text-xl font-semibold">{t("examples.conditions.ifElse.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Choose between two paths.
+              {t("examples.conditions.ifElse.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -69,15 +82,14 @@ END`}
                 router.push(`/editor?code=${encodeURIComponent(`X = 3\nIF X > 5 THEN\nPRINT "Big"\nELSE\nPRINT "Small"\nEND`)}`)
               }
             >
-              Run
+              {t("examples.conditions.run")}
             </Button>
           </div>
 
-          {/* EVEN / ODD */}
           <div>
-            <h2 className="text-xl font-semibold">Even or Odd</h2>
+            <h2 className="text-xl font-semibold">{t("examples.conditions.evenOdd.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Check if a number is even or odd.
+              {t("examples.conditions.evenOdd.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -96,15 +108,14 @@ END`}
                 router.push(`/editor?code=${encodeURIComponent(`X = 4\nIF X % 2 = 0 THEN\nPRINT "Even"\nELSE\nPRINT "Odd"\nEND`)}`)
               }
             >
-              Run
+              {t("examples.conditions.run")}
             </Button>
           </div>
 
-          {/* MAX OF TWO */}
           <div>
-            <h2 className="text-xl font-semibold">Max of two numbers</h2>
+            <h2 className="text-xl font-semibold">{t("examples.conditions.maxTwo.title")}</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Find the larger number between two values.
+              {t("examples.conditions.maxTwo.description")}
             </p>
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
@@ -125,7 +136,7 @@ END`}
                 router.push(`/editor?code=${encodeURIComponent(`A = 5\nB = 8\n\nIF A > B THEN\nPRINT A\nELSE\nPRINT B\nEND`)}`)
               }
             >
-              Run
+              {t("examples.conditions.run")}
             </Button>
           </div>
 
