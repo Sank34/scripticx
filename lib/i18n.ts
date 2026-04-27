@@ -583,6 +583,35 @@ export const translations = {
     },
 
     examples: {
+      title: "Examples",
+      subtitle: "Explore practical coding examples and learn by doing",
+
+      pages: {
+        basics: "Basics",
+        loops: "Loops",
+        conditions: "Conditions",
+        algorithms: "Algorithms",
+      },
+
+      sections: {
+        basics: {
+          title: "Basics",
+          description: "Simple programs and syntax examples",
+        },
+        loops: {
+          title: "Loops",
+          description: "Practice with loops and iterations",
+        },
+        conditions: {
+          title: "Conditions",
+          description: "If statements and logic",
+        },
+        algorithms: {
+          title: "Algorithms",
+          description: "Classic problems and solutions",
+        },
+      },
+
       basics: {
         title: "Basics",
         subtitle: "Simple examples to understand how the language works",
@@ -913,6 +942,12 @@ export const translations = {
 
     common: {
       viewAll: "View all",
+    },
+
+    notFound: {
+      title: "Page Not Found",
+      description: "The page you're looking for doesn't exist or was moved.",
+      goHome: "Go Home",
     },
   },
 
@@ -1500,6 +1535,35 @@ export const translations = {
     },
 
     examples: {
+      title: "Exemple",
+      subtitle: "Explorează exemple practice de cod și învață făcând",
+
+      pages: {
+        basics: "Elemente de bază",
+        loops: "Bucle",
+        conditions: "Condiții",
+        algorithms: "Algoritmi",
+      },
+
+      sections: {
+        basics: {
+          title: "Elemente de bază",
+          description: "Programe simple și exemple de sintaxă",
+        },
+        loops: {
+          title: "Bucle",
+          description: "Practică cu bucle și iterații",
+        },
+        conditions: {
+          title: "Condiții",
+          description: "Instrucțiuni IF și logică",
+        },
+        algorithms: {
+          title: "Algoritmi",
+          description: "Probleme clasice și soluții",
+        },
+      },
+
       basics: {
         title: "Elemente de bază",
         subtitle: "Exemple simple pentru a înțelege cum funcționează limbajul",
@@ -1830,6 +1894,12 @@ export const translations = {
 
     common: {
       viewAll: "Vezi tot",
+    },
+
+    notFound: {
+      title: "Pagina nu a fost găsită",
+      description: "Pagina pe care o cauți nu există sau a fost mutată.",
+      goHome: "Acasă",
     },
   },
 };

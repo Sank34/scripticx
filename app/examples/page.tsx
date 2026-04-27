@@ -21,35 +21,19 @@ export default function ExamplesPage() {
   };
 
   const sections = [
-    {
-      title: "Basics",
-      href: "/examples/basics",
-      description: "Simple programs and syntax examples",
-    },
-    {
-      title: "Loops",
-      href: "/examples/loops",
-      description: "Practice with loops and iterations",
-    },
-    {
-      title: "Conditions",
-      href: "/examples/conditions",
-      description: "If statements and logic",
-    },
-    {
-      title: "Algorithms",
-      href: "/examples/algorithms",
-      description: "Classic problems and solutions",
-    },
-  ];
+    { key: "basics", href: "/examples/basics" },
+    { key: "loops", href: "/examples/loops" },
+    { key: "conditions", href: "/examples/conditions" },
+    { key: "algorithms", href: "/examples/algorithms" },
+  ] as const;
 
   return (
     <div className="space-y-6">
 
       <div className="space-y-2">
-        <h1 className="text-4xl font-bold">Examples</h1>
+        <h1 className="text-4xl font-bold">{t("examples.title")}</h1>
         <p className="text-muted-foreground">
-          Explore practical coding examples and learn by doing
+          {t("examples.subtitle")}
         </p>
       </div>
 
@@ -58,9 +42,9 @@ export default function ExamplesPage() {
           <Link key={sec.href} href={sec.href}>
             <Card className="hover:scale-[1.02] transition cursor-pointer">
               <CardContent className="p-5 space-y-2">
-                <h2 className="text-lg font-semibold">{sec.title}</h2>
+                <h2 className="text-lg font-semibold">{t(`examples.sections.${sec.key}.title`)}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {sec.description}
+                  {t(`examples.sections.${sec.key}.description`)}
                 </p>
               </CardContent>
             </Card>
