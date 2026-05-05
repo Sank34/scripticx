@@ -28,9 +28,14 @@ export function reset() {
 function trim(str: string) {
   return str.trim();
 }
-//TO DO: add normalization for !=, == 
+
 function normalizeOperators(str: string) {
-  return str.replace(/≤/g, "<=").replace(/≥/g, ">=");
+  return str
+    .replace(/≤/g, "<=")
+    .replace(/≥/g, ">=")
+    .replace(/≠/g, "!=")
+    .replace(/\s=\s/g, " == ")
+
 }
 
 export function setVariable(name: string, value: Value) {
@@ -62,7 +67,7 @@ function tokenize(expr: string): string[] {
       }
     }
 
-    if ("+-*/()<>".includes(c)) {
+    if ("+-*/%()<>".includes(c)) {
       tokens.push(c);
       i++;
       continue;
@@ -86,10 +91,20 @@ function tokenize(expr: string): string[] {
 
     if (/[0-9]/.test(c)) {
       let num = "";
-      while (i < expr.length && /[0-9]/.test(expr[i])) {
+      let dotCount = 0;
+
+      while (
+        i < expr.length &&
+        (/[0-9]/.test(expr[i]) || expr[i] === ".")
+      ) {
+        if (expr[i] === ".") {
+          dotCount++;
+          if (dotCount > 1) break;
+        }
         num += expr[i];
         i++;
       }
+
       tokens.push(num);
       continue;
     }
@@ -109,6 +124,8 @@ function tokenize(expr: string): string[] {
 
   return tokens;
 }
+
+
 
 function parseExpression(tokens: string[]): ASTNode {
   let pos = 0;
@@ -133,7 +150,7 @@ function parseExpression(tokens: string[]): ASTNode {
     pos++;
 
     if (!isNaN(Number(token))) {
-      return { type: "number", value: Number(token) };
+      return { type: "number", value: parseFloat(token) };
     }
 
     if (token.startsWith('"') && token.endsWith('"')) {
@@ -158,7 +175,7 @@ function parseExpression(tokens: string[]): ASTNode {
   function parseMulDiv(): ASTNode {
     let node = parseUnary();
 
-    while (tokens[pos] === "*" || tokens[pos] === "/") {
+    while (tokens[pos] === "*" || tokens[pos] === "/" || tokens[pos] === "%") {
       const op = tokens[pos++];
       const right = parseUnary();
       node = { type: "binary", operator: op, left: node, right };
@@ -256,6 +273,9 @@ function evalAST(node: ASTNode): Value {
 
       case "/":
         return (left as number) / (right as number);
+
+      case "%":
+        return (left as number) % (right as number);
 
       case ">":
         return left > right;
