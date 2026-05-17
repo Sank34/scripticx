@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
 
+type ProblemsData = {
+  problems: any[];
+  progress: Record<string, number>;
+};
+
 export default function ProblemsPage() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
@@ -22,47 +28,53 @@ export default function ProblemsPage() {
   >("all");
 
   const [search, setSearch] = useState("");
-  const [progress, setProgress] = useState<Record<string, number>>({});
-  const [problems, setProblems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchAll() {
-      const { data: problemsData } = await supabase
-        .from("problems")
-        .select("*");
+  async function fetchProblemsData(): Promise<ProblemsData> {
+    const { data: problemsData } = await supabase
+      .from("problems")
+      .select("*");
 
-      if (problemsData) {
-        setProblems(problemsData);
-      }
+    const problems = problemsData || [];
 
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const { data: submissions } = await supabase
-        .from("submissions")
-        .select("problem_id, score")
-        .eq("user_id", user.id);
-
-      const bestScores: Record<string, number> = {};
-
-      submissions?.forEach((sub) => {
-        if (
-          !bestScores[sub.problem_id] ||
-          sub.score > bestScores[sub.problem_id]
-        ) {
-          bestScores[sub.problem_id] = sub.score;
-        }
-      });
-
-      setProgress(bestScores);
-      setLoading(false);
+    if (!user) {
+      return {
+        problems,
+        progress: {},
+      };
     }
 
-    fetchAll();
-  }, [user]);
+    const { data: submissions } = await supabase
+      .from("submissions")
+      .select("problem_id, score")
+      .eq("user_id", user.id);
+
+    const bestScores: Record<string, number> = {};
+
+    submissions?.forEach((sub) => {
+      if (
+        !bestScores[sub.problem_id] ||
+        sub.score > bestScores[sub.problem_id]
+      ) {
+        bestScores[sub.problem_id] = sub.score;
+      }
+    });
+
+    return {
+      problems,
+      progress: bestScores,
+    };
+  }
+
+  const {
+    data: problemsData,
+    isLoading: loading,
+  } = useQuery<ProblemsData>({
+    queryKey: ["problems", user?.id],
+    queryFn: fetchProblemsData,
+  });
+
+  const problems = problemsData?.problems || [];
+  const progress = problemsData?.progress || {};
 
   const filteredProblems = problems.filter((p) => {
     return (

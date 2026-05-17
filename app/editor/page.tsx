@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,17 +37,27 @@ import {
   Plus,
 } from "lucide-react";
 
+
+type SnippetItem = {
+  id: string;
+  title: string;
+  description: string;
+  code: string;
+  created_at: string;
+};
+
 type Value = string | number | boolean;
 
 function EditorContent() {
   const { user } = useAuth();
   const { t } = useLanguage();
 
+  const queryClient = useQueryClient();
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
-  const [snippets, setSnippets] = useState<any[]>([]);
 
   const [code, setCode] = useState(`X = 0
 WHILE X < 3
@@ -65,22 +77,26 @@ END`);
 
   const codeLines = code.split("\n");
 
-  useEffect(() => {
-    if (!user) return;
+  async function fetchSnippets(): Promise<SnippetItem[]> {
+    if (!user) return [];
 
-    async function fetchSnippets() {
-      const { data } = await supabase
-        .from("snippets")
-        .select("id, title, description, code, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(20);
+    const { data } = await supabase
+      .from("snippets")
+      .select("id, title, description, code, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
 
-      setSnippets(data || []);
-    }
+    return data || [];
+  }
 
-    fetchSnippets();
-  }, [user]);
+  const {
+    data: snippets = [],
+  } = useQuery<SnippetItem[]>({
+    queryKey: ["editor-snippets", user?.id],
+    queryFn: fetchSnippets,
+    enabled: !!user,
+  });
 
   function compile() {
     const parsed = code.split("\n").map(parseLine);
@@ -267,12 +283,8 @@ END`);
     }
 
     if (!silent) toast.success(t("editor.toast.snippetSaved"));
-    setSnippets(prev => {
-      const exists = prev.some(s => s.id === data.id);
-      if (exists) {
-        return prev.map(s => (s.id === data.id ? data : s));
-      }
-      return [data, ...prev];
+    await queryClient.invalidateQueries({
+      queryKey: ["editor-snippets", user.id],
     });
     setSavedId(data.id);
     return data.id;
@@ -304,7 +316,9 @@ END`);
       return;
     }
 
-    setSnippets(prev => prev.filter(s => s.id !== id));
+    await queryClient.invalidateQueries({
+      queryKey: ["editor-snippets", user?.id],
+    });
 
     if (savedId === id) {
       setSavedId(null);

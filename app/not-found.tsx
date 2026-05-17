@@ -12,7 +12,7 @@ export default function NotFound() {
   const t = translations[locale].notFound;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 p-6">
+    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center p-6 bg-transparent">
 
       <Card className="max-w-md w-full shadow-xl">
         <CardContent className="flex flex-col items-center text-center space-y-4 p-8">

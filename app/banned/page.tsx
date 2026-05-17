@@ -63,7 +63,7 @@ export default function BannedPage() {
   if (loading) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-red-50 dark:bg-red-950/20 p-6">
+    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center rounded-[20px] bg-white p-6">
 
       <Card className="max-w-md w-full border-red-500/30 shadow-xl">
         <CardContent className="flex flex-col items-center text-center space-y-4 p-8">

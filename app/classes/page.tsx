@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -14,10 +14,18 @@ import { Plus, Users, Link as LinkIcon } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+type ClassItem = {
+  id: string;
+  name: string;
+  invite_code: string;
+  role: string;
+};
+
 export default function ClassesPage() {
   const router = useRouter();
-  const [classes, setClasses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -32,17 +40,11 @@ export default function ClassesPage() {
     for (const k of keys) value = value?.[k];
     return value || key;
   };
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function load() {
-    setLoading(true);
-
+  
+  async function load(): Promise<ClassItem[]> {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
-    if (!user) return;
+    if (!user) return [];
 
     const { data: memberships } = await supabase
       .from("class_members")
@@ -70,9 +72,16 @@ export default function ClassesPage() {
       };
     });
 
-    setClasses(enriched);
-    setLoading(false);
+    return enriched;
   }
+
+  const {
+    data: classes = [],
+    isLoading: loading,
+  } = useQuery<ClassItem[]>({
+    queryKey: ["classes"],
+    queryFn: load,
+  });
 
   async function createClass() {
     if (!name.trim()) return;
@@ -101,7 +110,9 @@ export default function ClassesPage() {
       role: "teacher",
     });
 
-    setClasses((prev) => [data, ...prev]);
+    await queryClient.invalidateQueries({
+      queryKey: ["classes"],
+    });
     setOpen(false);
     setName("");
   }
@@ -127,7 +138,9 @@ export default function ClassesPage() {
       role: "student",
     });
 
-    setClasses((prev) => [cls, ...prev]);
+    await queryClient.invalidateQueries({
+      queryKey: ["classes"],
+    });
     setJoinCode("");
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,6 +27,37 @@ import {
 } from "@/components/ui/avatar";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+type ProfileStats = {
+  solved: number;
+  total: number;
+  average: number;
+};
+
+type DifficultyStats = {
+  easy: number;
+  medium: number;
+  hard: number;
+};
+
+type ProfileData = {
+  avatar: string | null;
+  username: string | null;
+  bio: string;
+  github: string;
+  twitter: string;
+  website: string;
+  stats: ProfileStats;
+  recent: any[];
+  difficulty: DifficultyStats;
+  streak: number;
+  favorites: string[];
+  followers: number;
+  following: number;
+  achievements: any[];
+};
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -56,37 +87,7 @@ function isValidUrl(url: string) {
 function ProfileContent() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
-
-  const [loading, setLoading] = useState(true);
-
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
-  const [bio, setBio] = useState("");
-  const [github, setGithub] = useState("");
-  const [twitter, setTwitter] = useState("");
-  const [website, setWebsite] = useState("");
-
-  const [stats, setStats] = useState({
-    solved: 0,
-    total: 0,
-    average: 0,
-  });
-
-  const [recent, setRecent] = useState<any[]>([]);
-  const [difficulty, setDifficulty] = useState({
-    easy: 0,
-    medium: 0,
-    hard: 0,
-  });
-
-  const [streak, setStreak] = useState(0);
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  const [followers, setFollowers] = useState(0);
-  const [following, setFollowing] = useState(0);
-
-  const [achievements, setAchievements] = useState<any[]>([]);
-
+  const queryClient = useQueryClient();
   const iconMap: any = {
     trophy: Trophy,
     flame: Flame,
@@ -95,10 +96,33 @@ function ProfileContent() {
     brain: Brain,
   };
 
-  async function fetchData() {
-    if (!user) return;
-
-    setLoading(true);
+  async function fetchData(): Promise<ProfileData> {
+    if (!user) {
+      return {
+        avatar: null,
+        username: null,
+        bio: "",
+        github: "",
+        twitter: "",
+        website: "",
+        stats: {
+          solved: 0,
+          total: 0,
+          average: 0,
+        },
+        recent: [],
+        difficulty: {
+          easy: 0,
+          medium: 0,
+          hard: 0,
+        },
+        streak: 0,
+        favorites: [],
+        followers: 0,
+        following: 0,
+        achievements: [],
+      };
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -106,20 +130,15 @@ function ProfileContent() {
       .eq("id", user.id)
       .maybeSingle();
 
-    setUsername(profile?.username || null);
-    setBio(profile?.bio || "");
-    setGithub(profile?.github || "");
-    setTwitter(profile?.twitter || "");
-    setWebsite(profile?.website || "");
-
     const validAvatar =
       profile?.avatar_url &&
       profile.avatar_url !== "null" &&
       profile.avatar_url.startsWith("http");
 
-    setAvatar(validAvatar ? profile.avatar_url : null);
-
     const profileId = profile?.id;
+
+    let followers = 0;
+    let following = 0;
 
     if (profileId) {
       const { count: followersCount } = await supabase
@@ -132,8 +151,8 @@ function ProfileContent() {
         .select("*", { count: "exact", head: true })
         .eq("follower_id", profileId);
 
-      setFollowers(followersCount || 0);
-      setFollowing(followingCount || 0);
+      followers = followersCount || 0;
+      following = followingCount || 0;
     }
 
     const { data } = await supabase
@@ -149,8 +168,30 @@ function ProfileContent() {
       .order("created_at", { ascending: false });
 
     if (!data) {
-      setLoading(false);
-      return;
+      return {
+        avatar: validAvatar ? profile.avatar_url : null,
+        username: profile?.username || null,
+        bio: profile?.bio || "",
+        github: profile?.github || "",
+        twitter: profile?.twitter || "",
+        website: profile?.website || "",
+        stats: {
+          solved: 0,
+          total: 0,
+          average: 0,
+        },
+        recent: [],
+        difficulty: {
+          easy: 0,
+          medium: 0,
+          hard: 0,
+        },
+        streak: 0,
+        favorites: [],
+        followers,
+        following,
+        achievements: [],
+      };
     }
 
     const best: Record<string, any> = {};
@@ -219,26 +260,61 @@ function ProfileContent() {
       `)
       .eq("user_id", user.id);
 
-    setAchievements(ach || []);
-    setStats({ solved, total, average });
-    setRecent(data.slice(0, 5));
-    setDifficulty({ easy, medium, hard });
-    setStreak(currentStreak);
-    setFavorites(fav);
-
-    setLoading(false);
+    return {
+      avatar: validAvatar ? profile.avatar_url : null,
+      username: profile?.username || null,
+      bio: profile?.bio || "",
+      github: profile?.github || "",
+      twitter: profile?.twitter || "",
+      website: profile?.website || "",
+      stats: { solved, total, average },
+      recent: data.slice(0, 5),
+      difficulty: { easy, medium, hard },
+      streak: currentStreak,
+      favorites: fav,
+      followers,
+      following,
+      achievements: ach || [],
+    };
   }
 
-  useEffect(() => {
-    fetchData();
+  const {
+    data: profileData,
+    isLoading: loading,
+  } = useQuery<ProfileData>({
+    queryKey: ["profile", user?.id, locale],
+    queryFn: fetchData,
+    enabled: !!user,
+  });
 
-    const handler = () => fetchData();
-    window.addEventListener("profile-updated", handler);
+  const avatar = profileData?.avatar || null;
+  const username = profileData?.username || null;
+  const bio = profileData?.bio || "";
+  const github = profileData?.github || "";
+  const twitter = profileData?.twitter || "";
+  const website = profileData?.website || "";
+  const stats = profileData?.stats || {
+    solved: 0,
+    total: 0,
+    average: 0,
+  };
+  const recent = profileData?.recent || [];
+  const difficulty = profileData?.difficulty || {
+    easy: 0,
+    medium: 0,
+    hard: 0,
+  };
+  const streak = profileData?.streak || 0;
+  const favorites = profileData?.favorites || [];
+  const followers = profileData?.followers || 0;
+  const following = profileData?.following || 0;
+  const achievements = profileData?.achievements || [];
 
-    return () => {
-      window.removeEventListener("profile-updated", handler);
-    };
-  }, [user]);
+  window.addEventListener("profile-updated", async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["profile", user?.id],
+    });
+  });
 
   if (loading || !user) {
     return (

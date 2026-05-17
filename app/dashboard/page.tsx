@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,118 +23,163 @@ import {
   AvatarFallback,
 } from "@/components/ui/avatar";
 
+type DashboardStats = {
+  solved: number;
+  total: number;
+  average: number;
+};
+
+type DashboardData = {
+  stats: DashboardStats;
+  recent: any[];
+  leaderboard: any[];
+  feed: any[];
+};
+
 function DashboardContent() {
   const { user } = useAuth();
   const { locale, t } = useLanguage();
 
-  const [loading, setLoading] = useState(true);
+  async function fetchDashboardData(): Promise<DashboardData> {
+    if (!user) {
+      return {
+        stats: {
+          solved: 0,
+          total: 0,
+          average: 0,
+        },
+        recent: [],
+        leaderboard: [],
+        feed: [],
+      };
+    }
 
-  const [stats, setStats] = useState({
+    const { data } = await supabase
+      .from("submissions")
+      .select(`
+        *,
+        problems (
+          title_i18n
+        )
+      `)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (!data) {
+      return {
+        stats: {
+          solved: 0,
+          total: 0,
+          average: 0,
+        },
+        recent: [],
+        leaderboard: [],
+        feed: [],
+      };
+    }
+
+    const best: Record<string, number> = {};
+
+    for (const sub of data) {
+      const current = best[sub.problem_id];
+      if (!current || sub.score > current) {
+        best[sub.problem_id] = sub.score;
+      }
+    }
+
+    const scores = Object.values(best);
+
+    const solved = scores.filter((s) => s === 100).length;
+    const total = Object.keys(best).length;
+    const average =
+      scores.length > 0
+        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        : 0;
+
+    const stats = {
+      solved,
+      total,
+      average,
+    };
+
+    const recent = data.slice(0, 5);
+
+    const { data: users } = await supabase
+      .from("profiles")
+      .select("id, username, avatar_url, total_score")
+      .order("total_score", { ascending: false })
+      .limit(5);
+
+    const leaderboard = users || [];
+
+    let feed: any[] = [];
+
+    const { data: following } = await supabase
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", user.id);
+
+    const ids = following?.map((f: any) => f.following_id) || [];
+
+    if (ids.length > 0) {
+      const { data: feedData } = await supabase
+        .from("submissions")
+        .select(`
+          score,
+          created_at,
+          user_id,
+          problem_id,
+          problems (title_i18n)
+        `)
+        .in("user_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (feedData) {
+        const userIds = [...new Set(feedData.map((f: any) => f.user_id))];
+
+        const { data: usersData } = await supabase
+          .from("profiles")
+          .select("id, username, avatar_url")
+          .in("id", userIds);
+
+        const userMap = Object.fromEntries(
+          (usersData || []).map((u: any) => [u.id, u])
+        );
+
+        feed = feedData.map((item: any) => ({
+          ...item,
+          profile: userMap[item.user_id],
+        }));
+      }
+    }
+
+    return {
+      stats,
+      recent,
+      leaderboard,
+      feed,
+    };
+  }
+
+  const {
+    data: dashboardData,
+    isLoading: loading,
+  } = useQuery<DashboardData>({
+    queryKey: ["dashboard", user?.id, locale],
+    queryFn: fetchDashboardData,
+    enabled: !!user,
+  });
+
+  const stats = dashboardData?.stats || {
     solved: 0,
     total: 0,
     average: 0,
-  });
+  };
 
-  const [recent, setRecent] = useState<any[]>([]);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [feed, setFeed] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    async function fetchData() {
-      const { data } = await supabase
-        .from("submissions")
-        .select(`
-          *,
-          problems (
-            title_i18n
-          )
-        `)
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (!data) {
-        setLoading(false);
-        return;
-      }
-
-      const best: Record<string, number> = {};
-
-      for (const sub of data) {
-        const current = best[sub.problem_id];
-        if (!current || sub.score > current) {
-          best[sub.problem_id] = sub.score;
-        }
-      }
-
-      const scores = Object.values(best);
-
-      const solved = scores.filter((s) => s === 100).length;
-      const total = Object.keys(best).length;
-      const average =
-        scores.length > 0
-          ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-          : 0;
-
-      setStats({ solved, total, average });
-      setRecent(data.slice(0, 5));
-
-      const { data: users } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url, total_score")
-        .order("total_score", { ascending: false })
-        .limit(5);
-
-      setLeaderboard(users || []);
-
-      const { data: following } = await supabase
-        .from("follows")
-        .select("following_id")
-        .eq("follower_id", user.id);
-
-      const ids = following?.map((f: any) => f.following_id) || [];
-
-      if (ids.length > 0) {
-        const { data: feedData } = await supabase
-          .from("submissions")
-          .select(`
-            score,
-            created_at,
-            user_id,
-            problem_id,
-            problems (title_i18n)
-          `)
-          .in("user_id", ids)
-          .order("created_at", { ascending: false })
-          .limit(10);
-
-        if (feedData) {
-          const userIds = [...new Set(feedData.map((f: any) => f.user_id))];
-
-          const { data: usersData } = await supabase
-            .from("profiles")
-            .select("id, username, avatar_url")
-            .in("id", userIds);
-
-          const userMap = Object.fromEntries(
-            (usersData || []).map((u: any) => [u.id, u])
-          );
-
-          const merged = feedData.map((item: any) => ({
-            ...item,
-            profile: userMap[item.user_id],
-          }));
-
-          setFeed(merged);
-        }
-      }
-
-      setLoading(false);
-    }
-
-    fetchData();
-  }, [user]);
+  const recent = dashboardData?.recent || [];
+  const leaderboard = dashboardData?.leaderboard || [];
+  const feed = dashboardData?.feed || [];
 
   if (loading || !user) {
     return (

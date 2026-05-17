@@ -121,7 +121,7 @@ export default function LoginPage() {
   if (loading) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center p-6">
 
       <Card className="w-full max-w-md">
         <CardHeader>

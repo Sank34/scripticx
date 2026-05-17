@@ -1,6 +1,7 @@
-"use client";
+ "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +33,7 @@ import Link from "next/link";
 
 function FeedContent() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const { locale } = useLanguage();
 
@@ -50,21 +52,23 @@ function FeedContent() {
     return fallback || key;
   };
 
-  const [posts, setPosts] = useState<any[]>([]);
   const [content, setContent] = useState("");
-  const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [likes, setLikes] = useState<Record<string, number>>({});
-  const [liked, setLiked] = useState<Record<string, boolean>>({});
-  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [image, setImage] = useState<File | null>(null);
-  const [suggested, setSuggested] = useState<any[]>([]);
-  const [following, setFollowing] = useState<Set<string>>(new Set());
 
-  async function fetchPosts() {
+  type FeedData = {
+    posts: any[];
+    likes: Record<string, number>;
+    liked: Record<string, boolean>;
+    commentCounts: Record<string, number>;
+    suggested: any[];
+    following: Set<string>;
+  };
+
+  async function fetchFeedData(): Promise<FeedData> {
     const { data } = await supabase
       .from("posts")
       .select("*")
@@ -85,10 +89,9 @@ function FeedContent() {
       })
     );
 
-    setPosts(postsWithProfiles);
-    setLoading(false);
-
     const postIds = (data || []).map((p) => p.id);
+
+    const commentCounts: Record<string, number> = {};
 
     if (postIds.length) {
       const { data: commentsData } = await supabase
@@ -96,42 +99,32 @@ function FeedContent() {
         .select("post_id")
         .in("post_id", postIds);
 
-      const counts: Record<string, number> = {};
       commentsData?.forEach((c: any) => {
-        counts[c.post_id] = (counts[c.post_id] || 0) + 1;
+        commentCounts[c.post_id] =
+          (commentCounts[c.post_id] || 0) + 1;
       });
-
-      setCommentCounts(counts);
-    } else {
-      setCommentCounts({});
     }
 
-    if (!user) {
-      setLikes({});
-      setLiked({});
-      return;
-    }
+    const postIdsForLikes = postIds;
+    // likes and liked
+    const likes: Record<string, number> = {};
+    const liked: Record<string, boolean> = {};
 
-    if (postIds.length) {
+    if (user && postIdsForLikes.length) {
       const { data: likesData } = await supabase
         .from("post_likes")
         .select("post_id, user_id")
-        .in("post_id", postIds);
-
-      const counts: Record<string, number> = {};
-      const likedMap: Record<string, boolean> = {};
+        .in("post_id", postIdsForLikes);
 
       likesData?.forEach((l: any) => {
-        counts[l.post_id] = (counts[l.post_id] || 0) + 1;
+        likes[l.post_id] = (likes[l.post_id] || 0) + 1;
         if (l.user_id === user?.id) {
-          likedMap[l.post_id] = true;
+          liked[l.post_id] = true;
         }
       });
-
-      setLikes(counts);
-      setLiked(likedMap);
     }
 
+    // following
     const { data: followingData } = await supabase
       .from("follows")
       .select("following_id")
@@ -141,8 +134,7 @@ function FeedContent() {
       (followingData || []).map((f: any) => f.following_id)
     );
 
-    setFollowing(followingSet);
-
+    // suggested users
     const { data: usersData } = await supabase
       .from("profiles")
       .select("id, username, avatar_url")
@@ -153,8 +145,31 @@ function FeedContent() {
         .filter((u: any) => !followingSet.has(u.id))
         .slice(0, 5);
 
-    setSuggested(filtered);
+    return {
+      posts: postsWithProfiles,
+      likes,
+      liked,
+      commentCounts,
+      suggested: filtered,
+      following: followingSet,
+    };
   }
+
+  const {
+    data: feedData,
+    isLoading: loading,
+  } = useQuery<FeedData>({
+    queryKey: ["feed", user?.id],
+    queryFn: fetchFeedData,
+    enabled: !!user,
+  });
+
+  const posts = feedData?.posts || [];
+  const likes = feedData?.likes || {};
+  const liked = feedData?.liked || {};
+  const commentCounts = feedData?.commentCounts || {};
+  const suggested = feedData?.suggested || [];
+  const following = feedData?.following || new Set<string>();
   async function toggleLike(postId: string) {
     if (!user) return;
 
@@ -164,17 +179,15 @@ function FeedContent() {
         .delete()
         .eq("post_id", postId)
         .eq("user_id", user.id);
-
-      setLiked((prev) => ({ ...prev, [postId]: false }));
-      setLikes((prev) => ({ ...prev, [postId]: (prev[postId] || 1) - 1 }));
     } else {
       await supabase
         .from("post_likes")
         .insert([{ post_id: postId, user_id: user.id }]);
-
-      setLiked((prev) => ({ ...prev, [postId]: true }));
-      setLikes((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
     }
+
+    await queryClient.invalidateQueries({
+      queryKey: ["feed", user.id],
+    });
   }
 
   async function handleShare(postId: string) {
@@ -183,11 +196,6 @@ function FeedContent() {
     toast.success(t("feed.linkCopied"));
   }
 
-  useEffect(() => {
-    if (user) {
-      fetchPosts();
-    }
-  }, [user]);
 
   async function createPost() {
     if (!content.trim() || !user) return;
@@ -241,7 +249,9 @@ function FeedContent() {
     setCode("");
     setShowCode(false);
     setImage(null);
-    fetchPosts();
+    await queryClient.invalidateQueries({
+      queryKey: ["feed", user.id],
+    });
     toast.success(t("feed.posted"));
     setOpen(false);
   }
@@ -256,13 +266,6 @@ function FeedContent() {
         .eq("follower_id", user.id)
         .eq("following_id", userId);
 
-      setFollowing((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(userId);
-        return newSet;
-      });
-
-      setSuggested((prev) => [...prev, suggested.find((u) => u.id === userId)].filter(Boolean));
       toast.success(t("feed.unfollowed"));
     } else {
       await supabase.from("follows").insert({
@@ -270,10 +273,12 @@ function FeedContent() {
         following_id: userId,
       });
 
-      setFollowing((prev) => new Set(prev).add(userId));
-      setSuggested((prev) => prev.filter((u) => u.id !== userId));
       toast.success(t("feed.followed"));
     }
+
+    await queryClient.invalidateQueries({
+      queryKey: ["feed", user.id],
+    });
   }
 
   return (

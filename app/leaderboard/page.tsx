@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -19,26 +19,33 @@ import { Crown, Medal, Trophy } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 
+type LeaderboardUser = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  total_score: number;
+};
+
+async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, username, avatar_url, total_score")
+    .order("total_score", { ascending: false })
+    .limit(50);
+
+  return data || [];
+}
+
 export default function LeaderboardPage() {
   const { t } = useLanguage();
 
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchLeaderboard() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url, total_score")
-        .order("total_score", { ascending: false })
-        .limit(50);
-
-      setUsers(data || []);
-      setLoading(false);
-    }
-
-    fetchLeaderboard();
-  }, []);
+  const {
+    data: users = [],
+    isLoading: loading,
+  } = useQuery<LeaderboardUser[]>({
+    queryKey: ["leaderboard"],
+    queryFn: fetchLeaderboard,
+  });
 
   const top3 = users.slice(0, 3);
   const rest = users.slice(3);

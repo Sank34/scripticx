@@ -1,33 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
-  SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
 
 import { Button } from "@/components/ui/button";
-
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
-
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 
 import {
   Tooltip,
@@ -46,13 +30,12 @@ import {
   List,
   LayoutDashboard,
   Shield,
-  User,
-  Settings,
-  LogOut,
   PanelLeft,
   BookOpen,
   ChevronDown,
-  Globe,
+  HelpCircle,
+  Sparkles,
+  Mail,
 } from "lucide-react";
 
 import { useEffect, useState, useRef } from "react";
@@ -63,8 +46,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
-  const { t, setLocale, locale } = useLanguage();
-  const router = useRouter();
+  const { t } = useLanguage();
 
   const [user, setUser] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -78,6 +60,8 @@ export function AppSidebar() {
   const [manualToggleExamples, setManualToggleExamples] = useState(false);
 
   const initialized = useRef(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [isScrollable, setIsScrollable] = useState(false);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -153,6 +137,23 @@ export function AppSidebar() {
   }, []);
 
   useEffect(() => {
+    function checkScrollable() {
+      if (!scrollRef.current) return;
+
+      const { scrollHeight, clientHeight } = scrollRef.current;
+      setIsScrollable(scrollHeight > clientHeight + 4);
+    }
+
+    checkScrollable();
+
+    window.addEventListener("resize", checkScrollable);
+
+    return () => {
+      window.removeEventListener("resize", checkScrollable);
+    };
+  }, [collapsed, openDocs, openExamples, pathname]);
+
+  useEffect(() => {
     if (pathname.startsWith("/learn") && !manualToggle) {
       setOpenDocs(true);
     }
@@ -162,20 +163,20 @@ export function AppSidebar() {
     }
   }, [pathname]);
 
-  async function logout() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  }
-
-  const initial = (username || user?.email || "U")[0]?.toUpperCase();
 
   function NavItem({ href, icon: Icon, label, active }: any) {
     const content = (
       <Link href={href}>
         <Button
           variant={active ? "secondary" : "ghost"}
-          className={`w-full gap-2 ${
-            collapsed ? "justify-center px-2" : "justify-start"
+          className={`h-10 w-full gap-2 rounded-xl text-[13px] font-medium transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+            active
+              ? "bg-zinc-100 text-black shadow-sm"
+              : "text-zinc-600"
+          } ${
+            collapsed
+              ? "justify-center px-2"
+              : "justify-start px-3"
           }`}
         >
           <Icon size={18} />
@@ -204,7 +205,11 @@ export function AppSidebar() {
         <Button
           variant={active ? "secondary" : "ghost"}
           size="sm"
-          className="w-full justify-start pl-8 text-sm"
+          className={`h-9 w-full justify-start rounded-lg pl-8 text-sm transition-all duration-200 hover:bg-zinc-100 hover:text-black active:scale-[0.98] ${
+            active
+              ? "bg-zinc-100 text-black shadow-sm"
+              : "text-zinc-600"
+          }`}
         >
           {label}
         </Button>
@@ -213,21 +218,71 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
-      <SidebarContent>
+    <Sidebar
+      collapsible="icon"
+      className="h-full bg-transparent overflow-hidden"
+    >
+      <SidebarContent className="flex h-full flex-col overflow-hidden">
 
-        <div className="flex items-center justify-between px-3 py-3">
-          {!collapsed && <span className="font-bold text-lg">Scripticx</span>}
+        <div
+          className={`sticky top-0 z-20 flex items-center justify-between bg-[var(--sidebar)] px-3 py-4 transition-all duration-200 ${
+            isScrollable
+              ? "border-b border-zinc-100/80"
+              : "border-transparent"
+          }`}
+        >
+          <div
+            className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ${
+              collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <img
+                src="/logoSCX.svg"
+                alt="ScripticX"
+                className="h-9 w-9 object-contain"
+              />
 
-          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+              <div className="flex flex-col leading-none">
+                <span className="font-semibold text-[17px] tracking-tight">
+                  ScripticX
+                </span>
+
+                <span className="text-xs text-muted-foreground">
+                  Platform
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="shrink-0"
+          >
             <PanelLeft
               size={18}
-              className={`transition-transform ${
+              className={`transition-transform duration-300 ${
                 collapsed ? "rotate-180" : ""
               }`}
             />
           </Button>
         </div>
+
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto overflow-x-hidden px-0"
+          style={{
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
+        >
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
 
         <SidebarGroup>
           {!collapsed && <SidebarGroupLabel>{t("sidebar.platform")}</SidebarGroupLabel>}
@@ -265,15 +320,7 @@ export function AppSidebar() {
 
           <SidebarGroupContent className="space-y-1">
 
-            <div
-              onMouseEnter={() => {
-                if (!manualToggle) setOpenDocs(true);
-              }}
-              onMouseLeave={() => {
-                if (!manualToggle) setOpenDocs(false);
-              }}
-              className="space-y-1"
-            >
+            <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <NavItem
                   href="/learn"
@@ -306,7 +353,7 @@ export function AppSidebar() {
                     openDocs ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
                   }`}
                 >
-                  <div className="ml-2 border-l pl-2 space-y-1">
+                  <div className="ml-3 pl-3 space-y-1">
                     <SubItem href="/learn/basics" label={t("learn.basics")} />
                     <SubItem href="/learn/variables" label={t("learn.variables")} />
                     <SubItem href="/learn/loops" label={t("learn.loops")} />
@@ -317,15 +364,7 @@ export function AppSidebar() {
 
             </div>
 
-            <div
-              onMouseEnter={() => {
-                if (!manualToggleExamples) setOpenExamples(true);
-              }}
-              onMouseLeave={() => {
-                if (!manualToggleExamples) setOpenExamples(false);
-              }}
-              className="space-y-1"
-            >
+            <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <NavItem
                   href="/examples"
@@ -358,7 +397,7 @@ export function AppSidebar() {
                     openExamples ? "max-h-60 opacity-100" : "max-h-0 opacity-0"
                   }`}
                 >
-                  <div className="ml-2 border-l pl-2 space-y-1">
+                  <div className="ml-3 pl-3 space-y-1">
                     <SubItem href="/examples/basics" label={t("examples.basics.title")} />
                     <SubItem href="/examples/loops" label={t("examples.loops.title")} />
                     <SubItem href="/examples/conditions" label={t("examples.conditions.title")} />
@@ -371,109 +410,49 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        </div>
+
       </SidebarContent>
-      <div className="border-b mt-4" />
-      <SidebarFooter className="p-3">
-        {user ? (
-          <DropdownMenu>
+      <div
+        className={`sticky bottom-0 z-20 mt-auto bg-[var(--sidebar)] px-2 py-3 transition-all duration-200 ${
+          isScrollable
+            ? "border-t border-zinc-100/80 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]"
+            : "border-transparent shadow-none"
+        }`}
+      >
+        <div className="space-y-1">
 
-            <DropdownMenuTrigger asChild>
-              <div className={`flex items-center gap-3 cursor-pointer hover:bg-muted/70 p-2 rounded-md transition ${collapsed ? "justify-center" : ""}`}>
-                <Avatar className="w-8 h-8">
-                  {avatar && <AvatarImage src={avatar} />}
-                  <AvatarFallback>{initial}</AvatarFallback>
-                </Avatar>
+          <Button
+            variant="ghost"
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+              collapsed ? "justify-center px-2" : "justify-start px-3"
+            }`}
+          >
+            <Sparkles size={17} />
+            {!collapsed && <span>What's new</span>}
+          </Button>
 
-                {!collapsed && (
-                  <div className="text-sm truncate">
-                    {username || user.email}
-                  </div>
-                )}
-              </div>
-            </DropdownMenuTrigger>
+          <Button
+            variant="ghost"
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+              collapsed ? "justify-center px-2" : "justify-start px-3"
+            }`}
+          >
+            <HelpCircle size={17} />
+            {!collapsed && <span>Help</span>}
+          </Button>
 
-            <DropdownMenuContent align="end" className="w-56">
-
-              <DropdownMenuLabel className="flex items-center gap-3 py-3">
-                <Avatar className="w-9 h-9">
-                  {avatar && <AvatarImage src={avatar} />}
-                  <AvatarFallback>{initial}</AvatarFallback>
-                </Avatar>
-
-                <div className="flex flex-col leading-tight">
-                  <span className="font-medium">{username || t("user.user")}</span>
-                  <span className="text-xs text-muted-foreground truncate max-w-[140px]">
-                    {user.email}
-                  </span>
-                </div>
-              </DropdownMenuLabel>
-
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem asChild>
-                <Link href="/profile" className="flex items-center gap-2">
-                  <User size={16} />
-                  {t("user.profile")}
-                </Link>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <Link href="/settings" className="flex items-center gap-2">
-                  <Settings size={16} />
-                  {t("user.settings")}
-                </Link>
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Globe size={16} />
-                  {t("user.language")}
-                </div>
-
-                <div className="flex items-center gap-2 text-xs">
-                  <button
-                    onClick={() => {
-                      setLocale("en");
-                      document.cookie = "locale=en; path=/";
-                      router.refresh();
-                    }}
-                    className={`px-2 py-0.5 rounded ${locale === "en" ? "bg-muted" : "hover:bg-muted/50"}`}
-                  >
-                    EN
-                  </button>
-                  <button
-                    onClick={() => {
-                      setLocale("ro");
-                      document.cookie = "locale=ro; path=/";
-                      router.refresh();
-                    }}
-                    className={`px-2 py-0.5 rounded ${locale === "ro" ? "bg-muted" : "hover:bg-muted/50"}`}
-                  >
-                    RO
-                  </button>
-                </div>
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem onClick={logout} className="flex items-center gap-2 text-red-500">
-                <LogOut size={16} />
-                {t("user.logout")}
-              </DropdownMenuItem>
-
-            </DropdownMenuContent>
-
-          </DropdownMenu>
-        ) : (
-          <Link href="/login">
-            <Button className="w-full">
-              {collapsed ? ">" : t("user.login")}
-            </Button>
-          </Link>
-        )}
-      </SidebarFooter>
+          <Button
+            variant="ghost"
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+              collapsed ? "justify-center px-2" : "justify-start px-3"
+            }`}
+          >
+            <Mail size={17} />
+            {!collapsed && <span>Contact</span>}
+          </Button>
+        </div>
+      </div>
     </Sidebar>
   );
 }
