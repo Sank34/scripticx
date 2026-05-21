@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/components/LanguageProvider";
 
 import { Button } from "@/components/ui/button";
 
@@ -30,6 +32,9 @@ import {
 } from "lucide-react";
 
 export function Topbar() {
+  const router = useRouter();
+  const { t, locale, setLocale } = useLanguage();
+
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
 
@@ -170,9 +175,37 @@ export function Topbar() {
 
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem className="flex items-center gap-2">
-                <Globe size={16} />
-                Language
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                className="flex items-center justify-between gap-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Globe size={16} />
+                  {t("user.language")}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <button
+                    onClick={() => {
+                      setLocale("en");
+                      document.cookie = "locale=en; path=/";
+                      router.refresh();
+                    }}
+                    className={`px-2 py-0.5 rounded ${locale === "en" ? "bg-muted" : "hover:bg-muted/50"}`}
+                  >
+                    EN
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLocale("ro");
+                      document.cookie = "locale=ro; path=/";
+                      router.refresh();
+                    }}
+                    className={`px-2 py-0.5 rounded ${locale === "ro" ? "bg-muted" : "hover:bg-muted/50"}`}
+                  >
+                    RO
+                  </button>
+                </div>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />

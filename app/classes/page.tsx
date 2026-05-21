@@ -13,6 +13,7 @@ import { Plus, Users, Link as LinkIcon } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -26,6 +27,7 @@ type ClassItem = {
 export default function ClassesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -79,8 +81,9 @@ export default function ClassesPage() {
     data: classes = [],
     isLoading: loading,
   } = useQuery<ClassItem[]>({
-    queryKey: ["classes"],
+    queryKey: ["classes", user?.id],
     queryFn: load,
+    enabled: !!user?.id,
   });
 
   async function createClass() {
