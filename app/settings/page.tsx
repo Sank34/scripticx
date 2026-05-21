@@ -29,7 +29,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-import { Slider } from "@/components/ui/slider";
 import Cropper from "react-easy-crop";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
@@ -330,8 +329,8 @@ function SettingsContent() {
           <CardTitle>{t("settings.security")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          
+          {/* TODO: Set the translation for the placeholder */}
+          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="New password" />
         </CardContent>
       </Card>
       <Button onClick={updatePassword}>{t("settings.updatePassword")}</Button>

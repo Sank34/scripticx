@@ -4,7 +4,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { Topbar } from "@/components/Topbar";
-import "./globals.css"
+import "./globals.css";
 import { Toaster } from "sonner";
 import { MobileDrawer } from "@/components/MobileDrawer";
 import Providers from "@/components/Providers";
@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Scripticx",
-  description: "Learn programming in an interactive way!",
+  title: "ScripticX Platform | Learn Programming",
+  description: "Welcome to ScripticX ! Begin your programming journey with us.",
 };
 
 export default function RootLayout({
