@@ -96,19 +96,31 @@ export default function HelpPage() {
                 >
                   <button
                     onClick={() => setOpenIndex(open ? null : i)}
-                    className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-muted/50 transition"
+                    className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors duration-200 hover:bg-muted/50"
                   >
                     <span className="font-medium text-sm">{faq.q}</span>
                     <ChevronDown
                       size={16}
-                      className={`transition-transform ${open ? "rotate-180" : ""}`}
+                      className={`transition-transform duration-300 ease-out ${open ? "rotate-180" : ""}`}
                     />
                   </button>
-                  {open && (
-                    <div className="px-4 pb-3 text-sm text-muted-foreground">
-                      {faq.a}
+                  <div
+                    className={`grid transition-all duration-300 ease-out ${
+                      open
+                        ? "grid-rows-[1fr] opacity-100"
+                        : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div
+                        className={`px-4 pb-3 text-sm text-muted-foreground transition-transform duration-300 ease-out ${
+                          open ? "translate-y-0" : "-translate-y-1"
+                        }`}
+                      >
+                        {faq.a}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

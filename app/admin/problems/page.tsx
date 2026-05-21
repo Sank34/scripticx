@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useRouter } from "next/navigation";
 import { getLocalized } from "@/lib/getLocalized";
+import { markdownPreview } from "@/lib/markdownPreview";
 import { useLanguage } from "@/components/LanguageProvider";
 
 import {
@@ -107,8 +108,8 @@ function AdminProblemsContent() {
                   <h2 className="font-semibold text-lg">
                     {getLocalized(p.title_i18n, locale)}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {getLocalized(p.description_i18n, locale)}
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {markdownPreview(getLocalized(p.description_i18n, locale))}
                   </p>
                 </div>
 

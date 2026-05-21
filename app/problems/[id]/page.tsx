@@ -13,6 +13,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { checkAchievements } from "@/lib/achievements";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
+import { Markdown } from "@/components/Markdown";
 
 function ProblemContent() {
   const { user } = useAuth();
@@ -205,69 +206,133 @@ function ProblemContent() {
     return <div className="p-6">{t("problemPage.notFound")}</div>;
   }
 
+  const passedCount = testResults.filter((r) => r.passed).length;
+
   return (
     <div className="h-[calc(100vh-80px)] flex">
 
-      <div className="w-1/2 border-r p-6">
-        <h1 className="text-2xl font-bold">
-          {getLocalized(problem.title_i18n, locale)}
-        </h1>
-        <p className="text-muted-foreground">
-          {getLocalized(problem.description_i18n, locale)}
-        </p>
-      </div>
+      <div className="w-1/2 flex flex-col bg-zinc-950 text-zinc-100 border-r">
 
-      <div className="w-1/2 p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+              MiniScript+
+            </span>
+          </div>
+          <button
+            onClick={runCode}
+            className="px-3 py-1.5 text-xs font-medium bg-white text-zinc-900 rounded-md hover:bg-zinc-200 transition"
+          >
+            {t("problemPage.actions.submit")}
+          </button>
+        </div>
 
-        <div className="flex-1 border rounded overflow-hidden">
+        <div className="flex-1 overflow-hidden">
           <Editor
             height="100%"
             defaultLanguage="miniscriptplus"
             theme="miniscriptplusTheme"
             value={code}
             onChange={(value) => setCode(value || "")}
+            options={{
+              fontSize: 14,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              padding: { top: 12, bottom: 12 },
+            }}
           />
         </div>
 
-        <button
-          onClick={runCode}
-          className="px-4 py-2 bg-black text-white rounded"
-        >
-          {t("problemPage.actions.submit")}
-        </button>
-
-        {result && <div className="font-bold">{result}</div>}
-
-        <div className="space-y-3">
-          {testResults.map((r, i) => (
-            <div
-              key={i}
-              className={`p-3 rounded border ${
-                r.passed ? "border-green-500" : "border-red-500"
-              }`}
-            >
-              <div className="flex justify-between">
-                <p>{t("problemPage.tests.test")} #{i + 1}</p>
-                {r.passed ? <Check /> : <X />}
+        {(result || testResults.length > 0) && (
+          <div className="max-h-[40%] overflow-y-auto border-t border-zinc-800 bg-zinc-900">
+            {result && (
+              <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                  {t("problemPage.tests.results") || "Results"}
+                </span>
+                <span className="text-sm font-semibold text-zinc-100">
+                  {result}
+                  {testResults.length > 0 && (
+                    <span className="ml-2 text-xs text-zinc-400">
+                      ({passedCount}/{testResults.length})
+                    </span>
+                  )}
+                </span>
               </div>
+            )}
 
-              <div className="text-sm mt-2">
-                <p>{t("problemPage.tests.input")}: {JSON.stringify(r.input)}</p>
+            <div className="p-3 space-y-2">
+              {testResults.map((r, i) => (
+                <div
+                  key={i}
+                  className={`rounded-md border p-3 ${
+                    r.passed
+                      ? "border-emerald-500/40 bg-emerald-500/10"
+                      : "border-red-500/40 bg-red-500/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">
+                      {t("problemPage.tests.test")} #{i + 1}
+                    </p>
+                    {r.passed ? (
+                      <Check size={16} className="text-emerald-400" />
+                    ) : (
+                      <X size={16} className="text-red-400" />
+                    )}
+                  </div>
 
-                {!r.passed && (
-                  <>
-                    <p className="mt-2 font-medium">{t("problemPage.tests.expected")}:</p>
-                    <pre className="bg-muted p-2 rounded">{r.expected}</pre>
+                  <div className="text-xs mt-2 space-y-1.5 text-zinc-300">
+                    <p>
+                      <span className="text-zinc-500">
+                        {t("problemPage.tests.input")}:
+                      </span>{" "}
+                      {JSON.stringify(r.input)}
+                    </p>
 
-                    <p className="mt-2 font-medium">{t("problemPage.tests.got")}:</p>
-                    <pre className="bg-muted p-2 rounded">{r.got}</pre>
-                  </>
-                )}
-              </div>
+                    {!r.passed && (
+                      <>
+                        <div>
+                          <p className="text-zinc-500">
+                            {t("problemPage.tests.expected")}:
+                          </p>
+                          <pre className="mt-1 rounded bg-zinc-950 px-2 py-1 font-mono text-[11px]">
+                            {r.expected}
+                          </pre>
+                        </div>
+                        <div>
+                          <p className="text-zinc-500">
+                            {t("problemPage.tests.got")}:
+                          </p>
+                          <pre className="mt-1 rounded bg-zinc-950 px-2 py-1 font-mono text-[11px]">
+                            {r.got}
+                          </pre>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+      </div>
 
+      <div className="w-1/2 overflow-y-auto">
+        <div className="px-8 py-6 space-y-4 max-w-2xl">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {problem.code != null && (
+              <span className="mr-2 text-muted-foreground font-mono">
+                #{problem.code}
+              </span>
+            )}
+            {getLocalized(problem.title_i18n, locale)}
+          </h1>
+          <div className="text-sm leading-relaxed text-zinc-700">
+            <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -18,6 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Markdown } from "@/components/Markdown";
+
 export function ProblemForm({ initialData, onSuccess }: any) {
   const { t } = useLanguage();
 
@@ -212,11 +215,32 @@ export function ProblemForm({ initialData, onSuccess }: any) {
           onChange={(e) => updateTitle(activeLang, e.target.value)}
         />
 
-        <Textarea
-          placeholder={`${t("admin.problems.form.description")} (${activeLang})`}
-          value={description_i18n[activeLang] || ""}
-          onChange={(e) => updateDescription(activeLang, e.target.value)}
-        />
+        <Tabs defaultValue="edit">
+          <TabsList>
+            <TabsTrigger value="edit">Edit</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
+          </TabsList>
+          <TabsContent value="edit">
+            <Textarea
+              placeholder={`${t("admin.problems.form.description")} (${activeLang}) — Markdown supported\n\n## Cerință\n\n## Date de intrare\n\n## Date de ieșire\n\n## Restricții și precizări\n\n## Exemplu`}
+              value={description_i18n[activeLang] || ""}
+              onChange={(e) => updateDescription(activeLang, e.target.value)}
+              rows={16}
+              className="font-mono text-sm"
+            />
+          </TabsContent>
+          <TabsContent value="preview">
+            <div className="min-h-[16rem] rounded-lg border border-input p-4">
+              {description_i18n[activeLang]?.trim() ? (
+                <Markdown>{description_i18n[activeLang]}</Markdown>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nothing to preview yet.
+                </p>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Textarea

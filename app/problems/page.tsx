@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
+import { markdownPreview } from "@/lib/markdownPreview";
 
 type ProblemsData = {
   problems: any[];
@@ -32,7 +33,8 @@ export default function ProblemsPage() {
   async function fetchProblemsData(): Promise<ProblemsData> {
     const { data: problemsData } = await supabase
       .from("problems")
-      .select("*");
+      .select("*")
+      .order("code", { ascending: true });
 
     const problems = problemsData || [];
 
@@ -77,10 +79,19 @@ export default function ProblemsPage() {
   const progress = problemsData?.progress || {};
 
   const filteredProblems = problems.filter((p) => {
+    if (filter !== "all" && p.difficulty !== filter) return false;
+
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+
+    const codeQuery = q.replace(/^#/, "");
+    if (/^\d+$/.test(codeQuery) && String(p.code ?? "") === codeQuery) {
+      return true;
+    }
+
     return (
-      (filter === "all" || p.difficulty === filter) &&
-      (getLocalized(p.title_i18n, locale).toLowerCase().includes(search.toLowerCase()) ||
-        getLocalized(p.description_i18n, locale).toLowerCase().includes(search.toLowerCase()))
+      getLocalized(p.title_i18n, locale).toLowerCase().includes(q) ||
+      getLocalized(p.description_i18n, locale).toLowerCase().includes(q)
     );
   });
 
@@ -123,12 +134,17 @@ export default function ProblemsPage() {
                 <Card className="hover:shadow-md transition cursor-pointer">
                   <CardContent className="p-4 flex justify-between items-center">
 
-                    <div>
+                    <div className="min-w-0">
                       <h2 className="text-lg font-semibold">
+                        {p.code != null && (
+                          <span className="mr-2 text-muted-foreground font-mono">
+                            #{p.code}
+                          </span>
+                        )}
                         {getLocalized(p.title_i18n, locale)}
                       </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {getLocalized(p.description_i18n, locale)}
+                      <p className="text-sm text-muted-foreground line-clamp-1">
+                        {markdownPreview(getLocalized(p.description_i18n, locale))}
                       </p>
                     </div>
 

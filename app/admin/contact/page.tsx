@@ -14,10 +14,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
+
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import {
   AlertDialog,
@@ -38,7 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { Mail, Trash, Search, CheckCircle2, Eye } from "lucide-react";
+import { Mail, Trash, Search, CheckCircle2, Eye, Clock, User } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -290,26 +290,83 @@ function AdminContactContent() {
       )}
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {viewing && (
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${topicStyle(viewing.topic)}`}>
-                  {topicLabel(viewing.topic)}
-                </span>
-              )}
-              {viewing?.name}
-            </DialogTitle>
-            <DialogDescription>
-              {viewing?.email} · {viewing ? new Date(viewing.created_at).toLocaleString() : ""}
-            </DialogDescription>
-          </DialogHeader>
-
+        <DialogContent className="!p-0 sm:max-w-md overflow-hidden">
           {viewing && (
-            <div className="space-y-4">
-              <p className="whitespace-pre-wrap text-sm">{viewing.description}</p>
+            <div className="flex flex-col">
 
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+              <div className="p-6 pb-5 border-b space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${topicStyle(viewing.topic)}`}>
+                    {topicLabel(viewing.topic)}
+                  </span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyle(viewing.status)}`}>
+                    {viewing.status}
+                  </span>
+                </div>
+
+                <DialogTitle className="mt-0 text-xl">
+                  Message from {viewing.name}
+                </DialogTitle>
+
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-zinc-100 text-zinc-700">
+                      {(viewing.name || "U")[0]?.toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm">
+                      <User size={14} className="text-muted-foreground" />
+                      <span className="font-medium truncate">{viewing.name}</span>
+                      {viewing.user_id && (
+                        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+                          registered
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Mail size={12} />
+                      <a
+                        href={`mailto:${viewing.email}`}
+                        className="truncate hover:underline"
+                      >
+                        {viewing.email}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock size={12} />
+                      <span>{new Date(viewing.created_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Message
+                </p>
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {viewing.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 border-t bg-muted/20 px-6 py-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => {
+                    setDeleting(viewing);
+                    setViewing(null);
+                  }}
+                >
+                  <Trash size={14} className="mr-1" />
+                  Delete
+                </Button>
+
                 <a href={`mailto:${viewing.email}?subject=Re: your message on ScripticX`}>
                   <Button variant="outline" size="sm">
                     <Mail size={14} className="mr-1" />
@@ -341,6 +398,7 @@ function AdminContactContent() {
                   </Button>
                 )}
               </div>
+
             </div>
           )}
         </DialogContent>
