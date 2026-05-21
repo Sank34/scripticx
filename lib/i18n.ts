@@ -212,6 +212,32 @@ export const translations = {
         share: "Share snippet",
       },
 
+      complexity: {
+        title: "Complexity Analyzer",
+        empty: "Run the analyzer to estimate time complexity, space complexity and optimization score.",
+        warnings: "Warnings",
+        suggestions: "Suggestions",
+        actions: {
+          analyze: "Analyze complexity",
+          rerun: "Re-run complexity analysis",
+        },
+        metrics: {
+          time: "Time",
+          space: "Space",
+          loops: "Loops",
+          maxNesting: "Max nesting",
+        },
+        levels: {
+          excellent: "excellent",
+          good: "good",
+          average: "average",
+          poor: "poor",
+        },
+        toast: {
+          completed: "Complexity analysis completed",
+        },
+      },
+
       debugger: {
         title: "Debugger",
         variables: "Variables",
@@ -1165,6 +1191,32 @@ export const translations = {
         save: "Salvează snippet",
         update: "Actualizează snippet",
         share: "Distribuie snippet",
+      },
+
+      complexity: {
+        title: "Analizor de complexitate",
+        empty: "Rulează analizorul pentru a estima complexitatea de timp, complexitatea de spațiu și scorul de optimizare.",
+        warnings: "Avertismente",
+        suggestions: "Sugestii",
+        actions: {
+          analyze: "Analizează complexitatea",
+          rerun: "Rulează din nou analiza complexității",
+        },
+        metrics: {
+          time: "Timp",
+          space: "Spațiu",
+          loops: "Bucle",
+          maxNesting: "Imbricare maximă",
+        },
+        levels: {
+          excellent: "excelent",
+          good: "bun",
+          average: "mediu",
+          poor: "slab",
+        },
+        toast: {
+          completed: "Analiza complexității este gata",
+        },
       },
 
       debugger: {

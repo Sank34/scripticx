@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -9,6 +9,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
 import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
+import {
+  analyzeMiniScriptComplexity,
+  type ComplexityAnalysis,
+} from "@/lib/complexity-analyzer";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +39,8 @@ import {
   Trash2,
   Pencil,
   Plus,
+  Gauge,
+  Lightbulb,
 } from "lucide-react";
 
 
@@ -47,10 +53,91 @@ type SnippetItem = {
 };
 
 type Value = string | number | boolean;
+type ProgramInstruction = ReturnType<typeof parseLine>;
+
+function getErrorDetails(error: unknown) {
+  if (error && typeof error === "object") {
+    const candidate = error as { message?: unknown; line?: unknown };
+
+    return {
+      message:
+        typeof candidate.message === "string"
+          ? candidate.message
+          : "Unknown error",
+      line: typeof candidate.line === "number" ? candidate.line : undefined,
+    };
+  }
+
+  return {
+    message: error instanceof Error ? error.message : "Unknown error",
+    line: undefined,
+  };
+}
+
+function getScoreColor(score: number) {
+  if (score >= 85) return "text-emerald-500";
+  if (score >= 65) return "text-lime-500";
+  if (score >= 40) return "text-amber-500";
+  return "text-red-500";
+}
+
+function getStrokeColor(score: number) {
+  if (score >= 85) return "#10b981";
+  if (score >= 65) return "#84cc16";
+  if (score >= 40) return "#f59e0b";
+  return "#ef4444";
+}
+
+function ComplexityCircle({
+  label,
+  score,
+}: {
+  label: string;
+  score: number;
+}) {
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const strokeColor = getStrokeColor(score);
+
+  return (
+    <div className="relative flex h-28 w-28 items-center justify-center">
+      <svg className="h-28 w-28 -rotate-90" viewBox="0 0 100 100">
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke="currentColor"
+          strokeWidth="8"
+          fill="transparent"
+          className="text-muted"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke={strokeColor}
+          strokeWidth="8"
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-500"
+        />
+      </svg>
+      <div className="absolute text-center">
+        <div className={`text-2xl font-bold ${getScoreColor(score)}`}>{score}%</div>
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function EditorContent() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   const queryClient = useQueryClient();
 
@@ -65,7 +152,7 @@ PRINT X
 X = X + 1
 END`);
 
-  const [program, setProgram] = useState<any[]>([]);
+  const [program, setProgram] = useState<ProgramInstruction[]>([]);
   const [variables, setVariables] = useState<Record<string, Value>>({});
   const [currentLine, setCurrentLine] = useState(0);
   const [output, setOutput] = useState<string[]>([]);
@@ -74,8 +161,14 @@ END`);
   const [inputVar, setInputVar] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  const [complexityEnabled, setComplexityEnabled] = useState(false);
 
   const codeLines = code.split("\n");
+  const complexityAnalysis = useMemo<ComplexityAnalysis | null>(() => {
+    if (!complexityEnabled) return null;
+
+    return analyzeMiniScriptComplexity(code, locale);
+  }, [code, locale, complexityEnabled]);
 
   async function fetchSnippets(): Promise<SnippetItem[]> {
     if (!user) return [];
@@ -133,12 +226,13 @@ END`);
       setCurrentLine(result.currentLine);
 
       if (result.output !== null) {
-        setOutput(prev => [...prev, result.output]);
+        setOutput(prev => [...prev, String(result.output)]);
       }
 
-    } catch (e: any) {
-      setOutput(prev => [...prev, "ERROR: " + e.message]);
-      setErrorLine(e.line ?? currentLine);
+    } catch (error: unknown) {
+      const details = getErrorDetails(error);
+      setOutput(prev => [...prev, "ERROR: " + details.message]);
+      setErrorLine(details.line ?? currentLine);
       setStopped(true);
     }
   }
@@ -174,7 +268,7 @@ END`);
 
   function runProgram() {
     let res;
-    let newOutput: string[] = [];
+    const newOutput: string[] = [];
 
     try {
       while (true) {
@@ -188,15 +282,16 @@ END`);
         }
 
         if (res.output !== null) {
-          newOutput.push(res.output);
+          newOutput.push(String(res.output));
         }
 
         setVariables(res.variables);
         setCurrentLine(res.currentLine);
       }
-    } catch (e: any) {
-      newOutput.push("ERROR: " + e.message);
-      setErrorLine(e.line ?? currentLine);
+    } catch (error: unknown) {
+      const details = getErrorDetails(error);
+      newOutput.push("ERROR: " + details.message);
+      setErrorLine(details.line ?? currentLine);
       setStopped(true);
     }
 
@@ -226,7 +321,7 @@ END`);
       URL.revokeObjectURL(url);
 
       toast.success(t("editor.toast.savedFile"));
-    } catch (e) {
+    } catch {
       toast.error(t("editor.toast.saveError"));
     }
   }
@@ -326,6 +421,11 @@ END`);
 
     toast.success(t("editor.toast.deleted"));
   }
+  function handleAnalyzeComplexity() {
+    setComplexityEnabled(true);
+    toast.success(t("editor.complexity.toast.completed"));
+  }
+
   async function loadSnippet(id: string) {
   const { data } = await supabase
     .from("snippets")
@@ -462,6 +562,28 @@ END`);
                     <TooltipContent>{t("editor.actions.share")}</TooltipContent>
                   </Tooltip>
 
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={handleAnalyzeComplexity}
+                        aria-label={
+                          complexityAnalysis
+                            ? t("editor.complexity.actions.rerun")
+                            : t("editor.complexity.actions.analyze")
+                        }
+                      >
+                        <Gauge size={16} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {complexityAnalysis
+                        ? t("editor.complexity.actions.rerun")
+                        : t("editor.complexity.actions.analyze")}
+                    </TooltipContent>
+                  </Tooltip>
+
                 </div>
               </TooltipProvider>
             </div>
@@ -514,6 +636,90 @@ END`);
                 </div>
               )}
 
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge size={18} />
+                {t("editor.complexity.title")}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {complexityAnalysis ? (
+                <>
+                  <div className="flex items-center justify-center">
+                    <ComplexityCircle
+                      label={t(`editor.complexity.levels.${complexityAnalysis.level}`)}
+                      score={complexityAnalysis.score}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-lg bg-muted p-3">
+                      <p className="text-xs text-muted-foreground">
+                        {t("editor.complexity.metrics.time")}
+                      </p>
+                      <p className="font-semibold">{complexityAnalysis.timeComplexity}</p>
+                    </div>
+
+                    <div className="rounded-lg bg-muted p-3">
+                      <p className="text-xs text-muted-foreground">
+                        {t("editor.complexity.metrics.space")}
+                      </p>
+                      <p className="font-semibold">{complexityAnalysis.spaceComplexity}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">
+                        {t("editor.complexity.metrics.loops")}
+                      </p>
+                      <p className="font-semibold">{complexityAnalysis.loopCount}</p>
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                      <p className="text-xs text-muted-foreground">
+                        {t("editor.complexity.metrics.maxNesting")}
+                      </p>
+                      <p className="font-semibold">{complexityAnalysis.maxNestedLoops}</p>
+                    </div>
+                  </div>
+
+                  {complexityAnalysis.warnings.length > 0 && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                      <div className="mb-2 font-semibold text-amber-700">
+                        {t("editor.complexity.warnings")}
+                      </div>
+                      <ul className="space-y-2 text-amber-700">
+                        {complexityAnalysis.warnings.map((warning, index) => (
+                          <li key={index}>• {warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border p-3 text-sm">
+                    <div className="mb-2 flex items-center gap-2 font-semibold">
+                      <Lightbulb size={15} />
+                      {t("editor.complexity.suggestions")}
+                    </div>
+
+                    <ul className="space-y-2 text-muted-foreground">
+                      {complexityAnalysis.suggestions.map((suggestion, index) => (
+                        <li key={index}>• {suggestion}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  {t("editor.complexity.empty")}
+                </div>
+              )}
             </CardContent>
           </Card>
 
