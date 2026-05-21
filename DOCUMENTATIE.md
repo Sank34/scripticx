@@ -157,7 +157,7 @@ scripticx/
 │   ├── layout/             # Sidebar, navbar, drawer mobil
 │   └── LanguageProvider.tsx
 ├── lib/                    # Logica de bază
-│   ├── engine.ts           # ⭐ Interpretorul MiniScript+ (MSP)
+│   ├── engine.ts           # Interpretorul MiniScript+ (MSP)
 │   ├── i18n.ts             # Sistem de traduceri RO/EN
 │   ├── supabase.ts         # Client Supabase (browser)
 │   ├── supabaseServer.ts   # Client Supabase (server)
@@ -199,9 +199,9 @@ Datele de la Supabase sunt aduse o singură dată și cache-uite client-side cu 
 
 Fiind o aplicație **web**, ScripticX rulează pe orice dispozitiv cu un browser modern:
 
-- ✅ Desktop (Windows, macOS, Linux)
-- ✅ Tabletă (iPadOS, Android)
-- ✅ Telefon mobil (interfață optimizată cu `MobileDrawer` și `MobileNav`)
+- Desktop (Windows, macOS, Linux)
+- Tabletă (iPadOS, Android)
+- Telefon mobil (interfață optimizată cu `MobileDrawer` și `MobileNav`)
 
 Designul este **responsive**, construit cu Tailwind CSS și o navigație dedicată pentru ecrane mici.
 
@@ -231,15 +231,6 @@ Limbajele existente (Python, JavaScript, Scratch) prezintă fiecare un compromis
 - **Scratch** — accesibil, dar nu pregătește tranziția spre programare reală
 
 **MiniScript+** este conceput special pentru context educațional în limba română: sintaxă minimă, mesaje de eroare clare și localizate, fără configurare, rulare instant în browser.
-
----
-
-## 5. Echipa și contact
-
-**Echipa ScripticX**
-Email: pricop.maia-oana@cngmm.ro
-Site: [scripticx.org](https://scripticx.org)
-Platformă: [platform.scripticx.org](https://platform.scripticx.org)
 
 ---
 

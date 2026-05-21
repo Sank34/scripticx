@@ -245,6 +245,14 @@ export const translations = {
         },
       },
 
+      visualization: {
+        title: "Code Visualization",
+        tabs: {
+          ast: "AST",
+          flowchart: "Flowchart",
+        },
+      },
+
       debugger: {
         title: "Debugger",
         variables: "Variables",
@@ -1230,6 +1238,14 @@ export const translations = {
         },
         toast: {
           completed: "Analiza complexității este gata",
+        },
+      },
+
+      visualization: {
+        title: "Vizualizare cod",
+        tabs: {
+          ast: "AST",
+          flowchart: "Flowchart",
         },
       },
 

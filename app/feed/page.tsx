@@ -30,9 +30,11 @@ import { Heart, MessageCircle, Share2, Code2 } from "lucide-react";
 
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 function FeedContent() {
   const { user } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const { locale } = useLanguage();
@@ -418,7 +420,7 @@ function FeedContent() {
             <div key={u.id} className="flex items-center justify-between">
               <div
                 className="flex items-center gap-3 cursor-pointer"
-                onClick={() => (window.location.href = `/u/${u.username}`)}
+                onClick={() => router.push(`/u/${u.username}`)}
               >
                 <Avatar>
                   {u.avatar_url && <AvatarImage src={u.avatar_url} />}
@@ -471,8 +473,9 @@ function FeedContent() {
                 <div>
                   <p
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
-                      window.location.href = `/u/${p.profiles?.username}`;
+                      router.push(`/u/${p.profiles?.username}`);
                     }}
                     className="font-medium hover:underline cursor-pointer"
                   >
@@ -525,7 +528,7 @@ function FeedContent() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.location.href = `/post/${p.id}`;
+                  router.push(`/post/${p.id}`);
                 }}
                 className="flex items-center gap-1 hover:opacity-80"
               >

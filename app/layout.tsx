@@ -59,11 +59,10 @@ export default function RootLayout({
 
                 </div>
               </div>
+              <MobileDrawer />
             </SidebarProvider>
         </LanguageProvider>
       </Providers>
-
-        <MobileDrawer />
 
         <Toaster position="bottom-right" richColors />
       </body>

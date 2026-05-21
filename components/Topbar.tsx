@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -31,12 +32,17 @@ import {
   User,
 } from "lucide-react";
 
+type TopbarProfile = {
+  username?: string | null;
+  avatar_url?: string | null;
+};
+
 export function Topbar() {
   const router = useRouter();
   const { t, locale, setLocale } = useLanguage();
 
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [profile, setProfile] = useState<TopbarProfile | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -52,7 +58,7 @@ export function Topbar() {
         .from("profiles")
         .select("username, avatar_url")
         .eq("id", currentUser.id)
-        .maybeSingle();
+        .maybeSingle<TopbarProfile>();
 
       setProfile(profileData);
     }
@@ -76,7 +82,7 @@ export function Topbar() {
           .from("profiles")
           .select("username, avatar_url")
           .eq("id", currentUser.id)
-          .maybeSingle();
+          .maybeSingle<TopbarProfile>();
 
         setProfile(profileData);
       }
@@ -87,7 +93,7 @@ export function Topbar() {
 
   async function logout() {
     await supabase.auth.signOut();
-    window.location.href = "/login";
+    router.replace("/login");
   }
 
   const initial = (
@@ -189,7 +195,6 @@ export function Topbar() {
                     onClick={() => {
                       setLocale("en");
                       document.cookie = "locale=en; path=/";
-                      router.refresh();
                     }}
                     className={`px-2 py-0.5 rounded ${locale === "en" ? "bg-muted" : "hover:bg-muted/50"}`}
                   >
@@ -199,7 +204,6 @@ export function Topbar() {
                     onClick={() => {
                       setLocale("ro");
                       document.cookie = "locale=ro; path=/";
-                      router.refresh();
                     }}
                     className={`px-2 py-0.5 rounded ${locale === "ro" ? "bg-muted" : "hover:bg-muted/50"}`}
                   >

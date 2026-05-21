@@ -36,12 +36,94 @@ import {
   HelpCircle,
   Sparkles,
   Mail,
+  type LucideIcon,
 } from "lucide-react";
 
 import { useEffect, useState, useRef } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
+
+type SidebarProfile = {
+  role?: string | null;
+};
+
+type NavItemProps = {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+};
+
+type SubItemProps = {
+  href: string;
+  label: string;
+};
+
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  active,
+}: NavItemProps) {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+
+  const content = (
+    <Button
+      asChild
+      variant={active ? "secondary" : "ghost"}
+      className={`h-10 w-full gap-2 rounded-xl text-[13px] font-medium transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+        active
+          ? "bg-zinc-100 text-black shadow-sm"
+          : "text-zinc-600"
+      } ${
+        collapsed
+          ? "justify-center px-2"
+          : "justify-start px-3"
+      }`}
+    >
+      <Link href={href}>
+        <Icon size={18} />
+        {!collapsed && label}
+      </Link>
+    </Button>
+  );
+
+  if (!collapsed) return content;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function SubItem({ href, label }: SubItemProps) {
+  const pathname = usePathname();
+  const active = pathname === href;
+
+  return (
+    <Button
+      asChild
+      variant={active ? "secondary" : "ghost"}
+      size="sm"
+      className={`h-9 w-full justify-start rounded-lg pl-8 text-sm transition-all duration-200 hover:bg-zinc-100 hover:text-black active:scale-[0.98] ${
+        active
+          ? "bg-zinc-100 text-black shadow-sm"
+          : "text-zinc-600"
+      }`}
+    >
+      <Link href={href}>
+        {label}
+      </Link>
+    </Button>
+  );
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -50,16 +132,13 @@ export function AppSidebar() {
   const { t } = useLanguage();
   const hasUnreadUpdates = useUnreadUpdates();
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
-  const [avatar, setAvatar] = useState<string | null>(null);
 
-  const [openDocs, setOpenDocs] = useState(false);
-  const [manualToggle, setManualToggle] = useState(false);
-
-  const [openExamples, setOpenExamples] = useState(false);
-  const [manualToggleExamples, setManualToggleExamples] = useState(false);
+  const [docsOpenOverride, setDocsOpenOverride] = useState<boolean | null>(null);
+  const [examplesOpenOverride, setExamplesOpenOverride] = useState<boolean | null>(null);
+  const openDocs = docsOpenOverride ?? pathname.startsWith("/learn");
+  const openExamples = examplesOpenOverride ?? pathname.startsWith("/examples");
 
   const initialized = useRef(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -83,20 +162,13 @@ export function AppSidebar() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, username, avatar_url")
+        .select("role")
         .eq("id", currentUser.id)
-        .maybeSingle();
+        .maybeSingle<SidebarProfile>();
 
       if (!active) return;
 
       setRole(profile?.role || "user");
-      setUsername(profile?.username || null);
-
-      const validAvatar =
-        profile?.avatar_url &&
-        profile.avatar_url.startsWith("http");
-
-      setAvatar(validAvatar ? profile.avatar_url : null);
     }
 
     load();
@@ -110,25 +182,16 @@ export function AppSidebar() {
 
       if (!currentUser) {
         setRole(null);
-        setUsername(null);
-        setAvatar(null);
         return;
       }
 
       supabase
         .from("profiles")
-        .select("role, username, avatar_url")
+        .select("role")
         .eq("id", currentUser.id)
-        .maybeSingle()
+        .maybeSingle<SidebarProfile>()
         .then(({ data }) => {
           setRole(data?.role || "user");
-          setUsername(data?.username || null);
-
-          const validAvatar =
-            data?.avatar_url &&
-            data.avatar_url.startsWith("http");
-
-          setAvatar(validAvatar ? data.avatar_url : null);
         });
     });
 
@@ -155,70 +218,6 @@ export function AppSidebar() {
     };
   }, [collapsed, openDocs, openExamples, pathname]);
 
-  useEffect(() => {
-    if (pathname.startsWith("/learn") && !manualToggle) {
-      setOpenDocs(true);
-    }
-
-    if (pathname.startsWith("/examples") && !manualToggleExamples) {
-      setOpenExamples(true);
-    }
-  }, [pathname]);
-
-
-  function NavItem({ href, icon: Icon, label, active }: any) {
-    const content = (
-      <Link href={href}>
-        <Button
-          variant={active ? "secondary" : "ghost"}
-          className={`h-10 w-full gap-2 rounded-xl text-[13px] font-medium transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
-            active
-              ? "bg-zinc-100 text-black shadow-sm"
-              : "text-zinc-600"
-          } ${
-            collapsed
-              ? "justify-center px-2"
-              : "justify-start px-3"
-          }`}
-        >
-          <Icon size={18} />
-          {!collapsed && label}
-        </Button>
-      </Link>
-    );
-
-    if (!collapsed) return content;
-
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>{content}</TooltipTrigger>
-          <TooltipContent side="right">{label}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  function SubItem({ href, label }: any) {
-    const active = pathname === href;
-
-    return (
-      <Link href={href}>
-        <Button
-          variant={active ? "secondary" : "ghost"}
-          size="sm"
-          className={`h-9 w-full justify-start rounded-lg pl-8 text-sm transition-all duration-200 hover:bg-zinc-100 hover:text-black active:scale-[0.98] ${
-            active
-              ? "bg-zinc-100 text-black shadow-sm"
-              : "text-zinc-600"
-          }`}
-        >
-          {label}
-        </Button>
-      </Link>
-    );
-  }
-
   return (
     <Sidebar
       collapsible="icon"
@@ -239,6 +238,7 @@ export function AppSidebar() {
             }`}
           >
             <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logoSCX.svg"
                 alt="ScripticX"
@@ -294,7 +294,7 @@ export function AppSidebar() {
               <NavItem href="/editor" icon={Code} label={t("nav.editor")} active={pathname.startsWith("/editor")} />
             )}
             {user && (
-              <NavItem href="/livecode" icon={SquareTerminal} label={"Live Code"} active={pathname.startsWith("/livecode") || pathname.startsWith("/live") } />
+              <NavItem href="/livecode" icon={SquareTerminal} label={t("nav.livecode")} active={pathname.startsWith("/livecode") || pathname.startsWith("/live") } />
             )}
             <NavItem href="/problems" icon={List} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
             <NavItem href="/leaderboard" icon={Trophy} label={t("nav.leaderboard")} active={pathname.startsWith("/leaderboard")} />
@@ -334,8 +334,7 @@ export function AppSidebar() {
                 {!collapsed && (
                   <button
                     onClick={() => {
-                      setOpenDocs((prev) => !prev);
-                      setManualToggle(true);
+                      setDocsOpenOverride(!openDocs);
                     }}
                     className="mr-2 p-1 hover:bg-muted rounded"
                   >
@@ -378,8 +377,7 @@ export function AppSidebar() {
                 {!collapsed && (
                   <button
                     onClick={() => {
-                      setOpenExamples((prev) => !prev);
-                      setManualToggleExamples(true);
+                      setExamplesOpenOverride(!openExamples);
                     }}
                     className="mr-2 p-1 hover:bg-muted rounded"
                   >
@@ -424,13 +422,14 @@ export function AppSidebar() {
       >
         <div className="space-y-1">
 
-          <Link href="/updates" className="relative block">
-            <Button
-              variant="ghost"
-              className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
-                collapsed ? "justify-center px-2" : "justify-start px-3"
-              } ${pathname.startsWith("/updates") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
-            >
+          <Button
+            asChild
+            variant="ghost"
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+              collapsed ? "justify-center px-2" : "justify-start px-3"
+            } ${pathname.startsWith("/updates") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+          >
+            <Link href="/updates">
               <span className="relative inline-flex">
                 <Sparkles size={17} />
                 {hasUnreadUpdates && (
@@ -441,32 +440,34 @@ export function AppSidebar() {
                 )}
               </span>
               {!collapsed && <span>{t("nav.whatsNew")}</span>}
-            </Button>
-          </Link>
+            </Link>
+          </Button>
 
-          <Link href="/help">
-            <Button
-              variant="ghost"
-              className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
-                collapsed ? "justify-center px-2" : "justify-start px-3"
-              } ${pathname.startsWith("/help") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
-            >
+          <Button
+            asChild
+            variant="ghost"
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+              collapsed ? "justify-center px-2" : "justify-start px-3"
+            } ${pathname.startsWith("/help") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+          >
+            <Link href="/help">
               <HelpCircle size={17} />
               {!collapsed && <span>{t("nav.help")}</span>}
-            </Button>
-          </Link>
+            </Link>
+          </Button>
 
-          <Link href="/contact">
-            <Button
-              variant="ghost"
-              className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
-                collapsed ? "justify-center px-2" : "justify-start px-3"
-              } ${pathname.startsWith("/contact") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
-            >
+          <Button
+            asChild
+            variant="ghost"
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+              collapsed ? "justify-center px-2" : "justify-start px-3"
+            } ${pathname.startsWith("/contact") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+          >
+            <Link href="/contact">
               <Mail size={17} />
               {!collapsed && <span>{t("nav.contact")}</span>}
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
     </Sidebar>

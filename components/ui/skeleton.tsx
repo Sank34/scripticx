@@ -1,11 +1,15 @@
+import type * as React from "react";
+
+import { cn } from "@/lib/utils";
+
 export function Skeleton({
   className,
-}: {
-  className?: string;
-}) {
+  ...props
+}: React.ComponentProps<"div">) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-muted ${className}`}
+      className={cn("animate-pulse rounded-md bg-muted", className)}
+      {...props}
     />
   );
 }

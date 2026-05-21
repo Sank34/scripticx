@@ -13,11 +13,13 @@ import {
   analyzeMiniScriptComplexity,
   type ComplexityAnalysis,
 } from "@/lib/complexity-analyzer";
+import { visualizeMiniScript } from "@/lib/msp-visualizer";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -41,6 +43,7 @@ import {
   Plus,
   Gauge,
   Lightbulb,
+  Workflow,
 } from "lucide-react";
 
 
@@ -169,6 +172,7 @@ END`);
 
     return analyzeMiniScriptComplexity(code, locale);
   }, [code, locale, complexityEnabled]);
+  const codeVisualization = useMemo(() => visualizeMiniScript(code), [code]);
 
   async function fetchSnippets(): Promise<SnippetItem[]> {
     if (!user) return [];
@@ -720,6 +724,40 @@ END`);
                   {t("editor.complexity.empty")}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Workflow size={18} />
+                {t("editor.visualization.title")}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              <Tabs defaultValue="ast" className="gap-3">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="ast">
+                    {t("editor.visualization.tabs.ast")}
+                  </TabsTrigger>
+                  <TabsTrigger value="flowchart">
+                    {t("editor.visualization.tabs.flowchart")}
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="ast">
+                  <pre className="max-h-[260px] overflow-auto rounded-lg border bg-muted/50 p-3 text-xs leading-relaxed whitespace-pre-wrap">
+                    {codeVisualization.ast}
+                  </pre>
+                </TabsContent>
+
+                <TabsContent value="flowchart">
+                  <pre className="max-h-[260px] overflow-auto rounded-lg border bg-muted/50 p-3 text-xs leading-relaxed whitespace-pre-wrap">
+                    {codeVisualization.flowchart}
+                  </pre>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
 

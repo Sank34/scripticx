@@ -4,7 +4,7 @@ import ClientPost from "@/app/post/[id]/ClientPost";
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string } | Promise<{ id: string }>;
+  params: Promise<{ id: string }>;
 }) {
   const supabase = createServerSupabase();
 
@@ -43,6 +43,6 @@ export async function generateMetadata({
   };
 }
 
-export default function PostPage(props: { params: { id: string } }) {
+export default function PostPage(props: { params: Promise<{ id: string }> }) {
   return <ClientPost {...props} />;
 }

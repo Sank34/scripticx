@@ -40,7 +40,7 @@ function normalizeUrl(url: string) {
 export async function generateMetadata({
   params,
 }: {
-  params: { username: string } | Promise<{ username: string }>;
+  params: Promise<{ username: string }>;
 }) {
   const supabase = createServerSupabase();
 

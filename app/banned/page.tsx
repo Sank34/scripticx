@@ -19,13 +19,14 @@ export default function BannedPage() {
 
   const t = (key: string) => {
     const keys = key.split(".");
-    let value: any = translations[locale];
+    let value: unknown = translations[locale];
 
     for (const k of keys) {
-      value = value?.[k];
+      if (!value || typeof value !== "object") return key;
+      value = (value as Record<string, unknown>)[k];
     }
 
-    return value || key;
+    return typeof value === "string" ? value : key;
   };
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export default function BannedPage() {
 
   async function logout() {
     await supabase.auth.signOut();
-    window.location.href = "/login";
+    router.replace("/login");
   }
 
   if (loading) return null;
