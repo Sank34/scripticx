@@ -7,6 +7,7 @@ export const translations = {
 
     nav: {
       editor: "Editor",
+      livecode: "Live Code",
       problems: "Problems",
       leaderboard: "Leaderboard",
       feed: "Feed",
@@ -19,6 +20,12 @@ export const translations = {
       whatsNew: "What's new",
       help: "Help",
       contact: "Contact",
+    },
+
+    mobileDrawer: {
+      title: "Mobile navigation",
+      subtitle: "Platform navigation",
+      open: "Open mobile navigation",
     },
 
     learn: {
@@ -988,6 +995,7 @@ export const translations = {
 
     nav: {
       editor: "Editor",
+      livecode: "Programare live",
       problems: "Probleme",
       leaderboard: "Clasament",
       feed: "Feed",
@@ -1000,6 +1008,12 @@ export const translations = {
       whatsNew: "Noutăți",
       help: "Ajutor",
       contact: "Contact",
+    },
+
+    mobileDrawer: {
+      title: "Navigare mobilă",
+      subtitle: "Navigarea platformei",
+      open: "Deschide navigarea mobilă",
     },
 
     learn: {
