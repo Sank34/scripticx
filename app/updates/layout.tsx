@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { fetchUpdates } from "@/lib/updates";
 import { useLanguage } from "@/components/LanguageProvider";
+import { getLocalized } from "@/lib/getLocalized";
 import { markUpdatesSeen } from "@/hooks/useUnreadUpdates";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -66,7 +67,7 @@ export default function UpdatesLayout({
                         : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-900"
                     }`}
                   >
-                    <div className="line-clamp-2">{u.title}</div>
+                    <div className="line-clamp-2">{getLocalized(u.title_i18n, locale)}</div>
                     <div className="mt-0.5 text-[11px] text-zinc-400">
                       {u.date}
                     </div>

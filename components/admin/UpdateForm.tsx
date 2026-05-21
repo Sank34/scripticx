@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { supabase } from "@/lib/supabase";
-import type { UpdateEntry, UpdateTag } from "@/lib/updates";
+import type { UpdateEntry, UpdateTag, LocalizedString } from "@/lib/updates";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 
 import { Markdown } from "@/components/Markdown";
 import { toast } from "sonner";
@@ -39,26 +47,77 @@ function slugify(s: string) {
 export function UpdateForm({ initialData, onSaved }: Props) {
   const isEdit = !!initialData?.id;
 
-  const [title, setTitle] = useState(initialData?.title ?? "");
+  const [languages, setLanguages] = useState<string[]>(
+    initialData?.title_i18n
+      ? Object.keys(initialData.title_i18n)
+      : ["en"]
+  );
+
+  const [activeLang, setActiveLang] = useState<string>(languages[0]);
+
+  const [titleI18n, setTitleI18n] = useState<LocalizedString>(
+    initialData?.title_i18n || { en: "" }
+  );
+
+  const [contentI18n, setContentI18n] = useState<LocalizedString>(
+    initialData?.content_i18n || { en: "" }
+  );
+
   const [slug, setSlug] = useState(initialData?.slug ?? "");
   const [slugTouched, setSlugTouched] = useState(isEdit);
   const [date, setDate] = useState(
     initialData?.date ?? new Date().toISOString().slice(0, 10)
   );
   const [tag, setTag] = useState<UpdateTag | "">(initialData?.tag ?? "");
-  const [content, setContent] = useState(initialData?.content ?? "");
 
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  function onTitleChange(v: string) {
-    setTitle(v);
-    if (!slugTouched) setSlug(slugify(v));
+  function updateTitle(lang: string, value: string) {
+    setTitleI18n((prev) => ({ ...prev, [lang]: value }));
+    if (lang === "en" && !slugTouched) setSlug(slugify(value));
+  }
+
+  function updateContent(lang: string, value: string) {
+    setContentI18n((prev) => ({ ...prev, [lang]: value }));
+  }
+
+  function addLanguage(lang: string) {
+    if (languages.includes(lang)) return;
+    setLanguages([...languages, lang]);
+    setActiveLang(lang);
+    setTitleI18n((prev) => ({ ...prev, [lang]: "" }));
+    setContentI18n((prev) => ({ ...prev, [lang]: "" }));
+  }
+
+  function removeLanguage(lang: string) {
+    if (languages.length === 1) return;
+
+    const updated = languages.filter((l) => l !== lang);
+    setLanguages(updated);
+
+    setTitleI18n((prev) => {
+      const copy = { ...prev };
+      delete copy[lang];
+      return copy;
+    });
+
+    setContentI18n((prev) => {
+      const copy = { ...prev };
+      delete copy[lang];
+      return copy;
+    });
+
+    if (activeLang === lang) setActiveLang(updated[0]);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!title.trim() || !slug.trim() || !date || !content.trim()) {
+    const hasTitle = Object.values(titleI18n).some((v) => v?.trim());
+    const hasContent = Object.values(contentI18n).some((v) => v?.trim());
+
+    if (!hasTitle || !hasContent || !slug.trim() || !date) {
       toast.error("Fill in title, slug, date, and content.");
       return;
     }
@@ -66,11 +125,11 @@ export function UpdateForm({ initialData, onSaved }: Props) {
     setSubmitting(true);
 
     const payload = {
-      title: title.trim(),
+      title_i18n: titleI18n,
+      content_i18n: contentI18n,
       slug: slug.trim(),
       date,
       tag: tag || null,
-      content,
     };
 
     const { error } = isEdit
@@ -91,12 +150,57 @@ export function UpdateForm({ initialData, onSaved }: Props) {
   return (
     <form onSubmit={submit} className="space-y-5">
 
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {languages.map((lang) => (
+            <Button
+              key={lang}
+              type="button"
+              size="sm"
+              variant={activeLang === lang ? "default" : "outline"}
+              onClick={() => setActiveLang(lang)}
+            >
+              {lang.toUpperCase()}
+            </Button>
+          ))}
+
+          {languages.length < 2 && (
+            <Select onValueChange={(val) => addLanguage(val)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Add language" />
+              </SelectTrigger>
+              <SelectContent>
+                {!languages.includes("en") && (
+                  <SelectItem value="en">English</SelectItem>
+                )}
+                {!languages.includes("ro") && (
+                  <SelectItem value="ro">Română</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          )}
+
+          {languages.length > 1 && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => removeLanguage(activeLang)}
+            >
+              Remove {activeLang.toUpperCase()}
+            </Button>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Title</label>
+          <label className="text-sm font-medium">
+            Title ({activeLang})
+          </label>
           <Input
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
+            value={titleI18n[activeLang] || ""}
+            onChange={(e) => updateTitle(activeLang, e.target.value)}
             placeholder="What's new in this release?"
           />
         </div>
@@ -117,11 +221,31 @@ export function UpdateForm({ initialData, onSaved }: Props) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Date</label>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+              >
+                <CalendarIcon size={16} className="mr-2 opacity-60" />
+                {date ? format(new Date(date), "PPP") : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date ? new Date(date) : undefined}
+                onSelect={(d) => {
+                  if (d) {
+                    setDate(format(d, "yyyy-MM-dd"));
+                    setCalendarOpen(false);
+                  }
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-1.5">
@@ -144,7 +268,9 @@ export function UpdateForm({ initialData, onSaved }: Props) {
       </div>
 
       <div className="space-y-1.5">
-        <label className="text-sm font-medium">Content (Markdown)</label>
+        <label className="text-sm font-medium">
+          Content ({activeLang}, Markdown)
+        </label>
         <Tabs defaultValue="edit">
           <TabsList>
             <TabsTrigger value="edit">Edit</TabsTrigger>
@@ -152,8 +278,8 @@ export function UpdateForm({ initialData, onSaved }: Props) {
           </TabsList>
           <TabsContent value="edit">
             <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+              value={contentI18n[activeLang] || ""}
+              onChange={(e) => updateContent(activeLang, e.target.value)}
               placeholder={"# Heading\n\nWrite your update in **Markdown**…"}
               rows={16}
               className="font-mono text-sm"
@@ -161,8 +287,8 @@ export function UpdateForm({ initialData, onSaved }: Props) {
           </TabsContent>
           <TabsContent value="preview">
             <div className="min-h-[16rem] rounded-lg border border-input p-4">
-              {content.trim() ? (
-                <Markdown>{content}</Markdown>
+              {contentI18n[activeLang]?.trim() ? (
+                <Markdown>{contentI18n[activeLang]}</Markdown>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Nothing to preview yet.

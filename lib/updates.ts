@@ -2,13 +2,15 @@ import { supabase } from "@/lib/supabase";
 
 export type UpdateTag = "new" | "fix" | "improved";
 
+export type LocalizedString = Record<string, string>;
+
 export type UpdateEntry = {
   id?: string;
   slug: string;
-  title: string;
+  title_i18n: LocalizedString;
+  content_i18n: LocalizedString;
   date: string;
   tag: UpdateTag | null;
-  content: string;
   created_at?: string;
 };
 

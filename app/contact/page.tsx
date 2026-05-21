@@ -18,12 +18,15 @@ import { CheckCircle2, Send } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
 import { Footer } from "@/components/Footer";
 
 type Topic = "bug" | "feature" | "account" | "feedback" | "other";
 
 export default function ContactPage() {
   const { locale } = useLanguage();
+  const { user, profile } = useAuth();
+  const isLoggedIn = !!user;
 
   const copy = locale === "ro"
     ? {
@@ -103,12 +106,15 @@ export default function ContactPage() {
     e.preventDefault();
     setError(null);
 
-    if (!name.trim() || !email.trim() || !topic || !description.trim()) {
+    const finalName = isLoggedIn ? (profile?.username ?? "") : name.trim();
+    const finalEmail = isLoggedIn ? (user?.email ?? "") : email.trim();
+
+    if (!finalName || !finalEmail || !topic || !description.trim()) {
       setError(copy.errorRequired);
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
       setError(copy.errorEmail);
       return;
     }
@@ -118,8 +124,9 @@ export default function ContactPage() {
     const { error: insertError } = await supabase
       .from("contact_messages")
       .insert({
-        name,
-        email,
+        user_id: user?.id ?? null,
+        name: finalName,
+        email: finalEmail,
         topic,
         description,
       });
@@ -127,7 +134,8 @@ export default function ContactPage() {
     setSubmitting(false);
 
     if (insertError) {
-      setError(copy.errorGeneric);
+      console.error("contact insert failed:", insertError);
+      setError(`${copy.errorGeneric} (${insertError.message})`);
       return;
     }
 
@@ -167,26 +175,28 @@ export default function ContactPage() {
             ) : (
               <form onSubmit={submit} className="space-y-5">
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">{copy.name}</label>
-                    <Input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder={copy.namePlaceholder}
-                    />
-                  </div>
+                {!isLoggedIn && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">{copy.name}</label>
+                      <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder={copy.namePlaceholder}
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">{copy.email}</label>
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder={copy.emailPlaceholder}
-                    />
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">{copy.email}</label>
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder={copy.emailPlaceholder}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">{copy.topic}</label>

@@ -32,11 +32,14 @@ import { Plus, Pencil, Trash, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { fetchUpdates, type UpdateEntry } from "@/lib/updates";
 import { UpdateForm } from "@/components/admin/UpdateForm";
+import { getLocalized } from "@/lib/getLocalized";
+import { useLanguage } from "@/components/LanguageProvider";
 import { toast } from "sonner";
 import Link from "next/link";
 
 function AdminUpdatesContent() {
   const queryClient = useQueryClient();
+  const { locale } = useLanguage();
 
   const { data: updates = [], isLoading } = useQuery({
     queryKey: ["updates"],
@@ -136,7 +139,7 @@ function AdminUpdatesContent() {
                         {u.tag}
                       </span>
                     )}
-                    <h2 className="truncate font-semibold">{u.title}</h2>
+                    <h2 className="truncate font-semibold">{getLocalized(u.title_i18n, locale)}</h2>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {u.date} · /updates/{u.slug}
@@ -201,7 +204,7 @@ function AdminUpdatesContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this update?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove "{deleting?.title}". This action cannot be undone.
+              This will permanently remove "{deleting ? getLocalized(deleting.title_i18n, locale) : ""}". This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

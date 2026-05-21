@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-import { Users, FileText, Sparkles } from "lucide-react";
+import { Users, FileText, Sparkles, Mail } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
 function AdminContent() {
@@ -75,6 +75,27 @@ function AdminContent() {
               onClick={() => router.push("/admin/updates")}
             >
               Manage updates
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition border-rose-500/30">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-rose-500" />
+              <h2 className="text-xl font-semibold">Contact</h2>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Read and manage messages from the contact form.
+            </p>
+
+            <Button
+              variant="default"
+              className="bg-rose-500 hover:bg-rose-600"
+              onClick={() => router.push("/admin/contact")}
+            >
+              View messages
             </Button>
           </CardContent>
         </Card>

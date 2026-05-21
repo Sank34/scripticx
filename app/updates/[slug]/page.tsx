@@ -1,33 +1,41 @@
+"use client";
+
+import { use } from "react";
 import { notFound } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 
 import { Markdown } from "@/components/Markdown";
-import { createServerSupabase } from "@/lib/supabaseServer";
+import { Skeleton } from "@/components/ui/skeleton";
+import { fetchUpdate } from "@/lib/updates";
+import { getLocalized } from "@/lib/getLocalized";
+import { useLanguage } from "@/components/LanguageProvider";
 
-export const dynamic = "force-dynamic";
-
-export default async function UpdatePage({
+export default function UpdatePage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const { slug } = use(params);
+  const { locale } = useLanguage();
 
-  const supabase = createServerSupabase();
-  const { data } = await supabase
-    .from("updates")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
+  const { data: update, isLoading } = useQuery({
+    queryKey: ["update", slug],
+    queryFn: () => fetchUpdate(slug),
+  });
 
-  const update = data as {
-    slug: string;
-    title: string;
-    date: string;
-    tag: "new" | "fix" | "improved" | null;
-    content: string;
-  } | null;
+  if (isLoading) {
+    return (
+      <article className="max-w-3xl space-y-6">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-40 w-full" />
+      </article>
+    );
+  }
 
-  if (!update) notFound();
+  if (!update) {
+    notFound();
+  }
 
   const tagStyle =
     update.tag === "new"
@@ -60,7 +68,7 @@ export default async function UpdatePage({
         <span>{update.date}</span>
       </div>
 
-      <Markdown>{update.content}</Markdown>
+      <Markdown>{getLocalized(update.content_i18n, locale)}</Markdown>
     </article>
   );
 }
