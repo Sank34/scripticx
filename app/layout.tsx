@@ -7,6 +7,7 @@ import { Topbar } from "@/components/Topbar";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { MobileDrawer } from "@/components/MobileDrawer";
+import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
 
 const geistSans = Geist({
@@ -49,11 +50,7 @@ export default function RootLayout({
 
                     <Topbar />
 
-                    <main className="min-h-0 flex-1 overflow-y-auto bg-white pb-16 md:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
-                        {children}
-                      </div>
-                    </main>
+                    <MainWrapper>{children}</MainWrapper>
 
                   </div>
 

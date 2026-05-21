@@ -340,6 +340,23 @@ export const translations = {
         input: "Input",
         expected: "Expected",
         got: "Got",
+        results: "Results",
+        correct: "Correct answer",
+        wrong: "Wrong answer",
+        programRead: "The program read",
+        programPrinted: "The program printed",
+        shouldHavePrinted: "The program should have printed",
+      },
+
+      tabs: {
+        description: "Problem",
+        solution: "My solution",
+      },
+
+      solution: {
+        points: "points",
+        successMessage: "Congratulations! Your code passed all tests.",
+        encouragement: "Your code got partial credit. Review the examples, try to fix your solution, and submit again.",
       }
     },
 
@@ -1336,6 +1353,23 @@ export const translations = {
         input: "Intrare",
         expected: "Așteptat",
         got: "Obținut",
+        results: "Rezultate",
+        correct: "Răspuns corect",
+        wrong: "Răspuns greșit",
+        programRead: "Programul a citit",
+        programPrinted: "Programul a afișat",
+        shouldHavePrinted: "Programul ar fi trebuit să afișeze",
+      },
+
+      tabs: {
+        description: "Cerință",
+        solution: "Soluția mea",
+      },
+
+      solution: {
+        points: "puncte",
+        successMessage: "Felicitări! Codul tău a trecut toate testele.",
+        encouragement: "Codul tău a obținut un punctaj parțial. Analizează exemplele, încearcă să îți corectezi soluția și trimite o nouă soluție.",
       }
     },
 

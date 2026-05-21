@@ -8,12 +8,24 @@ import Editor, { useMonaco } from "@monaco-editor/react";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserRole } from "@/hooks/useUserRole";
 import { checkAchievements } from "@/lib/achievements";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
 import { Markdown } from "@/components/Markdown";
+
+function slugify(text: string): string {
+  if (!text) return "problem";
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
 
 function ProblemContent() {
   const { user } = useAuth();
@@ -28,6 +40,7 @@ function ProblemContent() {
   const [result, setResult] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"description" | "solution">("description");
 
   useEffect(() => {
     if (!id || typeof id !== "string") return;
@@ -112,6 +125,7 @@ function ProblemContent() {
 
     setResult(`${t("problemPage.result.score")}: ${score}%`);
     setTestResults(results);
+    setActiveTab("solution");
 
     const { data: previous } = await supabase
       .from("submissions")
@@ -195,7 +209,7 @@ function ProblemContent() {
 
   if (!id || typeof id !== "string" || loading) {
     return (
-      <div className="flex h-[calc(100vh-80px)]">
+      <div className="flex h-full">
         <Skeleton className="w-1/2 h-full" />
         <Skeleton className="w-1/2 h-full" />
       </div>
@@ -209,17 +223,14 @@ function ProblemContent() {
   const passedCount = testResults.filter((r) => r.passed).length;
 
   return (
-    <div className="h-[calc(100vh-80px)] flex">
+    <div className="h-full flex flex-col-reverse md:flex-row">
 
-      <div className="w-1/2 flex flex-col bg-zinc-950 text-zinc-100 border-r">
+      <div className="w-full md:w-1/2 flex flex-col bg-zinc-950 text-zinc-100 md:border-r flex-1 md:flex-none min-h-[60vh] md:min-h-0">
 
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-              MiniScript+
-            </span>
-          </div>
+          <span className="text-xs font-mono text-zinc-400">
+            {slugify(getLocalized(problem.title_i18n, "en") || getLocalized(problem.title_i18n, locale))}.msp
+          </span>
           <button
             onClick={runCode}
             className="px-3 py-1.5 text-xs font-medium bg-white text-zinc-900 rounded-md hover:bg-zinc-200 transition"
@@ -243,96 +254,124 @@ function ProblemContent() {
             }}
           />
         </div>
-
-        {(result || testResults.length > 0) && (
-          <div className="max-h-[40%] overflow-y-auto border-t border-zinc-800 bg-zinc-900">
-            {result && (
-              <div className="px-4 py-2.5 border-b border-zinc-800 flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                  {t("problemPage.tests.results") || "Results"}
-                </span>
-                <span className="text-sm font-semibold text-zinc-100">
-                  {result}
-                  {testResults.length > 0 && (
-                    <span className="ml-2 text-xs text-zinc-400">
-                      ({passedCount}/{testResults.length})
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
-
-            <div className="p-3 space-y-2">
-              {testResults.map((r, i) => (
-                <div
-                  key={i}
-                  className={`rounded-md border p-3 ${
-                    r.passed
-                      ? "border-emerald-500/40 bg-emerald-500/10"
-                      : "border-red-500/40 bg-red-500/10"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">
-                      {t("problemPage.tests.test")} #{i + 1}
-                    </p>
-                    {r.passed ? (
-                      <Check size={16} className="text-emerald-400" />
-                    ) : (
-                      <X size={16} className="text-red-400" />
-                    )}
-                  </div>
-
-                  <div className="text-xs mt-2 space-y-1.5 text-zinc-300">
-                    <p>
-                      <span className="text-zinc-500">
-                        {t("problemPage.tests.input")}:
-                      </span>{" "}
-                      {JSON.stringify(r.input)}
-                    </p>
-
-                    {!r.passed && (
-                      <>
-                        <div>
-                          <p className="text-zinc-500">
-                            {t("problemPage.tests.expected")}:
-                          </p>
-                          <pre className="mt-1 rounded bg-zinc-950 px-2 py-1 font-mono text-[11px]">
-                            {r.expected}
-                          </pre>
-                        </div>
-                        <div>
-                          <p className="text-zinc-500">
-                            {t("problemPage.tests.got")}:
-                          </p>
-                          <pre className="mt-1 rounded bg-zinc-950 px-2 py-1 font-mono text-[11px]">
-                            {r.got}
-                          </pre>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      <div className="w-1/2 overflow-y-auto">
-        <div className="px-8 py-6 space-y-4 max-w-2xl">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {problem.code != null && (
-              <span className="mr-2 text-muted-foreground font-mono">
-                #{problem.code}
-              </span>
-            )}
-            {getLocalized(problem.title_i18n, locale)}
-          </h1>
-          <div className="text-sm leading-relaxed text-zinc-700">
-            <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
-          </div>
-        </div>
+      <div className="w-full md:w-1/2 flex flex-col overflow-hidden border-b md:border-b-0">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "description" | "solution")}
+          className="flex flex-1 flex-col overflow-hidden gap-0"
+        >
+          <TabsList className="w-full justify-start rounded-none border-b bg-white px-4 h-11 flex-shrink-0">
+            <TabsTrigger value="description" className="text-sm">
+              {t("problemPage.tabs.description") || "Cerință"}
+            </TabsTrigger>
+            <TabsTrigger value="solution" className="text-sm" disabled={testResults.length === 0}>
+              {t("problemPage.tabs.solution") || "Soluția mea"}
+              {testResults.length > 0 && (
+                <span className={`ml-2 text-xs font-semibold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
+                  {Math.round((passedCount / testResults.length) * 100)}%
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="description" className="flex-1 overflow-y-auto mt-0">
+            <div className="px-6 md:px-8 py-6 space-y-4">
+              <h1 className="text-2xl font-bold tracking-tight">
+                {problem.code != null && (
+                  <span className="mr-2 text-muted-foreground font-mono">
+                    #{problem.code}
+                  </span>
+                )}
+                {getLocalized(problem.title_i18n, locale)}
+              </h1>
+              <div className="text-sm leading-relaxed text-zinc-700">
+                <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="solution" className="flex-1 overflow-y-auto mt-0">
+            <div className="px-6 md:px-8 py-6 space-y-5">
+              {testResults.length > 0 && (
+                <>
+                  <div>
+                    <h2 className={`text-3xl font-bold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
+                      {Math.round((passedCount / testResults.length) * 100)} {t("problemPage.solution.points") || "puncte"}
+                    </h2>
+                    <p className="mt-2 text-sm text-zinc-600">
+                      {passedCount === testResults.length
+                        ? (t("problemPage.solution.successMessage") || "Felicitări! Codul tău a trecut toate testele.")
+                        : (t("problemPage.solution.encouragement") || "Codul tău a obținut un punctaj parțial. Analizează exemplele, încearcă să îți corectezi soluția și trimite o nouă soluție.")}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {testResults.map((r, i) => {
+                      const inputDisplay = Array.isArray(r.input)
+                        ? r.input.join(" ")
+                        : String(r.input);
+
+                      return (
+                        <div
+                          key={i}
+                          className="rounded-lg border border-zinc-200 bg-white overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-200 bg-zinc-50">
+                            <p className="text-sm font-semibold text-zinc-900">
+                              {t("problemPage.tests.test") || "Test"} #{i + 1}
+                            </p>
+                            <span className={`text-xs font-medium px-2 py-1 rounded ${
+                              r.passed
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-red-100 text-red-700"
+                            }`}>
+                              {r.passed
+                                ? (t("problemPage.tests.correct") || "Răspuns corect")
+                                : (t("problemPage.tests.wrong") || "Răspuns greșit")}
+                            </span>
+                          </div>
+
+                          <div className="p-4 space-y-3">
+                            <div>
+                              <p className="text-xs font-medium text-zinc-500 mb-1.5">
+                                {t("problemPage.tests.programRead") || "Programul a citit"}
+                              </p>
+                              <pre className="rounded bg-zinc-100 px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
+                                {inputDisplay || "—"}
+                              </pre>
+                            </div>
+
+                            <div>
+                              <p className="text-xs font-medium text-zinc-500 mb-1.5">
+                                {t("problemPage.tests.programPrinted") || "Programul a afișat"}
+                              </p>
+                              <pre className="rounded bg-zinc-100 px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
+                                {r.got || "—"}
+                              </pre>
+                            </div>
+
+                            {!r.passed && (
+                              <div>
+                                <p className="text-xs font-medium text-zinc-500 mb-1.5">
+                                  {t("problemPage.tests.shouldHavePrinted") || "Programul ar fi trebuit să afișeze"}
+                                </p>
+                                <pre className="rounded bg-zinc-100 px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
+                                  {r.expected}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
