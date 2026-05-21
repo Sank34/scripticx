@@ -41,12 +41,14 @@ import {
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { t } = useLanguage();
+  const hasUnreadUpdates = useUnreadUpdates();
 
   const [user, setUser] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -422,35 +424,49 @@ export function AppSidebar() {
       >
         <div className="space-y-1">
 
-          <Button
-            variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
-              collapsed ? "justify-center px-2" : "justify-start px-3"
-            }`}
-          >
-            <Sparkles size={17} />
-            {!collapsed && <span>What's new</span>}
-          </Button>
+          <Link href="/updates" className="relative block">
+            <Button
+              variant="ghost"
+              className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+                collapsed ? "justify-center px-2" : "justify-start px-3"
+              } ${pathname.startsWith("/updates") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+            >
+              <span className="relative inline-flex">
+                <Sparkles size={17} />
+                {hasUnreadUpdates && (
+                  <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-[var(--sidebar)]" />
+                  </span>
+                )}
+              </span>
+              {!collapsed && <span>{t("nav.whatsNew")}</span>}
+            </Button>
+          </Link>
 
-          <Button
-            variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
-              collapsed ? "justify-center px-2" : "justify-start px-3"
-            }`}
-          >
-            <HelpCircle size={17} />
-            {!collapsed && <span>Help</span>}
-          </Button>
+          <Link href="/help">
+            <Button
+              variant="ghost"
+              className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+                collapsed ? "justify-center px-2" : "justify-start px-3"
+              } ${pathname.startsWith("/help") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+            >
+              <HelpCircle size={17} />
+              {!collapsed && <span>{t("nav.help")}</span>}
+            </Button>
+          </Link>
 
-          <Button
-            variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
-              collapsed ? "justify-center px-2" : "justify-start px-3"
-            }`}
-          >
-            <Mail size={17} />
-            {!collapsed && <span>Contact</span>}
-          </Button>
+          <Link href="/contact">
+            <Button
+              variant="ghost"
+              className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+                collapsed ? "justify-center px-2" : "justify-start px-3"
+              } ${pathname.startsWith("/contact") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+            >
+              <Mail size={17} />
+              {!collapsed && <span>{t("nav.contact")}</span>}
+            </Button>
+          </Link>
         </div>
       </div>
     </Sidebar>

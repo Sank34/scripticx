@@ -16,6 +16,9 @@ export const translations = {
       docs: "Docs",
       examples: "Examples",
       classes: "Classes",
+      whatsNew: "What's new",
+      help: "Help",
+      contact: "Contact",
     },
 
     learn: {
@@ -968,6 +971,9 @@ export const translations = {
       docs: "Documentație",
       examples: "Exemple",
       classes: "Clase",
+      whatsNew: "Noutăți",
+      help: "Ajutor",
+      contact: "Contact",
     },
 
     learn: {
