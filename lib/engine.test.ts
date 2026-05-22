@@ -95,6 +95,30 @@ PRINT X
     expect(lastOutput).toBe(2);
   });
 
+  it("throws on division by zero", () => {
+    const program = compile(`
+A = 0
+B = 0
+C = A / B
+`);
+
+    step(program);
+    step(program);
+    expect(() => step(program)).toThrow("Division by zero is not allowed");
+  });
+
+  it("throws on modulo by zero", () => {
+    const program = compile(`
+A = 5
+B = 0
+C = A % B
+`);
+
+    step(program);
+    step(program);
+    expect(() => step(program)).toThrow("Modulo by zero is not allowed");
+  });
+
   it("throws a readable error for missing THEN", () => {
     const program = compile(`
 IF X > 0

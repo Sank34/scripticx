@@ -272,9 +272,15 @@ function evalAST(node: ASTNode): Value {
         return (left as number) * (right as number);
 
       case "/":
+        if ((right as number) === 0) {
+          throw new Error("Division by zero is not allowed");
+        }
         return (left as number) / (right as number);
 
       case "%":
+        if ((right as number) === 0) {
+          throw new Error("Modulo by zero is not allowed");
+        }
         return (left as number) % (right as number);
 
       case ">":
