@@ -9,8 +9,8 @@
 **Nume:** ScripticX
 **Categorie:** Software Educațional
 **Domenii web:**
-- `scripticx.org` — pagina de prezentare (landing)
-- `platform.scripticx.org` — platforma interactivă
+- `scripticx.org` — pagina de prezentare (landing) - deployed
+- `platform.scripticx.org` — platforma interactivă - not yet deployed
 
 ### Descriere
 
