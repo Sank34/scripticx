@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -143,17 +144,22 @@ function EditorContent() {
   const { t, locale } = useLanguage();
 
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
-  const [code, setCode] = useState(`X = 0
+  const [code, setCode] = useState(
+    () =>
+      searchParams.get("code") ??
+      `X = 0
 WHILE X < 3
 PRINT X
 X = X + 1
-END`);
+END`,
+  );
 
   const [program, setProgram] = useState<ProgramInstruction[]>([]);
   const [variables, setVariables] = useState<Record<string, Value>>({});
@@ -834,7 +840,9 @@ END`);
 export default function EditorPage() {
   return (
     <RouteGuard requireAuth>
-      <EditorContent />
+      <Suspense fallback={null}>
+        <EditorContent />
+      </Suspense>
     </RouteGuard>
   );
 }
