@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -161,7 +162,36 @@ export default function AssignmentPage() {
   }
 
   if (loading) {
-    return <div className="p-6">{t("classes.assignment.loading")}</div>;
+    return (
+      <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-1/2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-16 w-full" />
+          </CardContent>
+        </Card>
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-40" />
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-5 w-2/3" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-9 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (!assignment) {

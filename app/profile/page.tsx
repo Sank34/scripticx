@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
@@ -310,17 +310,93 @@ function ProfileContent() {
   const following = profileData?.following || 0;
   const achievements = profileData?.achievements || [];
 
-  window.addEventListener("profile-updated", async () => {
-    await queryClient.invalidateQueries({
-      queryKey: ["profile", user?.id],
-    });
-  });
+  useEffect(() => {
+    const handler = async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["profile", user?.id],
+      });
+    };
+    window.addEventListener("profile-updated", handler);
+    return () => window.removeEventListener("profile-updated", handler);
+  }, [queryClient, user?.id]);
 
   if (loading || !user) {
     return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-40 w-full" />
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-16 h-16 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-48" />
+              <Skeleton className="h-4 w-56" />
+              <div className="flex gap-4 mt-1">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </div>
+          </div>
+          <Skeleton className="h-9 w-9 rounded-md" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-4 w-44" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-2 w-full" />
+                <Skeleton className="h-4 w-10" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-24" /></CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-8 w-12" />
+                <Skeleton className="h-3 w-16" />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+              <CardContent className="flex gap-2">
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-6 w-20" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-2/3" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+              <CardContent className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex justify-between items-center border-b pb-2">
+                    <div className="space-y-1">
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                    <Skeleton className="h-6 w-12" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }

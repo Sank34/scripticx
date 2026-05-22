@@ -271,7 +271,7 @@ export default function LiveCodePage() {
             <Activity className="w-4 h-4" />
           </CardHeader>
           <CardContent className="text-2xl font-bold">
-            {rooms.length}
+            {loading ? <Skeleton className="h-8 w-10" /> : rooms.length}
           </CardContent>
         </Card>
 
@@ -281,7 +281,7 @@ export default function LiveCodePage() {
             <Activity className="w-4 h-4 text-green-500" />
           </CardHeader>
           <CardContent className="text-2xl font-bold">
-            {activeRooms.length}
+            {loading ? <Skeleton className="h-8 w-10" /> : activeRooms.length}
           </CardContent>
         </Card>
 
@@ -291,16 +291,37 @@ export default function LiveCodePage() {
             <Clock className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="text-2xl font-bold">
-            {pastRooms.length}
+            {loading ? <Skeleton className="h-8 w-10" /> : pastRooms.length}
           </CardContent>
         </Card>
 
       </div>
 
       {loading && (
-        <div className="space-y-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-40" /></CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-40" /></CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+          <div>
+            <Card>
+              <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 

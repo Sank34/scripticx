@@ -1,10 +1,23 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 export function MainWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isFullWidth = pathname?.startsWith("/problems/") && pathname !== "/problems";
+
+  useEffect(() => {
+    function onRejection(e: PromiseRejectionEvent) {
+      const r = e.reason;
+      if (r && typeof r === "object" && (r as any).type === "cancelation") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }
+    window.addEventListener("unhandledrejection", onRejection, true);
+    return () => window.removeEventListener("unhandledrejection", onRejection, true);
+  }, []);
 
   if (isFullWidth) {
     return (

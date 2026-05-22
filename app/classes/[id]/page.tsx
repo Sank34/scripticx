@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
@@ -27,6 +28,7 @@ export default function ClassPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
@@ -153,6 +155,7 @@ export default function ClassPage() {
       .order("created_at", { ascending: false });
 
     setAssignments(assignmentData || []);
+    setLoading(false);
   }
 
   async function createSession() {
@@ -259,6 +262,60 @@ export default function ClassPage() {
 
   const teacherName =
     members.find((m) => m.role === "teacher")?.username || t("classes.roles.teacher");
+
+  if (loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-5 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="border rounded p-3 flex justify-between items-center">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                    <Skeleton className="h-8 w-20" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-5 w-32" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="w-6 h-6 rounded-full" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-5 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">

@@ -374,20 +374,18 @@ export function step(program: any[]): StepResult {
 
   steps++;
   if (steps > MAX_STEPS) {
-    throw {
-      message: "Possible infinite loop detected",
-      line: currentLine + 1,
-    };
+    const err: any = new Error("Possible infinite loop detected");
+    err.line = currentLine + 1;
+    throw err;
   }
 
   let inst = program[currentLine];
   let output: any = null;
 
   if (inst.type === "ERROR") {
-    throw {
-      message: inst.message,
-      line: currentLine
-    };
+    const err: any = new Error(inst.message);
+    err.line = currentLine;
+    throw err;
   }
   if (inst.type === "EMPTY") {
     currentLine++;
@@ -396,13 +394,17 @@ export function step(program: any[]): StepResult {
     try {
       variables[inst.var] = evaluate(inst.value);
     } catch (e: any) {
-      throw { message: e.message, line: currentLine + 1 };
+      const err: any = new Error(e.message);
+      err.line = currentLine + 1;
+      throw err;
     }
   } else if (inst.type === "PRINT") {
     try {
       output = evaluate(inst.value);
     } catch (e: any) {
-      throw { message: e.message, line: currentLine + 1 };
+      const err: any = new Error(e.message);
+      err.line = currentLine + 1;
+      throw err;
     }
   } else if (inst.type === "IF") {
     if (!evaluateCondition(inst.condition)) {

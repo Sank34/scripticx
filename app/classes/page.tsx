@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { Plus, Users, Link as LinkIcon } from "lucide-react";
 
@@ -182,7 +183,21 @@ export default function ClassesPage() {
       </Card>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading && <div>{t("classes.loading")}</div>}
+        {loading &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-4" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-4 w-16 rounded" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
 
         {!loading && classes.length === 0 && (
           <p className="text-muted-foreground text-sm">

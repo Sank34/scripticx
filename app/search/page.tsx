@@ -185,7 +185,7 @@ function SearchContent() {
             </div>
           )}
 
-          {results.map((u) => (
+          {!loading && results.map((u) => (
             <Card
               key={u.id}
               onClick={() => goToUser(u.username)}
