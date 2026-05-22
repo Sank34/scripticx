@@ -42,6 +42,7 @@ import { Mail, Trash, Search, CheckCircle2, Eye, Clock, User } from "lucide-reac
 
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Topic = "bug" | "feature" | "account" | "feedback" | "other";
 type Status = "new" | "read" | "resolved";
@@ -66,16 +67,6 @@ async function fetchContactMessages(): Promise<ContactMessage[]> {
   return (data as ContactMessage[]) || [];
 }
 
-function topicLabel(t: Topic) {
-  switch (t) {
-    case "bug": return "Bug";
-    case "feature": return "Feature";
-    case "account": return "Account";
-    case "feedback": return "Feedback";
-    case "other": return "Other";
-  }
-}
-
 function topicStyle(t: Topic) {
   switch (t) {
     case "bug": return "bg-red-100 text-red-700";
@@ -95,7 +86,11 @@ function statusStyle(s: Status) {
 }
 
 function AdminContactContent() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
+
+  const topicLabel = (topic: Topic) => t(`admin.contact.topics.${topic}`);
+  const statusLabel = (status: Status) => t(`admin.contact.statuses.${status}`);
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["contact_messages"],
@@ -144,7 +139,7 @@ function AdminContactContent() {
       return;
     }
 
-    toast.success("Message deleted");
+    toast.success(t("admin.contact.toast.deleted"));
     setDeleting(null);
     invalidate();
   }
@@ -169,13 +164,15 @@ function AdminContactContent() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Mail size={24} className="text-rose-500" />
-            Contact messages
+            {t("admin.contact.title")}
             {newCount > 0 && (
-              <Badge className="bg-rose-500 hover:bg-rose-600">{newCount} new</Badge>
+              <Badge className="bg-rose-500 hover:bg-rose-600">
+                {t("admin.contact.newBadge").replace("{count}", String(newCount))}
+              </Badge>
             )}
           </h1>
           <p className="text-muted-foreground">
-            Messages submitted from the contact form.
+            {t("admin.contact.subtitle")}
           </p>
         </div>
       </div>
@@ -186,7 +183,7 @@ function AdminContactContent() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, email, content…"
+            placeholder={t("admin.contact.searchPlaceholder")}
             className="pl-9"
           />
         </div>
@@ -196,10 +193,10 @@ function AdminContactContent() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="read">Read</SelectItem>
-            <SelectItem value="resolved">Resolved</SelectItem>
+            <SelectItem value="all">{t("admin.contact.statusFilter.all")}</SelectItem>
+            <SelectItem value="new">{t("admin.contact.statusFilter.new")}</SelectItem>
+            <SelectItem value="read">{t("admin.contact.statusFilter.read")}</SelectItem>
+            <SelectItem value="resolved">{t("admin.contact.statusFilter.resolved")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -213,9 +210,9 @@ function AdminContactContent() {
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="p-10 text-center space-y-2">
-            <h2 className="font-semibold">No messages</h2>
+            <h2 className="font-semibold">{t("admin.contact.empty.title")}</h2>
             <p className="text-sm text-muted-foreground">
-              Nothing matches your current filters.
+              {t("admin.contact.empty.subtitle")}
             </p>
           </CardContent>
         </Card>
@@ -237,7 +234,7 @@ function AdminContactContent() {
                       {topicLabel(m.topic)}
                     </span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle(m.status)}`}>
-                      {m.status}
+                      {statusLabel(m.status)}
                     </span>
                     <span className="truncate font-semibold">{m.name}</span>
                     <span className="truncate text-xs text-muted-foreground">
@@ -258,7 +255,7 @@ function AdminContactContent() {
                     size="icon"
                     className="rounded-lg"
                     onClick={() => openMessage(m)}
-                    title="View"
+                    title={t("admin.contact.actions.view")}
                   >
                     <Eye size={16} />
                   </Button>
@@ -268,7 +265,7 @@ function AdminContactContent() {
                       size="icon"
                       className="rounded-lg text-blue-600 hover:text-blue-700"
                       onClick={() => setStatus(m.id, "resolved")}
-                      title="Mark as resolved"
+                      title={t("admin.contact.actions.markResolved")}
                     >
                       <CheckCircle2 size={16} />
                     </Button>
@@ -278,7 +275,7 @@ function AdminContactContent() {
                     size="icon"
                     className="rounded-lg text-red-600 hover:text-red-700"
                     onClick={() => setDeleting(m)}
-                    title="Delete"
+                    title={t("admin.contact.actions.delete")}
                   >
                     <Trash size={16} />
                   </Button>
@@ -300,12 +297,12 @@ function AdminContactContent() {
                     {topicLabel(viewing.topic)}
                   </span>
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyle(viewing.status)}`}>
-                    {viewing.status}
+                    {statusLabel(viewing.status)}
                   </span>
                 </div>
 
                 <DialogTitle className="mt-0 text-xl">
-                  Message from {viewing.name}
+                  {t("admin.contact.dialog.messageFrom").replace("{name}", viewing.name)}
                 </DialogTitle>
 
                 <div className="flex items-center gap-3">
@@ -321,7 +318,7 @@ function AdminContactContent() {
                       <span className="font-medium truncate">{viewing.name}</span>
                       {viewing.user_id && (
                         <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600">
-                          registered
+                          {t("admin.contact.dialog.registeredBadge")}
                         </span>
                       )}
                     </div>
@@ -344,7 +341,7 @@ function AdminContactContent() {
 
               <div className="p-6 space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Message
+                  {t("admin.contact.dialog.messageLabel")}
                 </p>
                 <div className="rounded-lg border bg-muted/30 p-4">
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -364,13 +361,13 @@ function AdminContactContent() {
                   }}
                 >
                   <Trash size={14} className="mr-1" />
-                  Delete
+                  {t("admin.contact.actions.delete")}
                 </Button>
 
-                <a href={`mailto:${viewing.email}?subject=Re: your message on ScripticX`}>
+                <a href={`mailto:${viewing.email}?subject=${encodeURIComponent(t("admin.contact.replySubject"))}`}>
                   <Button variant="outline" size="sm">
                     <Mail size={14} className="mr-1" />
-                    Reply by email
+                    {t("admin.contact.actions.reply")}
                   </Button>
                 </a>
 
@@ -383,7 +380,7 @@ function AdminContactContent() {
                     }}
                   >
                     <CheckCircle2 size={14} className="mr-1" />
-                    Mark resolved
+                    {t("admin.contact.actions.markResolved")}
                   </Button>
                 ) : (
                   <Button
@@ -394,7 +391,7 @@ function AdminContactContent() {
                       setViewing({ ...viewing, status: "read" });
                     }}
                   >
-                    Reopen
+                    {t("admin.contact.actions.reopen")}
                   </Button>
                 )}
               </div>
@@ -410,18 +407,18 @@ function AdminContactContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.contact.deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the message from "{deleting?.name}". This action cannot be undone.
+              {t("admin.contact.deleteDialog.description").replace("{name}", deleting?.name ?? "")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("admin.contact.deleteDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              {t("admin.contact.deleteDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

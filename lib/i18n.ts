@@ -938,6 +938,57 @@ export const translations = {
           },
         },
       },
+
+      contact: {
+        title: "Contact messages",
+        subtitle: "Messages submitted from the contact form.",
+        newBadge: "{count} new",
+        searchPlaceholder: "Search name, email, content…",
+        statusFilter: {
+          all: "All statuses",
+          new: "New",
+          read: "Read",
+          resolved: "Resolved",
+        },
+        empty: {
+          title: "No messages",
+          subtitle: "Nothing matches your current filters.",
+        },
+        topics: {
+          bug: "Bug",
+          feature: "Feature",
+          account: "Account",
+          feedback: "Feedback",
+          other: "Other",
+        },
+        statuses: {
+          new: "new",
+          read: "read",
+          resolved: "resolved",
+        },
+        actions: {
+          view: "View",
+          markResolved: "Mark as resolved",
+          delete: "Delete",
+          reply: "Reply by email",
+          reopen: "Reopen",
+        },
+        dialog: {
+          messageFrom: "Message from {name}",
+          registeredBadge: "registered",
+          messageLabel: "Message",
+        },
+        deleteDialog: {
+          title: "Delete this message?",
+          description: "This will permanently remove the message from \"{name}\". This action cannot be undone.",
+          cancel: "Cancel",
+          confirm: "Delete",
+        },
+        toast: {
+          deleted: "Message deleted",
+        },
+        replySubject: "Re: your message on ScripticX",
+      },
     },
 
     login: {
@@ -1003,6 +1054,13 @@ export const translations = {
 
     common: {
       viewAll: "View all",
+    },
+
+    updates: {
+      empty: {
+        title: "No updates yet",
+        subtitle: "Check back soon for the latest changes.",
+      },
     },
 
     notFound: {
@@ -1951,6 +2009,57 @@ export const translations = {
           },
         },
       },
+
+      contact: {
+        title: "Mesaje de contact",
+        subtitle: "Mesaje trimise din formularul de contact.",
+        newBadge: "{count} noi",
+        searchPlaceholder: "Caută nume, email, conținut…",
+        statusFilter: {
+          all: "Toate stările",
+          new: "Noi",
+          read: "Citite",
+          resolved: "Rezolvate",
+        },
+        empty: {
+          title: "Niciun mesaj",
+          subtitle: "Nimic nu corespunde filtrelor curente.",
+        },
+        topics: {
+          bug: "Bug",
+          feature: "Funcționalitate",
+          account: "Cont",
+          feedback: "Feedback",
+          other: "Altele",
+        },
+        statuses: {
+          new: "nou",
+          read: "citit",
+          resolved: "rezolvat",
+        },
+        actions: {
+          view: "Vezi",
+          markResolved: "Marchează ca rezolvat",
+          delete: "Șterge",
+          reply: "Răspunde prin email",
+          reopen: "Redeschide",
+        },
+        dialog: {
+          messageFrom: "Mesaj de la {name}",
+          registeredBadge: "înregistrat",
+          messageLabel: "Mesaj",
+        },
+        deleteDialog: {
+          title: "Ștergi acest mesaj?",
+          description: "Acest mesaj de la \"{name}\" va fi șters definitiv. Acțiunea nu poate fi anulată.",
+          cancel: "Anulează",
+          confirm: "Șterge",
+        },
+        toast: {
+          deleted: "Mesaj șters",
+        },
+        replySubject: "Re: mesajul tău pe ScripticX",
+      },
     },
 
     login: {
@@ -2016,6 +2125,13 @@ export const translations = {
 
     common: {
       viewAll: "Vezi tot",
+    },
+
+    updates: {
+      empty: {
+        title: "Nicio actualizare încă",
+        subtitle: "Revino în curând pentru cele mai noi modificări.",
+      },
     },
 
     notFound: {

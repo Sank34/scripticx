@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createServerSupabase } from "@/lib/supabaseServer";
+import { UpdatesEmptyState } from "./empty-state";
 
 export default async function UpdatesIndex() {
   const supabase = createServerSupabase();
@@ -15,14 +16,7 @@ export default async function UpdatesIndex() {
   const slug = (data as { slug: string } | null)?.slug;
 
   if (!slug) {
-    return (
-      <div className="max-w-2xl space-y-3 py-12 text-center">
-        <h1 className="text-2xl font-semibold text-zinc-900">No updates yet</h1>
-        <p className="text-sm text-zinc-500">
-          Check back soon for the latest changes.
-        </p>
-      </div>
-    );
+    return <UpdatesEmptyState />;
   }
 
   redirect(`/updates/${slug}`);

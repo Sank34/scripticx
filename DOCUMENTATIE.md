@@ -14,7 +14,7 @@
 
 ### Descriere
 
-ScripticX este o platformă educațională web destinată elevilor și începătorilor care doresc să învețe programarea într-un mod gradual, interactiv și accesibil. În centrul platformei se află **MiniScript+ (MSP)** — un limbaj de programare original, conceput special pentru educație: sintaxă curată, mesaje de eroare clare în limba utilizatorului și o curbă de învățare blândă.
+ScripticX este o platformă educațională web pentru elevi și începători care vor să înțeleagă programarea pas cu pas, fără să se lovească de bariere tehnice inutile. În centrul platformei se află **MiniScript+ (MSP)** — un limbaj de programare original, gândit de la zero pentru educație: sintaxă minimă, mesaje de eroare clare în limba utilizatorului și o curbă de învățare blândă.
 
 ### Public-țintă
 
@@ -158,7 +158,11 @@ scripticx/
 │   └── LanguageProvider.tsx
 ├── lib/                    # Logica de bază
 │   ├── engine.ts           # Interpretorul MiniScript+ (MSP)
+│   ├── msp-parser.ts       # Parser AST avansat pentru MSP
+│   ├── msp-visualizer.ts   # Generare diagrame AST și flowchart
+│   ├── complexity-analyzer.ts  # Analiză complexitate timp/spațiu
 │   ├── i18n.ts             # Sistem de traduceri RO/EN
+│   ├── getLocalized.ts     # Citire conținut multilingv din BD
 │   ├── supabase.ts         # Client Supabase (browser)
 │   ├── supabaseServer.ts   # Client Supabase (server)
 │   ├── achievements.ts     # Logică realizări
@@ -172,14 +176,14 @@ scripticx/
 
 #### Motorul MiniScript+ (`lib/engine.ts`)
 
-Componenta-vedetă a proiectului — un **interpretor complet** scris în TypeScript pentru limbajul propriu MSP. Include:
+Inima proiectului — un **interpretor** scris în TypeScript, care execută cod MSP direct în browser, fără niciun server implicat. Include:
 
 - **Lexer** — împarte codul sursă în tokeni
 - **Parser** — construiește arborele sintactic (AST)
-- **Evaluator** — execută AST-ul cu suport pentru variabile, funcții, condiții, bucle, operatori (inclusiv `%`), tipuri de date
+- **Evaluator** — execută AST-ul cu suport pentru variabile, condiții (`IF/ELSE`), bucle (`WHILE`), intrare/ieșire (`INPUT/PRINT`), operatori aritmetici (inclusiv `%`) și tipuri de date (numere, șiruri, boolean)
 - **Mesaje de eroare** prietenoase, localizate
 
-Rularea se face complet **în browser**, fără server, ceea ce garantează viteză și siguranță (codul utilizatorului nu părăsește dispozitivul).
+Codul utilizatorului rulează **exclusiv în browser** — nu ajunge niciodată pe vreun server, ceea ce garantează atât viteză, cât și confidențialitate.
 
 #### Sistemul de traduceri (`lib/i18n.ts`)
 
@@ -230,7 +234,7 @@ Limbajele existente (Python, JavaScript, Scratch) prezintă fiecare un compromis
 - **JavaScript** — disponibil în browser, dar plin de „gotchas" (`==` vs `===`, `this`, hoisting)
 - **Scratch** — accesibil, dar nu pregătește tranziția spre programare reală
 
-**MiniScript+** este conceput special pentru context educațional în limba română: sintaxă minimă, mesaje de eroare clare și localizate, fără configurare, rulare instant în browser.
+**MiniScript+** este conceput special pentru context educațional: sintaxă minimă, mesaje de eroare clare și localizate, zero configurare, rulare instant în browser. Un elev poate scrie primul program în primele minute.
 
 ---
 
