@@ -180,7 +180,7 @@ function AdminUpdatesContent() {
       )}
 
       <Dialog open={openForm} onOpenChange={setOpenForm}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Edit update" : "New update"}

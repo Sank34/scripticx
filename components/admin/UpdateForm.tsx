@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -282,19 +283,21 @@ export function UpdateForm({ initialData, onSaved }: Props) {
               onChange={(e) => updateContent(activeLang, e.target.value)}
               placeholder={"# Heading\n\nWrite your update in **Markdown**…"}
               rows={16}
-              className="font-mono text-sm"
+              className="font-mono text-sm field-sizing-fixed max-h-[400px]"
             />
           </TabsContent>
           <TabsContent value="preview">
-            <div className="min-h-[16rem] rounded-lg border border-input p-4">
-              {contentI18n[activeLang]?.trim() ? (
-                <Markdown>{contentI18n[activeLang]}</Markdown>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nothing to preview yet.
-                </p>
-              )}
-            </div>
+            <ScrollArea className="h-[400px] rounded-lg border border-input">
+              <div className="p-4">
+                {contentI18n[activeLang]?.trim() ? (
+                  <Markdown>{contentI18n[activeLang]}</Markdown>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nothing to preview yet.
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </div>
