@@ -249,7 +249,7 @@ export default function LiveRoomPage() {
       tokenizer: {
         root: [
           [/#.*/, "comment"],
-          [/\b(IF|THEN|ELSE|END|WHILE|PRINT|INPUT)\b/, "keyword"],
+          [/\b(IF|THEN|ELSE|END|WHILE|PRINT|INPUT|DIV|MOD|TRUE|FALSE|INT|TRUNC|FLOOR|ROUND|ABS)\b/, "keyword"],
           [/\b(true|false)\b/, "constant"],
           [/[0-9]+/, "number"],
           [/".*?"/, "string"],

@@ -8,9 +8,11 @@ export type StepResult = {
 type ASTNode =
   | { type: "number"; value: number }
   | { type: "string"; value: string }
+  | { type: "boolean"; value: boolean }
   | { type: "variable"; name: string }
   | { type: "binary"; operator: string; left: ASTNode; right: ASTNode }
-  | { type: "unary"; operator: string; value: ASTNode };
+  | { type: "unary"; operator: string; value: ASTNode }
+  | { type: "call"; name: string; args: ASTNode[] };
 
 type Value = string | number | boolean;
 
@@ -67,7 +69,7 @@ function tokenize(expr: string): string[] {
       }
     }
 
-    if ("+-*/%()<>".includes(c)) {
+    if ("+-*/%()<>,".includes(c)) {
       tokens.push(c);
       i++;
       continue;
@@ -147,6 +149,10 @@ function parseExpression(tokens: string[]): ASTNode {
       return node;
     }
 
+    if (token === undefined) {
+      throw new Error("Missing expression");
+    }
+
     pos++;
 
     if (!isNaN(Number(token))) {
@@ -155,6 +161,41 @@ function parseExpression(tokens: string[]): ASTNode {
 
     if (token.startsWith('"') && token.endsWith('"')) {
       return { type: "string", value: token.slice(1, -1) };
+    }
+
+    if (token.toUpperCase() === "TRUE") {
+      return { type: "boolean", value: true };
+    }
+
+    if (token.toUpperCase() === "FALSE") {
+      return { type: "boolean", value: false };
+    }
+
+    if (tokens[pos] === "(") {
+      pos++;
+
+      const args: ASTNode[] = [];
+
+      if (tokens[pos] !== ")") {
+        while (true) {
+          args.push(parseOr());
+
+          if (tokens[pos] !== ",") break;
+          pos++;
+        }
+      }
+
+      if (tokens[pos] !== ")") {
+        throw new Error("Missing closing parenthesis");
+      }
+
+      pos++;
+
+      return {
+        type: "call",
+        name: token,
+        args,
+      };
     }
 
     return { type: "variable", name: token };
@@ -169,13 +210,28 @@ function parseExpression(tokens: string[]): ASTNode {
         value: parseUnary(),
       };
     }
+
+    if (tokens[pos] === "-") {
+      pos++;
+      return {
+        type: "unary",
+        operator: "-",
+        value: parseUnary(),
+      };
+    }
+
+    if (tokens[pos] === "+") {
+      pos++;
+      return parseUnary();
+    }
+
     return parsePrimary();
   }
 
   function parseMulDiv(): ASTNode {
     let node = parseUnary();
 
-    while (tokens[pos] === "*" || tokens[pos] === "/" || tokens[pos] === "%") {
+    while (["*", "/", "%", "DIV", "MOD"].includes(tokens[pos]?.toUpperCase())) {
       const op = tokens[pos++];
       const right = parseUnary();
       node = { type: "binary", operator: op, left: node, right };
@@ -237,9 +293,64 @@ function parseExpression(tokens: string[]): ASTNode {
   return parseOr();
 }
 
+function asNumber(value: Value, operator: string) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    throw new Error(`Operator ${operator} can only be used with numbers`);
+  }
+
+  return value;
+}
+
+function requireArity(name: string, args: Value[], count: number) {
+  if (args.length !== count) {
+    throw new Error(`${name} expects ${count} argument${count === 1 ? "" : "s"}`);
+  }
+}
+
+function evaluateFunctionCall(name: string, args: Value[]): Value {
+  const fn = name.toUpperCase();
+
+  switch (fn) {
+    case "INT":
+    case "TRUNC":
+      requireArity(fn, args, 1);
+      return Math.trunc(asNumber(args[0], fn));
+
+    case "FLOOR":
+      requireArity(fn, args, 1);
+      return Math.floor(asNumber(args[0], fn));
+
+    case "ROUND":
+      if (args.length !== 1 && args.length !== 2) {
+        throw new Error("ROUND expects 1 or 2 arguments");
+      }
+
+      if (args.length === 1) {
+        return Math.round(asNumber(args[0], fn));
+      }
+
+      const decimals = asNumber(args[1], fn);
+
+      if (!Number.isInteger(decimals) || decimals < 0) {
+        throw new Error("ROUND decimals must be a non-negative integer");
+      }
+
+      const factor = 10 ** decimals;
+      return Math.round(asNumber(args[0], fn) * factor) / factor;
+
+    case "ABS":
+      requireArity(fn, args, 1);
+      return Math.abs(asNumber(args[0], fn));
+
+    default:
+      throw new Error(`Unknown function "${name}"`);
+  }
+}
+
 function evalAST(node: ASTNode): Value {
   if (node.type === "number") return node.value;
   if (node.type === "string") return node.value;
+  if (node.type === "boolean") return node.value;
 
   if (node.type === "variable") {
     if (variables.hasOwnProperty(node.name)) {
@@ -251,49 +362,66 @@ function evalAST(node: ASTNode): Value {
   if (node.type === "unary") {
     const val = evalAST(node.value);
     if (node.operator === "NOT") return !val;
+    if (node.operator === "-") {
+      if (typeof val !== "number") {
+        throw new Error("Unary minus can only be used with numbers");
+      }
+      return -val;
+    }
+  }
+
+  if (node.type === "call") {
+    return evaluateFunctionCall(node.name, node.args.map(evalAST));
   }
 
   if (node.type === "binary") {
-    console.log("EVAL:", node.operator, node.left, node.right);
     const left = evalAST(node.left);
     const right = evalAST(node.right);
+    const operator = node.operator.toUpperCase();
 
-    switch (node.operator) {
+    switch (operator) {
       case "+":
         if (typeof left === "string" || typeof right === "string") {
           return String(left) + String(right);
         }
-        return (left as number) + (right as number);
+        return asNumber(left, "+") + asNumber(right, "+");
 
       case "-":
-        return (left as number) - (right as number);
+        return asNumber(left, "-") - asNumber(right, "-");
 
       case "*":
-        return (left as number) * (right as number);
+        return asNumber(left, "*") * asNumber(right, "*");
 
       case "/":
-        if ((right as number) === 0) {
+        if (asNumber(right, "/") === 0) {
           throw new Error("Division by zero is not allowed");
         }
-        return (left as number) / (right as number);
+        return asNumber(left, "/") / asNumber(right, "/");
+
+      case "DIV":
+        if (asNumber(right, "DIV") === 0) {
+          throw new Error("Division by zero is not allowed");
+        }
+        return Math.trunc(asNumber(left, "DIV") / asNumber(right, "DIV"));
 
       case "%":
-        if ((right as number) === 0) {
+      case "MOD":
+        if (asNumber(right, operator) === 0) {
           throw new Error("Modulo by zero is not allowed");
         }
-        return (left as number) % (right as number);
+        return asNumber(left, operator) % asNumber(right, operator);
 
       case ">":
-        return left > right;
+        return asNumber(left, ">") > asNumber(right, ">");
 
       case "<":
-        return left < right;
+        return asNumber(left, "<") < asNumber(right, "<");
 
       case ">=":
-        return left >= right;
+        return asNumber(left, ">=") >= asNumber(right, ">=");
 
       case "<=":
-        return left <= right;
+        return asNumber(left, "<=") <= asNumber(right, "<=");
 
       case "==":
         return left === right;

@@ -45,30 +45,40 @@ export function Topbar() {
   const [profile, setProfile] = useState<TopbarProfile | null>(null);
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase.auth.getSession();
+    let active = true;
 
-      const currentUser = data.session?.user ?? null;
-
-      setUser(currentUser);
-
-      if (!currentUser) return;
-
+    async function loadProfile(currentUser: SupabaseUser) {
       const { data: profileData } = await supabase
         .from("profiles")
         .select("username, avatar_url")
         .eq("id", currentUser.id)
         .maybeSingle<TopbarProfile>();
 
+      if (!active) return;
+
       setProfile(profileData);
     }
 
-    load();
+    async function load() {
+      const { data } = await supabase.auth.getSession();
+
+      const currentUser = data.session?.user ?? null;
+
+      if (!active) return;
+
+      setUser(currentUser);
+
+      if (!currentUser) return;
+
+      await loadProfile(currentUser);
+    }
+
+    void load();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         const currentUser = session?.user ?? null;
 
         setUser(currentUser);
@@ -78,17 +88,16 @@ export function Topbar() {
           return;
         }
 
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("username, avatar_url")
-          .eq("id", currentUser.id)
-          .maybeSingle<TopbarProfile>();
-
-        setProfile(profileData);
+        window.setTimeout(() => {
+          void loadProfile(currentUser);
+        }, 0);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function logout() {

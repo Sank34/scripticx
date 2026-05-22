@@ -150,16 +150,7 @@ export function AppSidebar() {
 
     let active = true;
 
-    async function load() {
-      const { data } = await supabase.auth.getSession();
-      const currentUser = data.session?.user ?? null;
-
-      if (!active) return;
-
-      setUser(currentUser);
-
-      if (!currentUser) return;
-
+    async function loadRole(currentUser: User) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
@@ -171,7 +162,20 @@ export function AppSidebar() {
       setRole(profile?.role || "user");
     }
 
-    load();
+    async function load() {
+      const { data } = await supabase.auth.getSession();
+      const currentUser = data.session?.user ?? null;
+
+      if (!active) return;
+
+      setUser(currentUser);
+
+      if (!currentUser) return;
+
+      await loadRole(currentUser);
+    }
+
+    void load();
 
     const {
       data: { subscription },
@@ -185,14 +189,9 @@ export function AppSidebar() {
         return;
       }
 
-      supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", currentUser.id)
-        .maybeSingle<SidebarProfile>()
-        .then(({ data }) => {
-          setRole(data?.role || "user");
-        });
+      window.setTimeout(() => {
+        void loadRole(currentUser);
+      }, 0);
     });
 
     return () => {

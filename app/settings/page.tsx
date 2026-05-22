@@ -81,12 +81,13 @@ function SettingsContent() {
 
   useEffect(() => {
     if (!user) return;
+    const userId = user.id;
 
     async function loadProfile() {
       const { data } = await supabase
         .from("profiles")
         .select("username, avatar_url, bio, github, twitter, website")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
 
       if (data?.username) setUsername(data.username);

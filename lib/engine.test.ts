@@ -119,6 +119,148 @@ C = A % B
     expect(() => step(program)).toThrow("Modulo by zero is not allowed");
   });
 
+  it("supports unary minus for negative literals and variables", () => {
+    const negativeLiteral = compile(`
+N = -5
+PRINT (-1) * N
+`);
+
+    expect(step(negativeLiteral)).toMatchObject({
+      variables: { N: -5 },
+    });
+    expect(step(negativeLiteral)).toMatchObject({
+      output: 5,
+    });
+
+    reset();
+
+    const negativeVariable = compile(`
+N = 7
+PRINT -N
+`);
+
+    expect(step(negativeVariable)).toMatchObject({
+      variables: { N: 7 },
+    });
+    expect(step(negativeVariable)).toMatchObject({
+      output: -7,
+    });
+  });
+
+  it("supports integer division and MOD alias for digit algorithms", () => {
+    const program = compile(`
+N = 123
+CIF = N MOD 10
+N = N DIV 10
+PRINT CIF
+PRINT N
+`);
+
+    step(program);
+    expect(step(program)).toMatchObject({
+      variables: { N: 123, CIF: 3 },
+    });
+    expect(step(program)).toMatchObject({
+      variables: { N: 12, CIF: 3 },
+    });
+    expect(step(program)).toMatchObject({
+      output: 3,
+    });
+    expect(step(program)).toMatchObject({
+      output: 12,
+    });
+  });
+
+  it("supports numeric helper functions", () => {
+    const program = compile(`
+A = INT(7.9)
+B = FLOOR(-1.2)
+C = ROUND(2.6)
+D = ABS(-5)
+PRINT A + B + C + D
+`);
+
+    step(program);
+    step(program);
+    step(program);
+    step(program);
+
+    expect(step(program)).toMatchObject({
+      output: 13,
+      variables: {
+        A: 7,
+        B: -2,
+        C: 3,
+        D: 5,
+      },
+    });
+  });
+
+  it("supports ROUND with decimal places", () => {
+    const program = compile(`
+A = ROUND(3.14159, 2)
+B = ROUND(12.345, 1)
+C = ROUND(12.345, 0)
+PRINT A
+PRINT B
+PRINT C
+`);
+
+    step(program);
+    step(program);
+    step(program);
+
+    expect(step(program)).toMatchObject({
+      output: 3.14,
+    });
+    expect(step(program)).toMatchObject({
+      output: 12.3,
+    });
+    expect(step(program)).toMatchObject({
+      output: 12,
+    });
+  });
+
+  it("throws when ROUND receives invalid decimal places", () => {
+    const program = compile(`
+PRINT ROUND(3.14159, 1.5)
+`);
+
+    expect(() => step(program)).toThrow(
+      "ROUND decimals must be a non-negative integer"
+    );
+  });
+
+  it("supports boolean literals in conditions", () => {
+    const program = compile(`
+OK = TRUE
+IF OK == TRUE THEN
+PRINT "yes"
+ELSE
+PRINT "no"
+END
+`);
+
+    let lastOutput = null;
+    let current = step(program);
+    while (current) {
+      if (current.output !== null) lastOutput = current.output;
+      current = step(program);
+    }
+
+    expect(lastOutput).toBe("yes");
+  });
+
+  it("throws readable errors when numeric operators receive non-numbers", () => {
+    const program = compile(`
+TEXT = "abc"
+PRINT TEXT - 1
+`);
+
+    step(program);
+    expect(() => step(program)).toThrow("Operator - can only be used with numbers");
+  });
+
   it("throws a readable error for missing THEN", () => {
     const program = compile(`
 IF X > 0

@@ -1,51 +1,100 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
+type AuthProfile = {
+  id: string;
+  role?: string | null;
+  banned?: boolean | null;
+  [key: string]: unknown;
+};
+
+const AUTH_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error("Auth request timed out"));
+    }, timeoutMs);
+
+    promise
+      .then(resolve, reject)
+      .finally(() => window.clearTimeout(timeout));
+  });
+}
+
 export function useAuth() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const hasLoaded = useRef(false);
 
-  async function load() {
-    const { data } = await supabase.auth.getUser();
-    const currentUser = data.user;
-
-    setUser(currentUser);
-
-    if (!currentUser) {
-      setProfile(null);
-      setLoading(false);
-      return;
+  const load = useCallback(async (showLoading = false) => {
+    if (showLoading || !hasLoaded.current) {
+      setLoading(true);
     }
+    setError(null);
 
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", currentUser.id)
-      .single();
+    try {
+      const { data } = await withTimeout(
+        supabase.auth.getSession(),
+        AUTH_TIMEOUT_MS
+      );
 
-    setProfile(profileData || null);
-    setLoading(false);
-  }
+      const currentUser = data.session?.user ?? null;
+
+      setUser(currentUser);
+
+      if (!currentUser) {
+        setProfile(null);
+        return;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", currentUser.id)
+        .maybeSingle<AuthProfile>();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      setProfile(profileData || null);
+    } catch (err) {
+      console.error("Auth load failed:", err);
+      setUser(null);
+      setProfile(null);
+      setError(err instanceof Error ? err.message : "Auth load failed");
+    } finally {
+      hasLoaded.current = true;
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    load();
+    void load(true);
 
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      load();
+      window.setTimeout(() => {
+        void load(false);
+      }, 0);
     });
 
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [load]);
 
   return {
     user,
     profile,
     loading,
+    error,
+    reload: load,
     isAdmin: profile?.role === "admin",
     isBanned: profile?.banned === true,
   };

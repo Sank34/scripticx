@@ -405,7 +405,11 @@ function ProfileContent() {
     ? Math.round((stats.solved / stats.total) * 100)
     : 0;
 
-  const initial = (username || user.email || "U")[0]?.toUpperCase();
+  if (!user) return null;
+
+  const email = user.email || "";
+  const displayName = username || email.split("@")[0] || "User";
+  const initial = (displayName || "U")[0]?.toUpperCase();
 
   const handleShare = () => {
     const url = `${window.location.origin}/u/${username || user.id}`;
@@ -425,9 +429,9 @@ function ProfileContent() {
 
           <div>
             <h1 className="text-2xl font-bold">
-              {username || user.email.split("@")[0]}
+              {displayName}
             </h1>
-            <p className="text-muted-foreground">{user.email}</p>
+            <p className="text-muted-foreground">{email}</p>
 
             <div className="flex gap-4 mt-1 text-sm">
               <span><b>{followers}</b> {t("profile.followers")}</span>

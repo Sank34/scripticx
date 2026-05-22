@@ -71,76 +71,80 @@ function FeedContent() {
   };
 
   async function fetchFeedData(): Promise<FeedData> {
-    const { data } = await supabase
+    const { data: postsData } = await supabase
       .from("posts")
       .select("*")
       .order("created_at", { ascending: false });
 
-    const postsWithProfiles = await Promise.all(
-      (data || []).map(async (p) => {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("username, avatar_url")
-          .eq("id", p.user_id)
-          .maybeSingle();
-
-        return {
-          ...p,
-          profiles: profile,
-        };
-      })
-    );
-
-    const postIds = (data || []).map((p) => p.id);
+    const postsDataSafe = postsData || [];
+    const postIds = postsDataSafe.map((p) => p.id);
+    const authorIds = [
+      ...new Set(postsDataSafe.map((p) => p.user_id).filter(Boolean)),
+    ];
 
     const commentCounts: Record<string, number> = {};
-
-    if (postIds.length) {
-      const { data: commentsData } = await supabase
-        .from("comments")
-        .select("post_id")
-        .in("post_id", postIds);
-
-      commentsData?.forEach((c: any) => {
-        commentCounts[c.post_id] =
-          (commentCounts[c.post_id] || 0) + 1;
-      });
-    }
-
-    const postIdsForLikes = postIds;
-    // likes and liked
     const likes: Record<string, number> = {};
     const liked: Record<string, boolean> = {};
 
-    if (user && postIdsForLikes.length) {
-      const { data: likesData } = await supabase
-        .from("post_likes")
-        .select("post_id, user_id")
-        .in("post_id", postIdsForLikes);
+    const [
+      { data: profilesData },
+      { data: commentsData },
+      { data: likesData },
+      { data: followingData },
+      { data: usersData },
+    ] = await Promise.all([
+      authorIds.length
+        ? supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .in("id", authorIds)
+        : Promise.resolve({ data: [] }),
+      postIds.length
+        ? supabase
+            .from("comments")
+            .select("post_id")
+            .in("post_id", postIds)
+        : Promise.resolve({ data: [] }),
+      postIds.length
+        ? supabase
+            .from("post_likes")
+            .select("post_id, user_id")
+            .in("post_id", postIds)
+        : Promise.resolve({ data: [] }),
+      supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", user?.id),
+      supabase
+        .from("profiles")
+        .select("id, username, avatar_url")
+        .neq("id", user?.id),
+    ]);
 
-      likesData?.forEach((l: any) => {
-        likes[l.post_id] = (likes[l.post_id] || 0) + 1;
-        if (l.user_id === user?.id) {
-          liked[l.post_id] = true;
-        }
-      });
-    }
+    const profileMap = new Map(
+      (profilesData || []).map((profile: any) => [profile.id, profile])
+    );
 
-    // following
-    const { data: followingData } = await supabase
-      .from("follows")
-      .select("following_id")
-      .eq("follower_id", user?.id);
+    const postsWithProfiles = postsDataSafe.map((post) => ({
+      ...post,
+      profiles: profileMap.get(post.user_id) || null,
+    }));
+
+    commentsData?.forEach((comment: any) => {
+      commentCounts[comment.post_id] =
+        (commentCounts[comment.post_id] || 0) + 1;
+    });
+
+    likesData?.forEach((like: any) => {
+      likes[like.post_id] = (likes[like.post_id] || 0) + 1;
+      if (like.user_id === user?.id) {
+        liked[like.post_id] = true;
+      }
+    });
 
     const followingSet = new Set(
       (followingData || []).map((f: any) => f.following_id)
     );
-
-    // suggested users
-    const { data: usersData } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url")
-      .neq("id", user?.id);
 
     const filtered =
       (usersData || [])

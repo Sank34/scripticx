@@ -4,6 +4,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
+nextjs-portal {
+  display: none;
+}
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
