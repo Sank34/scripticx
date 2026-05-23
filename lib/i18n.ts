@@ -28,6 +28,20 @@ export const translations = {
       open: "Open mobile navigation",
     },
 
+    command: {
+      title: "Command menu",
+      description: "Search pages, live sessions and profiles.",
+      placeholder: "Type a command or search...",
+      open: "Open command menu",
+      empty: "No results found.",
+      untitledSession: "Untitled session",
+      groups: {
+        navigation: "Navigation",
+        liveSessions: "Live sessions",
+        participants: "Session participants",
+      },
+    },
+
     learn: {
       docs: "Docs",
       pages: {
@@ -1100,6 +1114,20 @@ export const translations = {
       title: "Navigare mobilă",
       subtitle: "Navigarea platformei",
       open: "Deschide navigarea mobilă",
+    },
+
+    command: {
+      title: "Meniu de comenzi",
+      description: "Caută pagini, sesiuni live și profiluri.",
+      placeholder: "Scrie o comandă sau caută...",
+      open: "Deschide meniul de comenzi",
+      empty: "Nu s-au găsit rezultate.",
+      untitledSession: "Sesiune fără titlu",
+      groups: {
+        navigation: "Navigare",
+        liveSessions: "Sesiuni live",
+        participants: "Participanți în sesiuni",
+      },
     },
 
     learn: {

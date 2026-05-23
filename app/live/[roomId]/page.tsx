@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
   type UIEvent,
 } from "react";
-import Editor, { type OnMount, useMonaco } from "@monaco-editor/react";
+import type { OnMount } from "@monaco-editor/react";
 import { useParams, useRouter } from "next/navigation";
 
 import { api, type LiveMessage, type LiveRoom, type ProfileSummary } from "@/lib/api";
@@ -26,6 +26,10 @@ import {
   analyzeMiniScriptComplexity,
   type ComplexityAnalysis,
 } from "@/lib/complexity-analyzer";
+import { ComplexityAnalyzerCard } from "@/components/editor/ComplexityAnalyzerCard";
+import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
+import { DebuggerStateCard } from "@/components/live/DebuggerStateCard";
+import { LiveConsolePanel } from "@/components/live/LiveConsolePanel";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -45,8 +49,6 @@ import { useLanguage } from "@/components/LanguageProvider";
 
 import {
   CheckCircle2,
-  Gauge,
-  Lightbulb,
   LogOut,
   MessageSquare,
   Play,
@@ -113,74 +115,21 @@ function getMessageTime(message: LiveMessage) {
   });
 }
 
+function getMessageKey(message: LiveMessage) {
+  if (message.id) return message.id;
+
+  return [
+    getMessageUserId(message),
+    message.created_at || message.createdAt || "",
+    message.text,
+  ].join(":");
+}
+
 function getUserColor(id: string) {
   const colors = ["#16a34a", "#2563eb", "#dc2626", "#9333ea", "#0891b2", "#ea580c"];
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash += id.charCodeAt(i);
   return colors[hash % colors.length];
-}
-
-function getScoreColor(score: number) {
-  if (score >= 85) return "text-emerald-500";
-  if (score >= 65) return "text-lime-500";
-  if (score >= 40) return "text-amber-500";
-  return "text-red-500";
-}
-
-function getStrokeColor(score: number) {
-  if (score >= 85) return "#10b981";
-  if (score >= 65) return "#84cc16";
-  if (score >= 40) return "#f59e0b";
-  return "#ef4444";
-}
-
-function ComplexityCircle({
-  label,
-  score,
-}: {
-  label: string;
-  score: number;
-}) {
-  const radius = 42;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-  const strokeColor = getStrokeColor(score);
-
-  return (
-    <div className="relative flex h-24 w-24 items-center justify-center">
-      <svg className="h-24 w-24 -rotate-90" viewBox="0 0 100 100">
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          stroke="currentColor"
-          strokeWidth="8"
-          fill="transparent"
-          className="text-zinc-100"
-        />
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          stroke={strokeColor}
-          strokeWidth="8"
-          fill="transparent"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-500"
-        />
-      </svg>
-      <div className="absolute text-center">
-        <div className={`text-xl font-bold ${getScoreColor(score)}`}>
-          {score}%
-        </div>
-        <div className="text-[9px] uppercase tracking-wide text-zinc-500">
-          {label}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 const MSP_TOKEN_PATTERN =
@@ -222,7 +171,6 @@ export default function LiveRoomPage() {
   const { roomId } = useParams() as { roomId: string };
   const router = useRouter();
   const { t, locale } = useLanguage();
-  const monaco = useMonaco();
 
   const [loading, setLoading] = useState(true);
   const [room, setRoom] = useState<LiveRoom | null>(null);
@@ -263,6 +211,7 @@ export default function LiveRoomPage() {
   const userRef = useRef<any>(null);
   const isChatVisibleRef = useRef(false);
   const currentProfileRef = useRef<ProfileSummary | null>(null);
+  const messageKeysRef = useRef<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const isOwner = Boolean(room && user?.id === room.owner_id);
@@ -436,47 +385,6 @@ export default function LiveRoomPage() {
   }, [allParticipants, isClosed, participants, profilesMap]);
 
   useEffect(() => {
-    if (!monaco) return;
-
-    if (!monaco.languages.getLanguages().some((language) => language.id === "miniscriptplus")) {
-      monaco.languages.register({ id: "miniscriptplus" });
-    }
-
-    monaco.languages.setMonarchTokensProvider("miniscriptplus", {
-      tokenizer: {
-        root: [
-          [/#.*/, "comment"],
-          [/\b(IF|THEN|ELSE|END|WHILE|PRINT|INPUT|DIV|MOD|TRUE|FALSE|INT|TRUNC|FLOOR|ROUND|ABS)\b/, "keyword"],
-          [/\b(true|false)\b/, "constant"],
-          [/[0-9]+/, "number"],
-          [/".*?"/, "string"],
-          [/<=|>=|==|!=|<|>/, "operator"],
-          [/[a-zA-Z_][a-zA-Z0-9_]*/, "identifier"],
-        ],
-      },
-    });
-
-    monaco.editor.defineTheme("miniscriptplusTheme", {
-      base: "vs",
-      inherit: true,
-      rules: [
-        { token: "comment", foreground: "6A9955", fontStyle: "italic" },
-        { token: "keyword", foreground: "7c3aed", fontStyle: "bold" },
-        { token: "number", foreground: "0f766e" },
-        { token: "string", foreground: "b45309" },
-        { token: "operator", foreground: "27272a" },
-        { token: "constant", foreground: "2563eb" },
-      ],
-      colors: {
-        "editor.background": "#ffffff",
-        "editorLineNumber.foreground": "#a1a1aa",
-        "editorCursor.foreground": "#18181b",
-        "editor.selectionBackground": "#dcfce7",
-      },
-    });
-  }, [monaco]);
-
-  useEffect(() => {
     async function init() {
       try {
         const { data } = await api.auth.getSession();
@@ -503,6 +411,7 @@ export default function LiveRoomPage() {
 
         setRoom(roomData);
         setCode(roomData.code || "");
+        messageKeysRef.current = new Set(chatData.map(getMessageKey));
         setMessages(chatData);
         setUsers(profileList);
         setLoading(false);
@@ -563,16 +472,12 @@ export default function LiveRoomPage() {
           const incoming = payload.payload as LiveMessage | undefined;
           if (!incoming) return;
 
-          setMessages((prev) => {
-            const exists = prev.some(
-              (item) =>
-                (item.id && incoming.id && item.id === incoming.id) ||
-                ((item.created_at || item.createdAt) === (incoming.created_at || incoming.createdAt) &&
-                  getMessageUserId(item) === getMessageUserId(incoming))
-            );
+          const messageKey = getMessageKey(incoming);
 
-            return exists ? prev : [...prev, incoming];
-          });
+          if (messageKeysRef.current.has(messageKey)) return;
+
+          messageKeysRef.current.add(messageKey);
+          setMessages((prev) => [...prev, incoming]);
 
           if (getMessageUserId(incoming) !== currentUser.id && !isChatVisibleRef.current) {
             setUnreadMessages((count) => count + 1);
@@ -699,6 +604,16 @@ export default function LiveRoomPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!isChatVisible) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isChatVisible]);
 
   useEffect(() => {
     let raf: number;
@@ -997,6 +912,7 @@ export default function LiveRoomPage() {
       payload: outgoing,
     });
 
+    messageKeysRef.current.add(getMessageKey(outgoing));
     setMessages((prev) => [...prev, outgoing]);
     setUnreadMessages(0);
     setMessage("");
@@ -1117,23 +1033,18 @@ export default function LiveRoomPage() {
         )}
 
         {isMobileEditor === false && (
-          <Editor
+          <MiniScriptMonacoEditor
             onMount={handleEditorMount}
             height="100%"
-            defaultLanguage="miniscriptplus"
-            theme="miniscriptplusTheme"
             value={code}
             onChange={(value) => {
-              handleChange(value || "");
+              handleChange(value);
               syncDesktopCursorLine();
             }}
+            readOnly={isClosed}
             options={{
-              fontSize: 14,
-              fontFamily: "JetBrains Mono, monospace",
-              minimap: { enabled: false },
               padding: { top: 16, bottom: 16 },
               smoothScrolling: true,
-              scrollBeyondLastLine: false,
               wordWrap: "on",
               automaticLayout: true,
               cursorSmoothCaretAnimation: "on",
@@ -1144,7 +1055,6 @@ export default function LiveRoomPage() {
               },
               tabSize,
               insertSpaces: true,
-              readOnly: isClosed,
               wrappingIndent: "same",
             }}
           />
@@ -1154,152 +1064,36 @@ export default function LiveRoomPage() {
   );
 
   const consolePanel = (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        {t("live.console")}
-      </div>
-
-      <div className="flex-1 overflow-y-auto bg-zinc-950 p-4 font-mono text-sm text-emerald-300">
-        {runState.output.length === 0 ? (
-          <div className="text-zinc-500">{t("live.noOutput")}</div>
-        ) : (
-          runState.output.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)
-        )}
-      </div>
-
-      {waitingInput && (
-        <div className="border-t border-zinc-200 bg-white p-3">
-          <div className="mb-2 text-xs font-medium text-zinc-500">
-            {t("live.inputPrompt")} {waitingInput}
-          </div>
-          <div className="flex gap-2">
-            <Input
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              placeholder={t("live.inputPlaceholder")}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") submitInput();
-              }}
-            />
-            <Button size="sm" onClick={submitInput}>{t("live.ok")}</Button>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-2 border-t border-zinc-200 bg-white p-3">
-        <div className="rounded-lg border border-zinc-200 p-2">
-          <div className="text-xs text-zinc-500">Line</div>
-          <div className="font-mono text-sm">{runState.currentLine}</div>
-        </div>
-        <div className="rounded-lg border border-zinc-200 p-2">
-          <div className="text-xs text-zinc-500">Variables</div>
-          <div className="font-mono text-sm">{Object.keys(runState.variables).length}</div>
-        </div>
-      </div>
-    </div>
+    <LiveConsolePanel
+      currentLine={runState.currentLine}
+      inputPlaceholder={t("live.inputPlaceholder")}
+      inputPrompt={t("live.inputPrompt")}
+      inputValue={inputValue}
+      noOutputLabel={t("live.noOutput")}
+      okLabel={t("live.ok")}
+      onInputValueChange={setInputValue}
+      onSubmitInput={submitInput}
+      output={runState.output}
+      title={t("live.console")}
+      variables={runState.variables}
+      waitingInput={waitingInput}
+    />
   );
 
   const debuggerPanel = (
     <div className="h-full overflow-y-auto p-4">
       <div className="space-y-4">
-        <section className="rounded-xl border border-zinc-200 bg-white">
-          <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            <CheckCircle2 size={14} />
-            {t("live.debugger")}
-          </div>
+        <DebuggerStateCard
+          currentLine={runState.currentLine}
+          title={t("live.debugger")}
+          variables={runState.variables}
+        />
 
-          <div className="space-y-3 p-3">
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-lg bg-zinc-50 p-3">
-                <p className="text-xs text-zinc-500">Line</p>
-                <p className="font-mono font-semibold">{runState.currentLine}</p>
-              </div>
-
-              <div className="rounded-lg bg-zinc-50 p-3">
-                <p className="text-xs text-zinc-500">Variables</p>
-                <p className="font-mono font-semibold">
-                  {Object.keys(runState.variables).length}
-                </p>
-              </div>
-            </div>
-
-            <pre className="max-h-52 overflow-auto rounded-lg bg-zinc-950 p-3 text-xs text-emerald-300">
-              {JSON.stringify(runState.variables, null, 2)}
-            </pre>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-zinc-200 bg-white">
-          <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            <Gauge size={14} />
-            {t("editor.complexity.title")}
-          </div>
-
-          <div className="space-y-4 p-3">
-            <div className="flex justify-center">
-              <ComplexityCircle
-                label={t(`editor.complexity.levels.${complexityAnalysis.level}`)}
-                score={complexityAnalysis.score}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-lg bg-zinc-50 p-3">
-                <p className="text-xs text-zinc-500">
-                  {t("editor.complexity.metrics.time")}
-                </p>
-                <p className="font-semibold">{complexityAnalysis.timeComplexity}</p>
-              </div>
-
-              <div className="rounded-lg bg-zinc-50 p-3">
-                <p className="text-xs text-zinc-500">
-                  {t("editor.complexity.metrics.space")}
-                </p>
-                <p className="font-semibold">{complexityAnalysis.spaceComplexity}</p>
-              </div>
-
-              <div className="rounded-lg border border-zinc-200 p-3">
-                <p className="text-xs text-zinc-500">
-                  {t("editor.complexity.metrics.loops")}
-                </p>
-                <p className="font-semibold">{complexityAnalysis.loopCount}</p>
-              </div>
-
-              <div className="rounded-lg border border-zinc-200 p-3">
-                <p className="text-xs text-zinc-500">
-                  {t("editor.complexity.metrics.maxNesting")}
-                </p>
-                <p className="font-semibold">{complexityAnalysis.maxNestedLoops}</p>
-              </div>
-            </div>
-
-            {complexityAnalysis.warnings.length > 0 && (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                <div className="mb-2 font-semibold text-amber-700">
-                  {t("editor.complexity.warnings")}
-                </div>
-                <ul className="space-y-2 text-amber-700">
-                  {complexityAnalysis.warnings.map((warning, index) => (
-                    <li key={index}>• {warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="rounded-lg border border-zinc-200 p-3 text-sm">
-              <div className="mb-2 flex items-center gap-2 font-semibold text-zinc-800">
-                <Lightbulb size={15} />
-                {t("editor.complexity.suggestions")}
-              </div>
-
-              <ul className="space-y-2 text-zinc-600">
-                {complexityAnalysis.suggestions.map((suggestion, index) => (
-                  <li key={index}>• {suggestion}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
+        <ComplexityAnalyzerCard
+          analysis={complexityAnalysis}
+          compact
+          frame="section"
+        />
       </div>
     </div>
   );

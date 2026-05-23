@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
+import { SectionCard } from "@/components/common/SectionCard";
+import { StatCard } from "@/components/common/StatCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Flame, Globe, Share2, Trophy, Check, Rocket, Brain } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
@@ -499,33 +501,26 @@ function ProfileContent() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle>{t("profile.streak.title")}</CardTitle>
-              <Flame className="w-10 h-10 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{streak}</div>
-              <p className="text-xs text-muted-foreground">
-                {t("profile.streak.days")}
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            icon={<Flame className="w-10 h-10 text-orange-500" />}
+            title={t("profile.streak.title")}
+            value={streak}
+            valueClassName="text-3xl font-bold"
+            subtitle={t("profile.streak.days")}
+          />
 
         </div>
 
         <div className="lg:col-span-2 space-y-6">
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("profile.difficulty.title")}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex gap-2">
-              <Badge variant="secondary">{t("profile.difficulty.easy")} {difficulty.easy}</Badge>
-              <Badge variant="default">{t("profile.difficulty.medium")} {difficulty.medium}</Badge>
-              <Badge variant="destructive">{t("profile.difficulty.hard")} {difficulty.hard}</Badge>
-            </CardContent>
-          </Card>
+          <SectionCard
+            title={t("profile.difficulty.title")}
+            contentClassName="flex gap-2"
+          >
+            <Badge variant="secondary">{t("profile.difficulty.easy")} {difficulty.easy}</Badge>
+            <Badge variant="default">{t("profile.difficulty.medium")} {difficulty.medium}</Badge>
+            <Badge variant="destructive">{t("profile.difficulty.hard")} {difficulty.hard}</Badge>
+          </SectionCard>
 
           <Card>
             <CardHeader>

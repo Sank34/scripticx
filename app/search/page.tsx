@@ -1,22 +1,19 @@
 "use client";
 
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
+import { EmptyState } from "@/components/common/EmptyState";
+import { UserListItem } from "@/components/user/UserListItem";
 
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-import { Search, Trophy, ArrowUpRight, UserX } from "lucide-react";
+import { Search, Trophy, UserX } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
-
-function normalize(str: string) {
-  return str.toLowerCase().trim();
-}
 
 function SearchContent() {
   const router = useRouter();
@@ -75,15 +72,11 @@ function SearchContent() {
     setLoading(false);
   }
 
-  function goToUser(username: string) {
-    router.push(`/u/${username}`);
-  }
-
   function handleSearch(value: string) {
     setQuery(value);
   }
 
-  function handleSubmit(e: any) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!query.trim()) return;
 
@@ -116,35 +109,14 @@ function SearchContent() {
 
           <div className="space-y-2">
             {topUsers.map((u, i) => (
-              <Card
+              <UserListItem
                 key={u.id}
-                onClick={() => goToUser(u.username)}
-                className="cursor-pointer hover:scale-[1.01] transition"
-              >
-                <CardContent className="flex items-center justify-between p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-muted-foreground w-5">
-                      #{i + 1}
-                    </span>
-
-                    <Avatar>
-                      {u.avatar_url && <AvatarImage src={u.avatar_url} />}
-                      <AvatarFallback>
-                        {u.username?.[0]?.toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div>
-                      <p className="font-medium">{u.username}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {u.total_score || 0} {t("search.points")}
-                      </p>
-                    </div>
-                  </div>
-
-                  <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
+                avatarUrl={u.avatar_url}
+                href={`/u/${u.username}`}
+                meta={`${u.total_score || 0} ${t("search.points")}`}
+                rank={i + 1}
+                username={u.username}
+              />
             ))}
           </div>
         </div>
@@ -179,47 +151,21 @@ function SearchContent() {
           )}
 
           {!loading && results.length === 0 && (
-            <div className="text-center py-10 text-muted-foreground space-y-2">
-              <UserX className="mx-auto w-6 h-6" />
-              <p>{t("search.noResults")}</p>
-            </div>
+            <EmptyState
+              icon={<UserX className="h-6 w-6" />}
+              title={t("search.noResults")}
+            />
           )}
 
           {!loading && results.map((u) => (
-            <Card
+            <UserListItem
               key={u.id}
-              onClick={() => goToUser(u.username)}
-              className="cursor-pointer hover:scale-[1.01] transition"
-            >
-              <CardContent className="flex items-center justify-between p-3">
-                <div className="flex items-center gap-3">
-
-                  <Avatar>
-                    {u.avatar_url && <AvatarImage src={u.avatar_url} />}
-                    <AvatarFallback>
-                      {u.username?.[0]?.toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div>
-                    <p className="font-medium">{u.username}</p>
-
-                    {u.bio && (
-                      <p className="text-xs text-muted-foreground line-clamp-1">
-                        {u.bio}
-                      </p>
-                    )}
-
-                    <p className="text-xs text-muted-foreground">
-                      {u.total_score || 0} {t("search.points")}
-                    </p>
-                  </div>
-
-                </div>
-
-                <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
+              avatarUrl={u.avatar_url}
+              description={u.bio}
+              href={`/u/${u.username}`}
+              meta={`${u.total_score || 0} ${t("search.points")}`}
+              username={u.username}
+            />
           ))}
 
         </div>

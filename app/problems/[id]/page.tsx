@@ -4,12 +4,15 @@ import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
 import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
 import { useParams } from "next/navigation";
-import Editor, { useMonaco } from "@monaco-editor/react";
 import RouteGuard from "@/components/RouteGuard";
+import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
+import {
+  TestResultCard,
+  type ProblemTestResult,
+} from "@/components/problems/TestResultCard";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useUserRole } from "@/hooks/useUserRole";
 import { checkAchievements } from "@/lib/achievements";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
@@ -30,15 +33,14 @@ function slugify(text: string): string {
 function ProblemContent() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
-  const { role } = useUserRole(user);
 
   const params = useParams();
   const id = params?.id;
 
   const [problem, setProblem] = useState<any>(null);
   const [code, setCode] = useState("");
-  const [result, setResult] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<any[]>([]);
+  const [, setResult] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<ProblemTestResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"description" | "solution">("description");
 
@@ -66,7 +68,7 @@ function ProblemContent() {
   async function runCode() {
     if (!problem || !user) return;
 
-    let results: any[] = [];
+    const results: ProblemTestResult[] = [];
 
     for (const test of problem.test_cases) {
       let program;
@@ -167,46 +169,6 @@ function ProblemContent() {
     await checkAchievements(user.id, score);
   }
 
-  const monaco = useMonaco();
-
-  useEffect(() => {
-    if (!monaco) return;
-
-    if (monaco.languages.getLanguages().some(l => l.id === "miniscriptplus")) {
-      return;
-    }
-
-    monaco.languages.register({ id: "miniscriptplus" });
-
-    monaco.languages.setMonarchTokensProvider("miniscriptplus", {
-      tokenizer: {
-        root: [
-          [/#.*/, "comment"],
-          [/\b(IF|THEN|ELSE|END|WHILE|PRINT|INPUT|DIV|MOD|TRUE|FALSE|INT|TRUNC|FLOOR|ROUND|ABS)\b/, "keyword"],
-          [/\b(true|false)\b/, "constant"],
-          [/[0-9]+/, "number"],
-          [/".*?"/, "string"],
-          [/<=|>=|==|!=|<|>/, "operator"],
-          [/[a-zA-Z_][a-zA-Z0-9_]*/, "identifier"],
-        ],
-      },
-    });
-
-    monaco.editor.defineTheme("miniscriptplusTheme", {
-      base: "vs-dark",
-      inherit: true,
-      rules: [
-        { token: "comment", foreground: "6A9955", fontStyle: "italic" },
-        { token: "keyword", foreground: "c586c0" },
-        { token: "number", foreground: "b5cea8" },
-        { token: "string", foreground: "ce9178" },
-        { token: "operator", foreground: "d4d4d4" },
-        { token: "constant", foreground: "569cd6" },
-      ],
-      colors: {},
-    });
-  }, [monaco]);
-
   if (!id || typeof id !== "string" || loading) {
     return (
       <div className="flex h-full">
@@ -240,16 +202,12 @@ function ProblemContent() {
         </div>
 
         <div className="flex-1 overflow-hidden">
-          <Editor
+          <MiniScriptMonacoEditor
             height="100%"
-            defaultLanguage="miniscriptplus"
-            theme="miniscriptplusTheme"
             value={code}
-            onChange={(value) => setCode(value || "")}
+            onChange={setCode}
+            theme="dark"
             options={{
-              fontSize: 14,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
               padding: { top: 12, bottom: 12 },
             }}
           />
@@ -308,64 +266,21 @@ function ProblemContent() {
                   </div>
 
                   <div className="space-y-3">
-                    {testResults.map((r, i) => {
-                      const inputDisplay = Array.isArray(r.input)
-                        ? r.input.join(" ")
-                        : String(r.input);
-
-                      return (
-                        <div
-                          key={i}
-                          className="rounded-lg border border-zinc-200 bg-white overflow-hidden"
-                        >
-                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-200 bg-zinc-50">
-                            <p className="text-sm font-semibold text-zinc-900">
-                              {t("problemPage.tests.test") || "Test"} #{i + 1}
-                            </p>
-                            <span className={`text-xs font-medium px-2 py-1 rounded ${
-                              r.passed
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-red-100 text-red-700"
-                            }`}>
-                              {r.passed
-                                ? (t("problemPage.tests.correct") || "Răspuns corect")
-                                : (t("problemPage.tests.wrong") || "Răspuns greșit")}
-                            </span>
-                          </div>
-
-                          <div className="p-4 space-y-3">
-                            <div>
-                              <p className="text-xs font-medium text-zinc-500 mb-1.5">
-                                {t("problemPage.tests.programRead") || "Programul a citit"}
-                              </p>
-                              <pre className="rounded bg-zinc-100 px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
-                                {inputDisplay || "—"}
-                              </pre>
-                            </div>
-
-                            <div>
-                              <p className="text-xs font-medium text-zinc-500 mb-1.5">
-                                {t("problemPage.tests.programPrinted") || "Programul a afișat"}
-                              </p>
-                              <pre className="rounded bg-zinc-100 px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
-                                {r.got || "—"}
-                              </pre>
-                            </div>
-
-                            {!r.passed && (
-                              <div>
-                                <p className="text-xs font-medium text-zinc-500 mb-1.5">
-                                  {t("problemPage.tests.shouldHavePrinted") || "Programul ar fi trebuit să afișeze"}
-                                </p>
-                                <pre className="rounded bg-zinc-100 px-3 py-2 font-mono text-xs whitespace-pre-wrap break-all">
-                                  {r.expected}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {testResults.map((testResult, index) => (
+                      <TestResultCard
+                        key={index}
+                        index={index}
+                        labels={{
+                          correct: t("problemPage.tests.correct") || "Răspuns corect",
+                          programPrinted: t("problemPage.tests.programPrinted") || "Programul a afișat",
+                          programRead: t("problemPage.tests.programRead") || "Programul a citit",
+                          shouldHavePrinted: t("problemPage.tests.shouldHavePrinted") || "Programul ar fi trebuit să afișeze",
+                          test: t("problemPage.tests.test") || "Test",
+                          wrong: t("problemPage.tests.wrong") || "Răspuns greșit",
+                        }}
+                        result={testResult}
+                      />
+                    ))}
                   </div>
                 </>
               )}

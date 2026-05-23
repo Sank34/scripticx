@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { translations } from "@/lib/i18n";
 import { createServerSupabase } from "@/lib/supabaseServer";
-import Link from "next/link";
+import { UserListItem } from "@/components/user/UserListItem";
 
 import {
   Card,
@@ -9,12 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
 
 export default async function FollowersPage({
   params,
@@ -76,22 +70,14 @@ export default async function FollowersPage({
             const u = f.profiles;
 
             return (
-              <Link
+              <UserListItem
                 key={u.id}
                 href={`/u/${u.username}`}
-                className="flex items-center gap-3 hover:opacity-80 transition"
-              >
-                <Avatar className="w-9 h-9">
-                  {u.avatar_url && <AvatarImage src={u.avatar_url} />}
-                  <AvatarFallback>
-                    {u.username?.[0]?.toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-
-                <span className="font-medium">
-                  {u.username}
-                </span>
-              </Link>
+                avatarUrl={u.avatar_url}
+                showArrow={false}
+                username={u.username}
+                variant="row"
+              />
             );
           })}
 

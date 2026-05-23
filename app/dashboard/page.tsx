@@ -3,25 +3,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
+import { EmptyState } from "@/components/common/EmptyState";
+import { PageHeader } from "@/components/common/PageHeader";
+import { SectionCard } from "@/components/common/SectionCard";
+import { StatCard } from "@/components/common/StatCard";
+import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import { Flame, Trophy, Activity } from "lucide-react";
 import { getLocalized } from "@/lib/getLocalized";
 import { useLanguage } from "@/components/LanguageProvider";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
 
 type DashboardStats = {
   solved: number;
@@ -201,75 +194,53 @@ function DashboardContent() {
   return (
     <div className="p-6 space-y-6">
 
-      <div>
-        <h1 className="text-3xl font-bold">
-          {t("dashboard.title")}
-        </h1>
-        <p className="text-muted-foreground">
-          {user.email}
-        </p>
-      </div>
+      <PageHeader
+        title={t("dashboard.title")}
+        subtitle={user.email}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-        <Card className="border-green-500/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-orange-500" />
-              {t("dashboard.stats.solved")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-orange-500">
-              {stats.solved}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          className="border-green-500/30"
+          icon={<Flame className="w-4 h-4 text-orange-500" />}
+          title={t("dashboard.stats.solved")}
+          value={stats.solved}
+          valueClassName="text-2xl font-bold text-orange-500"
+        />
 
-        <Card className="border-blue-500/30">
-          <CardHeader>
-            <CardTitle>{t("dashboard.stats.score")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-blue-500">
-              {stats.total}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          className="border-blue-500/30"
+          title={t("dashboard.stats.score")}
+          value={stats.total}
+          valueClassName="text-2xl font-bold text-blue-500"
+        />
 
-        <Card className="border-purple-500/30">
-          <CardHeader>
-            <CardTitle>{t("dashboard.stats.streak")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-500">
-              {stats.average}%
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          className="border-purple-500/30"
+          title={t("dashboard.stats.streak")}
+          value={`${stats.average}%`}
+          valueClassName="text-2xl font-bold text-green-500"
+        />
 
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-yellow-500" />
-            {t("leaderboard.title")}
-          </CardTitle>
+      <SectionCard
+        icon={<Trophy className="w-4 h-4 text-yellow-500" />}
+        title={t("leaderboard.title")}
+        action={
           <a
             href="/leaderboard"
             className="text-sm text-muted-foreground hover:underline"
           >
             {t("common.viewAll")}
           </a>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
+        }
+        contentClassName="space-y-3"
+      >
 
           {leaderboard.length === 0 && (
-            <p className="text-muted-foreground text-sm">
-              {t("dashboard.states.empty")}
-            </p>
+            <EmptyState className="py-4" title={t("dashboard.states.empty")} />
           )}
 
           {leaderboard.map((u, i) => (
@@ -283,12 +254,11 @@ function DashboardContent() {
                   #{i + 1}
                 </span>
 
-                <Avatar className="w-7 h-7">
-                  {u.avatar_url && <AvatarImage src={u.avatar_url} />}
-                  <AvatarFallback>
-                    {u.username?.[0]?.toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={u.avatar_url}
+                  className="w-7 h-7"
+                  username={u.username}
+                />
 
                 <span className="text-sm">
                   {u.username}
@@ -303,23 +273,16 @@ function DashboardContent() {
             </div>
           ))}
 
-        </CardContent>
-      </Card>
+      </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-orange-500" />
-            {t("dashboard.sections.activity")}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
+      <SectionCard
+        icon={<Activity className="w-4 h-4 text-orange-500" />}
+        title={t("dashboard.sections.activity")}
+        contentClassName="space-y-3"
+      >
 
           {feed.length === 0 && (
-            <p className="text-muted-foreground text-sm">
-              {t("dashboard.states.empty")}
-            </p>
+            <EmptyState className="py-4" title={t("dashboard.states.empty")} />
           )}
 
           {feed.map((item, i) => (
@@ -331,14 +294,11 @@ function DashboardContent() {
                   href={`/u/${item.profile?.username}`}
                   className="flex items-center gap-3 hover:opacity-80 transition"
                 >
-                  <Avatar className="w-7 h-7">
-                    {item.profile?.avatar_url && (
-                      <AvatarImage src={item.profile.avatar_url} />
-                    )}
-                    <AvatarFallback>
-                      {item.profile?.username?.[0]?.toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    avatarUrl={item.profile?.avatar_url}
+                    className="w-7 h-7"
+                    username={item.profile?.username}
+                  />
 
                   <span className="font-medium text-sm">
                     {item.profile?.username}
@@ -373,20 +333,15 @@ function DashboardContent() {
             </div>
           ))}
 
-        </CardContent>
-      </Card>
+      </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("dashboard.sections.recent")}</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
+      <SectionCard
+        title={t("dashboard.sections.recent")}
+        contentClassName="space-y-3"
+      >
 
           {recent.length === 0 && (
-            <p className="text-muted-foreground">
-              {t("dashboard.states.empty")}
-            </p>
+            <EmptyState className="py-4" title={t("dashboard.states.empty")} />
           )}
 
           {recent.map((r, i) => (
@@ -417,8 +372,7 @@ function DashboardContent() {
             </div>
           ))}
 
-        </CardContent>
-      </Card>
+      </SectionCard>
 
     </div>
   );

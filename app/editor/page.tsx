@@ -15,6 +15,7 @@ import {
   type ComplexityAnalysis,
 } from "@/lib/complexity-analyzer";
 import { visualizeMiniScript } from "@/lib/msp-visualizer";
+import { ComplexityAnalyzerCard } from "@/components/editor/ComplexityAnalyzerCard";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +44,6 @@ import {
   Pencil,
   Plus,
   Gauge,
-  Lightbulb,
   Workflow,
 } from "lucide-react";
 
@@ -76,67 +76,6 @@ function getErrorDetails(error: unknown) {
     message: error instanceof Error ? error.message : "Unknown error",
     line: undefined,
   };
-}
-
-function getScoreColor(score: number) {
-  if (score >= 85) return "text-emerald-500";
-  if (score >= 65) return "text-lime-500";
-  if (score >= 40) return "text-amber-500";
-  return "text-red-500";
-}
-
-function getStrokeColor(score: number) {
-  if (score >= 85) return "#10b981";
-  if (score >= 65) return "#84cc16";
-  if (score >= 40) return "#f59e0b";
-  return "#ef4444";
-}
-
-function ComplexityCircle({
-  label,
-  score,
-}: {
-  label: string;
-  score: number;
-}) {
-  const radius = 42;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-  const strokeColor = getStrokeColor(score);
-
-  return (
-    <div className="relative flex h-28 w-28 items-center justify-center">
-      <svg className="h-28 w-28 -rotate-90" viewBox="0 0 100 100">
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          stroke="currentColor"
-          strokeWidth="8"
-          fill="transparent"
-          className="text-muted"
-        />
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          stroke={strokeColor}
-          strokeWidth="8"
-          fill="transparent"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-500"
-        />
-      </svg>
-      <div className="absolute text-center">
-        <div className={`text-2xl font-bold ${getScoreColor(score)}`}>{score}%</div>
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          {label}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function EditorContent() {
@@ -649,89 +588,7 @@ END`,
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gauge size={18} />
-                {t("editor.complexity.title")}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {complexityAnalysis ? (
-                <>
-                  <div className="flex items-center justify-center">
-                    <ComplexityCircle
-                      label={t(`editor.complexity.levels.${complexityAnalysis.level}`)}
-                      score={complexityAnalysis.score}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="rounded-lg bg-muted p-3">
-                      <p className="text-xs text-muted-foreground">
-                        {t("editor.complexity.metrics.time")}
-                      </p>
-                      <p className="font-semibold">{complexityAnalysis.timeComplexity}</p>
-                    </div>
-
-                    <div className="rounded-lg bg-muted p-3">
-                      <p className="text-xs text-muted-foreground">
-                        {t("editor.complexity.metrics.space")}
-                      </p>
-                      <p className="font-semibold">{complexityAnalysis.spaceComplexity}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="rounded-lg border p-3">
-                      <p className="text-xs text-muted-foreground">
-                        {t("editor.complexity.metrics.loops")}
-                      </p>
-                      <p className="font-semibold">{complexityAnalysis.loopCount}</p>
-                    </div>
-
-                    <div className="rounded-lg border p-3">
-                      <p className="text-xs text-muted-foreground">
-                        {t("editor.complexity.metrics.maxNesting")}
-                      </p>
-                      <p className="font-semibold">{complexityAnalysis.maxNestedLoops}</p>
-                    </div>
-                  </div>
-
-                  {complexityAnalysis.warnings.length > 0 && (
-                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                      <div className="mb-2 font-semibold text-amber-700">
-                        {t("editor.complexity.warnings")}
-                      </div>
-                      <ul className="space-y-2 text-amber-700">
-                        {complexityAnalysis.warnings.map((warning, index) => (
-                          <li key={index}>• {warning}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div className="rounded-lg border p-3 text-sm">
-                    <div className="mb-2 flex items-center gap-2 font-semibold">
-                      <Lightbulb size={15} />
-                      {t("editor.complexity.suggestions")}
-                    </div>
-
-                    <ul className="space-y-2 text-muted-foreground">
-                      {complexityAnalysis.suggestions.map((suggestion, index) => (
-                        <li key={index}>• {suggestion}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  {t("editor.complexity.empty")}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ComplexityAnalyzerCard analysis={complexityAnalysis} />
 
           <Card>
             <CardHeader>

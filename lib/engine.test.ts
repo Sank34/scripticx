@@ -95,6 +95,31 @@ PRINT X
     expect(lastOutput).toBe(2);
   });
 
+  it("keeps looping when a while body contains an if else block", () => {
+    const program = compile(`
+A = 20
+B = 8
+WHILE A != B
+  IF A > B THEN
+    A = A - B
+  ELSE
+    B = B - A
+  END
+END
+PRINT A
+`);
+
+    let lastOutput = null;
+    let current = step(program);
+
+    while (current) {
+      if (current.output !== null) lastOutput = current.output;
+      current = step(program);
+    }
+
+    expect(lastOutput).toBe(4);
+  });
+
   it("throws on division by zero", () => {
     const program = compile(`
 A = 0

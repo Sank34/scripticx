@@ -18,45 +18,100 @@ import {
   MessageSquare,
   School,
   Search,
+  Shield,
   Sparkles,
   SquareTerminal,
   Trophy,
+  type LucideIcon,
 } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/hooks/useAuth";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+type MobileNavItem = {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  active?: (pathname: string) => boolean;
+  children?: Array<{
+    href: string;
+    label: string;
+  }>;
+};
+
 export function MobileDrawer() {
   const pathname = usePathname();
   const { t } = useLanguage();
   const hasUnreadUpdates = useUnreadUpdates();
+  const { user, isAdmin } = useAuth();
 
   if (pathname.startsWith("/live/")) {
     return null;
   }
 
-  const navItems = [
+  const isLoggedIn = Boolean(user);
+
+  const navItems: Array<{ label: string; items: MobileNavItem[] }> = [
     {
       label: t("sidebar.platform"),
       items: [
-        { href: "/editor", icon: Code, label: t("nav.editor") },
-        { href: "/livecode", icon: SquareTerminal, label: t("nav.livecode") },
+        ...(isLoggedIn
+          ? [
+              { href: "/editor", icon: Code, label: t("nav.editor") },
+              {
+                href: "/livecode",
+                icon: SquareTerminal,
+                label: t("nav.livecode"),
+                active: (currentPath: string) =>
+                  currentPath.startsWith("/livecode") ||
+                  currentPath.startsWith("/live"),
+              },
+            ]
+          : []),
         { href: "/problems", icon: List, label: t("nav.problems") },
         { href: "/leaderboard", icon: Trophy, label: t("nav.leaderboard") },
-        { href: "/feed", icon: MessageSquare, label: t("nav.feed") },
-        { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
-        { href: "/search", icon: Search, label: t("nav.search") },
-        { href: "/classes", icon: School, label: t("nav.classes") },
+        ...(isLoggedIn
+          ? [
+              { href: "/feed", icon: MessageSquare, label: t("nav.feed") },
+              { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
+              { href: "/search", icon: Search, label: t("nav.search") },
+              ...(isAdmin
+                ? [{ href: "/admin", icon: Shield, label: t("nav.admin") }]
+                : []),
+              { href: "/classes", icon: School, label: t("nav.classes") },
+            ]
+          : []),
       ],
     },
     {
       label: t("sidebar.learn"),
       items: [
-        { href: "/learn", icon: BookOpen, label: t("nav.docs") },
-        { href: "/examples", icon: BookOpen, label: t("nav.examples") },
+        {
+          href: "/learn",
+          icon: BookOpen,
+          label: t("nav.docs"),
+          children: [
+            { href: "/learn/basics", label: t("learn.basics") },
+            { href: "/learn/variables", label: t("learn.variables") },
+            { href: "/learn/loops", label: t("learn.loops") },
+            { href: "/learn/input-output", label: t("learn.inputOutput") },
+          ],
+        },
+        {
+          href: "/examples",
+          icon: BookOpen,
+          label: t("nav.examples"),
+          children: [
+            { href: "/examples/basics", label: t("examples.basics.title") },
+            { href: "/examples/loops", label: t("examples.loops.title") },
+            { href: "/examples/conditions", label: t("examples.conditions.title") },
+            { href: "/examples/algorithms", label: t("examples.algorithms.title") },
+          ],
+        },
       ],
     },
   ];
@@ -133,23 +188,50 @@ export function MobileDrawer() {
 
                     <div className="flex w-full flex-col items-center gap-2">
                       {section.items.map((item) => {
-                        const active = pathname.startsWith(item.href);
+                        const active = item.active
+                          ? item.active(pathname)
+                          : pathname.startsWith(item.href);
                         const Icon = item.icon;
 
                         return (
-                          <DrawerClose asChild key={item.href}>
-                            <Link
-                              href={item.href}
-                              className={`flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-medium transition-all duration-200 active:scale-[0.98] ${
-                                active
-                                  ? "bg-zinc-100 text-black shadow-sm"
-                                  : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
-                              }`}
-                            >
-                              <Icon size={22} />
-                              <span>{item.label}</span>
-                            </Link>
-                          </DrawerClose>
+                          <div key={item.href} className="w-full">
+                            <DrawerClose asChild>
+                              <Link
+                                href={item.href}
+                                className={`flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-medium transition-all duration-200 active:scale-[0.98] ${
+                                  active
+                                    ? "bg-zinc-100 text-black shadow-sm"
+                                    : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
+                                }`}
+                              >
+                                <Icon size={22} />
+                                <span>{item.label}</span>
+                              </Link>
+                            </DrawerClose>
+
+                            {item.children && active && (
+                              <div className="mt-2 flex flex-col items-center gap-1">
+                                {item.children.map((child) => {
+                                  const childActive = pathname === child.href;
+
+                                  return (
+                                    <DrawerClose asChild key={child.href}>
+                                      <Link
+                                        href={child.href}
+                                        className={`w-full rounded-xl px-4 py-2 text-center text-sm font-medium transition ${
+                                          childActive
+                                            ? "bg-zinc-100 text-black"
+                                            : "text-zinc-500 hover:bg-zinc-50 hover:text-black"
+                                        }`}
+                                      >
+                                        {child.label}
+                                      </Link>
+                                    </DrawerClose>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>

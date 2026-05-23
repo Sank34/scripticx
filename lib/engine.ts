@@ -503,6 +503,80 @@ function evaluateCondition(cond: string): boolean {
   return Boolean(evaluate(cond));
 }
 
+function isBlockStart(type: string) {
+  return type === "IF" || type === "WHILE";
+}
+
+function findElseOrEndForIf(program: any[], line: number) {
+  let depth = 1;
+
+  for (let i = line + 1; i < program.length; i++) {
+    const type = program[i].type;
+
+    if (isBlockStart(type)) depth++;
+
+    if (type === "END") {
+      depth--;
+      if (depth === 0) return i;
+    }
+
+    if (depth === 1 && type === "ELSE") return i;
+  }
+
+  throw new Error("Missing END for IF statement");
+}
+
+function findMatchingBlockStart(program: any[], line: number) {
+  let depth = 1;
+
+  for (let i = line - 1; i >= 0; i--) {
+    const type = program[i].type;
+
+    if (type === "END") depth++;
+
+    if (isBlockStart(type)) {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+
+  throw new Error("END without matching block");
+}
+
+function findMatchingEndFromElse(program: any[], line: number) {
+  let depth = 1;
+
+  for (let i = line + 1; i < program.length; i++) {
+    const type = program[i].type;
+
+    if (isBlockStart(type)) depth++;
+
+    if (type === "END") {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+
+  throw new Error("Missing END for ELSE statement");
+}
+
+function findMatchingEndForBlock(program: any[], line: number) {
+  let depth = 1;
+
+  for (let i = line + 1; i < program.length; i++) {
+    const type = program[i].type;
+
+    if (isBlockStart(type)) depth++;
+
+    if (type === "END") {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+
+  throw new Error(`Missing END for ${program[line].type} statement`);
+}
+
 export function step(program: any[]): StepResult {
   if (currentLine >= program.length) return null;
 
@@ -542,45 +616,19 @@ export function step(program: any[]): StepResult {
     }
   } else if (inst.type === "IF") {
     if (!evaluateCondition(inst.condition)) {
-      let depth = 1;
-      while (depth > 0) {
-        currentLine++;
-        if (program[currentLine].type === "IF") depth++;
-        if (program[currentLine].type === "END") depth--;
-        if (depth === 1 && program[currentLine].type === "ELSE") break;
-      }
+      currentLine = findElseOrEndForIf(program, currentLine);
     }
   } else if (inst.type === "ELSE") {
-    let depth = 1;
-    while (depth > 0) {
-      currentLine++;
-      if (program[currentLine].type === "IF") depth++;
-      if (program[currentLine].type === "END") depth--;
-    }
+    currentLine = findMatchingEndFromElse(program, currentLine);
   } else if (inst.type === "WHILE") {
     if (!evaluateCondition(inst.condition)) {
-      let depth = 1;
-      while (depth > 0) {
-        currentLine++;
-        if (program[currentLine].type === "WHILE") depth++;
-        if (program[currentLine].type === "END") depth--;
-      }
+      currentLine = findMatchingEndForBlock(program, currentLine);
     }
   } else if (inst.type === "END") {
-    let depth = 1;
-    let temp = currentLine;
+    const start = findMatchingBlockStart(program, currentLine);
 
-    while (temp > 0) {
-      temp--;
-      if (program[temp].type === "END") depth++;
-      else if (program[temp].type === "WHILE") depth--;
-
-      if (depth === 0) {
-        currentLine = temp - 1;
-        break;
-      }
-
-      if (program[temp].type === "IF") break;
+    if (program[start].type === "WHILE") {
+      currentLine = start - 1;
     }
   } else if (inst.type === "INPUT") {
     // currentLine++;

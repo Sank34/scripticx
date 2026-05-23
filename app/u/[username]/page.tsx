@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import PublicProfileHeader from "@/components/PublicProfileHeader";
+import { StatCard } from "@/components/common/StatCard";
 
 import {
   Card,
@@ -242,33 +243,21 @@ export default async function PublicProfile({
 
       <div className="grid grid-cols-3 gap-4">
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("publicProfile.stats.solved")}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {solved}
-          </CardContent>
-        </Card>
+        <StatCard
+          title={t("publicProfile.stats.solved")}
+          value={solved}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("publicProfile.stats.average")}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {average}%
-          </CardContent>
-        </Card>
+        <StatCard
+          title={t("publicProfile.stats.average")}
+          value={`${average}%`}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row justify-between items-center">
-            <CardTitle>{t("publicProfile.stats.streak")}</CardTitle>
-            <Flame className="w-5 h-5 text-orange-500" />
-          </CardHeader>
-          <CardContent className="text-2xl font-bold">
-            {streak}
-          </CardContent>
-        </Card>
+        <StatCard
+          icon={<Flame className="w-5 h-5 text-orange-500" />}
+          title={t("publicProfile.stats.streak")}
+          value={streak}
+        />
 
       </div>
 

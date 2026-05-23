@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type FeedData } from "@/lib/api";
 import RouteGuard from "@/components/RouteGuard";
+import { EmptyState } from "@/components/common/EmptyState";
+import { PageHeader } from "@/components/common/PageHeader";
+import { FeedPostCard } from "@/components/feed/FeedPostCard";
+import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
@@ -11,12 +15,10 @@ import { translations } from "@/lib/i18n";
 import {
   Card,
   CardContent,
-  CardHeader,
 } from "@/components/ui/card";
 
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import {
@@ -26,10 +28,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { Heart, MessageCircle, Share2, Code2 } from "lucide-react";
+import { Code2, MessageCircle } from "lucide-react";
 
 import { toast } from "sonner";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 function FeedContent() {
@@ -155,17 +156,11 @@ function FeedContent() {
     <div className="p-6 max-w-2xl mx-auto space-y-6">
 
       <div>
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{t("feed.title")}</h1>
-          <span className="text-sm text-muted-foreground">
-            {posts.length} {t("feed.posts")}
-          </span>
-        </div>
-
-        <p className="text-sm text-muted-foreground mt-1">
-          {t("feed.subtitle")}
-        </p>
-
+        <PageHeader
+          title={t("feed.title")}
+          subtitle={t("feed.subtitle")}
+          meta={`${posts.length} ${t("feed.posts")}`}
+        />
         <div className="border-b mt-4" />
       </div>
 
@@ -186,14 +181,10 @@ function FeedContent() {
                   <DialogTitle className="mt-0">{t("feed.createPost")}</DialogTitle>
 
                   <div className="flex items-center gap-3">
-                    <Avatar>
-                      {user?.user_metadata?.avatar_url && (
-                        <AvatarImage src={user.user_metadata.avatar_url} />
-                      )}
-                      <AvatarFallback>
-                        {(user?.email || "U")[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      avatarUrl={user?.user_metadata?.avatar_url}
+                      email={user?.email}
+                    />
 
                     <div className="text-sm text-muted-foreground">
                       {user?.email}
@@ -290,12 +281,7 @@ function FeedContent() {
                 className="flex items-center gap-3 cursor-pointer"
                 onClick={() => router.push(`/u/${u.username}`)}
               >
-                <Avatar>
-                  {u.avatar_url && <AvatarImage src={u.avatar_url} />}
-                  <AvatarFallback>
-                    {(u.username || "U")[0]}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar avatarUrl={u.avatar_url} username={u.username} />
 
                 <p className="text-sm font-medium">{u.username}</p>
               </div>
@@ -318,106 +304,28 @@ function FeedContent() {
         ))}
 
       {!loading && posts.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          {t("feed.noPosts")}
-        </div>
+        <EmptyState
+          icon={<MessageCircle className="h-6 w-6" />}
+          title={t("feed.noPosts")}
+        />
       )}
 
       {!loading &&
         posts.map((p) => (
-          <Card key={p.id} className="hover:shadow-sm transition">
-            <Link href={`/post/${p.id}`}>
-              <CardHeader className="flex flex-row items-center gap-3 cursor-pointer">
-
-                <Avatar>
-                  {p.profiles?.avatar_url && (
-                    <AvatarImage src={p.profiles.avatar_url} />
-                  )}
-                  <AvatarFallback>
-                    {(p.profiles?.username || "U")[0]}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div>
-                  <p
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      router.push(`/u/${p.profiles?.username}`);
-                    }}
-                    className="font-medium hover:underline cursor-pointer"
-                  >
-                    {p.profiles?.username || "User"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {p.created_at
-                      ? new Date(p.created_at).toLocaleString()
-                      : ""}
-                  </p>
-                </div>
-
-              </CardHeader>
-
-              <CardContent className="space-y-3 cursor-pointer pt-4">
-                <p className="whitespace-pre-wrap">{p.content}</p>
-
-                {p.image_url && (
-                  <img
-                    src={p.image_url}
-                    className="rounded-lg max-h-[400px] object-cover w-full mt-2"
-                  />
-                )}
-
-                {p.code && (
-                  <pre className="bg-muted p-3 rounded text-sm overflow-auto font-mono">
-                    {p.code}
-                  </pre>
-                )}
-              </CardContent>
-            </Link>
-
-            <div className="px-6 pb-5 pt-1 flex items-center gap-4 text-sm">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleLike(p.id);
-                }}
-                className="flex items-center gap-1 hover:opacity-80"
-              >
-                <Heart
-                  size={16}
-                  className={`transition-transform duration-150 ${
-                    liked[p.id]
-                      ? "fill-red-500 text-red-500 scale-110"
-                      : "scale-100"
-                  } active:scale-125`}
-                />
-                <span>{likes[p.id] || 0}</span>
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push(`/post/${p.id}`);
-                }}
-                className="flex items-center gap-1 hover:opacity-80"
-              >
-                <MessageCircle size={16} />
-                <span>{commentCounts[p.id] || 0}</span>
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleShare(p.id);
-                }}
-                className="flex items-center gap-1 hover:opacity-80"
-              >
-                <Share2 size={16} />
-                <span>{t("feed.share")}</span>
-              </button>
-            </div>
-          </Card>
+          <FeedPostCard
+            key={p.id}
+            commentCount={commentCounts[p.id] || 0}
+            isLiked={Boolean(liked[p.id])}
+            labels={{
+              share: t("feed.share"),
+            }}
+            likeCount={likes[p.id] || 0}
+            onAuthorOpen={(username) => router.push(`/u/${username}`)}
+            onCommentsOpen={(postId) => router.push(`/post/${postId}`)}
+            onShare={handleShare}
+            onToggleLike={toggleLike}
+            post={p}
+          />
         ))}
 
     </div>

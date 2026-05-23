@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 import { api, type ProfileSummary } from "@/lib/api";
+import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 
 import { Button } from "@/components/ui/button";
@@ -99,13 +100,20 @@ export function Topbar() {
   return (
     <header className="flex h-14 items-center justify-between border-b border-zinc-200/70 bg-white px-5">
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-3">
         <div className="text-sm font-medium text-zinc-900">
           Workspace
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 justify-center px-3">
+        <PlatformCommandMenu
+          isAdmin={profile?.role === "admin"}
+          user={user}
+        />
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
 
         {user ? (
           <DropdownMenu>
