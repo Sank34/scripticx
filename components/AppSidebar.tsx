@@ -41,13 +41,9 @@ import {
 
 import { useEffect, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { api, type ProfileSummary } from "@/lib/api";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
-
-type SidebarProfile = {
-  role?: string | null;
-};
 
 type NavItemProps = {
   href: string;
@@ -151,11 +147,9 @@ export function AppSidebar() {
     let active = true;
 
     async function loadRole(currentUser: User) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", currentUser.id)
-        .maybeSingle<SidebarProfile>();
+      const profile: ProfileSummary | null = await api.profiles.getSummary(
+        currentUser.id
+      );
 
       if (!active) return;
 
@@ -163,7 +157,7 @@ export function AppSidebar() {
     }
 
     async function load() {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await api.auth.getSession();
       const currentUser = data.session?.user ?? null;
 
       if (!active) return;
@@ -177,9 +171,7 @@ export function AppSidebar() {
 
     void load();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const subscription = api.auth.onAuthStateChange((session) => {
       const currentUser = session?.user ?? null;
 
       setUser(currentUser);

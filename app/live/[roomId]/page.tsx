@@ -1,249 +1,446 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import Editor, { useMonaco } from "@monaco-editor/react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type UIEvent,
+} from "react";
+import Editor, { type OnMount, useMonaco } from "@monaco-editor/react";
 import { useParams, useRouter } from "next/navigation";
 
+import { api, type LiveMessage, type LiveRoom, type ProfileSummary } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
-import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
+import {
+  advanceLine,
+  parseLine,
+  reset,
+  setVariable,
+  step,
+  type StepResult,
+} from "@/lib/engine";
+import {
+  analyzeMiniScriptComplexity,
+  type ComplexityAnalysis,
+} from "@/lib/complexity-analyzer";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Share2 } from "lucide-react";
-import { toast } from "sonner";
-import { useLanguage } from "@/components/LanguageProvider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLanguage } from "@/components/LanguageProvider";
+
+import {
+  CheckCircle2,
+  Gauge,
+  Lightbulb,
+  LogOut,
+  MessageSquare,
+  Play,
+  Plus,
+  Send,
+  Share2,
+  Square,
+  Terminal,
+  Users,
+} from "lucide-react";
+import { toast } from "sonner";
+
+type LiveParticipant = {
+  user_id: string;
+  username?: string | null;
+  avatar_url?: string | null;
+};
+
+type CursorPosition = {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  lastSeen: number;
+  username?: string | null;
+  avatar_url?: string | null;
+};
+
+type RunState = {
+  output: string[];
+  variables: Record<string, unknown>;
+  currentLine: number;
+};
+
+type CursorDebugInfo = {
+  statusLine: number;
+  positionLine?: number;
+  selectionLine?: number;
+  modelLines?: number;
+  focused?: boolean;
+};
+
+const EMPTY_RUN_STATE: RunState = {
+  output: [],
+  variables: {},
+  currentLine: 0,
+};
+
+function getInitial(profile?: ProfileSummary | LiveParticipant | null) {
+  return profile?.username?.[0]?.toUpperCase() || "U";
+}
+
+function getMessageUserId(message: LiveMessage) {
+  return message.userId || message.user_id || "";
+}
+
+function getMessageTime(message: LiveMessage) {
+  const value = message.createdAt || message.created_at;
+  if (!value) return "";
+
+  return new Date(value).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getUserColor(id: string) {
+  const colors = ["#16a34a", "#2563eb", "#dc2626", "#9333ea", "#0891b2", "#ea580c"];
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash += id.charCodeAt(i);
+  return colors[hash % colors.length];
+}
+
+function getScoreColor(score: number) {
+  if (score >= 85) return "text-emerald-500";
+  if (score >= 65) return "text-lime-500";
+  if (score >= 40) return "text-amber-500";
+  return "text-red-500";
+}
+
+function getStrokeColor(score: number) {
+  if (score >= 85) return "#10b981";
+  if (score >= 65) return "#84cc16";
+  if (score >= 40) return "#f59e0b";
+  return "#ef4444";
+}
+
+function ComplexityCircle({
+  label,
+  score,
+}: {
+  label: string;
+  score: number;
+}) {
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const strokeColor = getStrokeColor(score);
+
+  return (
+    <div className="relative flex h-24 w-24 items-center justify-center">
+      <svg className="h-24 w-24 -rotate-90" viewBox="0 0 100 100">
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke="currentColor"
+          strokeWidth="8"
+          fill="transparent"
+          className="text-zinc-100"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          stroke={strokeColor}
+          strokeWidth="8"
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-500"
+        />
+      </svg>
+      <div className="absolute text-center">
+        <div className={`text-xl font-bold ${getScoreColor(score)}`}>
+          {score}%
+        </div>
+        <div className="text-[9px] uppercase tracking-wide text-zinc-500">
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const MSP_TOKEN_PATTERN =
+  /(#.*$|"(?:[^"\\]|\\.)*"|\b(?:IF|THEN|ELSE|END|WHILE|PRINT|INPUT|DIV|MOD|TRUE|FALSE|INT|TRUNC|FLOOR|ROUND|ABS|AND|OR|NOT)\b|\b\d+(?:\.\d+)?\b|<=|>=|==|!=|[+\-*/%<>=(),]|\b[a-zA-Z_][a-zA-Z0-9_]*\b|\s+|.)/g;
+
+function getTokenClass(token: string) {
+  if (/^#/.test(token)) return "text-emerald-700 italic";
+  if (/^"/.test(token)) return "text-amber-700";
+  if (/^\d/.test(token)) return "text-teal-700";
+  if (/^(TRUE|FALSE)$/i.test(token)) return "text-blue-700";
+  if (/^(IF|THEN|ELSE|END|WHILE|PRINT|INPUT|DIV|MOD|AND|OR|NOT)$/i.test(token)) {
+    return "font-semibold text-violet-700";
+  }
+  if (/^(INT|TRUNC|FLOOR|ROUND|ABS)$/i.test(token)) return "font-semibold text-sky-700";
+  if (/^(<=|>=|==|!=|[+\-*/%<>=(),])$/.test(token)) return "text-zinc-700";
+  return "text-zinc-900";
+}
+
+function renderHighlightedMiniScriptLine(line: string, lineIndex: number) {
+  if (!line) return <span className="text-transparent">.</span>;
+
+  const tokens = line.match(MSP_TOKEN_PATTERN) ?? [line];
+
+  return tokens.map((token, tokenIndex) => (
+    <span
+      key={`${lineIndex}-${tokenIndex}-${token}`}
+      className={getTokenClass(token)}
+    >
+      {token}
+    </span>
+  ));
+}
+
+function getLineFromOffset(text: string, offset: number) {
+  return text.slice(0, offset).split("\n").length;
+}
 
 export default function LiveRoomPage() {
   const { roomId } = useParams() as { roomId: string };
   const router = useRouter();
-
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const monaco = useMonaco();
 
   const [loading, setLoading] = useState(true);
-  const [room, setRoom] = useState<any>(null);
+  const [room, setRoom] = useState<LiveRoom | null>(null);
   const [code, setCode] = useState("");
   const [user, setUser] = useState<any>(null);
-  const [participants, setParticipants] = useState<any[]>([]);
-  const [allParticipants, setAllParticipants] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [profilesMap, setProfilesMap] = useState<Record<string, any>>({});
-  useEffect(() => {
-    async function loadProfiles() {
-      const ids = Array.from(new Set([
-        ...participants.map(p => p.user_id),
-        ...messages.map(m => m.userId || m.user_id).filter(Boolean)
-      ]));
-      if (!ids.length) return;
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url, bio, github, twitter, website")
-        .in("id", ids);
-
-      if (data) {
-        const map: any = {};
-        data.forEach(p => { map[p.id] = p; });
-        setProfilesMap(map);
-      }
-    }
-
-    loadProfiles();
-  }, [participants, messages]);
-
-  const [hoveredUser, setHoveredUser] = useState<string | null>(null);
-  const hoverTimeout = useRef<any>(null);
-  const [message, setMessage] = useState("");
+  const [participants, setParticipants] = useState<LiveParticipant[]>([]);
+  const [allParticipants, setAllParticipants] = useState<ProfileSummary[]>([]);
+  const [messages, setMessages] = useState<LiveMessage[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Record<string, ProfileSummary>>({});
+  const [users, setUsers] = useState<ProfileSummary[]>([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [users, setUsers] = useState<any[]>([]);
-
-  useEffect(() => {
-    async function loadUsers() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url")
-        .limit(50);
-
-      if (data) setUsers(data);
-    }
-
-    loadUsers();
-  }, []);
-
-  // Invite user to room, with duplicate check and toasts
-  async function inviteUser(targetId: string) {
-    try {
-      // check if already participant or invited
-      const { data: existing } = await supabase
-        .from("room_participants")
-        .select("id, status")
-        .eq("room_id", roomId)
-        .eq("user_id", targetId)
-        .maybeSingle();
-
-      if (existing) {
-        toast.error(existing.status === "accepted" ? t("live.toast.userInSession") : t("live.toast.userInvited"));
-        return;
-      }
-
-      const { error } = await supabase
-        .from("room_participants")
-        .insert({
-          room_id: roomId,
-          user_id: targetId,
-          status: "invited",
-        });
-
-      if (error) {
-        toast.error(t("live.toast.inviteFailed"));
-        return;
-      }
-
-      toast.success(t("live.toast.inviteSent"));
-    } catch (e) {
-      toast.error(t("live.toast.error"));
-    }
-  }
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-  const [mousePositions, setMousePositions] = useState<Record<string, {
-    x: number;
-    y: number;
-    targetX: number;
-    targetY: number;
-    lastSeen: number;
-  }>>({});
-
-  const [output, setOutput] = useState<string[]>([]);
+  const [message, setMessage] = useState("");
+  const [runState, setRunState] = useState<RunState>(EMPTY_RUN_STATE);
   const [program, setProgram] = useState<any[]>([]);
-  const [running, setRunning] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [waitingInput, setWaitingInput] = useState<string | null>(null);
-  async function runCode() {
-    try {
-      const parsed = code.split("\n").map(parseLine);
-      setProgram(parsed);
-      reset();
-
-      let out: string[] = [];
-      let res;
-
-      while (true) {
-        res = step(parsed);
-        if (!res) break;
-
-        if ((res as any).inputRequest) {
-          setWaitingInput((res as any).inputRequest);
-          break;
-        }
-
-        if (res.output !== null) {
-          out.push(String(res.output));
-        }
-      }
-
-      setOutput(out);
-    } catch (e: any) {
-      setOutput(["Error: " + e.message]);
-    }
-  }
-
-  function continueRun() {
-    try {
-      let out: string[] = [];
-      let res;
-
-      while (true) {
-        res = step(program);
-        if (!res) break;
-
-        if ((res as any).inputRequest) {
-          setWaitingInput((res as any).inputRequest);
-          break;
-        }
-
-        if (res.output !== null) {
-          out.push(String(res.output));
-        }
-      }
-
-      if (out.length) {
-        setOutput((prev) => [...prev, ...out]);
-      }
-    } catch (e: any) {
-      setOutput(["Error: " + e.message]);
-    }
-  }
-
-  function stepCode() {
-    try {
-      if (!program.length) {
-        const parsed = code.split("\n").map(parseLine);
-        setProgram(parsed);
-        reset();
-        return;
-      }
-
-      const res = step(program);
-
-      if (!res) {
-        setRunning(false);
-        return;
-      }
-
-      if ((res as any).inputRequest) {
-        setWaitingInput((res as any).inputRequest);
-        return;
-      }
-
-      if (res.output !== null) {
-        setOutput((prev) => [...prev, String(res.output)]);
-      }
-    } catch (e: any) {
-      setOutput(["Error: " + e.message]);
-    }
-  }
-
-  function submitInput() {
-    if (!waitingInput) return;
-
-    const val = Number(inputValue);
-    setVariable(waitingInput, isNaN(val) ? inputValue : val);
-    advanceLine();
-
-    setInputValue("");
-    setWaitingInput(null);
-
-    continueRun();
-  }
-
-  function clearOutput() {
-    setOutput([]);
-    reset();
-    setProgram([]);
-  }
+  const [mousePositions, setMousePositions] = useState<Record<string, CursorPosition>>({});
+  const [cursorNow, setCursorNow] = useState(Date.now());
+  const [mobileTab, setMobileTab] = useState("code");
+  const [rightTab, setRightTab] = useState("console");
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [isMobileEditor, setIsMobileEditor] = useState<boolean | null>(null);
+  const [editorCursorLine, setEditorCursorLine] = useState(1);
+  const [tabSize, setTabSize] = useState(2);
+  const [cursorDebugEnabled, setCursorDebugEnabled] = useState(false);
+  const [cursorDebugInfo, setCursorDebugInfo] = useState<CursorDebugInfo>({
+    statusLine: 1,
+  });
 
   const channelRef = useRef<any>(null);
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const editorCursorDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+  const mobileTextAreaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mobileHighlightRef = useRef<HTMLDivElement | null>(null);
   const isRemote = useRef(false);
-  const saveTimeout = useRef<any>(null);
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userRef = useRef<any>(null);
+  const isChatVisibleRef = useRef(false);
+  const currentProfileRef = useRef<ProfileSummary | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const monaco = useMonaco();
+  const isOwner = Boolean(room && user?.id === room.owner_id);
+  const isClosed = room?.status === "closed";
+  const isChatVisible = mobileTab === "chat" || rightTab === "chat";
+  const mobileEditorLines = useMemo(
+    () => (code.length > 0 ? code : 'PRINT "Hello"').split("\n"),
+    [code]
+  );
+  const complexityAnalysis = useMemo<ComplexityAnalysis>(
+    () => analyzeMiniScriptComplexity(code, locale),
+    [code, locale]
+  );
+
+  const tabSizeControl = (
+    <Select
+      value={String(tabSize)}
+      onValueChange={(value) => setTabSize(Number(value))}
+    >
+      <SelectTrigger
+        size="sm"
+        className="h-7 border-zinc-200 bg-white px-2 text-xs text-zinc-600"
+        aria-label={t("live.tabSize")}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="end">
+        {[2, 3, 4, 8].map((size) => (
+          <SelectItem key={size} value={String(size)}>
+            {size} {t("live.spaces")}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  function openProfile(username?: string | null) {
+    if (!username) return;
+    router.push(`/u/${username}`);
+  }
+
+  const scheduleSaveCode = useCallback((value: string) => {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+
+    saveTimeout.current = setTimeout(() => {
+      void api.live.saveCode(roomId, value).catch((error) => {
+        console.warn("Could not persist live code:", error);
+      });
+    }, 1000);
+  }, [roomId]);
+
+  const syncDesktopCursorLine = useCallback((lineFromEvent?: number) => {
+    const editor = editorRef.current;
+    const selectionLine = editor?.getSelection()?.positionLineNumber;
+    const positionLine = editor?.getPosition()?.lineNumber;
+    const lineNumber = lineFromEvent ?? selectionLine ?? positionLine ?? 1;
+
+    setEditorCursorLine((current) =>
+      current === lineNumber ? current : lineNumber
+    );
+
+    setCursorDebugInfo({
+      statusLine: lineNumber,
+      positionLine,
+      selectionLine,
+      modelLines: editor?.getModel()?.getLineCount(),
+      focused: editor?.hasTextFocus(),
+    });
+  }, []);
+
+  const clearEditorCursorListeners = useCallback(() => {
+    editorCursorDisposablesRef.current.forEach((disposable) => disposable.dispose());
+    editorCursorDisposablesRef.current = [];
+  }, []);
+
+  const handleEditorMount: OnMount = (editor) => {
+    editorRef.current = editor;
+    clearEditorCursorListeners();
+    syncDesktopCursorLine();
+    editorCursorDisposablesRef.current = [
+      editor.onDidChangeCursorPosition((event) => {
+        syncDesktopCursorLine(event.position.lineNumber);
+      }),
+      editor.onDidChangeCursorSelection((event) => {
+        syncDesktopCursorLine(event.selection.positionLineNumber);
+      }),
+      editor.onDidChangeModelContent(() => syncDesktopCursorLine()),
+      editor.onKeyUp(() => syncDesktopCursorLine()),
+      editor.onMouseDown((event) => {
+        syncDesktopCursorLine(event.target.position?.lineNumber);
+      }),
+      editor.onMouseUp((event) => {
+        syncDesktopCursorLine(event.target.position?.lineNumber);
+      }),
+      editor.onDidFocusEditorText(() => syncDesktopCursorLine()),
+    ];
+
+    window.setTimeout(() => {
+      editor.layout();
+      editor.focus();
+      syncDesktopCursorLine();
+    }, 0);
+  };
+
+  useEffect(() => {
+    return clearEditorCursorListeners;
+  }, [clearEditorCursorListeners]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const updateEditorMode = () => setIsMobileEditor(mediaQuery.matches);
+
+    updateEditorMode();
+    mediaQuery.addEventListener("change", updateEditorMode);
+
+    return () => mediaQuery.removeEventListener("change", updateEditorMode);
+  }, []);
+
+  useEffect(() => {
+    setCursorDebugEnabled(new URLSearchParams(window.location.search).has("cursorDebug"));
+  }, []);
+
+  useEffect(() => {
+    if (isMobileEditor !== false) return;
+    if (mobileTab !== "code") return;
+
+    const timeout = window.setTimeout(() => {
+      editorRef.current?.layout();
+      editorRef.current?.focus();
+      syncDesktopCursorLine();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [isMobileEditor, mobileTab, syncDesktopCursorLine]);
+
+  useEffect(() => {
+    if (isMobileEditor !== false) return;
+
+    const interval = window.setInterval(syncDesktopCursorLine, 120);
+    return () => window.clearInterval(interval);
+  }, [isMobileEditor, syncDesktopCursorLine]);
+
+  useEffect(() => {
+    isChatVisibleRef.current = isChatVisible;
+
+    if (isChatVisible) {
+      setUnreadMessages(0);
+    }
+  }, [isChatVisible]);
+
+  const participantProfiles = useMemo(() => {
+    const onlineIds = new Set(participants.map((participant) => participant.user_id));
+
+    const online = participants.map((participant) => ({
+      id: participant.user_id,
+      username: participant.username || profilesMap[participant.user_id]?.username,
+      avatar_url: participant.avatar_url || profilesMap[participant.user_id]?.avatar_url,
+      online: true,
+    }));
+
+    const offline = (isClosed ? allParticipants : Object.values(profilesMap))
+      .filter((profile) => !onlineIds.has(profile.id))
+      .map((profile) => ({
+        id: profile.id,
+        username: profile.username,
+        avatar_url: profile.avatar_url,
+        online: false,
+      }));
+
+    return [...online, ...offline];
+  }, [allParticipants, isClosed, participants, profilesMap]);
 
   useEffect(() => {
     if (!monaco) return;
 
-    if (monaco.languages.getLanguages().some(l => l.id === "miniscriptplus")) {
-      return;
+    if (!monaco.languages.getLanguages().some((language) => language.id === "miniscriptplus")) {
+      monaco.languages.register({ id: "miniscriptplus" });
     }
-
-    monaco.languages.register({ id: "miniscriptplus" });
 
     monaco.languages.setMonarchTokensProvider("miniscriptplus", {
       tokenizer: {
@@ -260,159 +457,175 @@ export default function LiveRoomPage() {
     });
 
     monaco.editor.defineTheme("miniscriptplusTheme", {
-      base: "vs-dark",
+      base: "vs",
       inherit: true,
       rules: [
         { token: "comment", foreground: "6A9955", fontStyle: "italic" },
-        { token: "keyword", foreground: "c586c0" },
-        { token: "number", foreground: "b5cea8" },
-        { token: "string", foreground: "ce9178" },
-        { token: "operator", foreground: "d4d4d4" },
-        { token: "constant", foreground: "569cd6" },
+        { token: "keyword", foreground: "7c3aed", fontStyle: "bold" },
+        { token: "number", foreground: "0f766e" },
+        { token: "string", foreground: "b45309" },
+        { token: "operator", foreground: "27272a" },
+        { token: "constant", foreground: "2563eb" },
       ],
-      colors: {},
+      colors: {
+        "editor.background": "#ffffff",
+        "editorLineNumber.foreground": "#a1a1aa",
+        "editorCursor.foreground": "#18181b",
+        "editor.selectionBackground": "#dcfce7",
+      },
     });
   }, [monaco]);
 
-  function getUserColor(id: string) {
-    const colors = ["#ff4d4f","#40a9ff","#73d13d","#ffa940","#9254de","#13c2c2"];
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) hash += id.charCodeAt(i);
-    return colors[hash % colors.length];
-  }
-
   useEffect(() => {
     async function init() {
-      const { data } = await supabase.auth.getUser();
-      const currentUser = data.user;
-      if (!currentUser) {
-        router.replace("/login");
-        return;
-      }
-      setUser(currentUser);
-      userRef.current = currentUser;
+      try {
+        const { data } = await api.auth.getSession();
+        const currentUser = data.session?.user;
 
-      const { data: roomData } = await supabase
-        .from("live_rooms")
-        .select("*")
-        .eq("id", roomId)
-        .maybeSingle();
+        if (!currentUser) {
+          router.replace("/login");
+          return;
+        }
 
-      if (!roomData) {
-        router.replace("/livecode");
-        return;
-      }
+        setUser(currentUser);
+        userRef.current = currentUser;
 
-      setRoom(roomData);
-      setCode(roomData.code || "");
+        const [roomData, chatData, profileList] = await Promise.all([
+          api.live.getRoom(roomId),
+          api.live.getMessages(roomId),
+          api.live.listProfiles(50),
+        ]);
 
-      const { data: chatData } = await supabase
-        .from("live_messages")
-        .select("*")
-        .eq("room_id", roomId)
-        .order("created_at", { ascending: true });
+        if (!roomData) {
+          router.replace("/livecode");
+          return;
+        }
 
-      if (chatData) setMessages(chatData);
+        setRoom(roomData);
+        setCode(roomData.code || "");
+        setMessages(chatData);
+        setUsers(profileList);
+        setLoading(false);
 
-      setLoading(false);
-
-      const channel = supabase.channel(`room-${roomId}`, {
-        config: {
-          broadcast: {
-            self: true,
+        const channel = supabase.channel(`room-${roomId}`, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: currentUser.id },
           },
-          presence: {
-            key: currentUser.id,
-          },
-        },
-      });
-
-      channel.on("broadcast", { event: "code-update" }, (payload: any) => {
-        if (payload?.payload?.userId === currentUser.id) return;
-        isRemote.current = true;
-        setCode(payload.payload.code);
-      });
-
-      channel.on("broadcast", { event: "mouse-move" }, (payload: any) => {
-        const { userId, x, y } = payload.payload || {};
-        if (!userId) return;
-
-        setMousePositions((prev) => {
-          const existing = prev[userId];
-
-          return {
-            ...prev,
-            [userId]: {
-              x: existing?.x ?? x,
-              y: existing?.y ?? y,
-              targetX: x,
-              targetY: y,
-              lastSeen: Date.now(),
-            },
-          };
         });
-      });
 
-      channel.on("broadcast", { event: "chat-message" }, (payload: any) => {
-        const msg = payload.payload;
-        if (!msg) return;
+        channel.on("broadcast", { event: "code-update" }, (payload: any) => {
+          if (payload?.payload?.userId === currentUser.id) return;
+          const nextCode = payload.payload.code || "";
 
-        setMessages((prev) => {
-          const exists = prev.some(
-            (m) =>
-              (m.id && msg.id && m.id === msg.id) ||
-              (
-                (m.created_at || m.createdAt) === (msg.created_at || msg.createdAt) &&
-                (m.user_id || m.userId) === (msg.user_id || msg.userId)
-              )
-          );
-          if (exists) return prev;
-          return [...prev, msg];
-        });
-      });
+          isRemote.current = true;
+          setCode(nextCode);
 
-      channel.on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const raw = Object.values(state).flat();
-
-        const uniqueMap = new Map();
-
-        raw.forEach((p: any) => {
-          if (!uniqueMap.has(p.user_id)) {
-            uniqueMap.set(p.user_id, {
-              user_id: p.user_id,
-              username: p.username,
-              avatar_url: p.avatar_url,
-            });
+          if (currentUser.id === roomData.owner_id) {
+            scheduleSaveCode(nextCode);
           }
         });
 
-        setParticipants(Array.from(uniqueMap.values()));
-      });
+        channel.on("broadcast", { event: "mouse-move" }, (payload: any) => {
+          const { userId, x, y, username, avatar_url } = payload.payload || {};
+          if (!userId || userId === currentUser.id) return;
 
-      channel.subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await supabase.from("live_participants").upsert({
-            room_id: roomId,
-            user_id: currentUser.id,
+          if (username || avatar_url) {
+            setProfilesMap((prev) => ({
+              ...prev,
+              [userId]: {
+                id: userId,
+                username: username || prev[userId]?.username || "User",
+                avatar_url: avatar_url || prev[userId]?.avatar_url || null,
+              },
+            }));
+          }
+
+          setMousePositions((prev) => {
+            const existing = prev[userId];
+
+            return {
+              ...prev,
+              [userId]: {
+                x: existing?.x ?? x,
+                y: existing?.y ?? y,
+                targetX: x,
+                targetY: y,
+                lastSeen: Date.now(),
+                username: username || existing?.username || null,
+                avatar_url: avatar_url || existing?.avatar_url || null,
+              },
+            };
+          });
+        });
+
+        channel.on("broadcast", { event: "chat-message" }, (payload: any) => {
+          const incoming = payload.payload as LiveMessage | undefined;
+          if (!incoming) return;
+
+          setMessages((prev) => {
+            const exists = prev.some(
+              (item) =>
+                (item.id && incoming.id && item.id === incoming.id) ||
+                ((item.created_at || item.createdAt) === (incoming.created_at || incoming.createdAt) &&
+                  getMessageUserId(item) === getMessageUserId(incoming))
+            );
+
+            return exists ? prev : [...prev, incoming];
           });
 
-          try {
-            await supabase
-              .from("room_participants")
-              .insert({
-                room_id: roomId,
-                user_id: currentUser.id,
-              })
-              .select()
-              .single();
-          } catch {}
+          if (getMessageUserId(incoming) !== currentUser.id && !isChatVisibleRef.current) {
+            setUnreadMessages((count) => count + 1);
+          }
+        });
 
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("username, avatar_url")
-            .eq("id", currentUser.id)
-            .maybeSingle();
+        channel.on("presence", { event: "sync" }, () => {
+          const state = channel.presenceState();
+          const raw = Object.values(state).flat();
+          const uniqueMap = new Map<string, LiveParticipant>();
+
+          raw.forEach((participant: any) => {
+            if (!uniqueMap.has(participant.user_id)) {
+              uniqueMap.set(participant.user_id, {
+                user_id: participant.user_id,
+                username: participant.username,
+                avatar_url: participant.avatar_url,
+              });
+            }
+          });
+
+          setParticipants(Array.from(uniqueMap.values()));
+        });
+
+        channel.subscribe(async (status) => {
+          if (status !== "SUBSCRIBED") return;
+
+          const profile = await api.profiles.getSummary(currentUser.id);
+          currentProfileRef.current = profile;
+
+          setProfilesMap((prev) => ({
+            ...prev,
+            [currentUser.id]: profile || {
+              id: currentUser.id,
+              username: "User",
+              avatar_url: null,
+            },
+          }));
+
+          setParticipants((prev) => {
+            if (prev.some((participant) => participant.user_id === currentUser.id)) {
+              return prev;
+            }
+
+            return [
+              ...prev,
+              {
+                user_id: currentUser.id,
+                username: profile?.username || "User",
+                avatar_url: profile?.avatar_url || null,
+              },
+            ];
+          });
 
           await channel.track({
             user_id: currentUser.id,
@@ -420,71 +633,87 @@ export default function LiveRoomPage() {
             avatar_url: profile?.avatar_url || null,
             online_at: new Date().toISOString(),
           });
-        }
-      });
-      channelRef.current = channel;
+
+          void api.live.markLiveParticipant(roomId, currentUser.id).catch((error) => {
+            console.warn("Could not mark live participant:", error);
+          });
+
+          void api.live.joinRoom(roomId, currentUser.id).catch(() => {});
+        });
+
+        channelRef.current = channel;
+      } catch (error) {
+        console.error("Live room init failed:", error);
+        toast.error(t("live.toast.error"));
+        router.replace("/livecode");
+      }
     }
 
-    init();
+    void init();
 
     return () => {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
+
       if (userRef.current) {
-        supabase
-          .from("live_participants")
-          .delete()
-          .eq("room_id", roomId)
-          .eq("user_id", userRef.current.id);
+        void api.live.removeLiveParticipant(roomId, userRef.current.id);
       }
     };
-  }, [roomId]);
+  }, [roomId, router, scheduleSaveCode, t]);
+
+  useEffect(() => {
+    async function loadProfiles() {
+      const ids = Array.from(
+        new Set([
+          ...participants.map((participant) => participant.user_id),
+          ...messages.map((item) => getMessageUserId(item)).filter(Boolean),
+        ])
+      );
+
+      if (!ids.length) return;
+
+      const profiles = await api.live.listProfilesByIds(ids);
+      const map = Object.fromEntries(profiles.map((profile) => [profile.id, profile]));
+      setProfilesMap(map);
+    }
+
+    void loadProfiles();
+  }, [participants, messages]);
 
   useEffect(() => {
     if (!room || room.status !== "closed") return;
 
     async function loadAllParticipants() {
-      const { data: dbParticipants } = await supabase
-        .from("room_participants")
-        .select("user_id")
-        .eq("room_id", roomId);
-
-      if (!dbParticipants) return;
-
-      const ids = dbParticipants.map(p => p.user_id);
-      if (!ids.length) return;
-
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url")
-        .in("id", ids);
-
-      if (profiles) {
-        setAllParticipants(profiles);
-      }
+      const rows = await api.live.listRoomParticipants(roomId);
+      const ids = rows.map((row) => row.user_id);
+      const profiles = await api.live.listProfilesByIds(ids);
+      setAllParticipants(profiles);
     }
 
-    loadAllParticipants();
-  }, [room?.status, roomId]);
+    void loadAllParticipants();
+  }, [room, roomId]);
 
   useEffect(() => {
-    let raf: any;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    let raf: number;
 
     function animate() {
       setMousePositions((prev) => {
-        const next: any = {};
+        const next: Record<string, CursorPosition> = {};
 
-        Object.entries(prev).forEach(([id, pos]: any) => {
+        Object.entries(prev).forEach(([id, pos]) => {
           const lerpFactor = 0.25;
-
-          const newX = pos.x + (pos.targetX - pos.x) * lerpFactor;
-          const newY = pos.y + (pos.targetY - pos.y) * lerpFactor;
 
           next[id] = {
             ...pos,
-            x: newX,
-            y: newY,
+            x: pos.x + (pos.targetX - pos.x) * lerpFactor,
+            y: pos.y + (pos.targetY - pos.y) * lerpFactor,
           };
         });
 
@@ -500,27 +729,43 @@ export default function LiveRoomPage() {
   }, []);
 
   useEffect(() => {
-    let rafId: any = null;
+    const interval = window.setInterval(() => {
+      setCursorNow(Date.now());
+      setMousePositions((prev) => {
+        const now = Date.now();
+        const next: Record<string, CursorPosition> = {};
 
-    function handleMove(e: MouseEvent) {
+        Object.entries(prev).forEach(([id, data]) => {
+          if (now - data.lastSeen < 1500) {
+            next[id] = data;
+          }
+        });
+
+        return next;
+      });
+    }, 500);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let rafId: number | null = null;
+
+    function handleMove(event: MouseEvent) {
       if (!channelRef.current || !userRef.current) return;
 
       const payload = {
         userId: userRef.current.id,
-        x: e.clientX / window.innerWidth,
-        y: e.clientY / window.innerHeight,
+        x: event.clientX / window.innerWidth,
+        y: event.clientY / window.innerHeight,
+        username: currentProfileRef.current?.username || "User",
+        avatar_url: currentProfileRef.current?.avatar_url || null,
       };
-
-      channelRef.current.send({
-        type: "broadcast",
-        event: "mouse-move",
-        payload,
-      });
 
       if (rafId) cancelAnimationFrame(rafId);
 
       rafId = requestAnimationFrame(() => {
-        channelRef.current.send({
+        channelRef.current?.send({
           type: "broadcast",
           event: "mouse-move",
           payload,
@@ -536,29 +781,210 @@ export default function LiveRoomPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMousePositions((prev) => {
-        const now = Date.now();
-        const next: any = {};
+  function applyStepResult(result: StepResult, collectedOutput: string[] = []) {
+    if (!result) return;
 
-        Object.entries(prev).forEach(([id, data]: any) => {
-          if (now - data.lastSeen < 1500) {
-            next[id] = data;
-          }
-        });
+    setRunState({
+      output: collectedOutput,
+      variables: result.variables,
+      currentLine: result.currentLine,
+    });
+  }
 
-        return next;
+  function runCode() {
+    try {
+      const parsed = code.split("\n").map(parseLine);
+      setProgram(parsed);
+      reset();
+      setWaitingInput(null);
+
+      const collectedOutput: string[] = [];
+      let lastResult: StepResult = null;
+
+      while (true) {
+        const result = step(parsed);
+        if (!result) break;
+
+        lastResult = result;
+
+        if (result.inputRequest) {
+          setWaitingInput(result.inputRequest);
+          break;
+        }
+
+        if (result.output !== null) {
+          collectedOutput.push(String(result.output));
+        }
+      }
+
+      applyStepResult(lastResult, collectedOutput);
+
+      if (!lastResult) {
+        setRunState({ ...EMPTY_RUN_STATE, output: collectedOutput });
+      }
+
+      setMobileTab("run");
+      setRightTab("console");
+    } catch (error: any) {
+      setRunState({
+        output: [`Error: ${error.message}`],
+        variables: {},
+        currentLine: error.line || 0,
       });
-    }, 500);
+      setMobileTab("run");
+      setRightTab("console");
+    }
+  }
 
-    return () => clearInterval(interval);
-  }, []);
+  function continueRun() {
+    try {
+      const collectedOutput: string[] = [];
+      let lastResult: StepResult = null;
+
+      while (true) {
+        const result = step(program);
+        if (!result) break;
+
+        lastResult = result;
+
+        if (result.inputRequest) {
+          setWaitingInput(result.inputRequest);
+          break;
+        }
+
+        if (result.output !== null) {
+          collectedOutput.push(String(result.output));
+        }
+      }
+
+      if (lastResult) {
+        setRunState((prev) => ({
+          output: [...prev.output, ...collectedOutput],
+          variables: lastResult?.variables || prev.variables,
+          currentLine: lastResult?.currentLine || prev.currentLine,
+        }));
+      }
+    } catch (error: any) {
+      setRunState((prev) => ({
+        ...prev,
+        output: [`Error: ${error.message}`],
+        currentLine: error.line || prev.currentLine,
+      }));
+    }
+  }
+
+  function stepCode() {
+    try {
+      let parsed = program;
+
+      if (!parsed.length) {
+        parsed = code.split("\n").map(parseLine);
+        setProgram(parsed);
+        reset();
+      }
+
+      const result = step(parsed);
+      if (!result) return;
+
+      if (result.inputRequest) {
+        setWaitingInput(result.inputRequest);
+      }
+
+      setRunState((prev) => ({
+        output:
+          result.output !== null
+            ? [...prev.output, String(result.output)]
+            : prev.output,
+        variables: result.variables,
+        currentLine: result.currentLine,
+      }));
+      setMobileTab("run");
+      setRightTab("console");
+    } catch (error: any) {
+      setRunState((prev) => ({
+        ...prev,
+        output: [`Error: ${error.message}`],
+        currentLine: error.line || prev.currentLine,
+      }));
+    }
+  }
+
+  function submitInput() {
+    if (!waitingInput) return;
+
+    const value = Number(inputValue);
+    setVariable(waitingInput, Number.isNaN(value) ? inputValue : value);
+    advanceLine();
+
+    setInputValue("");
+    setWaitingInput(null);
+    continueRun();
+  }
+
+  function clearOutput() {
+    setRunState(EMPTY_RUN_STATE);
+    setProgram([]);
+    setWaitingInput(null);
+    reset();
+  }
+
+  function handleChange(value: string) {
+    if (!room || isClosed) return;
+
+    setCode(value);
+
+    if (isRemote.current) {
+      isRemote.current = false;
+      return;
+    }
+
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "code-update",
+      payload: { code: value, userId: userRef.current?.id },
+    });
+
+    scheduleSaveCode(value);
+  }
+
+  function handleMobileCodeScroll(event: UIEvent<HTMLTextAreaElement>) {
+    const highlight = mobileHighlightRef.current;
+    if (!highlight) return;
+
+    highlight.scrollTop = event.currentTarget.scrollTop;
+    highlight.scrollLeft = event.currentTarget.scrollLeft;
+  }
+
+  function updateMobileCursorLine(target: HTMLTextAreaElement) {
+    setEditorCursorLine(getLineFromOffset(target.value, target.selectionStart));
+  }
+
+  function handleMobileCodeKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Tab") return;
+
+    event.preventDefault();
+
+    const target = event.currentTarget;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const spaces = " ".repeat(tabSize);
+    const nextCode = `${code.slice(0, start)}${spaces}${code.slice(end)}`;
+
+    handleChange(nextCode);
+    setEditorCursorLine(getLineFromOffset(nextCode, start + tabSize));
+
+    window.requestAnimationFrame(() => {
+      mobileTextAreaRef.current?.focus();
+      if (!mobileTextAreaRef.current) return;
+      mobileTextAreaRef.current.selectionStart = start + tabSize;
+      mobileTextAreaRef.current.selectionEnd = start + tabSize;
+    });
+  }
 
   async function sendMessage() {
     if (!message.trim() || !channelRef.current || !userRef.current) return;
 
-    const msg = {
+    const outgoing: LiveMessage = {
       id: `${Date.now()}-${Math.random()}`,
       text: message,
       userId: userRef.current.id,
@@ -568,16 +994,18 @@ export default function LiveRoomPage() {
     channelRef.current.send({
       type: "broadcast",
       event: "chat-message",
-      payload: msg,
+      payload: outgoing,
     });
 
-    await supabase.from("live_messages").insert({
-      room_id: roomId,
-      user_id: msg.userId,
-      text: msg.text,
-    });
-
+    setMessages((prev) => [...prev, outgoing]);
+    setUnreadMessages(0);
     setMessage("");
+
+    try {
+      await api.live.sendMessage(roomId, outgoing.userId || "", outgoing.text);
+    } catch {
+      toast.error(t("live.toast.error"));
+    }
   }
 
   async function shareSession() {
@@ -586,451 +1014,593 @@ export default function LiveRoomPage() {
     toast.success(t("live.shareCopied"));
   }
 
-  function handleChange(value: string) {
-    if (!room || room.status === "closed") return;
+  async function inviteUser(targetId: string) {
+    try {
+      const existing = await api.live.getParticipant(roomId, targetId);
 
-    setCode(value);
+      if (existing) {
+        toast.error(
+          existing.status === "accepted"
+            ? t("live.toast.userInSession")
+            : t("live.toast.userInvited")
+        );
+        return;
+      }
 
-    if (isRemote.current) {
-      isRemote.current = false;
-      return;
+      await api.live.inviteUser(roomId, targetId);
+      toast.success(t("live.toast.inviteSent"));
+    } catch {
+      toast.error(t("live.toast.inviteFailed"));
     }
-
-    if (!channelRef.current) return;
-
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "code-update",
-      payload: { code: value, userId: userRef.current?.id }
-    });
-
-    clearTimeout(saveTimeout.current);
-    saveTimeout.current = setTimeout(async () => {
-      await supabase
-        .from("live_rooms")
-        .update({ code: value })
-        .eq("id", roomId);
-    }, 1000);
   }
 
   async function closeSession() {
-    if (!room || user?.id !== room.owner_id) return;
+    if (!room || !isOwner) return;
 
-    await supabase
-      .from("live_rooms")
-      .update({ status: "closed", ended_at: new Date().toISOString() })
-      .eq("id", roomId);
-
-    setRoom((prev: any) => ({ ...prev, status: "closed" }));
+    await api.live.closeRoom(roomId);
+    setRoom((prev) => (prev ? { ...prev, status: "closed" } : prev));
   }
+
+  const editorPanel = (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-y border-zinc-200 bg-white md:border">
+      <div className="flex h-10 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
+          <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+          <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+          <span className="ml-2 truncate text-xs font-medium text-zinc-700">main.msp</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">
+            {isClosed ? t("live.sessionEnded") : "MiniScript+"}
+          </span>
+          <div className="md:hidden">{tabSizeControl}</div>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {isMobileEditor === null && (
+          <Skeleton className="h-full min-h-[520px] w-full rounded-none md:min-h-0" />
+        )}
+
+        {isMobileEditor === true && (
+          <div className="relative h-full min-h-[520px] overflow-hidden bg-white font-mono text-[15px] leading-6 md:min-h-0">
+            <div
+              ref={mobileHighlightRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+            >
+              <div className="grid min-h-full min-w-max grid-cols-[3.25rem_1fr]">
+                <div className="select-none border-r border-zinc-100 bg-zinc-50/80 py-4 text-right text-xs leading-6 text-zinc-400">
+                  {mobileEditorLines.map((_, index) => (
+                    <div key={index} className="h-6 pr-3">
+                      {index + 1}
+                    </div>
+                  ))}
+                </div>
+
+                <pre className="m-0 min-w-[calc(100vw-5rem)] whitespace-pre px-4 py-4 text-[15px] leading-6">
+                  {mobileEditorLines.map((line, index) => (
+                    <div key={index} className="h-6">
+                      {code.length > 0 ? (
+                        renderHighlightedMiniScriptLine(line, index)
+                      ) : (
+                        <span className="text-zinc-400">{line}</span>
+                      )}
+                    </div>
+                  ))}
+                </pre>
+              </div>
+            </div>
+
+            <textarea
+              ref={mobileTextAreaRef}
+              value={code}
+              onChange={(event) => {
+                handleChange(event.target.value);
+                updateMobileCursorLine(event.target);
+              }}
+              onClick={(event) => updateMobileCursorLine(event.currentTarget)}
+              onKeyUp={(event) => updateMobileCursorLine(event.currentTarget)}
+              onSelect={(event) => updateMobileCursorLine(event.currentTarget)}
+              onScroll={handleMobileCodeScroll}
+              onKeyDown={handleMobileCodeKeyDown}
+              readOnly={isClosed}
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
+              wrap="off"
+              aria-label="MiniScript+ editor"
+              className="absolute inset-0 h-full w-full resize-none overflow-auto border-0 bg-transparent py-4 pl-[4.25rem] pr-4 font-mono text-[15px] leading-6 text-transparent caret-zinc-900 outline-none selection:bg-emerald-200/70"
+            />
+          </div>
+        )}
+
+        {isMobileEditor === false && (
+          <Editor
+            onMount={handleEditorMount}
+            height="100%"
+            defaultLanguage="miniscriptplus"
+            theme="miniscriptplusTheme"
+            value={code}
+            onChange={(value) => {
+              handleChange(value || "");
+              syncDesktopCursorLine();
+            }}
+            options={{
+              fontSize: 14,
+              fontFamily: "JetBrains Mono, monospace",
+              minimap: { enabled: false },
+              padding: { top: 16, bottom: 16 },
+              smoothScrolling: true,
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+              automaticLayout: true,
+              cursorSmoothCaretAnimation: "on",
+              cursorBlinking: "smooth",
+              scrollbar: {
+                verticalScrollbarSize: 8,
+                horizontalScrollbarSize: 8,
+              },
+              tabSize,
+              insertSpaces: true,
+              readOnly: isClosed,
+              wrappingIndent: "same",
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+
+  const consolePanel = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        {t("live.console")}
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-zinc-950 p-4 font-mono text-sm text-emerald-300">
+        {runState.output.length === 0 ? (
+          <div className="text-zinc-500">{t("live.noOutput")}</div>
+        ) : (
+          runState.output.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)
+        )}
+      </div>
+
+      {waitingInput && (
+        <div className="border-t border-zinc-200 bg-white p-3">
+          <div className="mb-2 text-xs font-medium text-zinc-500">
+            {t("live.inputPrompt")} {waitingInput}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              placeholder={t("live.inputPlaceholder")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitInput();
+              }}
+            />
+            <Button size="sm" onClick={submitInput}>{t("live.ok")}</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 border-t border-zinc-200 bg-white p-3">
+        <div className="rounded-lg border border-zinc-200 p-2">
+          <div className="text-xs text-zinc-500">Line</div>
+          <div className="font-mono text-sm">{runState.currentLine}</div>
+        </div>
+        <div className="rounded-lg border border-zinc-200 p-2">
+          <div className="text-xs text-zinc-500">Variables</div>
+          <div className="font-mono text-sm">{Object.keys(runState.variables).length}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const debuggerPanel = (
+    <div className="h-full overflow-y-auto p-4">
+      <div className="space-y-4">
+        <section className="rounded-xl border border-zinc-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <CheckCircle2 size={14} />
+            {t("live.debugger")}
+          </div>
+
+          <div className="space-y-3 p-3">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-lg bg-zinc-50 p-3">
+                <p className="text-xs text-zinc-500">Line</p>
+                <p className="font-mono font-semibold">{runState.currentLine}</p>
+              </div>
+
+              <div className="rounded-lg bg-zinc-50 p-3">
+                <p className="text-xs text-zinc-500">Variables</p>
+                <p className="font-mono font-semibold">
+                  {Object.keys(runState.variables).length}
+                </p>
+              </div>
+            </div>
+
+            <pre className="max-h-52 overflow-auto rounded-lg bg-zinc-950 p-3 text-xs text-emerald-300">
+              {JSON.stringify(runState.variables, null, 2)}
+            </pre>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-zinc-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <Gauge size={14} />
+            {t("editor.complexity.title")}
+          </div>
+
+          <div className="space-y-4 p-3">
+            <div className="flex justify-center">
+              <ComplexityCircle
+                label={t(`editor.complexity.levels.${complexityAnalysis.level}`)}
+                score={complexityAnalysis.score}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-lg bg-zinc-50 p-3">
+                <p className="text-xs text-zinc-500">
+                  {t("editor.complexity.metrics.time")}
+                </p>
+                <p className="font-semibold">{complexityAnalysis.timeComplexity}</p>
+              </div>
+
+              <div className="rounded-lg bg-zinc-50 p-3">
+                <p className="text-xs text-zinc-500">
+                  {t("editor.complexity.metrics.space")}
+                </p>
+                <p className="font-semibold">{complexityAnalysis.spaceComplexity}</p>
+              </div>
+
+              <div className="rounded-lg border border-zinc-200 p-3">
+                <p className="text-xs text-zinc-500">
+                  {t("editor.complexity.metrics.loops")}
+                </p>
+                <p className="font-semibold">{complexityAnalysis.loopCount}</p>
+              </div>
+
+              <div className="rounded-lg border border-zinc-200 p-3">
+                <p className="text-xs text-zinc-500">
+                  {t("editor.complexity.metrics.maxNesting")}
+                </p>
+                <p className="font-semibold">{complexityAnalysis.maxNestedLoops}</p>
+              </div>
+            </div>
+
+            {complexityAnalysis.warnings.length > 0 && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <div className="mb-2 font-semibold text-amber-700">
+                  {t("editor.complexity.warnings")}
+                </div>
+                <ul className="space-y-2 text-amber-700">
+                  {complexityAnalysis.warnings.map((warning, index) => (
+                    <li key={index}>• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-zinc-200 p-3 text-sm">
+              <div className="mb-2 flex items-center gap-2 font-semibold text-zinc-800">
+                <Lightbulb size={15} />
+                {t("editor.complexity.suggestions")}
+              </div>
+
+              <ul className="space-y-2 text-zinc-600">
+                {complexityAnalysis.suggestions.map((suggestion, index) => (
+                  <li key={index}>• {suggestion}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  const peoplePanel = (
+    <div className="h-full overflow-y-auto p-4">
+      <div className="space-y-2">
+        {participantProfiles.map((profile) => (
+          <button
+            key={profile.id}
+            type="button"
+            onClick={() => openProfile(profile.username)}
+            disabled={!profile.username}
+            className="flex w-full items-center gap-3 rounded-lg border border-zinc-200 p-2 text-left transition hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-transparent"
+          >
+            <Avatar className="h-8 w-8">
+              {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
+              <AvatarFallback>{getInitial(profile)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{profile.username || "User"}</div>
+              <div className="text-xs text-zinc-500">
+                {profile.id === room?.owner_id ? t("live.owner") : profile.online ? "Online" : "Offline"}
+              </div>
+            </div>
+            <span className={`h-2 w-2 rounded-full ${profile.online ? "bg-emerald-500" : "bg-zinc-300"}`} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const chatPanel = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-3">
+          {messages.map((item) => {
+            const messageUserId = getMessageUserId(item);
+            const isMe = messageUserId === user?.id;
+            const profile =
+              participants.find((participant) => participant.user_id === messageUserId) ||
+              profilesMap[messageUserId];
+
+            return (
+              <div
+                key={`${item.id || ""}-${item.created_at || item.createdAt || ""}-${messageUserId}`}
+                className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}
+              >
+                {!isMe && (
+                  <button
+                    type="button"
+                    onClick={() => openProfile(profile?.username)}
+                    disabled={!profile?.username}
+                    className="rounded-full disabled:cursor-default"
+                    aria-label={profile?.username ? `Open ${profile.username}` : "User"}
+                  >
+                  <Avatar className="h-7 w-7">
+                    {profile?.avatar_url && <AvatarImage src={profile.avatar_url} />}
+                    <AvatarFallback>{getInitial(profile)}</AvatarFallback>
+                  </Avatar>
+                  </button>
+                )}
+                <div
+                  className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm ${
+                    isMe
+                      ? "rounded-br-sm bg-zinc-900 text-white"
+                      : "rounded-bl-sm bg-zinc-100 text-zinc-900"
+                  }`}
+                >
+                  {!isMe && (
+                    <button
+                      type="button"
+                      onClick={() => openProfile(profile?.username)}
+                      disabled={!profile?.username}
+                      className="mb-1 block text-[11px] font-medium opacity-60 hover:underline disabled:cursor-default disabled:hover:no-underline"
+                    >
+                      {profile?.username || "User"}
+                    </button>
+                  )}
+                  <div className="whitespace-pre-wrap break-words">{item.text}</div>
+                  <div className="mt-1 text-right text-[10px] opacity-50">
+                    {getMessageTime(item)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {!isClosed && (
+        <div className="border-t border-zinc-200 bg-white p-3">
+          <div className="flex gap-2">
+            <Input
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder={t("live.messagePlaceholder")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void sendMessage();
+              }}
+            />
+            <Button size="icon" onClick={sendMessage} aria-label={t("live.send")}>
+              <Send size={16} />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const sidePanel = (
+    <Tabs value={rightTab} onValueChange={setRightTab} className="flex h-full min-h-0 flex-col gap-0">
+      <div className="border-b border-zinc-200 bg-white px-2 py-2">
+        <TabsList className="grid h-9 w-full grid-cols-4">
+          <TabsTrigger value="console" aria-label={t("live.console")}>
+            <Terminal size={15} />
+          </TabsTrigger>
+          <TabsTrigger value="debugger" aria-label={t("live.debugger")}>
+            <CheckCircle2 size={15} />
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="relative">
+            <MessageSquare size={15} />
+            {unreadMessages > 0 && (
+              <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-4 text-white">
+                {unreadMessages > 9 ? "9+" : unreadMessages}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="people"><Users size={15} /></TabsTrigger>
+        </TabsList>
+      </div>
+      <TabsContent value="console" className="min-h-0">{consolePanel}</TabsContent>
+      <TabsContent value="debugger" className="min-h-0">{debuggerPanel}</TabsContent>
+      <TabsContent value="chat" className="min-h-0">{chatPanel}</TabsContent>
+      <TabsContent value="people" className="min-h-0">{peoplePanel}</TabsContent>
+    </Tabs>
+  );
 
   if (loading) {
     return (
-      <div className="w-full">
-        <div className="p-6 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <Skeleton className="h-7 w-48" />
-                <Skeleton className="h-4 w-64" />
-              </div>
-              <div className="flex gap-2">
-                <Skeleton className="h-9 w-20" />
-                <Skeleton className="h-9 w-24" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-6 w-6 rounded-full" />
-              <Skeleton className="h-6 w-6 rounded-full" />
-            </div>
-            <Skeleton className="h-[400px] w-full" />
-            <Skeleton className="h-32 w-full" />
+      <div className="h-full bg-white">
+        <div className="flex h-full flex-col">
+          <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-4">
+            <Skeleton className="h-6 w-44" />
+            <Skeleton className="h-9 w-28" />
           </div>
-          <div className="space-y-4">
-            <Skeleton className="h-6 w-24" />
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-10 w-full" />
+          <div className="grid flex-1 grid-cols-1 gap-0 md:grid-cols-[1fr_360px]">
+            <Skeleton className="m-4 h-[calc(100%-2rem)]" />
+            <Skeleton className="m-4 hidden h-[calc(100%-2rem)] md:block" />
           </div>
         </div>
       </div>
     );
   }
 
-  const isOwner = user?.id === room.owner_id;
+  if (!room) return null;
 
   return (
-    <div className="w-full">
-      <div className="p-6 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-      <div className="lg:col-span-2 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{t("live.sessionTitle")}</h1>
-            <div className="text-sm text-muted-foreground mt-1">
-              <span className="font-medium text-foreground">
-                {room.name || t("live.untitledSession")}
-              </span>
-              <span> - </span>
-              <span className="font-mono">{room.id}</span>
+    <div className="h-full overflow-hidden bg-white">
+      <div className="flex h-full min-h-0 flex-col">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-3 md:px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => router.push("/livecode")} aria-label="Back">
+              <LogOut size={17} />
+            </Button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-sm font-semibold md:text-base">
+                  {room.name || t("live.untitledSession")}
+                </h1>
+                <Badge variant={isClosed ? "secondary" : "default"} className="hidden md:inline-flex">
+                  {isClosed ? t("livecode.status.closed") : t("livecode.status.active")}
+                </Badge>
+              </div>
+              <div className="hidden text-xs text-zinc-500 md:block">
+                {participants.length} {t("live.online")} · {room.id}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={shareSession}
-              className="flex items-center gap-2"
-            >
-              <Share2 size={16} />
+          <div className="flex items-center gap-1.5">
+            <div className="mr-1 hidden -space-x-2 md:flex">
+              {participants.slice(0, 4).map((participant) => (
+                <button
+                  key={participant.user_id}
+                  type="button"
+                  onClick={() => openProfile(participant.username)}
+                  disabled={!participant.username}
+                  className="rounded-full transition hover:-translate-y-0.5 disabled:cursor-default disabled:hover:translate-y-0"
+                  aria-label={participant.username ? `Open ${participant.username}` : "User"}
+                >
+                <Avatar className="h-7 w-7 border-2 border-white">
+                  {participant.avatar_url && <AvatarImage src={participant.avatar_url} />}
+                  <AvatarFallback>{getInitial(participant)}</AvatarFallback>
+                </Avatar>
+                </button>
+              ))}
+            </div>
+            <Button size="sm" onClick={runCode} className="gap-2">
+              <Play size={15} />
+              {t("live.run")}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={stepCode} className="hidden gap-2 sm:inline-flex">
+              <Plus size={15} />
+              {t("live.step")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearOutput} className="hidden sm:inline-flex">
+              {t("live.clear")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={shareSession} className="hidden gap-2 sm:inline-flex">
+              <Share2 size={15} />
               {t("live.share")}
             </Button>
-
-            {isOwner && room.status === "active" && (
-              <Button variant="secondary" onClick={() => setInviteOpen(true)}>
+            {isOwner && !isClosed && (
+              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} className="hidden sm:inline-flex">
                 {t("live.invite")}
               </Button>
             )}
-
-            {isOwner && room.status === "active" && (
-              <Button variant="destructive" onClick={closeSession}>
+            {isOwner && !isClosed && (
+              <Button size="sm" variant="destructive" onClick={closeSession} className="hidden sm:inline-flex">
+                <Square size={14} />
                 {t("live.endSession")}
               </Button>
             )}
           </div>
-        </div>
+        </header>
 
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">
-            {participants.length} {t("live.online")}
-          </span>
-
-          <div className="flex items-center gap-2">
-            {participants.map((p, i) => {
-              const profile = profilesMap[p.user_id];
-              const isMe = p.user_id === user?.id;
-
-              return (
-                <div
-                  key={i}
-                  className="relative inline-block"
-                  onMouseEnter={() => {
-                    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-                    setHoveredUser(p.user_id);
-                  }}
-                  onMouseLeave={() => {
-                    hoverTimeout.current = setTimeout(() => {
-                      setHoveredUser(null);
-                    }, 150);
-                  }}
-                >
-                  <Link href={`/u/${p.username}`}>
-                    <div className="flex items-center gap-1 text-xs cursor-pointer">
-                      {p.avatar_url ? (
-                        <img
-                          src={p.avatar_url}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
-                          {p.username?.[0]?.toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-
-                  {/* Tooltip */}
-                  <div
-                    className={`absolute left-1/2 -translate-x-1/2 mt-2 transition-opacity duration-150 z-50 ${
-                      hoveredUser === p.user_id
-                        ? "opacity-100 pointer-events-auto"
-                        : "opacity-0 pointer-events-none"
-                    }`}
-                  >
-                    <div
-                      className="w-56 p-3 rounded-lg border bg-background shadow-lg space-y-2 text-xs"
-                      onMouseEnter={() => {
-                        if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-                        setHoveredUser(p.user_id);
-                      }}
-                      onMouseLeave={() => {
-                        hoverTimeout.current = setTimeout(() => {
-                          setHoveredUser(null);
-                        }, 150);
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        {p.avatar_url ? (
-                          <img src={p.avatar_url} className="w-8 h-8 rounded-full" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                            {p.username?.[0]?.toUpperCase()}
-                          </div>
-                        )}
-
-                        <div>
-                          <div className="font-medium">
-                            {p.username} {isMe && t("live.you")}
-                          </div>
-                        </div>
-                      </div>
-
-                      {profile?.bio && (
-                        <div className="text-muted-foreground">{profile.bio}</div>
-                      )}
-
-                      <div className="flex gap-2">
-                        {profile?.github && (
-                          <a href={profile.github} target="_blank" className="underline">GitHub</a>
-                        )}
-                        {profile?.twitter && (
-                          <a href={profile.twitter} target="_blank" className="underline">Twitter</a>
-                        )}
-                        {profile?.website && (
-                          <a href={profile.website} target="_blank" className="underline">Website</a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+        {isMobileEditor === false && (
+          <div className="hidden min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px] md:grid">
+            <main className="flex min-h-0 min-w-0 flex-col bg-white">
+              {editorPanel}
+              <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">
+                <span>Ln {editorCursorLine}</span>
+                <div className="flex items-center gap-2">
+                  <span>{t("live.tabSize")}</span>
+                  {tabSizeControl}
+                  <span>· MSP</span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {room.status === "closed" && (
-          <div className="text-sm text-muted-foreground">
-            {t("live.sessionEnded")}
-          </div>
-        )}
-
-        <div className="space-y-3">
-
-        <div className="flex gap-2">
-          <Button onClick={runCode}>{t("live.run")}</Button>
-          <Button variant="secondary" onClick={stepCode}>{t("live.step")}</Button>
-          <Button variant="outline" onClick={clearOutput}>{t("live.clear")}</Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("live.editor")}</CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0 overflow-hidden">
-            <div className="border rounded overflow-hidden min-w-0 max-w-full">
-              <Editor
-                height="400px"
-                defaultLanguage="miniscriptplus"
-                theme="miniscriptplusTheme"
-                value={code}
-                onChange={(value) => handleChange(value || "")}
-                options={{
-                  fontSize: 14,
-                  fontFamily: "JetBrains Mono, monospace",
-                  minimap: { enabled: false },
-                  padding: { top: 12 },
-                  smoothScrolling: true,
-                  scrollBeyondLastLine: false,
-                  wordWrap: "on",
-                  automaticLayout: true,
-                  cursorSmoothCaretAnimation: "on",
-                  cursorBlinking: "smooth",
-                  scrollbar: {
-                    verticalScrollbarSize: 6,
-                    horizontalScrollbarSize: 6,
-                  },
-                  readOnly: room.status === "closed",
-                  wrappingIndent: "same",
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("live.debugger")}</CardTitle>
-          </CardHeader>
-          <CardContent className="min-w-0 overflow-hidden">
-            <div className="bg-black text-green-400 font-mono text-sm p-3 rounded h-40 overflow-auto">
-              {output.length === 0 && <div className="opacity-50">{t("live.noOutput")}</div>}
-              {output.map((line, i) => (
-                <div key={i}>{line}</div>
-              ))}
-            </div>
-            {/* Input UI */}
-            {waitingInput && (
-              <div className="border rounded-lg p-3 mt-2 flex gap-2 items-center">
-                <span className="text-sm">{t("live.inputPrompt")} {waitingInput}:</span>
-                <input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  className="flex-1 px-2 py-1 border rounded text-sm"
-                  placeholder={t("live.inputPlaceholder")}
-                />
-                <Button size="sm" onClick={submitInput}>{t("live.ok")}</Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        </div>
-      </div>
-
-      <div className="space-y-4">
-
-        {/* User Panel */}
-        <div className="border rounded-lg p-3">
-          <div className="text-sm font-medium mb-3">{t("live.users")}</div>
-
-          <div className="space-y-2">
-            {(() => {
-              const onlineIds = new Set(participants.map(p => p.user_id));
-
-              const onlineUsers = participants.map(p => ({
-                id: p.user_id,
-                username: p.username,
-                avatar_url: p.avatar_url,
-                online: true
-              }));
-
-              const extraUsersSource =
-                room.status === "closed"
-                  ? allParticipants
-                  : Object.values(profilesMap);
-
-              const extraUsers = extraUsersSource
-                .filter((p: any) => !onlineIds.has(p.user_id || p.id))
-                .map((p: any) => ({
-                  id: p.user_id || p.id,
-                  username: p.username,
-                  avatar_url: p.avatar_url,
-                  online: false
-                }));
-
-              const merged = [...onlineUsers, ...extraUsers];
-
-              return merged.map((p: any) => {
-                const isOwnerUser = p.id === room.owner_id;
-
-                return (
-                  <div key={p.id} className="flex items-center gap-2 text-sm">
-                    {p.avatar_url ? (
-                      <img
-                        src={p.avatar_url}
-                        className="w-7 h-7 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs">
-                        {p.username?.[0]?.toUpperCase()}
-                      </div>
-                    )}
-
-                    <div className="flex-1 flex items-center gap-2">
-                      <span className="font-medium">{p.username}</span>
-
-                      {isOwnerUser && (
-                        <span className="text-[10px] px-2 py-[2px] bg-primary text-white rounded">
-                          {t("live.owner")}
-                        </span>
-                      )}
-                    </div>
-
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        p.online
-                          ? "bg-green-500"
-                          : "bg-gray-400 opacity-50"
-                      }`}
-                    />
-                  </div>
-                );
-              });
-            })()}
+            </main>
+            <aside className="min-h-0 border-l border-zinc-200 bg-white">
+              {sidePanel}
+            </aside>
           </div>
-        </div>
-
-        {/* Chat Panel */}
-        {room.status === "active" && (
-        <div className="flex flex-col border rounded-lg overflow-hidden h-[400px]">
-          <div className="p-3 border-b text-sm font-medium">
-            {t("live.chat")}
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {messages.map((m) => {
-              const isMe = (m.userId || m.user_id) === user?.id;
-              const userId = m.userId || m.user_id;
-              const u =
-                participants.find((p) => (p.user_id || p.id) === userId) ||
-                allParticipants.find((p) => (p.user_id || p.id) === userId) ||
-                profilesMap[userId];
-              const time = new Date(m.createdAt || m.created_at).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              });
-              return (
-                <div
-                  key={`${m.id || ""}-${m.created_at || ""}-${m.userId || m.user_id || ""}`}
-                  className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}
-                >
-                  {!isMe && (
-                    u?.avatar_url ? (
-                      <img
-                        src={u.avatar_url}
-                        className="w-6 h-6 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs">
-                        {u?.username?.[0]?.toUpperCase() || "U"}
-                      </div>
-                    )
-                  )}
-                  <div
-                    className={`max-w-[70%] px-3 py-2 rounded-lg text-sm break-words whitespace-pre-wrap ${
-                      isMe
-                        ? "bg-primary text-white rounded-br-none"
-                        : "bg-muted rounded-bl-none"
-                    }`}
-                  >
-                    {!isMe && (
-                      <div className="text-[10px] font-medium mb-1 opacity-70">
-                        {u?.username || "User"}
-                      </div>
-                    )}
-                    <div className="break-words whitespace-pre-wrap">{m.text}</div>
-                    <div className="text-[10px] opacity-60 mt-1 text-right">
-                      {time}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-          <div className="p-2 border-t flex gap-2">
-            <input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={t("live.messagePlaceholder")}
-              className="flex-1 text-sm px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") sendMessage();
-              }}
-            />
-            <Button size="sm" onClick={sendMessage} className="px-3">
-              {t("live.send")}
-            </Button>
-          </div>
-        </div>
         )}
 
+        {isMobileEditor === true && (
+          <Tabs value={mobileTab} onValueChange={setMobileTab} className="flex min-h-0 flex-1 flex-col gap-0 md:hidden">
+            <TabsContent value="code" className="min-h-0 flex-1 data-[state=inactive]:hidden">
+              {editorPanel}
+            </TabsContent>
+            <TabsContent value="run" className="min-h-0 flex-1 data-[state=inactive]:hidden">
+              {consolePanel}
+            </TabsContent>
+            <TabsContent value="debugger" className="min-h-0 flex-1 data-[state=inactive]:hidden">
+              {debuggerPanel}
+            </TabsContent>
+            <TabsContent value="chat" className="min-h-0 flex-1 data-[state=inactive]:hidden">
+              {chatPanel}
+            </TabsContent>
+            <TabsContent value="people" className="min-h-0 flex-1 data-[state=inactive]:hidden">
+              {peoplePanel}
+            </TabsContent>
+
+            <div className="fixed bottom-20 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-zinc-200 bg-white/95 p-1 shadow-lg backdrop-blur">
+              <TabsList className="grid h-10 w-full grid-cols-5 bg-zinc-100">
+                <TabsTrigger value="code">Code</TabsTrigger>
+                <TabsTrigger value="run">Console</TabsTrigger>
+                <TabsTrigger value="debugger">Debug</TabsTrigger>
+                <TabsTrigger value="chat" className="relative">
+                  Chat
+                  {unreadMessages > 0 && (
+                    <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-4 text-white">
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="people">People</TabsTrigger>
+              </TabsList>
+            </div>
+          </Tabs>
+        )}
+
+        {isMobileEditor === null && (
+          <div className="grid flex-1 grid-cols-1 gap-0 md:grid-cols-[1fr_360px]">
+            <Skeleton className="m-4 h-[calc(100%-2rem)]" />
+            <Skeleton className="m-4 hidden h-[calc(100%-2rem)] md:block" />
+          </div>
+        )}
       </div>
 
       {Object.entries(mousePositions).map(([id, pos]) => {
-        if (id === user?.id) return null;
-
-        const userData = participants.find((p) => p.user_id === id);
-        const opacity = Math.max(0, 1 - (Date.now() - pos.lastSeen) / 1500);
+        const userData =
+          participants.find((participant) => participant.user_id === id) ||
+          profilesMap[id] ||
+          {
+            username: pos.username,
+            avatar_url: pos.avatar_url,
+          };
+        const opacity = Math.max(0, 1 - (cursorNow - pos.lastSeen) / 1500);
 
         return (
           <div
@@ -1046,36 +1616,15 @@ export default function LiveRoomPage() {
               opacity,
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
+            <div className="flex flex-col items-center gap-1">
               <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  background: getUserColor(id),
-                  borderRadius: "50% 50% 50% 0",
-                  transform: "rotate(-45deg)",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
-                }}
+                style={{ background: getUserColor(id) }}
+                className="h-3.5 w-3.5 rotate-[-45deg] rounded-br-full rounded-tl-full rounded-tr-full shadow"
               />
-
               {userData?.username && (
                 <div
-                  style={{
-                    fontSize: 10,
-                    padding: "2px 6px",
-                    borderRadius: 6,
-                    background: getUserColor(id),
-                    color: "white",
-                    whiteSpace: "nowrap",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-                  }}
+                  style={{ background: getUserColor(id) }}
+                  className="rounded px-1.5 py-0.5 text-[10px] text-white shadow"
                 >
                   {userData.username}
                 </div>
@@ -1085,54 +1634,63 @@ export default function LiveRoomPage() {
         );
       })}
 
-    {/* Invite Modal */}
-    <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t("live.inviteTitle")}</DialogTitle>
-        </DialogHeader>
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("live.searchPlaceholder")}
-        />
-        <div className="max-h-72 overflow-y-auto space-y-2 mt-2">
-          {users
-            .filter(u => u.id !== user?.id)
-            .filter(u =>
-              u.username?.toLowerCase().includes(search.toLowerCase())
-            )
-            .map((u) => {
-              const isAlreadyInSession = participants.some(p => p.user_id === u.id);
-              return (
-                <div
-                  key={u.id}
-                  className="flex items-center justify-between border rounded-lg px-3 py-2 hover:bg-muted/50 transition"
-                >
-                  <div className="flex items-center gap-2">
-                    {u.avatar_url ? (
-                      <img src={u.avatar_url} className="w-7 h-7 rounded-full" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs">
-                        {u.username?.[0]?.toUpperCase()}
-                      </div>
-                    )}
-                    <span className="text-sm font-medium">{u.username}</span>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={isAlreadyInSession}
-                    onClick={() => inviteUser(u.id)}
-                  >
-                    {isAlreadyInSession ? t("live.inSession") : t("live.inviteButton")}
-                  </Button>
-                </div>
-              );
-            })}
+      {cursorDebugEnabled && (
+        <div className="fixed bottom-4 left-4 z-[10000] rounded-lg border border-amber-300 bg-amber-50 p-3 font-mono text-[11px] text-amber-950 shadow-xl">
+          <div>status: {editorCursorLine}</div>
+          <div>sync: {cursorDebugInfo.statusLine}</div>
+          <div>pos: {cursorDebugInfo.positionLine ?? "-"}</div>
+          <div>sel: {cursorDebugInfo.selectionLine ?? "-"}</div>
+          <div>lines: {cursorDebugInfo.modelLines ?? "-"}</div>
+          <div>focus: {String(cursorDebugInfo.focused ?? false)}</div>
         </div>
-      </DialogContent>
-    </Dialog>
-      </div>
+      )}
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("live.inviteTitle")}</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("live.searchPlaceholder")}
+          />
+          <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+            {users
+              .filter((profile) => profile.id !== user?.id)
+              .filter((profile) =>
+                profile.username?.toLowerCase().includes(search.toLowerCase())
+              )
+              .map((profile) => {
+                const isAlreadyInSession = participants.some(
+                  (participant) => participant.user_id === profile.id
+                );
+
+                return (
+                  <div
+                    key={profile.id}
+                    className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8">
+                        {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
+                        <AvatarFallback>{getInitial(profile)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium">{profile.username}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={isAlreadyInSession}
+                      onClick={() => inviteUser(profile.id)}
+                    >
+                      {isAlreadyInSession ? t("live.inSession") : t("live.inviteButton")}
+                    </Button>
+                  </div>
+                );
+              })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import { supabase } from "@/lib/supabase";
+import { api, type ProfileSummary } from "@/lib/api";
 import { useLanguage } from "@/components/LanguageProvider";
 
 import { Button } from "@/components/ui/button";
@@ -32,27 +32,18 @@ import {
   User,
 } from "lucide-react";
 
-type TopbarProfile = {
-  username?: string | null;
-  avatar_url?: string | null;
-};
-
 export function Topbar() {
   const router = useRouter();
   const { t, locale, setLocale } = useLanguage();
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [profile, setProfile] = useState<TopbarProfile | null>(null);
+  const [profile, setProfile] = useState<ProfileSummary | null>(null);
 
   useEffect(() => {
     let active = true;
 
     async function loadProfile(currentUser: SupabaseUser) {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("username, avatar_url")
-        .eq("id", currentUser.id)
-        .maybeSingle<TopbarProfile>();
+      const profileData = await api.profiles.getSummary(currentUser.id);
 
       if (!active) return;
 
@@ -60,7 +51,7 @@ export function Topbar() {
     }
 
     async function load() {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await api.auth.getSession();
 
       const currentUser = data.session?.user ?? null;
 
@@ -75,24 +66,20 @@ export function Topbar() {
 
     void load();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        const currentUser = session?.user ?? null;
+    const subscription = api.auth.onAuthStateChange((session) => {
+      const currentUser = session?.user ?? null;
 
-        setUser(currentUser);
+      setUser(currentUser);
 
-        if (!currentUser) {
-          setProfile(null);
-          return;
-        }
-
-        window.setTimeout(() => {
-          void loadProfile(currentUser);
-        }, 0);
+      if (!currentUser) {
+        setProfile(null);
+        return;
       }
-    );
+
+      window.setTimeout(() => {
+        void loadProfile(currentUser);
+      }, 0);
+    });
 
     return () => {
       active = false;
@@ -101,7 +88,7 @@ export function Topbar() {
   }, []);
 
   async function logout() {
-    await supabase.auth.signOut();
+    await api.auth.signOut();
     router.replace("/login");
   }
 

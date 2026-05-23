@@ -5,7 +5,9 @@ import { useEffect } from "react";
 
 export function MainWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isFullWidth = pathname?.startsWith("/problems/") && pathname !== "/problems";
+  const isFullWidth =
+    (pathname?.startsWith("/problems/") && pathname !== "/problems") ||
+    pathname?.startsWith("/live/");
 
   useEffect(() => {
     function onRejection(e: PromiseRejectionEvent) {

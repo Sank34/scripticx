@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, type LiveCodeData, type LiveRoom } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -16,14 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useLanguage } from "@/components/LanguageProvider";
 
-type LiveCodeData = {
-  rooms: any[];
-  invites: any[];
-  userId: string | null;
-};
-
 export default function LiveCodePage() {
-  const [participantsMap, setParticipantsMap] = useState<Record<string, any[]>>({});
   const [open, setOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -32,122 +26,8 @@ export default function LiveCodePage() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
 
-  async function fetchParticipants(currentRooms: any[]) {
-    const roomIds = currentRooms.map(r => r.id);
-    const ownerIds = currentRooms.map(r => r.owner_id);
-
-    const { data: participants } = await supabase
-      .from("live_participants")
-      .select("room_id, user_id")
-      .in("room_id", roomIds);
-
-    const userIds = [
-      ...new Set([
-        ...(participants ? participants.map(p => p.user_id) : []),
-        ...ownerIds
-      ])
-    ];
-
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url")
-      .in("id", userIds);
-
-    const profileMap: any = {};
-    profiles?.forEach(p => {
-      profileMap[p.id] = p;
-    });
-
-    userIds.forEach(id => {
-      if (!profileMap[id]) {
-        profileMap[id] = {
-          id,
-          username: "User",
-          avatar_url: null,
-        };
-      }
-    });
-
-    const grouped: any = {};
-    currentRooms.forEach(r => {
-      grouped[r.id] = [];
-    });
-
-    (participants || []).forEach(p => {
-      if (!grouped[p.room_id]) grouped[p.room_id] = [];
-      grouped[p.room_id].push(profileMap[p.user_id]);
-    });
-
-    currentRooms.forEach(r => {
-      if (!grouped[r.id].length) {
-        const ownerProfile = profileMap[r.owner_id];
-        if (ownerProfile) grouped[r.id].push(ownerProfile);
-      }
-    });
-
-    setParticipantsMap(grouped);
-  }
-
   async function loadLiveCodeData(): Promise<LiveCodeData> {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData.session?.user;
-
-    if (!user) {
-      return {
-        rooms: [],
-        invites: [],
-        userId: null,
-      };
-    }
-
-    const { data: inviteData } = await supabase
-      .from("room_participants")
-      .select("room_id, live_rooms(*)")
-      .eq("user_id", user.id)
-      .eq("status", "invited");
-
-    const { data: ownedRooms } = await supabase
-      .from("live_rooms")
-      .select("*")
-      .eq("owner_id", user.id);
-
-    const { data: participantRows } = await supabase
-      .from("room_participants")
-      .select("room_id")
-      .eq("user_id", user.id)
-      .eq("status", "accepted");
-
-    const roomIds = participantRows?.map(r => r.room_id) || [];
-
-    let participantRooms: any[] = [];
-    if (roomIds.length) {
-      const { data } = await supabase
-        .from("live_rooms")
-        .select("*")
-        .in("id", roomIds);
-
-      participantRooms = data || [];
-    }
-
-    const merged = [...(ownedRooms || []), ...participantRooms];
-    const uniqueMap: any = {};
-    merged.forEach(r => {
-      uniqueMap[r.id] = r;
-    });
-
-    const finalRooms = Object.values(uniqueMap).sort((a: any, b: any) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    if (finalRooms.length) {
-      await fetchParticipants(finalRooms);
-    }
-
-    return {
-      rooms: finalRooms,
-      invites: inviteData || [],
-      userId: user.id,
-    };
+    return api.live.getLiveCodeData();
   }
 
   const {
@@ -158,9 +38,10 @@ export default function LiveCodePage() {
     queryFn: loadLiveCodeData,
   });
 
-  const rooms = livecodeData?.rooms || [];
+  const rooms = useMemo(() => livecodeData?.rooms || [], [livecodeData?.rooms]);
   const invites = livecodeData?.invites || [];
   const userId = livecodeData?.userId || null;
+  const participantsMap = livecodeData?.participantsByRoom || {};
 
   useEffect(() => {
     if (!rooms.length) return;
@@ -192,23 +73,12 @@ export default function LiveCodePage() {
 
     setCreating(true);
 
-    const { data, error } = await supabase
-      .from("live_rooms")
-      .insert({
-        owner_id: userId,
-        name: sessionName || t("livecode.dialog.untitled"),
-        status: "active"
-      })
-      .select()
-      .single();
+    try {
+      const data = await api.live.createRoom(
+        userId,
+        sessionName || t("livecode.dialog.untitled")
+      );
 
-    if (error) {
-      console.error("Create session error:", error);
-      setCreating(false);
-      return;
-    }
-
-    if (data) {
       await queryClient.invalidateQueries({
         queryKey: ["livecode"],
       });
@@ -216,15 +86,16 @@ export default function LiveCodePage() {
       setSessionName("");
       setCreating(false);
       router.push(`/live/${data.id}`);
+    } catch (error) {
+      console.error("Create session error:", error);
+      setCreating(false);
     }
   }
 
   async function acceptInvite(roomId: string) {
-    await supabase
-      .from("room_participants")
-      .update({ status: "accepted" })
-      .eq("room_id", roomId)
-      .eq("user_id", userId);
+    if (!userId) return;
+
+    await api.live.acceptInvite(roomId, userId);
 
     await queryClient.invalidateQueries({
       queryKey: ["livecode"],
@@ -232,11 +103,9 @@ export default function LiveCodePage() {
   }
 
   async function declineInvite(roomId: string) {
-    await supabase
-      .from("room_participants")
-      .delete()
-      .eq("room_id", roomId)
-      .eq("user_id", userId);
+    if (!userId) return;
+
+    await api.live.declineInvite(roomId, userId);
 
     await queryClient.invalidateQueries({
       queryKey: ["livecode"],
@@ -352,7 +221,9 @@ export default function LiveCodePage() {
                         <div>
                           <p className="font-medium">{room.name || t("livecode.sessions.fallbackName")}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(room.created_at).toLocaleString()}
+                            {room.created_at
+                              ? new Date(room.created_at).toLocaleString()
+                              : ""}
                           </p>
                         </div>
 
@@ -419,7 +290,9 @@ export default function LiveCodePage() {
                         <div>
                           <p className="font-medium">{room.name || t("livecode.sessions.fallbackName")}</p>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(room.created_at).toLocaleString()}
+                            {room.created_at
+                              ? new Date(room.created_at).toLocaleString()
+                              : ""}
                           </p>
                         </div>
 
@@ -459,7 +332,9 @@ export default function LiveCodePage() {
 
                 <div className="space-y-2">
                   {invites.map((inv) => {
-                    const room = inv.live_rooms;
+                    const room = Array.isArray(inv.live_rooms)
+                      ? inv.live_rooms[0] as LiveRoom | undefined
+                      : inv.live_rooms;
 
                     return (
                       <div

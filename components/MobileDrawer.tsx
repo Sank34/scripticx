@@ -10,7 +10,6 @@ import {
 
 import {
   BookOpen,
-  ChevronUp,
   Code,
   HelpCircle,
   LayoutDashboard,
@@ -34,6 +33,10 @@ export function MobileDrawer() {
   const pathname = usePathname();
   const { t } = useLanguage();
   const hasUnreadUpdates = useUnreadUpdates();
+
+  if (pathname.startsWith("/live/")) {
+    return null;
+  }
 
   const navItems = [
     {
@@ -70,14 +73,14 @@ export function MobileDrawer() {
   ];
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 md:hidden">
+    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 -translate-x-1/2 md:hidden">
       <Drawer>
         <DrawerTrigger asChild>
           <button
             aria-label={t("mobileDrawer.open")}
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-200 bg-white/90 shadow-lg backdrop-blur-xl transition-all duration-200 hover:scale-105 active:scale-95"
+            className="flex h-7 w-28 items-center justify-center rounded-full border border-zinc-200/80 bg-white/80 shadow-[0_10px_30px_rgba(24,24,27,0.14)] backdrop-blur-xl transition-all duration-200 active:scale-95"
           >
-            <ChevronUp size={22} className="text-zinc-700" />
+            <span className="h-1.5 w-12 rounded-full bg-zinc-400" />
           </button>
         </DrawerTrigger>
 

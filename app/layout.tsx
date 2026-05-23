@@ -38,15 +38,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.className} h-screen overflow-hidden bg-zinc-100 antialiased`}
       >
-      <Providers>
+        <Providers>
           <LanguageProvider>
-              <SidebarProvider>
+            <SidebarProvider>
               <div className="h-screen w-full overflow-hidden p-2">
                 <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-zinc-100">
 
                   <AppSidebar />
 
-                  <div className="flex h-full flex-1 flex-col overflow-hidden rounded-[24px] border border-zinc-200/70 bg-white shadow-sm min-h-0">
+                  <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-zinc-200/70 bg-white shadow-sm">
 
                     <Topbar />
 
@@ -56,10 +56,10 @@ export default function RootLayout({
 
                 </div>
               </div>
-              <MobileDrawer />
             </SidebarProvider>
-        </LanguageProvider>
-      </Providers>
+            <MobileDrawer />
+          </LanguageProvider>
+        </Providers>
 
         <Toaster position="bottom-right" richColors />
       </body>

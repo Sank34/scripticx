@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { api, type FeedData } from "@/lib/api";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -61,104 +61,19 @@ function FeedContent() {
   const [showCode, setShowCode] = useState(false);
   const [image, setImage] = useState<File | null>(null);
 
-  type FeedData = {
-    posts: any[];
-    likes: Record<string, number>;
-    liked: Record<string, boolean>;
-    commentCounts: Record<string, number>;
-    suggested: any[];
-    following: Set<string>;
-  };
-
   async function fetchFeedData(): Promise<FeedData> {
-    const { data: postsData } = await supabase
-      .from("posts")
-      .select("*")
-      .order("created_at", { ascending: false });
+    if (!user) {
+      return {
+        posts: [],
+        likes: {},
+        liked: {},
+        commentCounts: {},
+        suggested: [],
+        following: new Set<string>(),
+      };
+    }
 
-    const postsDataSafe = postsData || [];
-    const postIds = postsDataSafe.map((p) => p.id);
-    const authorIds = [
-      ...new Set(postsDataSafe.map((p) => p.user_id).filter(Boolean)),
-    ];
-
-    const commentCounts: Record<string, number> = {};
-    const likes: Record<string, number> = {};
-    const liked: Record<string, boolean> = {};
-
-    const [
-      { data: profilesData },
-      { data: commentsData },
-      { data: likesData },
-      { data: followingData },
-      { data: usersData },
-    ] = await Promise.all([
-      authorIds.length
-        ? supabase
-            .from("profiles")
-            .select("id, username, avatar_url")
-            .in("id", authorIds)
-        : Promise.resolve({ data: [] }),
-      postIds.length
-        ? supabase
-            .from("comments")
-            .select("post_id")
-            .in("post_id", postIds)
-        : Promise.resolve({ data: [] }),
-      postIds.length
-        ? supabase
-            .from("post_likes")
-            .select("post_id, user_id")
-            .in("post_id", postIds)
-        : Promise.resolve({ data: [] }),
-      supabase
-        .from("follows")
-        .select("following_id")
-        .eq("follower_id", user?.id),
-      supabase
-        .from("profiles")
-        .select("id, username, avatar_url")
-        .neq("id", user?.id),
-    ]);
-
-    const profileMap = new Map(
-      (profilesData || []).map((profile: any) => [profile.id, profile])
-    );
-
-    const postsWithProfiles = postsDataSafe.map((post) => ({
-      ...post,
-      profiles: profileMap.get(post.user_id) || null,
-    }));
-
-    commentsData?.forEach((comment: any) => {
-      commentCounts[comment.post_id] =
-        (commentCounts[comment.post_id] || 0) + 1;
-    });
-
-    likesData?.forEach((like: any) => {
-      likes[like.post_id] = (likes[like.post_id] || 0) + 1;
-      if (like.user_id === user?.id) {
-        liked[like.post_id] = true;
-      }
-    });
-
-    const followingSet = new Set(
-      (followingData || []).map((f: any) => f.following_id)
-    );
-
-    const filtered =
-      (usersData || [])
-        .filter((u: any) => !followingSet.has(u.id))
-        .slice(0, 5);
-
-    return {
-      posts: postsWithProfiles,
-      likes,
-      liked,
-      commentCounts,
-      suggested: filtered,
-      following: followingSet,
-    };
+    return api.feed.getFeedData(user.id);
   }
 
   const {
@@ -179,17 +94,7 @@ function FeedContent() {
   async function toggleLike(postId: string) {
     if (!user) return;
 
-    if (liked[postId]) {
-      await supabase
-        .from("post_likes")
-        .delete()
-        .eq("post_id", postId)
-        .eq("user_id", user.id);
-    } else {
-      await supabase
-        .from("post_likes")
-        .insert([{ post_id: postId, user_id: user.id }]);
-    }
+    await api.feed.toggleLike(postId, user.id, Boolean(liked[postId]));
 
     await queryClient.invalidateQueries({
       queryKey: ["feed", user.id],
@@ -208,49 +113,20 @@ function FeedContent() {
 
     setPosting(true);
 
-    let imageUrl = null;
-
-    if (image) {
-      const ext = image.name.split(".").pop();
-      const fileName = `${user.id}-${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("posts")
-        .upload(fileName, image);
-
-      if (uploadError) {
-        // console.error("Upload error:", uploadError);
-        toast.error(t("feed.imageUploadFailed"));
-      }
-
-      if (!uploadError) {
-        const { data } = supabase.storage
-          .from("posts")
-          .getPublicUrl(fileName);
-
-        // console.log("Public URL:", data.publicUrl);
-        imageUrl = data.publicUrl;
-      }
-    }
-
-    const { error } = await supabase
-      .from("posts")
-      .insert([
-        {
-          user_id: user.id,
-          content,
-          code: code || null,
-          image_url: imageUrl,
-        },
-      ]);
-
-    setPosting(false);
-
-    if (error) {
+    try {
+      await api.feed.createPost({
+        userId: user.id,
+        content,
+        code,
+        image,
+      });
+    } catch {
+      setPosting(false);
       toast.error(t("feed.failedToPost"));
       return;
     }
 
+    setPosting(false);
     setContent("");
     setCode("");
     setShowCode(false);
@@ -265,22 +141,10 @@ function FeedContent() {
   async function followUser(userId: string) {
     if (!user) return;
 
-    if (following.has(userId)) {
-      await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", user.id)
-        .eq("following_id", userId);
+    const isFollowing = following.has(userId);
 
-      toast.success(t("feed.unfollowed"));
-    } else {
-      await supabase.from("follows").insert({
-        follower_id: user.id,
-        following_id: userId,
-      });
-
-      toast.success(t("feed.followed"));
-    }
+    await api.feed.toggleFollow(user.id, userId, isFollowing);
+    toast.success(t(isFollowing ? "feed.unfollowed" : "feed.followed"));
 
     await queryClient.invalidateQueries({
       queryKey: ["feed", user.id],
@@ -486,7 +350,9 @@ function FeedContent() {
                     {p.profiles?.username || "User"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(p.created_at).toLocaleString()}
+                    {p.created_at
+                      ? new Date(p.created_at).toLocaleString()
+                      : ""}
                   </p>
                 </div>
 

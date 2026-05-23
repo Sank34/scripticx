@@ -571,7 +571,10 @@ export const translations = {
       clear: "Clear",
       editor: "Editor",
 
+      console: "Console",
       debugger: "Debugger",
+      tabSize: "Tab size",
+      spaces: "spaces",
       noOutput: "No output",
       inputPrompt: "Input",
       inputPlaceholder: "Enter value...",
@@ -1642,7 +1645,10 @@ export const translations = {
       clear: "Șterge",
       editor: "Editor",
 
+      console: "Consolă",
       debugger: "Debugger",
+      tabSize: "Tab",
+      spaces: "spații",
       noOutput: "Niciun output",
       inputPrompt: "Input",
       inputPlaceholder: "Introdu valoarea...",
