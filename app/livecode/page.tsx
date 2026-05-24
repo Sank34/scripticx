@@ -47,6 +47,41 @@ export default function LiveCodePage() {
   const participantsMap = livecodeData?.participantsByRoom || {};
 
   useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`livecode-invites-${userId}`, {
+        config: {
+          broadcast: { self: false },
+        },
+      })
+      .on("broadcast", { event: "invite" }, async () => {
+        await queryClient.invalidateQueries({
+          queryKey: ["livecode"],
+        });
+      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "room_participants",
+          filter: `user_id=eq.${userId}`,
+        },
+        async () => {
+          await queryClient.invalidateQueries({
+            queryKey: ["livecode"],
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, userId]);
+
+  useEffect(() => {
     if (!rooms.length) return;
 
     const channel = supabase

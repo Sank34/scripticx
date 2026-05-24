@@ -211,6 +211,7 @@ export default function LiveRoomPage() {
   const userRef = useRef<any>(null);
   const isChatVisibleRef = useRef(false);
   const currentProfileRef = useRef<ProfileSummary | null>(null);
+  const isMobileEditorRef = useRef<boolean | null>(null);
   const messageKeysRef = useRef<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -331,6 +332,14 @@ export default function LiveRoomPage() {
   }, []);
 
   useEffect(() => {
+    isMobileEditorRef.current = isMobileEditor;
+
+    if (isMobileEditor) {
+      setMousePositions({});
+    }
+  }, [isMobileEditor]);
+
+  useEffect(() => {
     setCursorDebugEnabled(new URLSearchParams(window.location.search).has("cursorDebug"));
   }, []);
 
@@ -385,10 +394,20 @@ export default function LiveRoomPage() {
   }, [allParticipants, isClosed, participants, profilesMap]);
 
   useEffect(() => {
+    let active = true;
+    let localChannel: ReturnType<typeof supabase.channel> | null = null;
+
     async function init() {
       try {
+        setParticipants([]);
+        setAllParticipants([]);
+        setMousePositions({});
+        setUnreadMessages(0);
+
         const { data } = await api.auth.getSession();
         const currentUser = data.session?.user;
+
+        if (!active) return;
 
         if (!currentUser) {
           router.replace("/login");
@@ -397,12 +416,21 @@ export default function LiveRoomPage() {
 
         setUser(currentUser);
         userRef.current = currentUser;
+        setParticipants([
+          {
+            user_id: currentUser.id,
+            username: "User",
+            avatar_url: null,
+          },
+        ]);
 
         const [roomData, chatData, profileList] = await Promise.all([
           api.live.getRoom(roomId),
           api.live.getMessages(roomId),
           api.live.listProfiles(50),
         ]);
+
+        if (!active) return;
 
         if (!roomData) {
           router.replace("/livecode");
@@ -423,6 +451,9 @@ export default function LiveRoomPage() {
           },
         });
 
+        localChannel = channel;
+        channelRef.current = channel;
+
         channel.on("broadcast", { event: "code-update" }, (payload: any) => {
           if (payload?.payload?.userId === currentUser.id) return;
           const nextCode = payload.payload.code || "";
@@ -436,6 +467,8 @@ export default function LiveRoomPage() {
         });
 
         channel.on("broadcast", { event: "mouse-move" }, (payload: any) => {
+          if (isMobileEditorRef.current !== false) return;
+
           const { userId, x, y, username, avatar_url } = payload.payload || {};
           if (!userId || userId === currentUser.id) return;
 
@@ -484,6 +517,40 @@ export default function LiveRoomPage() {
           }
         });
 
+        channel.on("broadcast", { event: "participant-online" }, (payload: any) => {
+          const incoming = payload.payload as LiveParticipant | undefined;
+          if (!incoming?.user_id) return;
+
+          setParticipants((prev) => {
+            const existing = prev.find(
+              (participant) => participant.user_id === incoming.user_id
+            );
+
+            if (existing) {
+              return prev.map((participant) =>
+                participant.user_id === incoming.user_id
+                  ? {
+                      ...participant,
+                      username: incoming.username || participant.username,
+                      avatar_url: incoming.avatar_url || participant.avatar_url,
+                    }
+                  : participant
+              );
+            }
+
+            return [...prev, incoming];
+          });
+
+          setProfilesMap((prev) => ({
+            ...prev,
+            [incoming.user_id]: {
+              id: incoming.user_id,
+              username: incoming.username || prev[incoming.user_id]?.username || "User",
+              avatar_url: incoming.avatar_url || prev[incoming.user_id]?.avatar_url || null,
+            },
+          }));
+        });
+
         channel.on("presence", { event: "sync" }, () => {
           const state = channel.presenceState();
           const raw = Object.values(state).flat();
@@ -499,13 +566,33 @@ export default function LiveRoomPage() {
             }
           });
 
-          setParticipants(Array.from(uniqueMap.values()));
+          const profile = currentProfileRef.current;
+
+          if (!uniqueMap.has(currentUser.id)) {
+            uniqueMap.set(currentUser.id, {
+              user_id: currentUser.id,
+              username: profile?.username || "User",
+              avatar_url: profile?.avatar_url || null,
+            });
+          }
+
+          setParticipants((prev) => {
+            const next = Array.from(uniqueMap.values());
+
+            if (!next.length && prev.length) {
+              return prev;
+            }
+
+            return next;
+          });
         });
 
         channel.subscribe(async (status) => {
-          if (status !== "SUBSCRIBED") return;
+          if (!active || status !== "SUBSCRIBED") return;
 
           const profile = await api.profiles.getSummary(currentUser.id);
+          if (!active) return;
+
           currentProfileRef.current = profile;
 
           setProfilesMap((prev) => ({
@@ -539,15 +626,25 @@ export default function LiveRoomPage() {
             online_at: new Date().toISOString(),
           });
 
+          void channel.send({
+            type: "broadcast",
+            event: "participant-online",
+            payload: {
+              user_id: currentUser.id,
+              username: profile?.username || "User",
+              avatar_url: profile?.avatar_url || null,
+            },
+          });
+
           void api.live.markLiveParticipant(roomId, currentUser.id).catch((error) => {
             console.warn("Could not mark live participant:", error);
           });
 
           void api.live.joinRoom(roomId, currentUser.id).catch(() => {});
         });
-
-        channelRef.current = channel;
       } catch (error) {
+        if (!active) return;
+
         console.error("Live room init failed:", error);
         toast.error(t("live.toast.error"));
         router.replace("/livecode");
@@ -557,10 +654,16 @@ export default function LiveRoomPage() {
     void init();
 
     return () => {
+      active = false;
+
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
 
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+      if (localChannel) {
+        supabase.removeChannel(localChannel);
+      }
+
+      if (channelRef.current === localChannel) {
+        channelRef.current = null;
       }
 
       if (userRef.current) {
@@ -667,6 +770,7 @@ export default function LiveRoomPage() {
     let rafId: number | null = null;
 
     function handleMove(event: MouseEvent) {
+      if (isMobileEditorRef.current !== false) return;
       if (!channelRef.current || !userRef.current) return;
 
       const payload = {
@@ -688,13 +792,15 @@ export default function LiveRoomPage() {
       });
     }
 
+    if (isMobileEditor !== false) return;
+
     window.addEventListener("mousemove", handleMove);
 
     return () => {
       window.removeEventListener("mousemove", handleMove);
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, []);
+  }, [isMobileEditor]);
 
   function applyStepResult(result: StepResult, collectedOutput: string[] = []) {
     if (!result) return;
@@ -944,6 +1050,13 @@ export default function LiveRoomPage() {
       }
 
       await api.live.inviteUser(roomId, targetId);
+      const inviteChannel = supabase.channel(`livecode-invites-${targetId}`);
+      void inviteChannel
+        .httpSend("invite", { roomId })
+        .finally(() => {
+          void supabase.removeChannel(inviteChannel);
+        })
+        .catch(() => {});
       toast.success(t("live.toast.inviteSent"));
     } catch {
       toast.error(t("live.toast.inviteFailed"));
@@ -960,15 +1073,16 @@ export default function LiveRoomPage() {
   const editorPanel = (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-y border-zinc-200 bg-white md:border">
       <div className="flex h-10 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
-          <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
-          <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400" />
+          <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-yellow-400" />
+          <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" />
           <span className="ml-2 truncate text-xs font-medium text-zinc-700">main.msp</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">
-            {isClosed ? t("live.sessionEnded") : "MiniScript+"}
+        <div className="flex min-w-0 shrink-0 items-center gap-2">
+          <Play size={13} className="shrink-0 text-zinc-500" />
+          <span className="max-w-[7rem] truncate text-xs text-zinc-500 sm:max-w-none">
+            {isClosed && isMobileEditor ? t("livecode.status.closed") : isClosed ? t("live.sessionEnded") : "MiniScript+"}
           </span>
           <div className="md:hidden">{tabSizeControl}</div>
         </div>
@@ -1255,9 +1369,9 @@ export default function LiveRoomPage() {
   return (
     <div className="h-full overflow-hidden bg-white">
       <div className="flex h-full min-h-0 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-3 md:px-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/livecode")} aria-label="Back">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-zinc-200 bg-white px-3 md:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+            <Button variant="ghost" size="icon" onClick={() => router.push("/livecode")} aria-label="Back" className="shrink-0">
               <LogOut size={17} />
             </Button>
             <div className="min-w-0">
@@ -1275,7 +1389,7 @@ export default function LiveRoomPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <div className="mr-1 hidden -space-x-2 md:flex">
               {participants.slice(0, 4).map((participant) => (
                 <button
@@ -1293,8 +1407,8 @@ export default function LiveRoomPage() {
                 </button>
               ))}
             </div>
-            <Button size="sm" onClick={runCode} className="gap-2">
-              <Play size={15} />
+            <Button size="sm" onClick={runCode} className="shrink-0 gap-2 px-3">
+              <Play size={15} className="shrink-0" />
               {t("live.run")}
             </Button>
             <Button size="sm" variant="secondary" onClick={stepCode} className="hidden gap-2 sm:inline-flex">
@@ -1386,7 +1500,7 @@ export default function LiveRoomPage() {
         )}
       </div>
 
-      {Object.entries(mousePositions).map(([id, pos]) => {
+      {isMobileEditor === false && Object.entries(mousePositions).map(([id, pos]) => {
         const userData =
           participants.find((participant) => participant.user_id === id) ||
           profilesMap[id] ||

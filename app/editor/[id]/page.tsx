@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/common/EmptyState";
 
 import { Copy, ExternalLink, Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -97,7 +98,12 @@ export default function EditorSnippetPage() {
   }
 
   if (!data) {
-    return <div className="p-6">{t("snippetPage.notFound")}</div>;
+    return (
+      <EmptyState
+        className="p-6"
+        title={t("snippetPage.notFound")}
+      />
+    );
   }
 
   const initial = profile?.username?.[0]?.toUpperCase() || "U";

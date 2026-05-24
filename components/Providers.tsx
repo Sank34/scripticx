@@ -8,6 +8,37 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+const realtimeInvalidationTargets = [
+  "livecode",
+  "command-menu",
+  "dashboard",
+  "profile",
+  "feed",
+  "leaderboard",
+  "problems",
+  "classes",
+  "updates",
+  "contact_messages",
+  "editor-snippets",
+];
+
+const realtimeTables = [
+  "live_rooms",
+  "room_participants",
+  "live_participants",
+  "live_messages",
+  "profiles",
+  "posts",
+  "comments",
+  "post_likes",
+  "follows",
+  "snippets",
+  "submissions",
+  "user_achievements",
+  "updates",
+  "contact_messages",
+];
+
 export default function Providers({
   children,
 }: {
@@ -20,14 +51,62 @@ export default function Providers({
           queries: {
             staleTime: 1000 * 60 * 3,
             gcTime: 1000 * 60 * 30,
-            refetchOnReconnect: true,
-            refetchOnWindowFocus: true,
+            refetchOnReconnect: "always",
+            refetchOnWindowFocus: "always",
+            refetchOnMount: "always",
             retry: 2,
           },
         },
       })
   );
   const lastResumeAt = useRef(0);
+
+  useEffect(() => {
+    let invalidationTimeout: number | null = null;
+
+    function invalidateRealtimeQueries() {
+      if (invalidationTimeout) return;
+
+      invalidationTimeout = window.setTimeout(() => {
+        invalidationTimeout = null;
+
+        void queryClient.invalidateQueries({
+          predicate: (query) => {
+            const scope = query.queryKey[0];
+            return (
+              typeof scope === "string" &&
+              realtimeInvalidationTargets.includes(scope)
+            );
+          },
+        });
+      }, 250);
+    }
+
+    const channel = supabase.channel("global-realtime-invalidations");
+
+    realtimeTables.forEach((table) => {
+      channel.on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table,
+        },
+        invalidateRealtimeQueries
+      );
+    });
+
+    channel.subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        void queryClient.refetchQueries({ type: "active" });
+      }
+    });
+
+    return () => {
+      if (invalidationTimeout) window.clearTimeout(invalidationTimeout);
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   useEffect(() => {
     async function resumeSupabaseAndQueries() {
@@ -45,9 +124,10 @@ export default function Providers({
         await supabase.auth.refreshSession();
       }
 
+      supabase.realtime.connect();
+
       await queryClient.refetchQueries({
         type: "active",
-        stale: true,
       });
     }
 

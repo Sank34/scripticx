@@ -55,6 +55,8 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
   const router = useRouter();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(720);
 
   const { data: liveCodeData } = useQuery<LiveCodeData>({
     queryKey: ["command-menu", "livecode", user?.id],
@@ -76,6 +78,23 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent;
+    const safari =
+      /Safari/i.test(userAgent) &&
+      !/Chrome|Chromium|CriOS|FxiOS|Edg/i.test(userAgent);
+
+    function updateViewport() {
+      setViewportHeight(window.innerHeight);
+    }
+
+    setIsSafari(safari);
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+
+    return () => window.removeEventListener("resize", updateViewport);
   }, []);
 
   const pageCommands = useMemo<CommandEntry[]>(() => {
@@ -220,12 +239,21 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     router.push(href);
   }
 
+  const safariDialogMaxHeight = Math.max(
+    280,
+    Math.min(560, viewportHeight - 96)
+  );
+  const safariListMaxHeight = Math.max(
+    180,
+    Math.min(420, viewportHeight - 184)
+  );
+
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hidden h-9 w-full max-w-xl items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 text-sm text-zinc-500 shadow-inner transition hover:border-zinc-300 hover:bg-white sm:flex"
+        className="hidden h-9 w-full max-w-md items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 text-sm text-zinc-500 shadow-inner transition hover:border-zinc-300 hover:bg-white sm:flex"
       >
         <span className="flex min-w-0 items-center gap-2">
           <Search className="h-4 w-4 shrink-0" />
@@ -239,11 +267,24 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         onOpenChange={setOpen}
         title={t("command.title")}
         description={t("command.description")}
-        className="max-w-xl border-zinc-200 bg-white/95 shadow-2xl backdrop-blur-xl"
+        className={`max-w-xl border-zinc-200 bg-white/95 shadow-2xl backdrop-blur-xl ${
+          isSafari ? "" : "max-h-[calc(100vh-4rem)]"
+        }`}
+        contentStyle={
+          isSafari ? { maxHeight: safariDialogMaxHeight } : undefined
+        }
       >
-        <Command>
+        <Command
+          className={isSafari ? "" : "max-h-[calc(100vh-4rem)]"}
+          style={isSafari ? { maxHeight: safariDialogMaxHeight } : undefined}
+        >
           <CommandInput placeholder={t("command.placeholder")} />
-          <CommandList className="max-h-[420px]">
+          <CommandList
+            className={`overflow-y-auto ${
+              isSafari ? "" : "max-h-[calc(100vh-9rem)]"
+            }`}
+            style={isSafari ? { maxHeight: safariListMaxHeight } : undefined}
+          >
             <CommandEmpty>{t("command.empty")}</CommandEmpty>
 
             <CommandGroup heading={t("command.groups.navigation")}>

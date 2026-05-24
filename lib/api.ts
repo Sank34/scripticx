@@ -434,10 +434,15 @@ class LiveApi {
   }
 
   async markLiveParticipant(roomId: string, userId: string) {
-    const { error } = await this.client.from("live_participants").upsert({
-      room_id: roomId,
-      user_id: userId,
-    });
+    const { error } = await this.client
+      .from("live_participants")
+      .upsert(
+        {
+          room_id: roomId,
+          user_id: userId,
+        },
+        { onConflict: "room_id,user_id" }
+      );
 
     if (error) throw error;
   }
@@ -445,12 +450,14 @@ class LiveApi {
   async joinRoom(roomId: string, userId: string) {
     const { error } = await this.client
       .from("room_participants")
-      .insert({
-        room_id: roomId,
-        user_id: userId,
-      })
-      .select()
-      .single();
+      .upsert(
+        {
+          room_id: roomId,
+          user_id: userId,
+          status: "accepted",
+        },
+        { onConflict: "room_id,user_id" }
+      );
 
     if (error) throw error;
   }
@@ -598,19 +605,38 @@ class LiveApi {
     const roomIds = rooms.map((room) => room.id);
     if (!roomIds.length) return {};
 
-    const { data: participants, error: participantsError } = await this.client
-      .from("live_participants")
-      .select("room_id, user_id")
-      .in("room_id", roomIds);
+    const [
+      { data: liveParticipants, error: liveParticipantsError },
+      { data: roomParticipants, error: roomParticipantsError },
+    ] = await Promise.all([
+      this.client
+        .from("live_participants")
+        .select("room_id, user_id")
+        .in("room_id", roomIds),
+      this.client
+        .from("room_participants")
+        .select("room_id, user_id")
+        .in("room_id", roomIds)
+        .eq("status", "accepted"),
+    ]);
 
-    if (participantsError) throw participantsError;
+    if (liveParticipantsError) throw liveParticipantsError;
+
+    if (roomParticipantsError) {
+      console.warn("Could not load accepted room participants:", roomParticipantsError);
+    }
 
     const ownerIds = rooms.map((room) => room.owner_id);
+    const participantRows = [
+      ...((liveParticipants || []) as Array<{ room_id: string; user_id: string }>),
+      ...((roomParticipantsError ? [] : roomParticipants || []) as Array<{
+        room_id: string;
+        user_id: string;
+      }>),
+    ];
     const userIds = [
       ...new Set([
-        ...((participants || []) as Array<{ user_id: string }>).map(
-          (participant) => participant.user_id
-        ),
+        ...participantRows.map((participant) => participant.user_id),
         ...ownerIds,
       ]),
     ];
@@ -623,17 +649,21 @@ class LiveApi {
       grouped[room.id] = [];
     });
 
-    ((participants || []) as Array<{ room_id: string; user_id: string }>).forEach(
-      (participant) => {
-        const profile = profileMap.get(participant.user_id);
-        if (profile) grouped[participant.room_id]?.push(profile);
-      }
-    );
-
     rooms.forEach((room) => {
-      if (!grouped[room.id]?.length) {
-        const ownerProfile = profileMap.get(room.owner_id);
-        if (ownerProfile) grouped[room.id] = [ownerProfile];
+      const ownerProfile = profileMap.get(room.owner_id);
+      if (ownerProfile) grouped[room.id].push(ownerProfile);
+    });
+
+    participantRows.forEach((participant) => {
+      const profile = profileMap.get(participant.user_id);
+      const roomProfiles = grouped[participant.room_id];
+
+      if (
+        profile &&
+        roomProfiles &&
+        !roomProfiles.some((item) => item.id === profile.id)
+      ) {
+        roomProfiles.push(profile);
       }
     });
 

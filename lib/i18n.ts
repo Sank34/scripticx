@@ -371,6 +371,16 @@ export const translations = {
         points: "points",
         successMessage: "Congratulations! Your code passed all tests.",
         encouragement: "Your code got partial credit. Review the examples, try to fix your solution, and submit again.",
+      },
+
+      evaluation: {
+        title: "Evaluating solution...",
+        subtitle: "Running your code against every test case.",
+        testCase: "Test case",
+        pending: "pending",
+        evaluating: "evaluating",
+        passed: "passed",
+        failed: "failed",
       }
     },
 
@@ -476,6 +486,7 @@ export const translations = {
       linkCopied: "Link copied!",
       userFallback: "User",
       notFound: "Post not found",
+      notFoundDescription: "This post may have been removed or is no longer public.",
       viewPost: "View post",
       writeComment: "Write a comment...",
       send: "Send",
@@ -559,10 +570,12 @@ export const translations = {
       followers: {
         title: "Followers",
         count: "{count} followers",
+        empty: "No followers yet.",
       },
       following: {
         title: "Following",
         count: "{count} following",
+        empty: "Not following anyone yet.",
       },
     },
 
@@ -1459,6 +1472,16 @@ export const translations = {
         points: "puncte",
         successMessage: "Felicitări! Codul tău a trecut toate testele.",
         encouragement: "Codul tău a obținut un punctaj parțial. Analizează exemplele, încearcă să îți corectezi soluția și trimite o nouă soluție.",
+      },
+
+      evaluation: {
+        title: "Se evaluează soluția...",
+        subtitle: "Rulăm soluția pe fiecare test case.",
+        testCase: "Test case",
+        pending: "în așteptare",
+        evaluating: "se evaluează",
+        passed: "passed",
+        failed: "failed",
       }
     },
 
@@ -1564,6 +1587,7 @@ export const translations = {
       linkCopied: "Link copiat!",
       userFallback: "Utilizator",
       notFound: "Postarea nu a fost găsită",
+      notFoundDescription: "Postarea a fost ștearsă sau nu mai este publică.",
       viewPost: "Vezi postarea",
       writeComment: "Scrie un comentariu...",
       send: "Trimite",
@@ -1647,10 +1671,12 @@ export const translations = {
       followers: {
         title: "Urmăritori",
         count: "{count} urmăritori",
+        empty: "Nu există urmăritori încă.",
       },
       following: {
         title: "Urmăriți",
         count: "{count} urmăriți",
+        empty: "Nu urmărește pe nimeni încă.",
       },
     },
 

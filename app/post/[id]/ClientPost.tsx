@@ -18,7 +18,8 @@ import {
 import PostComments from "@/components/PostComments";
 
 import { Heart, MessageCircle, Share2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
@@ -33,6 +34,7 @@ function ClientPost({
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
   const [commentsCount, setCommentsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   const { locale } = useLanguage();
 
@@ -59,7 +61,10 @@ function ClientPost({
         .eq("id", id)
         .maybeSingle();
 
-      if (!postData) return;
+      if (!postData) {
+        setLoading(false);
+        return;
+      }
 
       setPost(postData);
 
@@ -91,10 +96,11 @@ function ClientPost({
         .eq("post_id", id);
 
       setCommentsCount(commentsData?.length || 0);
+      setLoading(false);
     }
 
-    load();
-  }, []);
+    void load();
+  }, [params]);
 
   async function toggleLike() {
     const user = (await supabase.auth.getUser()).data.user;
@@ -127,8 +133,18 @@ function ClientPost({
     toast.success(t("post.linkCopied"));
   }
 
+  if (loading) {
+    return <PostSkeleton />;
+  }
+
   if (!post) {
-    return <div className="p-6">{t("post.loading")}</div>;
+    return (
+      <EmptyState
+        className="p-6"
+        title={t("post.notFound")}
+        description={t("post.notFoundDescription")}
+      />
+    );
   }
 
   return (
@@ -166,6 +182,7 @@ function ClientPost({
           {post.image_url && (
             <img
               src={post.image_url}
+              alt=""
               className="rounded-lg max-h-[400px] object-cover w-full"
             />
           )}
@@ -219,4 +236,39 @@ function ClientPost({
 
 export default function PostPage(props: any) {
   return <ClientPost {...props} />;
+}
+
+function PostSkeleton() {
+  return (
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-44" />
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-36 w-full" />
+        </CardContent>
+
+        <div className="flex gap-4 px-6 pb-4">
+          <Skeleton className="h-5 w-12" />
+          <Skeleton className="h-5 w-12" />
+          <Skeleton className="h-5 w-16" />
+        </div>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-6">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-10 w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

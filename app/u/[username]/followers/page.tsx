@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { translations } from "@/lib/i18n";
 import { createServerSupabase } from "@/lib/supabaseServer";
+import { EmptyState } from "@/components/common/EmptyState";
 import { UserListItem } from "@/components/user/UserListItem";
 
 import {
@@ -35,7 +36,12 @@ export default async function FollowersPage({
     .single();
 
   if (!profile) {
-    return <div className="p-6">{t("publicProfile.notFound")}</div>;
+    return (
+      <EmptyState
+        className="p-6"
+        title={t("publicProfile.notFound")}
+      />
+    );
   }
 
   const { data: follows } = await supabase
@@ -65,6 +71,13 @@ export default async function FollowersPage({
         </CardHeader>
 
         <CardContent className="space-y-3">
+
+          {!follows?.length && (
+            <EmptyState
+              className="py-8"
+              title={t("social.followers.empty")}
+            />
+          )}
 
           {follows?.map((f: any) => {
             const u = f.profiles;
