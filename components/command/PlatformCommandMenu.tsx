@@ -6,6 +6,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import {
   BookOpen,
   Code,
+  Command as CommandIcon,
   LayoutDashboard,
   List,
   MessageSquare,
@@ -23,6 +24,7 @@ import { useRouter } from "next/navigation";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -32,6 +34,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { api, type LiveCodeData } from "@/lib/api";
 
 type PlatformCommandMenuProps = {
@@ -63,6 +66,8 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        if (!window.matchMedia("(min-width: 640px)").matches) return;
+
         event.preventDefault();
         setOpen((value) => !value);
       }
@@ -226,18 +231,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
           <Search className="h-4 w-4 shrink-0" />
           <span className="truncate">{t("command.placeholder")}</span>
         </span>
-        <kbd className="rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[11px] text-zinc-500 shadow-sm">
-          ⌘K
-        </kbd>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 sm:hidden"
-        aria-label={t("command.open")}
-      >
-        <Search className="h-4 w-4" />
+        <ShortcutKeys shortcut="⌘ K" />
       </button>
 
       <CommandDialog
@@ -247,50 +241,52 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         description={t("command.description")}
         className="max-w-xl border-zinc-200 bg-white/95 shadow-2xl backdrop-blur-xl"
       >
-        <CommandInput placeholder={t("command.placeholder")} />
-        <CommandList className="max-h-[420px]">
-          <CommandEmpty>{t("command.empty")}</CommandEmpty>
+        <Command>
+          <CommandInput placeholder={t("command.placeholder")} />
+          <CommandList className="max-h-[420px]">
+            <CommandEmpty>{t("command.empty")}</CommandEmpty>
 
-          <CommandGroup heading={t("command.groups.navigation")}>
-            {pageCommands.map((command) => (
-              <CommandMenuItem
-                key={command.href}
-                command={command}
-                onSelect={runCommand}
-              />
-            ))}
-          </CommandGroup>
+            <CommandGroup heading={t("command.groups.navigation")}>
+              {pageCommands.map((command) => (
+                <CommandMenuItem
+                  key={command.href}
+                  command={command}
+                  onSelect={runCommand}
+                />
+              ))}
+            </CommandGroup>
 
-          {user && liveSessionCommands.length > 0 && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading={t("command.groups.liveSessions")}>
-                {liveSessionCommands.map((command) => (
-                  <CommandMenuItem
-                    key={command.href}
-                    command={command}
-                    onSelect={runCommand}
-                  />
-                ))}
-              </CommandGroup>
-            </>
-          )}
+            {user && liveSessionCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.liveSessions")}>
+                  {liveSessionCommands.map((command) => (
+                    <CommandMenuItem
+                      key={command.href}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
 
-          {user && liveParticipantCommands.length > 0 && (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading={t("command.groups.participants")}>
-                {liveParticipantCommands.map((command) => (
-                  <CommandMenuItem
-                    key={`${command.href}-${command.breadcrumb?.join("/")}`}
-                    command={command}
-                    onSelect={runCommand}
-                  />
-                ))}
-              </CommandGroup>
-            </>
-          )}
-        </CommandList>
+            {user && liveParticipantCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.participants")}>
+                  {liveParticipantCommands.map((command) => (
+                    <CommandMenuItem
+                      key={`${command.href}-${command.breadcrumb?.join("/")}`}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
       </CommandDialog>
     </>
   );
@@ -322,7 +318,23 @@ function CommandMenuItem({
           </div>
         )}
       </div>
-      {command.shortcut && <CommandShortcut>{command.shortcut}</CommandShortcut>}
+      {command.shortcut && (
+        <CommandShortcut>
+          <ShortcutKeys shortcut={command.shortcut} />
+        </CommandShortcut>
+      )}
     </CommandItem>
+  );
+}
+
+function ShortcutKeys({ shortcut }: { shortcut: string }) {
+  return (
+    <KbdGroup>
+      {shortcut.split(" ").map((key) => (
+        <Kbd key={key}>
+          {key === "⌘" ? <CommandIcon className="h-3 w-3" /> : key}
+        </Kbd>
+      ))}
+    </KbdGroup>
   );
 }
