@@ -609,6 +609,7 @@ export const translations = {
 
       users: "Users",
       owner: "Owner",
+      removeParticipant: "Remove participant",
 
       chat: "Chat",
       messagePlaceholder: "Type a message...",
@@ -624,6 +625,9 @@ export const translations = {
         userInvited: "User already invited",
         inviteFailed: "Failed to send invite",
         inviteSent: "Invite sent",
+        noAccess: "You no longer have access to this live session.",
+        removeFailed: "Failed to remove participant",
+        userRemoved: "Participant removed",
         error: "Unexpected error",
       },
     },
@@ -1710,6 +1714,7 @@ export const translations = {
 
       users: "Utilizatori",
       owner: "Proprietar",
+      removeParticipant: "Elimină participant",
 
       chat: "Chat",
       messagePlaceholder: "Scrie un mesaj...",
@@ -1725,6 +1730,9 @@ export const translations = {
         userInvited: "Utilizatorul a fost deja invitat",
         inviteFailed: "Eroare la trimiterea invitației",
         inviteSent: "Invitație trimisă",
+        noAccess: "Nu mai ai acces la această sesiune live.",
+        removeFailed: "Eroare la eliminarea participantului",
+        userRemoved: "Participant eliminat",
         error: "Eroare neașteptată",
       },
     },

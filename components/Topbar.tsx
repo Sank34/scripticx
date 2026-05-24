@@ -8,6 +8,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api, type ProfileSummary } from "@/lib/api";
 import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
 import { useLanguage } from "@/components/LanguageProvider";
+import { TopbarBreadcrumbs } from "@/components/navigation/TopbarBreadcrumbs";
 
 import { Button } from "@/components/ui/button";
 
@@ -98,15 +99,22 @@ export function Topbar() {
   )[0]?.toUpperCase();
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-zinc-200/70 bg-white px-5">
+    <header className="relative flex h-14 items-center justify-between border-b border-zinc-200/70 bg-white px-5">
 
-      <div className="flex shrink-0 items-center gap-3">
-        <div className="text-sm font-medium text-zinc-900">
-          Workspace
+      <div className="flex min-w-0 shrink-0 items-center gap-3 md:w-[22rem] lg:w-[28rem]">
+        <TopbarBreadcrumbs />
+      </div>
+
+      <div className="pointer-events-none absolute left-1/2 hidden w-[min(28rem,42vw)] -translate-x-1/2 justify-center sm:flex">
+        <div className="pointer-events-auto w-full">
+          <PlatformCommandMenu
+            isAdmin={profile?.role === "admin"}
+            user={user}
+          />
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 justify-center px-3">
+      <div className="flex min-w-0 flex-1 justify-center px-3 sm:hidden">
         <PlatformCommandMenu
           isAdmin={profile?.role === "admin"}
           user={user}

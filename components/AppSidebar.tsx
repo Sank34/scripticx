@@ -136,14 +136,10 @@ export function AppSidebar() {
   const openDocs = docsOpenOverride ?? pathname.startsWith("/learn");
   const openExamples = examplesOpenOverride ?? pathname.startsWith("/examples");
 
-  const initialized = useRef(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isScrollable, setIsScrollable] = useState(false);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
     let active = true;
 
     async function loadRole(currentUser: User) {

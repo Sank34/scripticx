@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import {
@@ -49,6 +49,7 @@ type CommandEntry = {
   keywords?: string[];
   label: string;
   shortcut?: string;
+  shortcutKey?: string;
 };
 
 export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps) {
@@ -103,21 +104,24 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/problems",
         icon: List,
         label: t("nav.problems"),
-        shortcut: "G P",
+        shortcut: "⌘ P",
+        shortcutKey: "p",
         keywords: ["tasks", "exercises", "problems"],
       },
       {
         href: "/leaderboard",
         icon: Trophy,
         label: t("nav.leaderboard"),
-        shortcut: "G L",
+        shortcut: "⌘ L",
+        shortcutKey: "l",
         keywords: ["ranking", "score"],
       },
       {
         href: "/learn",
         icon: BookOpen,
         label: t("nav.docs"),
-        shortcut: "G D",
+        shortcut: "⌘ D",
+        shortcutKey: "d",
         keywords: ["documentation", "learn"],
       },
       {
@@ -141,21 +145,24 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/dashboard",
         icon: LayoutDashboard,
         label: t("nav.dashboard"),
-        shortcut: "G H",
+        shortcut: "⌘ H",
+        shortcutKey: "h",
         keywords: ["home", "overview"],
       },
       {
         href: "/editor",
         icon: Code,
         label: t("nav.editor"),
-        shortcut: "G E",
+        shortcut: "⌘ E",
+        shortcutKey: "e",
         keywords: ["miniscript", "snippet", "code"],
       },
       {
         href: "/livecode",
         icon: SquareTerminal,
         label: t("nav.livecode"),
-        shortcut: "G V",
+        shortcut: "⌘ V",
+        shortcutKey: "v",
         keywords: ["session", "collaboration"],
       },
       {
@@ -180,13 +187,15 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/profile",
         icon: User,
         label: t("user.profile"),
-        shortcut: "G U",
+        shortcut: "⌘ U",
+        shortcutKey: "u",
       },
       {
         href: "/settings",
         icon: Settings,
         label: t("user.settings"),
-        shortcut: "G S",
+        shortcut: "⌘ S",
+        shortcutKey: "s",
       }
     );
 
@@ -195,7 +204,8 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/admin",
         icon: Shield,
         label: t("nav.admin"),
-        shortcut: "G A",
+        shortcut: "⌘ A",
+        shortcutKey: "a",
         keywords: ["manage", "panel"],
       });
     }
@@ -234,10 +244,30 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     });
   }, [liveCodeData, liveSessionCommands, t]);
 
-  function runCommand(href: string) {
+  const runCommand = useCallback((href: string) => {
     setOpen(false);
     router.push(href);
-  }
+  }, [router]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleMenuShortcut(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.altKey || event.shiftKey) return;
+
+      const key = event.key.toLowerCase();
+      const command = pageCommands.find((entry) => entry.shortcutKey === key);
+      if (!command) return;
+
+      event.preventDefault();
+      runCommand(command.href);
+    }
+
+    window.addEventListener("keydown", handleMenuShortcut);
+
+    return () => window.removeEventListener("keydown", handleMenuShortcut);
+  }, [open, pageCommands, runCommand]);
 
   const safariDialogMaxHeight = Math.max(
     280,

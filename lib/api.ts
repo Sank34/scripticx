@@ -413,7 +413,7 @@ class LiveApi {
   async getParticipant(roomId: string, userId: string) {
     const { data, error } = await this.client
       .from("room_participants")
-      .select("id, status")
+      .select("id, status, user_id")
       .eq("room_id", roomId)
       .eq("user_id", userId)
       .maybeSingle<RoomParticipant>();
@@ -424,11 +424,16 @@ class LiveApi {
   }
 
   async inviteUser(roomId: string, userId: string) {
-    const { error } = await this.client.from("room_participants").insert({
-      room_id: roomId,
-      user_id: userId,
-      status: "invited",
-    });
+    const { error } = await this.client
+      .from("room_participants")
+      .upsert(
+        {
+          room_id: roomId,
+          user_id: userId,
+          status: "invited",
+        },
+        { onConflict: "room_id,user_id" }
+      );
 
     if (error) throw error;
   }
@@ -475,12 +480,31 @@ class LiveApi {
   async listRoomParticipants(roomId: string) {
     const { data, error } = await this.client
       .from("room_participants")
-      .select("user_id")
-      .eq("room_id", roomId);
+      .select("user_id, status")
+      .eq("room_id", roomId)
+      .in("status", ["accepted", "invited"]);
 
     if (error) throw error;
 
-    return (data || []) as Array<{ user_id: string }>;
+    return (data || []) as Array<{ user_id: string; status?: string | null }>;
+  }
+
+  async removeRoomParticipant(roomId: string, userId: string) {
+    const [{ error: participantError }, { error: liveError }] = await Promise.all([
+      this.client
+        .from("room_participants")
+        .update({ status: "removed" })
+        .eq("room_id", roomId)
+        .eq("user_id", userId),
+      this.client
+        .from("live_participants")
+        .delete()
+        .eq("room_id", roomId)
+        .eq("user_id", userId),
+    ]);
+
+    if (participantError) throw participantError;
+    if (liveError) throw liveError;
   }
 
   async saveCode(roomId: string, code: string) {
@@ -617,7 +641,7 @@ class LiveApi {
         .from("room_participants")
         .select("room_id, user_id")
         .in("room_id", roomIds)
-        .eq("status", "accepted"),
+        .in("status", ["accepted", "invited"]),
     ]);
 
     if (liveParticipantsError) throw liveParticipantsError;

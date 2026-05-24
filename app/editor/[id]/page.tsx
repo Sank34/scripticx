@@ -27,10 +27,87 @@ import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
 
+type ProjectFile = {
+  id: string;
+  name: string;
+  language: "msp" | "text";
+  content: string;
+};
+
+type SnippetData = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  description: string | null;
+  code: string | null;
+  files?: unknown;
+  created_at: string;
+};
+
+type ProfileData = {
+  username: string | null;
+  avatar_url: string | null;
+};
+
+function createFileId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createMainProjectFile(content: string): ProjectFile {
+  return {
+    id: createFileId(),
+    name: "main.msp",
+    language: "msp",
+    content,
+  };
+}
+
+function normalizeProjectFiles(
+  files: unknown,
+  fallbackCode: string
+): ProjectFile[] {
+  if (!Array.isArray(files)) {
+    return [createMainProjectFile(fallbackCode)];
+  }
+
+  const normalized = files
+    .map((file): ProjectFile | null => {
+      if (!file || typeof file !== "object") return null;
+
+      const candidate = file as {
+        id?: unknown;
+        name?: unknown;
+        content?: unknown;
+      };
+
+      return {
+        id: typeof candidate.id === "string" ? candidate.id : createFileId(),
+        name:
+          typeof candidate.name === "string" && candidate.name.trim()
+            ? candidate.name.trim()
+            : "main.msp",
+        language: "msp",
+        content:
+          typeof candidate.content === "string" ? candidate.content : "",
+      } satisfies ProjectFile;
+    })
+    .filter((file): file is ProjectFile => Boolean(file));
+
+  return normalized.length
+    ? normalized
+    : [createMainProjectFile(fallbackCode)];
+}
+
 export default function EditorSnippetPage() {
   const { t } = useLanguage();
-  const [data, setData] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [data, setData] = useState<SnippetData | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const params = useParams();
@@ -46,16 +123,24 @@ export default function EditorSnippetPage() {
         .eq("id", id)
         .maybeSingle();
 
-      setData(snippet);
+      const snippetData = snippet as SnippetData | null;
+      const projectFiles = normalizeProjectFiles(
+        snippetData?.files,
+        snippetData?.code || ""
+      );
 
-      if (snippet?.user_id) {
+      setData(snippetData);
+      setFiles(projectFiles);
+      setActiveFileId(projectFiles[0]?.id ?? null);
+
+      if (snippetData?.user_id) {
         const { data: prof } = await supabase
           .from("profiles")
           .select("username, avatar_url")
-          .eq("id", snippet.user_id)
+          .eq("id", snippetData.user_id)
           .maybeSingle();
 
-        setProfile(prof);
+        setProfile(prof as ProfileData | null);
       }
 
       setLoading(false);
@@ -106,11 +191,16 @@ export default function EditorSnippetPage() {
     );
   }
 
+  const snippet = data;
   const initial = profile?.username?.[0]?.toUpperCase() || "U";
+  const activeFile =
+    files.find((file) => file.id === activeFileId) ?? files[0] ?? null;
 
   async function handleCopyCode() {
     try {
-      await navigator.clipboard.writeText(data.code);
+      await navigator.clipboard.writeText(
+        activeFile?.content ?? snippet.code ?? ""
+      );
       toast.success(t("snippetPage.toast.codeCopied"));
     } catch {
       toast.error(t("snippetPage.toast.copyError"));
@@ -119,7 +209,7 @@ export default function EditorSnippetPage() {
 
   async function handleCopyLink() {
     try {
-      const url = `${window.location.origin}/editor/${data.id}`;
+      const url = `${window.location.origin}/editor/${snippet.id}`;
       await navigator.clipboard.writeText(url);
       toast.success(t("snippetPage.toast.linkCopied"));
     } catch {
@@ -132,13 +222,13 @@ export default function EditorSnippetPage() {
 
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">
-          {data.title || t("snippetPage.untitled")}
+          {snippet.title || t("snippetPage.untitled")}
         </h1>
 
         <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
           <Badge variant="secondary">{t("snippetPage.public")}</Badge>
           <span>
-            {new Date(data.created_at).toLocaleString()}
+            {new Date(snippet.created_at).toLocaleString()}
           </span>
         </div>
       </div>
@@ -198,20 +288,46 @@ export default function EditorSnippetPage() {
 
       </div>
 
-      {data.description && (
+      {snippet.description && (
         <p className="text-muted-foreground">
-          {data.description}
+          {snippet.description}
         </p>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("snippetPage.code.title")}</CardTitle>
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+            <span>{t("snippetPage.code.title")}</span>
+            {activeFile && (
+              <span className="text-sm font-normal text-muted-foreground">
+                {activeFile.name}
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
 
         <CardContent>
+          {files.length > 1 && (
+            <div className="mb-3 flex gap-2 overflow-x-auto">
+              {files.map((file) => (
+                <button
+                  key={file.id}
+                  type="button"
+                  onClick={() => setActiveFileId(file.id)}
+                  className={`rounded-md border px-3 py-1 text-sm transition ${
+                    file.id === activeFile?.id
+                      ? "border-foreground bg-muted font-medium"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {file.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           <pre className="bg-muted p-4 rounded text-sm overflow-auto whitespace-pre-wrap break-words">
-            {data.code}
+            {activeFile?.content ?? snippet.code}
           </pre>
         </CardContent>
       </Card>

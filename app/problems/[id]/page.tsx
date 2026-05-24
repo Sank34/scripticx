@@ -6,6 +6,7 @@ import type { OnMount } from "@monaco-editor/react";
 import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
 import { useParams } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
+import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 import {
   TestResultCard,
@@ -336,29 +337,37 @@ function ProblemContent() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <MiniScriptMonacoEditor
-                onMount={handleEditorMount}
-                height="100%"
-                value={code}
-                onChange={setCode}
-                options={{
-                  padding: { top: 16, bottom: 16 },
-                  smoothScrolling: true,
-                  wordWrap: "on",
-                  automaticLayout: true,
-                  cursorSmoothCaretAnimation: "on",
-                  cursorBlinking: "smooth",
-                  scrollbar: {
-                    verticalScrollbarSize: 8,
-                    horizontalScrollbarSize: 8,
-                  },
-                  tabSize,
-                  insertSpaces: true,
-                  wrappingIndent: "same",
-                }}
-              />
-            </div>
+            <CodeEditorContextMenu
+              code={code}
+              fileName={fileName}
+              onChange={setCode}
+              onSubmit={runCode}
+            >
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <MiniScriptMonacoEditor
+                  onMount={handleEditorMount}
+                  height="100%"
+                  value={code}
+                  onChange={setCode}
+                  options={{
+                    contextmenu: false,
+                    padding: { top: 16, bottom: 16 },
+                    smoothScrolling: true,
+                    wordWrap: "on",
+                    automaticLayout: true,
+                    cursorSmoothCaretAnimation: "on",
+                    cursorBlinking: "smooth",
+                    scrollbar: {
+                      verticalScrollbarSize: 8,
+                      horizontalScrollbarSize: 8,
+                    },
+                    tabSize,
+                    insertSpaces: true,
+                    wrappingIndent: "same",
+                  }}
+                />
+              </div>
+            </CodeEditorContextMenu>
           </div>
 
           <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">

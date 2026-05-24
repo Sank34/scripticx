@@ -15,6 +15,7 @@ import {
   AvatarImage,
   AvatarFallback,
 } from "@/components/ui/avatar";
+import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import PostComments from "@/components/PostComments";
 
 import { Heart, MessageCircle, Share2 } from "lucide-react";
@@ -188,9 +189,7 @@ function ClientPost({
           )}
 
           {post.code && (
-            <pre className="bg-muted p-3 rounded text-sm overflow-auto font-mono">
-              {post.code}
-            </pre>
+            <HighlightedCodeBlock code={post.code} />
           )}
         </CardContent>
 

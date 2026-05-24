@@ -1,63 +1,110 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { OnMount } from "@monaco-editor/react";
 import { useSearchParams } from "next/navigation";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import RouteGuard from "@/components/RouteGuard";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
-
-import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
-import {
-  analyzeMiniScriptComplexity,
-  type ComplexityAnalysis,
-} from "@/lib/complexity-analyzer";
-import { visualizeMiniScript } from "@/lib/msp-visualizer";
+import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
 import { ComplexityAnalyzerCard } from "@/components/editor/ComplexityAnalyzerCard";
-
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
-import { PageContainer } from "@/components/layout/PageContainer";
+import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
+import { DebuggerStateCard } from "@/components/live/DebuggerStateCard";
+import { LiveConsolePanel } from "@/components/live/LiveConsolePanel";
 import { useLanguage } from "@/components/LanguageProvider";
-
+import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
+import { useAuth } from "@/hooks/useAuth";
 import {
-  Play,
+  analyzeMiniScriptComplexity,
+  type ComplexityAnalysis,
+} from "@/lib/complexity-analyzer";
+import {
+  advanceLine,
+  parseLine,
+  reset,
+  setVariable,
+  step,
+  type StepResult,
+} from "@/lib/engine";
+import { visualizeMiniScript } from "@/lib/msp-visualizer";
+import { supabase } from "@/lib/supabase";
+import {
   Bug,
-  StepForward,
+  Copy,
+  FileDown,
+  Gauge,
+  ListTree,
+  Pencil,
+  Play,
+  Plus,
   Save,
   Share2,
-  FileDown,
+  StepForward,
+  Terminal,
   Trash2,
-  Pencil,
-  Plus,
-  Gauge,
   Workflow,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 
+type ProjectFile = {
+  id: string;
+  name: string;
+  language: "msp" | "text";
+  content: string;
+};
 
 type SnippetItem = {
   id: string;
   title: string;
   description: string;
   code: string;
+  files?: ProjectFile[] | null;
   created_at: string;
 };
 
 type Value = string | number | boolean;
 type ProgramInstruction = ReturnType<typeof parseLine>;
+type MonacoEditorInstance = Parameters<OnMount>[0];
 
 function getErrorDetails(error: unknown) {
   if (error && typeof error === "object") {
@@ -78,26 +125,104 @@ function getErrorDetails(error: unknown) {
   };
 }
 
+function parseInputValue(value: string): Value {
+  if (value === "true" || value === "false") return value === "true";
+  if (!Number.isNaN(Number(value))) return Number(value);
+  return value;
+}
+
+function normalizeErrorLine(line: number | undefined) {
+  if (typeof line !== "number") return null;
+  return Math.max(1, line);
+}
+
+function createFileId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getFileLanguage(name: string): ProjectFile["language"] {
+  return name.toLowerCase().endsWith(".msp") ? "msp" : "text";
+}
+
+function createProjectFile(name = "main.msp", content = ""): ProjectFile {
+  return {
+    id: createFileId(),
+    name,
+    language: getFileLanguage(name),
+    content,
+  };
+}
+
+function normalizeProjectFiles(files: unknown, fallbackCode: string) {
+  if (!Array.isArray(files)) {
+    return [createProjectFile("main.msp", fallbackCode)];
+  }
+
+  const normalized = files
+    .map((file) => {
+      if (!file || typeof file !== "object") return null;
+
+      const candidate = file as {
+        id?: unknown;
+        name?: unknown;
+        language?: unknown;
+        content?: unknown;
+      };
+      const name =
+        typeof candidate.name === "string" && candidate.name.trim()
+          ? candidate.name.trim()
+          : "main.msp";
+
+      return {
+        id: typeof candidate.id === "string" ? candidate.id : createFileId(),
+        name,
+        language: getFileLanguage(name),
+        content:
+          typeof candidate.content === "string" ? candidate.content : "",
+      } satisfies ProjectFile;
+    })
+    .filter((file): file is ProjectFile => Boolean(file));
+
+  return normalized.length
+    ? normalized
+    : [createProjectFile("main.msp", fallbackCode)];
+}
+
+function getPrimaryFile(files: ProjectFile[]) {
+  return files.find((file) => file.name === "main.msp") ?? files[0];
+}
+
 function EditorContent() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
-
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const initialFiles = useMemo(
+    () => [
+      createProjectFile(
+        "main.msp",
+        searchParams.get("code") ??
+          `X = 0
+WHILE X < 3
+PRINT X
+X = X + 1
+END`
+      ),
+    ],
+    [searchParams]
+  );
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
-
-  const [code, setCode] = useState(
-    () =>
-      searchParams.get("code") ??
-      `X = 0
-WHILE X < 3
-PRINT X
-X = X + 1
-END`,
+  const [files, setFiles] = useState<ProjectFile[]>(() => initialFiles);
+  const [activeFileId, setActiveFileId] = useState<string | null>(
+    () => initialFiles[0]?.id ?? null
   );
 
   const [program, setProgram] = useState<ProgramInstruction[]>([]);
@@ -110,21 +235,64 @@ END`,
   const [inputValue, setInputValue] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [complexityEnabled, setComplexityEnabled] = useState(false);
+  const [tabSize, setTabSize] = useState(2);
+  const [editorLine, setEditorLine] = useState(1);
+  const [activePanel, setActivePanel] = useState("console");
+  const [createFileOpen, setCreateFileOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("file-2.msp");
+  const [newFileError, setNewFileError] = useState("");
 
-  const codeLines = code.split("\n");
+  const editorRef = useRef<MonacoEditorInstance | null>(null);
+  const decorationIdsRef = useRef<string[]>([]);
+
+  const activeFile = useMemo(
+    () => files.find((file) => file.id === activeFileId) ?? files[0],
+    [files, activeFileId]
+  );
+  const code = activeFile?.content ?? "";
+  const executionLine =
+    errorLine ?? (program.length > 0 && !stopped ? Math.max(1, currentLine + 1) : null);
   const complexityAnalysis = useMemo<ComplexityAnalysis | null>(() => {
     if (!complexityEnabled) return null;
-
     return analyzeMiniScriptComplexity(code, locale);
   }, [code, locale, complexityEnabled]);
   const codeVisualization = useMemo(() => visualizeMiniScript(code), [code]);
+  const fileName = activeFile?.name ?? "main.msp";
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const decorations = [];
+
+    if (executionLine) {
+      decorations.push({
+        range: {
+          startLineNumber: executionLine,
+          startColumn: 1,
+          endLineNumber: executionLine,
+          endColumn: 1,
+        },
+        options: {
+          isWholeLine: true,
+          className: errorLine ? "msp-error-line" : "msp-current-line",
+          glyphMarginClassName: errorLine ? "msp-error-glyph" : "msp-current-glyph",
+        },
+      });
+    }
+
+    decorationIdsRef.current = editor.deltaDecorations(
+      decorationIdsRef.current,
+      decorations
+    );
+  }, [executionLine, errorLine]);
 
   async function fetchSnippets(): Promise<SnippetItem[]> {
     if (!user) return [];
 
     const { data } = await supabase
       .from("snippets")
-      .select("id, title, description, code, created_at")
+      .select("id, title, description, code, files, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -132,141 +300,168 @@ END`,
     return data || [];
   }
 
-  const {
-    data: snippets = [],
-  } = useQuery<SnippetItem[]>({
+  const { data: snippets = [] } = useQuery<SnippetItem[]>({
     queryKey: ["editor-snippets", user?.id],
     queryFn: fetchSnippets,
     enabled: !!user,
   });
 
-  function compile() {
+  const compile = useCallback(() => {
     const parsed = code.split("\n").map(parseLine);
 
-    setProgram(parsed);
     reset();
-
+    setProgram(parsed);
     setVariables({});
     setCurrentLine(0);
     setOutput([]);
     setStopped(false);
     setErrorLine(null);
+    setInputVar(null);
+    setInputValue("");
+
+    return parsed;
+  }, [code]);
+
+  function applyStepResult(result: StepResult, collectedOutput: string[] = []) {
+    if (!result) {
+      setStopped(true);
+      return false;
+    }
+
+    if (result.inputRequest) {
+      setInputVar(result.inputRequest);
+      setActivePanel("console");
+      return false;
+    }
+
+    setVariables(result.variables as Record<string, Value>);
+    setCurrentLine(result.currentLine);
+
+    if (result.output !== null) {
+      collectedOutput.push(String(result.output));
+    }
+
+    return true;
   }
 
   function handleStep() {
-    if (program.length === 0 || stopped) return;
+    const activeProgram = program.length > 0 ? program : compile();
+
+    if (stopped && program.length > 0) return;
 
     setIsRunning(false);
+    setActivePanel("debugger");
 
     try {
-      const result = step(program);
+      const result = step(activeProgram);
+      const collectedOutput: string[] = [];
+      applyStepResult(result, collectedOutput);
 
-      if (!result) {
-        setStopped(true);
-        return;
+      if (collectedOutput.length) {
+        setOutput((prev) => [...prev, ...collectedOutput]);
       }
-
-      if (result.inputRequest) {
-        setInputVar(result.inputRequest);
-        return;
-      }
-
-      setVariables(result.variables);
-      setCurrentLine(result.currentLine);
-
-      if (result.output !== null) {
-        setOutput(prev => [...prev, String(result.output)]);
-      }
-
     } catch (error: unknown) {
       const details = getErrorDetails(error);
-      setOutput(prev => [...prev, "ERROR: " + details.message]);
-      setErrorLine(details.line ?? currentLine);
+      setOutput((prev) => [...prev, `ERROR: ${details.message}`]);
+      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine + 1));
+      setStopped(true);
+      setActivePanel("console");
+    }
+  }
+
+  function runProgram(activeProgram: ProgramInstruction[]) {
+    const newOutput: string[] = [];
+
+    try {
+      while (true) {
+        const result = step(activeProgram);
+
+        if (!result) {
+          setStopped(true);
+          break;
+        }
+
+        const shouldContinue = applyStepResult(result, newOutput);
+        if (!shouldContinue) break;
+      }
+    } catch (error: unknown) {
+      const details = getErrorDetails(error);
+      newOutput.push(`ERROR: ${details.message}`);
+      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine + 1));
       setStopped(true);
     }
+
+    if (newOutput.length) {
+      setOutput((prev) => [...prev, ...newOutput]);
+    }
+  }
+
+  function handleRun() {
+    const activeProgram = compile();
+
+    setIsRunning(true);
+    setActivePanel("console");
+    runProgram(activeProgram);
   }
 
   function handleSubmitInput() {
     if (!inputVar) return;
 
-    let value: Value;
-
-    if (inputValue === "true" || inputValue === "false") {
-      value = inputValue === "true";
-    } else if (!isNaN(Number(inputValue))) {
-      value = Number(inputValue);
-    } else {
-      value = inputValue;
-    }
+    const value = parseInputValue(inputValue);
 
     setVariable(inputVar, value);
-
-    setVariables(prev => ({
+    setVariables((prev) => ({
       ...prev,
-      [inputVar]: value
+      [inputVar]: value,
     }));
-
     setInputVar(null);
     setInputValue("");
 
     advanceLine();
-    setCurrentLine(prev => prev + 1);
+    setCurrentLine((prev) => prev + 1);
 
-    if (isRunning) runProgram();
-  }
-
-  function runProgram() {
-    let res;
-    const newOutput: string[] = [];
-
-    try {
-      while (true) {
-        res = step(program);
-
-        if (!res) break;
-
-        if (res.inputRequest) {
-          setInputVar(res.inputRequest);
-          break;
-        }
-
-        if (res.output !== null) {
-          newOutput.push(String(res.output));
-        }
-
-        setVariables(res.variables);
-        setCurrentLine(res.currentLine);
-      }
-    } catch (error: unknown) {
-      const details = getErrorDetails(error);
-      newOutput.push("ERROR: " + details.message);
-      setErrorLine(details.line ?? currentLine);
-      setStopped(true);
+    if (isRunning) {
+      runProgram(program);
     }
-
-    setOutput(prev => [...prev, ...newOutput]);
   }
 
-  function handleRun() {
-    if (program.length === 0 || stopped) return;
+  function resetRuntimeState(clearOutput = false) {
+    setProgram([]);
+    setVariables({});
+    setCurrentLine(0);
+    if (clearOutput) setOutput([]);
+    setStopped(false);
+    setErrorLine(null);
+    setInputVar(null);
+    setInputValue("");
+  }
 
-    setIsRunning(true);
-    runProgram();
+  function handleCodeChange(nextCode: string) {
+    setFiles((currentFiles) =>
+      currentFiles.map((file) =>
+        file.id === activeFile?.id ? { ...file, content: nextCode } : file
+      )
+    );
+    resetRuntimeState();
   }
 
   function handleSaveFile() {
+    saveFile(activeFile);
+  }
+
+  function saveFile(file: ProjectFile | undefined | null) {
+    if (!file) return;
+
     try {
-      const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+      const blob = new Blob([file.content], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-
       const link = document.createElement("a");
-      link.href = url;
-      link.download = "solution.msp";
 
+      link.href = url;
+      link.download = file.name || "main.msp";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
       URL.revokeObjectURL(url);
 
       toast.success(t("editor.toast.savedFile"));
@@ -275,63 +470,58 @@ END`,
     }
   }
 
+  async function copyFileName(fileNameToCopy: string) {
+    await navigator.clipboard.writeText(fileNameToCopy);
+    toast.success("File name copied");
+  }
+
   async function saveSnippet(silent = false) {
     if (!user) return;
-    if (!code.trim()) {
+
+    const primaryFile = getPrimaryFile(files);
+
+    if (!files.some((file) => file.content.trim())) {
       if (!silent) toast.error("Code cannot be empty");
       return;
     }
+
     setSaving(true);
 
-    let data, error;
+    const payload = {
+      title,
+      description,
+      code: primaryFile?.content ?? "",
+      files,
+      is_public: true,
+    };
 
-    if (savedId) {
-      const res = await supabase
-        .from("snippets")
-        .update({
-          title,
-          description,
-          code,
-          is_public: true,
-        })
-        .eq("id", savedId)
-        .select()
-        .single();
-
-      data = res.data;
-      error = res.error;
-    } else {
-      const res = await supabase
-        .from("snippets")
-        .insert([
-          {
-            user_id: user.id,
-            title,
-            description,
-            code,
-            is_public: true,
-          },
-        ])
-        .select()
-        .single();
-
-      data = res.data;
-      error = res.error;
-    }
+    const response = savedId
+      ? await supabase
+          .from("snippets")
+          .update(payload)
+          .eq("id", savedId)
+          .select()
+          .single()
+      : await supabase
+          .from("snippets")
+          .insert([{ user_id: user.id, ...payload }])
+          .select()
+          .single();
 
     setSaving(false);
 
-    if (error) {
+    if (response.error) {
       toast.error(t("editor.toast.snippetSaveError"));
       return;
     }
 
     if (!silent) toast.success(t("editor.toast.snippetSaved"));
+
     await queryClient.invalidateQueries({
       queryKey: ["editor-snippets", user.id],
     });
-    setSavedId(data.id);
-    return data.id;
+    setSavedId(response.data.id);
+    return response.data.id as string;
   }
 
   async function handleShare() {
@@ -345,15 +535,11 @@ END`,
 
     const url = `${window.location.origin}/editor/${idToUse}`;
     await navigator.clipboard.writeText(url);
-
     toast.success(t("editor.toast.copied"));
   }
 
   async function deleteSnippet(id: string) {
-    const { error } = await supabase
-      .from("snippets")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("snippets").delete().eq("id", id);
 
     if (error) {
       toast.error(t("editor.toast.deleteError"));
@@ -364,333 +550,693 @@ END`,
       queryKey: ["editor-snippets", user?.id],
     });
 
-    if (savedId === id) {
-      setSavedId(null);
-    }
-
+    if (savedId === id) setSavedId(null);
     toast.success(t("editor.toast.deleted"));
   }
+
+  function createEditorFile() {
+    setNewFileName(`file-${files.length + 1}.msp`);
+    setNewFileError("");
+    setCreateFileOpen(true);
+  }
+
+  function confirmCreateEditorFile() {
+    const trimmedName = newFileName.trim();
+
+    if (!trimmedName) {
+      setNewFileError("File name is required");
+      return;
+    }
+
+    if (!/^[\w.-]+$/.test(trimmedName)) {
+      setNewFileError("Use only letters, numbers, dots, dashes and underscores");
+      return;
+    }
+
+    if (files.some((file) => file.name === trimmedName)) {
+      setNewFileError("A file with this name already exists");
+      return;
+    }
+
+    const nextFile = createProjectFile(trimmedName);
+    setFiles((currentFiles) => [...currentFiles, nextFile]);
+    setActiveFileId(nextFile.id);
+    setCreateFileOpen(false);
+    setNewFileError("");
+    resetRuntimeState();
+  }
+
+  function renameEditorFile(fileId: string) {
+    const file = files.find((item) => item.id === fileId);
+    if (!file) return;
+
+    const name = window.prompt("Rename file", file.name);
+    const trimmedName = name?.trim();
+
+    if (!trimmedName || trimmedName === file.name) return;
+
+    if (files.some((item) => item.id !== fileId && item.name === trimmedName)) {
+      toast.error("A file with this name already exists");
+      return;
+    }
+
+    setFiles((currentFiles) =>
+      currentFiles.map((item) =>
+        item.id === fileId
+          ? { ...item, name: trimmedName, language: getFileLanguage(trimmedName) }
+          : item
+      )
+    );
+  }
+
+  function deleteEditorFile(fileId: string) {
+    if (files.length === 1) {
+      toast.error("Project needs at least one file");
+      return;
+    }
+
+    const nextFiles = files.filter((file) => file.id !== fileId);
+
+    setFiles(nextFiles);
+
+    if (activeFileId === fileId) {
+      setActiveFileId(nextFiles[0]?.id ?? null);
+      resetRuntimeState();
+    }
+  }
+
+  function switchEditorFile(fileId: string) {
+    if (fileId === activeFileId) return;
+
+    setActiveFileId(fileId);
+    resetRuntimeState();
+  }
+
   function handleAnalyzeComplexity() {
     setComplexityEnabled(true);
+    setActivePanel("analysis");
     toast.success(t("editor.complexity.toast.completed"));
   }
 
   async function loadSnippet(id: string) {
-  const { data } = await supabase
-    .from("snippets")
-    .select("*")
-    .eq("id", id)
-    .single();
+    const { data } = await supabase
+      .from("snippets")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  if (data) {
-    setCode(data.code);
+    if (!data) return;
+
+    const nextFiles = normalizeProjectFiles(data.files, data.code || "");
+
+    setFiles(nextFiles);
+    setActiveFileId(nextFiles[0]?.id ?? null);
     setTitle(data.title || "");
     setDescription(data.description || "");
     setSavedId(data.id);
+    resetRuntimeState(true);
   }
-}
 
   function createNewSnippet() {
     setSavedId(null);
     setTitle("");
     setDescription("");
-    setCode("");
+    const nextFile = createProjectFile("main.msp");
+    setFiles([nextFile]);
+    setActiveFileId(nextFile.id);
+    resetRuntimeState(true);
   }
 
+  const handleEditorMount: OnMount = (editor) => {
+    editorRef.current = editor;
+
+    const syncLine = () => {
+      setEditorLine(editor.getPosition()?.lineNumber ?? 1);
+    };
+
+    syncLine();
+    editor.onDidChangeCursorPosition(syncLine);
+    editor.onDidFocusEditorText(syncLine);
+    editor.onDidChangeModelContent(syncLine);
+  };
+
+  const tabSizeControl = (
+    <Select
+      value={String(tabSize)}
+      onValueChange={(value) => setTabSize(Number(value))}
+    >
+      <SelectTrigger
+        size="sm"
+        className="h-7 border-zinc-200 bg-white px-2 text-xs text-zinc-600"
+        aria-label={t("live.tabSize")}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="end">
+        {[2, 3, 4, 8].map((size) => (
+          <SelectItem key={size} value={String(size)}>
+            {size} {t("live.spaces")}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const toolbarButton = (
+    label: string,
+    icon: React.ReactNode,
+    onClick: () => void | Promise<void>,
+    variant: "default" | "secondary" | "outline" | "ghost" = "outline",
+    disabled = false
+  ) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="icon"
+          variant={variant}
+          onClick={onClick}
+          disabled={disabled}
+          aria-label={label}
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+
+  const metadataPanel = (
+    <div className="space-y-3 p-4">
+      <Input
+        placeholder={t("editor.placeholderTitle")}
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+      />
+      <Input
+        placeholder={t("editor.placeholderDescription")}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+    </div>
+  );
+
+  const consolePanel = (
+    <LiveConsolePanel
+      currentLine={currentLine}
+      inputPlaceholder={t("live.inputPlaceholder")}
+      inputPrompt={t("editor.debugger.input")}
+      inputValue={inputValue}
+      noOutputLabel={t("editor.debugger.output")}
+      okLabel={t("editor.debugger.submit")}
+      onInputValueChange={setInputValue}
+      onSubmitInput={handleSubmitInput}
+      output={output}
+      title={t("live.console")}
+      variables={variables}
+      waitingInput={inputVar}
+    />
+  );
+
+  const debuggerPanel = (
+    <div className="h-full overflow-y-auto p-4">
+      <DebuggerStateCard
+        currentLine={currentLine}
+        title={t("editor.debugger.title")}
+        variables={variables}
+      />
+    </div>
+  );
+
+  const analysisPanel = (
+    <div className="h-full overflow-y-auto p-4">
+      <ComplexityAnalyzerCard
+        analysis={complexityAnalysis}
+        compact
+        frame="section"
+      />
+    </div>
+  );
+
+  const visualizationPanel = (
+    <div className="h-full overflow-y-auto p-4">
+      <section className="rounded-xl border border-zinc-200 bg-white">
+        <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <Workflow size={14} />
+          {t("editor.visualization.title")}
+        </div>
+        <Tabs defaultValue="ast" className="gap-0">
+          <TabsList className="grid h-10 w-full grid-cols-2 rounded-none border-b bg-zinc-50 px-3">
+            <TabsTrigger value="ast" className="text-xs">
+              {t("editor.visualization.tabs.ast")}
+            </TabsTrigger>
+            <TabsTrigger value="flowchart" className="text-xs">
+              {t("editor.visualization.tabs.flowchart")}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="ast" className="mt-0">
+            <pre className="max-h-[360px] overflow-auto p-3 text-xs leading-relaxed whitespace-pre-wrap">
+              {codeVisualization.ast}
+            </pre>
+          </TabsContent>
+          <TabsContent value="flowchart" className="mt-0">
+            <pre className="max-h-[360px] overflow-auto p-3 text-xs leading-relaxed whitespace-pre-wrap">
+              {codeVisualization.flowchart}
+            </pre>
+          </TabsContent>
+        </Tabs>
+      </section>
+    </div>
+  );
+
+  const snippetsPanel = (
+    <div className="h-full overflow-y-auto p-4">
+      <div className="space-y-2">
+        {snippets.length === 0 && (
+          <div className="rounded-xl border border-dashed border-zinc-200 p-4 text-sm text-zinc-500">
+            {t("editor.snippets.empty")}
+          </div>
+        )}
+
+        {snippets.map((snippet) => (
+          <div
+            key={snippet.id}
+            className={`group flex items-center gap-2 rounded-xl border p-3 transition ${
+              savedId === snippet.id
+                ? "border-zinc-900 bg-zinc-50"
+                : "border-zinc-200 hover:bg-zinc-50"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => loadSnippet(snippet.id)}
+              className="min-w-0 flex-1 text-left"
+            >
+              <div className="truncate text-sm font-semibold">
+                {snippet.title || t("editor.snippets.untitled")}
+              </div>
+              <div className="truncate text-xs text-zinc-500">
+                {new Date(snippet.created_at).toLocaleString()}
+              </div>
+            </button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => loadSnippet(snippet.id)}
+              aria-label={t("editor.snippets.edit")}
+            >
+              <Pencil size={14} />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => deleteSnippet(snippet.id)}
+              aria-label={t("editor.snippets.delete")}
+            >
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
-    <PageContainer variant="full">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>{t("editor.title")}</CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-4 flex flex-col h-full">
-
-            <Input
-              placeholder={t("editor.placeholderTitle")}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-
-            <Textarea
-              placeholder={t("editor.placeholderDescription")}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-
-            <div className="flex-1 flex flex-col gap-2">
-              <Textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="font-mono flex-1"
-              />
-
-              <div className="bg-slate-900 text-white rounded-md p-3 font-mono text-sm overflow-auto max-h-[250px]">
-                {codeLines.map((line, index) => (
-                  <div
-                    key={index}
-                    className={`px-2 py-1 rounded
-                      ${index === errorLine ? "bg-red-500/50" :
-                        index === currentLine ? "bg-blue-500/40" :
-                        ""}`}
-                  >
-                    {index + 1}. {line}
-                  </div>
-                ))}
-              </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+      <TooltipProvider>
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+          <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4">
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold md:text-base">
+                {t("editor.title")}
+              </h1>
+              <p className="hidden truncate text-xs text-zinc-500 sm:block">
+                {title || fileName}
+              </p>
             </div>
 
-            <div className="mt-2">
-              <TooltipProvider>
-                <div className="flex gap-2 flex-wrap p-2 bg-muted/40 rounded-lg border sticky bottom-0">
+            <div className="flex shrink-0 items-center gap-1.5">
+              {toolbarButton(t("editor.actions.newSnippet"), <Plus size={16} />, createNewSnippet)}
+              {toolbarButton(t("editor.actions.compile"), <Bug size={16} />, () => {
+                compile();
+              }, "secondary")}
+              {toolbarButton(t("editor.actions.step"), <StepForward size={16} />, handleStep, "outline", stopped)}
+              {toolbarButton(t("editor.actions.run"), <Play size={16} />, handleRun, "default")}
+              <div className="hidden items-center gap-1.5 sm:flex">
+                {toolbarButton(t("editor.actions.download"), <FileDown size={16} />, handleSaveFile)}
+                {toolbarButton(
+                  savedId ? t("editor.actions.update") : t("editor.actions.save"),
+                  <Save size={16} />,
+                  async () => {
+                    await saveSnippet(false);
+                  },
+                  "outline",
+                  saving
+                )}
+                {toolbarButton(t("editor.actions.share"), <Share2 size={16} />, handleShare, "secondary")}
+                {toolbarButton(
+                  complexityAnalysis
+                    ? t("editor.complexity.actions.rerun")
+                    : t("editor.complexity.actions.analyze"),
+                  <Gauge size={16} />,
+                  handleAnalyzeComplexity
+                )}
+              </div>
+            </div>
+          </header>
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" variant="outline" onClick={createNewSnippet}>
-                        <Plus size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("editor.actions.newSnippet")}</TooltipContent>
-                  </Tooltip>
+          <div className="flex h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-zinc-200 bg-zinc-50 px-3 sm:hidden">
+            {toolbarButton(t("editor.actions.download"), <FileDown size={16} />, handleSaveFile)}
+            {toolbarButton(
+              savedId ? t("editor.actions.update") : t("editor.actions.save"),
+              <Save size={16} />,
+              async () => {
+                await saveSnippet(false);
+              },
+              "outline",
+              saving
+            )}
+            {toolbarButton(t("editor.actions.share"), <Share2 size={16} />, handleShare, "secondary")}
+            {toolbarButton(
+              complexityAnalysis
+                ? t("editor.complexity.actions.rerun")
+                : t("editor.complexity.actions.analyze"),
+              <Gauge size={16} />,
+              handleAnalyzeComplexity
+            )}
+          </div>
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" variant="secondary" onClick={compile}>
-                        <Bug size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("editor.actions.compile")}</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" onClick={handleStep} disabled={stopped}>
-                        <StepForward size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("editor.actions.step")}</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" onClick={handleRun} disabled={stopped}>
-                        <Play size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("editor.actions.run")}</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" variant="outline" onClick={handleSaveFile}>
-                        <FileDown size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("editor.actions.download")}</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" onClick={() => saveSnippet(false)} disabled={saving}>
-                        <Save size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {savedId ? t("editor.actions.update") : t("editor.actions.save")}
-                    </TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="icon" variant="secondary" onClick={handleShare}>
-                        <Share2 size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("editor.actions.share")}</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={handleAnalyzeComplexity}
-                        aria-label={
-                          complexityAnalysis
-                            ? t("editor.complexity.actions.rerun")
-                            : t("editor.complexity.actions.analyze")
-                        }
-                      >
-                        <Gauge size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {complexityAnalysis
-                        ? t("editor.complexity.actions.rerun")
-                        : t("editor.complexity.actions.analyze")}
-                    </TooltipContent>
-                  </Tooltip>
-
+          <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <main className="flex min-h-0 min-w-0 flex-col border-b border-zinc-200 bg-white xl:border-r xl:border-b-0">
+              <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400" />
+                  <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-yellow-400" />
+                  <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" />
+                  <span className="ml-2 truncate text-xs font-medium text-zinc-700">
+                    {fileName}
+                  </span>
                 </div>
-              </TooltipProvider>
-            </div>
-
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("editor.debugger.title")}</CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-
-              <div>
-                <h3 className="font-semibold mb-1">{t("editor.debugger.variables")}</h3>
-                <pre className="text-sm bg-muted p-2 rounded whitespace-pre-wrap break-words">
-                  {JSON.stringify(variables, null, 2)}
-                </pre>
+                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                  <Play size={13} />
+                  <span>MiniScript+</span>
+                </div>
               </div>
 
-              <div>
-                <h3 className="font-semibold">{t("editor.debugger.currentLine")}</h3>
-                <p>{currentLine}</p>
+              <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-zinc-200 bg-white px-2">
+                {files.map((file) => {
+                  const isActive = file.id === activeFile?.id;
+
+                  return (
+                    <ContextMenu key={file.id}>
+                      <ContextMenuTrigger asChild>
+                        <div
+                          className={`flex h-7 min-w-0 shrink-0 items-center rounded-md border text-xs transition ${
+                            isActive
+                              ? "border-zinc-300 bg-zinc-100 text-zinc-950"
+                              : "border-transparent bg-white text-zinc-500 hover:bg-zinc-50"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => switchEditorFile(file.id)}
+                            onDoubleClick={() => renameEditorFile(file.id)}
+                            className="max-w-[150px] truncate px-2 font-medium"
+                            title={`${file.name} - double click to rename`}
+                          >
+                            {file.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteEditorFile(file.id)}
+                            className="flex h-6 w-6 items-center justify-center rounded-sm text-zinc-400 hover:bg-zinc-200 hover:text-zinc-900"
+                            aria-label={`Delete ${file.name}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent className="w-48">
+                        <ContextMenuLabel className="truncate">
+                          {file.name}
+                        </ContextMenuLabel>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onSelect={() => switchEditorFile(file.id)}>
+                          <Play size={14} />
+                          Open
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => renameEditorFile(file.id)}>
+                          <Pencil size={14} />
+                          Rename
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => copyFileName(file.name)}>
+                          <Copy size={14} />
+                          Copy name
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => saveFile(file)}>
+                          <FileDown size={14} />
+                          Download
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onSelect={createEditorFile}>
+                          <Plus size={14} />
+                          New file
+                        </ContextMenuItem>
+                        <ContextMenuItem
+                          disabled={files.length === 1}
+                          variant="destructive"
+                          onSelect={() => deleteEditorFile(file.id)}
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
+                  );
+                })}
+
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0"
+                      onClick={createEditorFile}
+                      aria-label="Create file"
+                    >
+                      <Plus size={14} />
+                    </Button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-44">
+                    <ContextMenuItem onSelect={createEditorFile}>
+                      <Plus size={14} />
+                      New file
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               </div>
 
-              <div>
-                <h3 className="font-semibold mb-1">{t("editor.debugger.output")}</h3>
-                <pre className="text-sm bg-muted p-2 rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words">
-                  {output.join("\n")}
-                </pre>
-              </div>
-
-              {inputVar && (
-                <div className="space-y-2">
-                  <p className="font-medium">
-                    {t("editor.debugger.input")} {inputVar}:
-                  </p>
-
-                  <Input
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+              <CodeEditorContextMenu
+                code={code}
+                fileName={fileName}
+                onChange={handleCodeChange}
+                onRun={handleRun}
+              >
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <MiniScriptMonacoEditor
+                    onMount={handleEditorMount}
+                    height="100%"
+                    value={code}
+                    onChange={handleCodeChange}
+                    options={{
+                      contextmenu: false,
+                      padding: { top: 16, bottom: 16 },
+                      smoothScrolling: true,
+                      wordWrap: "on",
+                      automaticLayout: true,
+                      cursorSmoothCaretAnimation: "on",
+                      cursorBlinking: "smooth",
+                      glyphMargin: true,
+                      scrollbar: {
+                        verticalScrollbarSize: 8,
+                        horizontalScrollbarSize: 8,
+                      },
+                      tabSize,
+                      insertSpaces: true,
+                      wrappingIndent: "same",
+                    }}
                   />
-
-                  <Button onClick={handleSubmitInput}>
-                    {t("editor.debugger.submit")}
-                  </Button>
                 </div>
-              )}
+              </CodeEditorContextMenu>
 
-            </CardContent>
-          </Card>
+              <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">
+                <span>Ln {editorLine}</span>
+                <div className="flex items-center gap-2">
+                  <span>{t("live.tabSize")}</span>
+                  {tabSizeControl}
+                  <span>· MSP</span>
+                </div>
+              </div>
+            </main>
 
-          <ComplexityAnalyzerCard analysis={complexityAnalysis} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Workflow size={18} />
-                {t("editor.visualization.title")}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              <Tabs defaultValue="ast" className="gap-3">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="ast">
-                    {t("editor.visualization.tabs.ast")}
+            <aside className="min-h-0 overflow-hidden bg-white">
+              <Tabs
+                value={activePanel}
+                onValueChange={setActivePanel}
+                className="flex h-full min-h-[420px] flex-col gap-0 xl:min-h-0"
+              >
+                <TabsList className="grid h-11 w-full grid-cols-5 rounded-none border-b bg-zinc-50 px-3">
+                  <TabsTrigger
+                    value="console"
+                    className="gap-1.5 px-2 text-xs"
+                    title={t("live.console")}
+                  >
+                    <Terminal size={14} />
+                    <span className="sr-only">{t("live.console")}</span>
                   </TabsTrigger>
-                  <TabsTrigger value="flowchart">
-                    {t("editor.visualization.tabs.flowchart")}
+                  <TabsTrigger
+                    value="debugger"
+                    className="gap-1.5 px-2 text-xs"
+                    title={t("editor.debugger.title")}
+                  >
+                    <Bug size={14} />
+                    <span className="sr-only">{t("editor.debugger.title")}</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="analysis"
+                    className="gap-1.5 px-2 text-xs"
+                    title={t("editor.complexity.title")}
+                  >
+                    <Gauge size={14} />
+                    <span className="sr-only">{t("editor.complexity.title")}</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="visual"
+                    className="gap-1.5 px-2 text-xs"
+                    title={t("editor.visualization.title")}
+                  >
+                    <Workflow size={14} />
+                    <span className="sr-only">{t("editor.visualization.title")}</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="snippets"
+                    className="gap-1.5 px-2 text-xs"
+                    title={t("editor.snippets.title")}
+                  >
+                    <ListTree size={14} />
+                    <span className="sr-only">{t("editor.snippets.title")}</span>
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="ast">
-                  <pre className="max-h-[260px] overflow-auto rounded-lg border bg-muted/50 p-3 text-xs leading-relaxed whitespace-pre-wrap">
-                    {codeVisualization.ast}
-                  </pre>
-                </TabsContent>
+                <div className="min-h-0 border-b border-zinc-200">
+                  {metadataPanel}
+                </div>
 
-                <TabsContent value="flowchart">
-                  <pre className="max-h-[260px] overflow-auto rounded-lg border bg-muted/50 p-3 text-xs leading-relaxed whitespace-pre-wrap">
-                    {codeVisualization.flowchart}
-                  </pre>
+                <TabsContent value="console" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                  {consolePanel}
+                </TabsContent>
+                <TabsContent value="debugger" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                  {debuggerPanel}
+                </TabsContent>
+                <TabsContent value="analysis" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                  {analysisPanel}
+                </TabsContent>
+                <TabsContent value="visual" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                  {visualizationPanel}
+                </TabsContent>
+                <TabsContent value="snippets" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">
+                  {snippetsPanel}
                 </TabsContent>
               </Tabs>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("editor.snippets.title")}</CardTitle>
-            </CardHeader>
-
-            <CardContent className="max-h-[300px] overflow-y-auto space-y-2">
-              <TooltipProvider>
-
-                {snippets.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {t("editor.snippets.empty")}
-                  </p>
-                )}
-
-                {snippets.map((s) => (
-                  <div
-                    key={s.id}
-                    className={`p-2 rounded transition flex items-center justify-between group cursor-pointer ${savedId === s.id ? "bg-muted border border-primary" : "hover:bg-muted"}`}
-                  >
-                    <div
-                      onClick={() => loadSnippet(s.id)}
-                      className="cursor-pointer flex-1"
-                    >
-                      <p className="font-medium text-sm">
-                        {s.title || t("editor.snippets.untitled")}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(s.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => loadSnippet(s.id)}
-                          >
-                            <Pencil size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{t("editor.snippets.edit")}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => deleteSnippet(s.id)}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{t("editor.snippets.delete")}</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </div>
-                ))}
-
-              </TooltipProvider>
-            </CardContent>
-          </Card>
-
+            </aside>
+          </div>
         </div>
+      </TooltipProvider>
 
-      </div>
-    </PageContainer>
+      <Dialog open={createFileOpen} onOpenChange={setCreateFileOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create file</DialogTitle>
+            <DialogDescription>
+              Add a new file to this snippet project.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              confirmCreateEditorFile();
+            }}
+          >
+            <label
+              htmlFor="editor-new-file-name"
+              className="text-sm font-medium text-zinc-700"
+            >
+              File name
+            </label>
+            <Input
+              id="editor-new-file-name"
+              autoFocus
+              value={newFileName}
+              onChange={(event) => {
+                setNewFileName(event.target.value);
+                setNewFileError("");
+              }}
+              placeholder="main.msp"
+            />
+            {newFileError && (
+              <p className="text-xs text-red-600">{newFileError}</p>
+            )}
+          </form>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCreateFileOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmCreateEditorFile}>
+              Create file
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <style jsx global>{`
+        .msp-current-line {
+          background: rgba(132, 204, 22, 0.12);
+          border-top: 1px solid rgba(132, 204, 22, 0.32);
+          border-bottom: 1px solid rgba(132, 204, 22, 0.32);
+        }
+
+        .msp-error-line {
+          background: rgba(239, 68, 68, 0.14);
+          border-top: 1px solid rgba(239, 68, 68, 0.36);
+          border-bottom: 1px solid rgba(239, 68, 68, 0.36);
+        }
+
+        .msp-current-glyph {
+          background: #84cc16;
+          border-radius: 999px;
+          margin-left: 6px;
+          width: 6px !important;
+          height: 6px !important;
+          top: 9px;
+        }
+
+        .msp-error-glyph {
+          background: #ef4444;
+          border-radius: 999px;
+          margin-left: 6px;
+          width: 6px !important;
+          height: 6px !important;
+          top: 9px;
+        }
+      `}</style>
+    </div>
   );
 }
 

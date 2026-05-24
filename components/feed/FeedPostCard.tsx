@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Code2, Heart, MessageCircle, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Share2 } from "lucide-react";
 
 import type { FeedPost } from "@/lib/api";
+import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -76,10 +77,7 @@ export function FeedPostCard({
           )}
 
           {post.code && (
-            <pre className="bg-muted p-3 rounded text-sm overflow-auto font-mono">
-              <Code2 className="mb-2 h-4 w-4 text-muted-foreground" />
-              {post.code}
-            </pre>
+            <HighlightedCodeBlock code={post.code} />
           )}
         </CardContent>
       </Link>

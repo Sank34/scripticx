@@ -6,6 +6,7 @@ import { useEffect } from "react";
 export function MainWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isFullWidth =
+    pathname === "/editor" ||
     (pathname?.startsWith("/problems/") && pathname !== "/problems") ||
     pathname?.startsWith("/live/");
 

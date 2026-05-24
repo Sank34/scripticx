@@ -12,7 +12,13 @@ import {
 import type { OnMount } from "@monaco-editor/react";
 import { useParams, useRouter } from "next/navigation";
 
-import { api, type LiveMessage, type LiveRoom, type ProfileSummary } from "@/lib/api";
+import {
+  api,
+  type LiveMessage,
+  type LiveRoom,
+  type ProfileSummary,
+  type RoomParticipant,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
   advanceLine,
@@ -26,6 +32,7 @@ import {
   analyzeMiniScriptComplexity,
   type ComplexityAnalysis,
 } from "@/lib/complexity-analyzer";
+import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
 import { ComplexityAnalyzerCard } from "@/components/editor/ComplexityAnalyzerCard";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 import { DebuggerStateCard } from "@/components/live/DebuggerStateCard";
@@ -57,6 +64,7 @@ import {
   Share2,
   Square,
   Terminal,
+  UserMinus,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -65,6 +73,10 @@ type LiveParticipant = {
   user_id: string;
   username?: string | null;
   avatar_url?: string | null;
+};
+
+type ParticipantProfile = ProfileSummary & {
+  online: boolean;
 };
 
 type CursorPosition = {
@@ -371,7 +383,7 @@ export default function LiveRoomPage() {
     }
   }, [isChatVisible]);
 
-  const participantProfiles = useMemo(() => {
+  const participantProfiles = useMemo<ParticipantProfile[]>(() => {
     const onlineIds = new Set(participants.map((participant) => participant.user_id));
 
     const online = participants.map((participant) => ({
@@ -381,7 +393,8 @@ export default function LiveRoomPage() {
       online: true,
     }));
 
-    const offline = (isClosed ? allParticipants : Object.values(profilesMap))
+    const knownProfiles = allParticipants.length ? allParticipants : Object.values(profilesMap);
+    const offline = knownProfiles
       .filter((profile) => !onlineIds.has(profile.id))
       .map((profile) => ({
         id: profile.id,
@@ -391,7 +404,7 @@ export default function LiveRoomPage() {
       }));
 
     return [...online, ...offline];
-  }, [allParticipants, isClosed, participants, profilesMap]);
+  }, [allParticipants, participants, profilesMap]);
 
   useEffect(() => {
     let active = true;
@@ -433,6 +446,19 @@ export default function LiveRoomPage() {
         if (!active) return;
 
         if (!roomData) {
+          router.replace("/livecode");
+          return;
+        }
+
+        const membership =
+          currentUser.id === roomData.owner_id
+            ? { status: "owner" }
+            : await api.live.getParticipant(roomId, currentUser.id);
+
+        if (!active) return;
+
+        if (currentUser.id !== roomData.owner_id && membership?.status !== "accepted") {
+          toast.error(t("live.toast.noAccess"));
           router.replace("/livecode");
           return;
         }
@@ -550,6 +576,58 @@ export default function LiveRoomPage() {
             },
           }));
         });
+
+        channel.on("broadcast", { event: "participant-removed" }, (payload: any) => {
+          const removedUserId = payload.payload?.userId as string | undefined;
+          if (!removedUserId) return;
+
+          setParticipants((prev) =>
+            prev.filter((participant) => participant.user_id !== removedUserId)
+          );
+          setAllParticipants((prev) =>
+            prev.filter((participant) => participant.id !== removedUserId)
+          );
+
+          if (removedUserId === currentUser.id) {
+            toast.error(t("live.toast.noAccess"));
+            router.replace("/livecode");
+          }
+        });
+
+        channel.on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "room_participants",
+            filter: `room_id=eq.${roomId}`,
+          },
+          async (payload: any) => {
+            const nextRow = payload.new as RoomParticipant | undefined;
+            const previousRow = payload.old as RoomParticipant | undefined;
+            const changedUserId = nextRow?.user_id || previousRow?.user_id;
+
+            if (changedUserId === currentUser.id && nextRow?.status === "removed") {
+              toast.error(t("live.toast.noAccess"));
+              router.replace("/livecode");
+              return;
+            }
+
+            if (changedUserId) {
+              setParticipants((prev) =>
+                prev.filter((participant) => participant.user_id !== changedUserId)
+              );
+            }
+
+            const rows = await api.live.listRoomParticipants(roomId);
+            const memberIds = new Set([
+              roomData.owner_id,
+              ...rows.map((row) => row.user_id),
+            ]);
+            const profiles = await api.live.listProfilesByIds(Array.from(memberIds));
+            if (active) setAllParticipants(profiles);
+          }
+        );
 
         channel.on("presence", { event: "sync" }, () => {
           const state = channel.presenceState();
@@ -692,11 +770,17 @@ export default function LiveRoomPage() {
   }, [participants, messages]);
 
   useEffect(() => {
-    if (!room || room.status !== "closed") return;
+    if (!room) return;
 
     async function loadAllParticipants() {
       const rows = await api.live.listRoomParticipants(roomId);
-      const ids = rows.map((row) => row.user_id);
+      const ids = Array.from(
+        new Set(
+          [room?.owner_id, ...rows.map((row) => row.user_id)].filter(
+            (id): id is string => Boolean(id)
+          )
+        )
+      );
       const profiles = await api.live.listProfilesByIds(ids);
       setAllParticipants(profiles);
     }
@@ -1040,7 +1124,7 @@ export default function LiveRoomPage() {
     try {
       const existing = await api.live.getParticipant(roomId, targetId);
 
-      if (existing) {
+      if (existing && existing.status !== "removed") {
         toast.error(
           existing.status === "accepted"
             ? t("live.toast.userInSession")
@@ -1060,6 +1144,31 @@ export default function LiveRoomPage() {
       toast.success(t("live.toast.inviteSent"));
     } catch {
       toast.error(t("live.toast.inviteFailed"));
+    }
+  }
+
+  async function removeParticipant(targetId: string) {
+    if (!isOwner || targetId === room?.owner_id || targetId === user?.id) return;
+
+    try {
+      await api.live.removeRoomParticipant(roomId, targetId);
+      setParticipants((prev) =>
+        prev.filter((participant) => participant.user_id !== targetId)
+      );
+      setAllParticipants((prev) =>
+        prev.filter((participant) => participant.id !== targetId)
+      );
+
+      void channelRef.current?.send({
+        type: "broadcast",
+        event: "participant-removed",
+        payload: { userId: targetId },
+      });
+
+      toast.success(t("live.toast.userRemoved"));
+    } catch (error) {
+      console.error("Remove participant failed:", error);
+      toast.error(t("live.toast.removeFailed"));
     }
   }
 
@@ -1094,84 +1203,103 @@ export default function LiveRoomPage() {
         )}
 
         {isMobileEditor === true && (
-          <div className="relative h-full min-h-[520px] overflow-hidden bg-white font-mono text-[15px] leading-6 md:min-h-0">
-            <div
-              ref={mobileHighlightRef}
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 overflow-hidden"
-            >
-              <div className="grid min-h-full min-w-max grid-cols-[3.25rem_1fr]">
-                <div className="select-none border-r border-zinc-100 bg-zinc-50/80 py-4 text-right text-xs leading-6 text-zinc-400">
-                  {mobileEditorLines.map((_, index) => (
-                    <div key={index} className="h-6 pr-3">
-                      {index + 1}
-                    </div>
-                  ))}
+          <CodeEditorContextMenu
+            code={code}
+            fileName="main.msp"
+            onChange={handleChange}
+            onRun={runCode}
+            readOnly={isClosed}
+          >
+            <div className="relative h-full min-h-[520px] overflow-hidden bg-white font-mono text-[15px] leading-6 md:min-h-0">
+              <div
+                ref={mobileHighlightRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 overflow-hidden"
+              >
+                <div className="grid min-h-full min-w-max grid-cols-[3.25rem_1fr]">
+                  <div className="select-none border-r border-zinc-100 bg-zinc-50/80 py-4 text-right text-xs leading-6 text-zinc-400">
+                    {mobileEditorLines.map((_, index) => (
+                      <div key={index} className="h-6 pr-3">
+                        {index + 1}
+                      </div>
+                    ))}
+                  </div>
+
+                  <pre className="m-0 min-w-[calc(100vw-5rem)] whitespace-pre px-4 py-4 text-[15px] leading-6">
+                    {mobileEditorLines.map((line, index) => (
+                      <div key={index} className="h-6">
+                        {code.length > 0 ? (
+                          renderHighlightedMiniScriptLine(line, index)
+                        ) : (
+                          <span className="text-zinc-400">{line}</span>
+                        )}
+                      </div>
+                    ))}
+                  </pre>
                 </div>
-
-                <pre className="m-0 min-w-[calc(100vw-5rem)] whitespace-pre px-4 py-4 text-[15px] leading-6">
-                  {mobileEditorLines.map((line, index) => (
-                    <div key={index} className="h-6">
-                      {code.length > 0 ? (
-                        renderHighlightedMiniScriptLine(line, index)
-                      ) : (
-                        <span className="text-zinc-400">{line}</span>
-                      )}
-                    </div>
-                  ))}
-                </pre>
               </div>
-            </div>
 
-            <textarea
-              ref={mobileTextAreaRef}
-              value={code}
-              onChange={(event) => {
-                handleChange(event.target.value);
-                updateMobileCursorLine(event.target);
-              }}
-              onClick={(event) => updateMobileCursorLine(event.currentTarget)}
-              onKeyUp={(event) => updateMobileCursorLine(event.currentTarget)}
-              onSelect={(event) => updateMobileCursorLine(event.currentTarget)}
-              onScroll={handleMobileCodeScroll}
-              onKeyDown={handleMobileCodeKeyDown}
-              readOnly={isClosed}
-              spellCheck={false}
-              autoCapitalize="none"
-              autoCorrect="off"
-              wrap="off"
-              aria-label="MiniScript+ editor"
-              className="absolute inset-0 h-full w-full resize-none overflow-auto border-0 bg-transparent py-4 pl-[4.25rem] pr-4 font-mono text-[15px] leading-6 text-transparent caret-zinc-900 outline-none selection:bg-emerald-200/70"
-            />
-          </div>
+              <textarea
+                ref={mobileTextAreaRef}
+                value={code}
+                onChange={(event) => {
+                  handleChange(event.target.value);
+                  updateMobileCursorLine(event.target);
+                }}
+                onClick={(event) => updateMobileCursorLine(event.currentTarget)}
+                onKeyUp={(event) => updateMobileCursorLine(event.currentTarget)}
+                onSelect={(event) => updateMobileCursorLine(event.currentTarget)}
+                onScroll={handleMobileCodeScroll}
+                onKeyDown={handleMobileCodeKeyDown}
+                readOnly={isClosed}
+                spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                wrap="off"
+                aria-label="MiniScript+ editor"
+                className="absolute inset-0 h-full w-full resize-none overflow-auto border-0 bg-transparent py-4 pl-[4.25rem] pr-4 font-mono text-[15px] leading-6 text-transparent caret-zinc-900 outline-none selection:bg-emerald-200/70"
+              />
+            </div>
+          </CodeEditorContextMenu>
         )}
 
         {isMobileEditor === false && (
-          <MiniScriptMonacoEditor
-            onMount={handleEditorMount}
-            height="100%"
-            value={code}
-            onChange={(value) => {
-              handleChange(value);
-              syncDesktopCursorLine();
-            }}
+          <CodeEditorContextMenu
+            code={code}
+            fileName="main.msp"
+            onChange={handleChange}
+            onRun={runCode}
             readOnly={isClosed}
-            options={{
-              padding: { top: 16, bottom: 16 },
-              smoothScrolling: true,
-              wordWrap: "on",
-              automaticLayout: true,
-              cursorSmoothCaretAnimation: "on",
-              cursorBlinking: "smooth",
-              scrollbar: {
-                verticalScrollbarSize: 8,
-                horizontalScrollbarSize: 8,
-              },
-              tabSize,
-              insertSpaces: true,
-              wrappingIndent: "same",
-            }}
-          />
+          >
+            <div className="h-full min-h-0">
+              <MiniScriptMonacoEditor
+                onMount={handleEditorMount}
+                height="100%"
+                value={code}
+                onChange={(value) => {
+                  handleChange(value);
+                  syncDesktopCursorLine();
+                }}
+                readOnly={isClosed}
+                options={{
+                  contextmenu: false,
+                  padding: { top: 16, bottom: 16 },
+                  smoothScrolling: true,
+                  wordWrap: "on",
+                  automaticLayout: true,
+                  cursorSmoothCaretAnimation: "on",
+                  cursorBlinking: "smooth",
+                  scrollbar: {
+                    verticalScrollbarSize: 8,
+                    horizontalScrollbarSize: 8,
+                  },
+                  tabSize,
+                  insertSpaces: true,
+                  wrappingIndent: "same",
+                }}
+              />
+            </div>
+          </CodeEditorContextMenu>
         )}
       </div>
     </div>
@@ -1216,25 +1344,42 @@ export default function LiveRoomPage() {
     <div className="h-full overflow-y-auto p-4">
       <div className="space-y-2">
         {participantProfiles.map((profile) => (
-          <button
+          <div
             key={profile.id}
-            type="button"
-            onClick={() => openProfile(profile.username)}
-            disabled={!profile.username}
-            className="flex w-full items-center gap-3 rounded-lg border border-zinc-200 p-2 text-left transition hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-transparent"
+            className="flex w-full items-center gap-3 rounded-lg border border-zinc-200 p-2 text-left"
           >
-            <Avatar className="h-8 w-8">
-              {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
-              <AvatarFallback>{getInitial(profile)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{profile.username || "User"}</div>
-              <div className="text-xs text-zinc-500">
-                {profile.id === room?.owner_id ? t("live.owner") : profile.online ? "Online" : "Offline"}
+            <button
+              type="button"
+              onClick={() => openProfile(profile.username)}
+              disabled={!profile.username}
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
+            >
+              <Avatar className="h-8 w-8">
+                {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
+                <AvatarFallback>{getInitial(profile)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{profile.username || "User"}</div>
+                <div className="text-xs text-zinc-500">
+                  {profile.id === room?.owner_id ? t("live.owner") : profile.online ? "Online" : "Offline"}
+                </div>
               </div>
-            </div>
+            </button>
             <span className={`h-2 w-2 rounded-full ${profile.online ? "bg-emerald-500" : "bg-zinc-300"}`} />
-          </button>
+            {isOwner && profile.id !== room?.owner_id && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={() => removeParticipant(profile.id)}
+                aria-label={t("live.removeParticipant")}
+                title={t("live.removeParticipant")}
+              >
+                <UserMinus size={15} />
+              </Button>
+            )}
+          </div>
         ))}
       </div>
     </div>
