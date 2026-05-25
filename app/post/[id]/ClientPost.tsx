@@ -1,6 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -108,19 +109,12 @@ function ClientPost({
     if (!user || !post) return;
 
     if (liked) {
-      await supabase
-        .from("post_likes")
-        .delete()
-        .eq("post_id", post.id)
-        .eq("user_id", user.id);
+      await api.feed.toggleLike(post.id, user.id, true);
 
       setLikes((l) => l - 1);
       setLiked(false);
     } else {
-      await supabase.from("post_likes").insert({
-        post_id: post.id,
-        user_id: user.id,
-      });
+      await api.feed.toggleLike(post.id, user.id, false);
 
       setLikes((l) => l + 1);
       setLiked(true);

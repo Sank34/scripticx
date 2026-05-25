@@ -9,6 +9,7 @@ import { api, type ProfileSummary } from "@/lib/api";
 import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 import { TopbarBreadcrumbs } from "@/components/navigation/TopbarBreadcrumbs";
+import { NotificationsPopover } from "@/components/notifications/NotificationsPopover";
 
 import { Button } from "@/components/ui/button";
 
@@ -124,7 +125,10 @@ export function Topbar() {
       <div className="flex shrink-0 items-center gap-2">
 
         {user ? (
-          <DropdownMenu>
+          <>
+            <NotificationsPopover user={user} />
+
+            <DropdownMenu>
 
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-zinc-100">
@@ -236,7 +240,8 @@ export function Topbar() {
 
             </DropdownMenuContent>
 
-          </DropdownMenu>
+            </DropdownMenu>
+          </>
         ) : (
           <Link href="/login">
             <Button

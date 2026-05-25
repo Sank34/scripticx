@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -224,6 +225,25 @@ export default function ClassPage() {
 
     if (data) {
       setAssignments((prev) => [data, ...prev]);
+      await Promise.all(
+        members
+          .filter((member) => member.id !== userId && member.role !== "teacher")
+          .map((member) =>
+            api.notifications.create({
+              userId: member.id,
+              actorId: userId,
+              type: "new_assignment",
+              title: `New assignment in ${cls?.name || "your class"}`,
+              body: assignmentTitle,
+              href: `/classes/${cls?.id}/assignments/${data.id}`,
+              metadata: {
+                assignmentId: data.id,
+                classId: cls?.id || null,
+                className: cls?.name || null,
+              },
+            })
+          )
+      );
       setAssignmentTitle("");
       setAssignmentDescription("");
       setAssignmentDeadline("");

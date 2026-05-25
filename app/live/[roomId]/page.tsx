@@ -101,6 +101,9 @@ type CursorDebugInfo = {
   selectionLine?: number;
   modelLines?: number;
   focused?: boolean;
+  supabaseLatencyMs?: number;
+  supabasePingStatus?: "idle" | "ok" | "error" | "pending";
+  supabasePingError?: string;
 };
 
 const EMPTY_RUN_STATE: RunState = {
@@ -211,10 +214,12 @@ export default function LiveRoomPage() {
   const [cursorDebugEnabled, setCursorDebugEnabled] = useState(false);
   const [cursorDebugInfo, setCursorDebugInfo] = useState<CursorDebugInfo>({
     statusLine: 1,
+    supabasePingStatus: "idle",
   });
 
   const channelRef = useRef<any>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const executionDecorationIdsRef = useRef<string[]>([]);
   const editorCursorDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
   const mobileTextAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const mobileHighlightRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +235,10 @@ export default function LiveRoomPage() {
   const isOwner = Boolean(room && user?.id === room.owner_id);
   const isClosed = room?.status === "closed";
   const isChatVisible = mobileTab === "chat" || rightTab === "chat";
+  const executionLine =
+    program.length > 0 && runState.currentLine > 0
+      ? Math.max(1, runState.currentLine)
+      : null;
   const mobileEditorLines = useMemo(
     () => (code.length > 0 ? code : 'PRINT "Hello"').split("\n"),
     [code]
@@ -286,13 +295,14 @@ export default function LiveRoomPage() {
       current === lineNumber ? current : lineNumber
     );
 
-    setCursorDebugInfo({
+    setCursorDebugInfo((current) => ({
+      ...current,
       statusLine: lineNumber,
       positionLine,
       selectionLine,
       modelLines: editor?.getModel()?.getLineCount(),
       focused: editor?.hasTextFocus(),
-    });
+    }));
   }, []);
 
   const clearEditorCursorListeners = useCallback(() => {
@@ -334,6 +344,34 @@ export default function LiveRoomPage() {
   }, [clearEditorCursorListeners]);
 
   useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const decorations = executionLine
+      ? [
+          {
+            range: {
+              startLineNumber: executionLine,
+              startColumn: 1,
+              endLineNumber: executionLine,
+              endColumn: 1,
+            },
+            options: {
+              isWholeLine: true,
+              className: "msp-current-line",
+              glyphMarginClassName: "msp-current-glyph",
+            },
+          },
+        ]
+      : [];
+
+    executionDecorationIdsRef.current = editor.deltaDecorations(
+      executionDecorationIdsRef.current,
+      decorations
+    );
+  }, [executionLine]);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
     const updateEditorMode = () => setIsMobileEditor(mediaQuery.matches);
 
@@ -354,6 +392,48 @@ export default function LiveRoomPage() {
   useEffect(() => {
     setCursorDebugEnabled(new URLSearchParams(window.location.search).has("cursorDebug"));
   }, []);
+
+  useEffect(() => {
+    if (!cursorDebugEnabled || !roomId) return;
+
+    let active = true;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    async function pingSupabase() {
+      setCursorDebugInfo((current) => ({
+        ...current,
+        supabasePingStatus: "pending",
+      }));
+
+      const startedAt = performance.now();
+
+      const { error } = await supabase
+        .from("live_rooms")
+        .select("id")
+        .eq("id", roomId)
+        .maybeSingle();
+
+      if (!active) return;
+
+      const latency = Math.round(performance.now() - startedAt);
+
+      setCursorDebugInfo((current) => ({
+        ...current,
+        supabaseLatencyMs: latency,
+        supabasePingStatus: error ? "error" : "ok",
+        supabasePingError: error?.message,
+      }));
+
+      timeout = setTimeout(pingSupabase, 5000);
+    }
+
+    void pingSupabase();
+
+    return () => {
+      active = false;
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [cursorDebugEnabled, roomId]);
 
   useEffect(() => {
     if (isMobileEditor !== false) return;
@@ -1134,6 +1214,18 @@ export default function LiveRoomPage() {
       }
 
       await api.live.inviteUser(roomId, targetId);
+      await api.notifications.create({
+        userId: targetId,
+        actorId: user?.id || null,
+        type: "live_invite",
+        title: `${currentProfileRef.current?.username || "Someone"} invited you to a live session`,
+        body: room?.name || "Open the live coding session.",
+        href: `/live/${roomId}`,
+        metadata: {
+          roomId,
+          roomName: room?.name || null,
+        },
+      });
       const inviteChannel = supabase.channel(`livecode-invites-${targetId}`);
       void inviteChannel
         .httpSend("invite", { roomId })
@@ -1227,7 +1319,14 @@ export default function LiveRoomPage() {
 
                   <pre className="m-0 min-w-[calc(100vw-5rem)] whitespace-pre px-4 py-4 text-[15px] leading-6">
                     {mobileEditorLines.map((line, index) => (
-                      <div key={index} className="h-6">
+                      <div
+                        key={index}
+                        className={`h-6 ${
+                          executionLine === index + 1
+                            ? "-mx-2 rounded bg-lime-100/70 px-2 ring-1 ring-lime-300/70"
+                            : ""
+                        }`}
+                      >
                         {code.length > 0 ? (
                           renderHighlightedMiniScriptLine(line, index)
                         ) : (
@@ -1695,6 +1794,16 @@ export default function LiveRoomPage() {
           <div>sel: {cursorDebugInfo.selectionLine ?? "-"}</div>
           <div>lines: {cursorDebugInfo.modelLines ?? "-"}</div>
           <div>focus: {String(cursorDebugInfo.focused ?? false)}</div>
+          <div>
+            supabase realtime: {cursorDebugInfo.supabaseLatencyMs ?? "-"}ms
+            {" "}
+            ({cursorDebugInfo.supabasePingStatus ?? "idle"})
+          </div>
+          {cursorDebugInfo.supabasePingError && (
+            <div className="max-w-48 truncate">
+              ping error: {cursorDebugInfo.supabasePingError}
+            </div>
+          )}
         </div>
       )}
 

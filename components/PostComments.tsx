@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
 import { Input } from "@/components/ui/input";
@@ -75,6 +76,30 @@ export default function PostComments({ postId }: { postId: string }) {
     if (error) {
       console.error(error);
       return;
+    }
+
+    const [{ data: post }, actor] = await Promise.all([
+      supabase
+        .from("posts")
+        .select("user_id, content")
+        .eq("id", postId)
+        .maybeSingle(),
+      api.profiles.getSummary(user.id),
+    ]);
+
+    if (post?.user_id && post.user_id !== user.id) {
+      await api.notifications.create({
+        userId: post.user_id,
+        actorId: user.id,
+        type: "post_comment",
+        title: `${actor?.username || "Someone"} commented on your post`,
+        body: content.trim().slice(0, 140),
+        href: `/post/${postId}`,
+        metadata: {
+          postId,
+          username: actor?.username || null,
+        },
+      });
     }
 
     setContent("");

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 export default function FollowButton({
@@ -63,6 +64,20 @@ export default function FollowButton({
       await supabase.from("follows").insert({
         follower_id: currentUserId,
         following_id: targetUserId,
+      });
+
+      const actor = await api.profiles.getSummary(currentUserId);
+
+      await api.notifications.create({
+        userId: targetUserId,
+        actorId: currentUserId,
+        type: "follow",
+        title: `${actor?.username || "Someone"} started following you`,
+        body: "Open their profile from ScripticX.",
+        href: actor?.username ? `/u/${actor.username}` : "/profile",
+        metadata: {
+          username: actor?.username || null,
+        },
       });
 
       setFollowing(true);

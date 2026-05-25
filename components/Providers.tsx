@@ -20,6 +20,8 @@ const realtimeInvalidationTargets = [
   "updates",
   "contact_messages",
   "editor-snippets",
+  "notifications",
+  "daily-challenge",
 ];
 
 const realtimeTables = [
@@ -37,6 +39,8 @@ const realtimeTables = [
   "user_achievements",
   "updates",
   "contact_messages",
+  "notifications",
+  "daily_challenges",
 ];
 
 export default function Providers({

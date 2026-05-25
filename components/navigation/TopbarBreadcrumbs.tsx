@@ -62,6 +62,8 @@ export function TopbarBreadcrumbs() {
     profile: t("user.profile"),
     search: t("nav.search"),
     settings: t("user.settings"),
+    assignments: "Assignments",
+    solve: "Solve",
     u: t("user.profile"),
     updates: t("nav.whatsNew"),
   };
@@ -73,9 +75,7 @@ export function TopbarBreadcrumbs() {
     },
   ];
 
-  let href = "";
   segments.forEach((segment, index) => {
-    href += `/${segment}`;
     const isLast = index === segments.length - 1;
     const previous = segments[index - 1];
     const label =
@@ -91,7 +91,7 @@ export function TopbarBreadcrumbs() {
         : formatSegment(decodeURIComponent(segment)));
 
     crumbs.push({
-      href: isLast ? undefined : href,
+      href: isLast ? undefined : resolveCrumbHref(segments, index),
       label,
     });
   });
@@ -148,6 +148,33 @@ export function TopbarBreadcrumbs() {
 function userHomeHref(segments: string[]) {
   if (segments.length === 0) return undefined;
   return "/dashboard";
+}
+
+function resolveCrumbHref(segments: string[], index: number) {
+  const segment = segments[index];
+  const previous = segments[index - 1];
+
+  if (segment === "post") return "/feed";
+  if (segment === "live") return "/livecode";
+  if (segment === "u") return "/search";
+
+  if (segment === "assignments" && segments[0] === "classes") {
+    return segments[1] ? `/classes/${segments[1]}` : "/classes";
+  }
+
+  if (previous === "assignments" && segments[0] === "classes") {
+    return segments[1]
+      ? `/classes/${segments[1]}/assignments/${segment}`
+      : "/classes";
+  }
+
+  if (segment === "solve" && segments[0] === "classes") {
+    return segments[3]
+      ? `/classes/${segments[1]}/assignments/${segments[3]}`
+      : "/classes";
+  }
+
+  return `/${segments.slice(0, index + 1).join("/")}`;
 }
 
 function CrumbNode({

@@ -196,6 +196,12 @@ function getPrimaryFile(files: ProjectFile[]) {
   return files.find((file) => file.name === "main.msp") ?? files[0];
 }
 
+function getSnippetFileCount(snippet: SnippetItem) {
+  return Array.isArray(snippet.files) && snippet.files.length > 0
+    ? snippet.files.length
+    : 1;
+}
+
 function EditorContent() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
@@ -251,7 +257,7 @@ END`
   );
   const code = activeFile?.content ?? "";
   const executionLine =
-    errorLine ?? (program.length > 0 && !stopped ? Math.max(1, currentLine + 1) : null);
+    errorLine ?? (program.length > 0 && !stopped && currentLine > 0 ? currentLine : null);
   const complexityAnalysis = useMemo<ComplexityAnalysis | null>(() => {
     if (!complexityEnabled) return null;
     return analyzeMiniScriptComplexity(code, locale);
@@ -363,7 +369,7 @@ END`
     } catch (error: unknown) {
       const details = getErrorDetails(error);
       setOutput((prev) => [...prev, `ERROR: ${details.message}`]);
-      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine + 1));
+      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine));
       setStopped(true);
       setActivePanel("console");
     }
@@ -387,7 +393,7 @@ END`
     } catch (error: unknown) {
       const details = getErrorDetails(error);
       newOutput.push(`ERROR: ${details.message}`);
-      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine + 1));
+      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine));
       setStopped(true);
     }
 
@@ -638,6 +644,14 @@ END`
     toast.success(t("editor.complexity.toast.completed"));
   }
 
+  function formatSnippetFileCount(count: number) {
+    if (locale === "ro") {
+      return count === 1 ? "1 fișier" : `${count} fișiere`;
+    }
+
+    return count === 1 ? "1 file" : `${count} files`;
+  }
+
   async function loadSnippet(id: string) {
     const { data } = await supabase
       .from("snippets")
@@ -834,8 +848,14 @@ END`
               <div className="truncate text-sm font-semibold">
                 {snippet.title || t("editor.snippets.untitled")}
               </div>
-              <div className="truncate text-xs text-zinc-500">
-                {new Date(snippet.created_at).toLocaleString()}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+                <span className="truncate">
+                  {new Date(snippet.created_at).toLocaleString()}
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                  <ListTree size={12} />
+                  {formatSnippetFileCount(getSnippetFileCount(snippet))}
+                </span>
               </div>
             </button>
             <Button

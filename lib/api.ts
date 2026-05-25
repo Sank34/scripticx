@@ -74,6 +74,36 @@ export type LiveCodeData = {
   participantsByRoom: Record<string, ProfileSummary[]>;
 };
 
+export type AppNotification = {
+  id: string;
+  user_id: string;
+  actor_id?: string | null;
+  type: string;
+  title: string;
+  body?: string | null;
+  href?: string | null;
+  metadata?: Record<string, unknown> | null;
+  read_at?: string | null;
+  created_at: string;
+  actor?: ProfileSummary | null;
+};
+
+export type DailyChallenge = {
+  id: string;
+  challenge_date: string;
+  problem_id: string;
+  bonus_points?: number | null;
+  is_active?: boolean | null;
+  created_at?: string | null;
+  problems?: {
+    id: string;
+    code?: number | null;
+    title_i18n?: Record<string, string> | null;
+    description_i18n?: Record<string, string> | null;
+    difficulty?: string | null;
+  } | null;
+};
+
 type SupabaseAuthSubscription = ReturnType<
   SupabaseClient["auth"]["onAuthStateChange"]
 >["data"]["subscription"];
@@ -96,6 +126,16 @@ type CreatePostInput = {
   content: string;
   code?: string | null;
   image?: File | null;
+};
+
+type CreateNotificationInput = {
+  userId: string;
+  actorId?: string | null;
+  type: string;
+  title: string;
+  body?: string | null;
+  href?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -300,6 +340,30 @@ class FeedApi {
       .insert([{ post_id: postId, user_id: userId }]);
 
     if (error) throw error;
+
+    const [{ data: post }, actor] = await Promise.all([
+      this.client
+        .from("posts")
+        .select("id, user_id, content")
+        .eq("id", postId)
+        .maybeSingle<FeedPost>(),
+      this.profiles.getSummary(userId),
+    ]);
+
+    if (post?.user_id && post.user_id !== userId) {
+      await NotificationsApi.createWithClient(this.client, {
+        userId: post.user_id,
+        actorId: userId,
+        type: "post_like",
+        title: `${actor?.username || "Someone"} liked your post`,
+        body: post.content?.slice(0, 120) || "Open your post on ScripticX.",
+        href: `/post/${postId}`,
+        metadata: {
+          postId,
+          username: actor?.username || null,
+        },
+      });
+    }
   }
 
   async createPost({ userId, content, code, image }: CreatePostInput) {
@@ -354,6 +418,121 @@ class FeedApi {
       follower_id: followerId,
       following_id: followingId,
     });
+
+    if (error) throw error;
+
+    const actor = await this.profiles.getSummary(followerId);
+
+    await NotificationsApi.createWithClient(this.client, {
+      userId: followingId,
+      actorId: followerId,
+      type: "follow",
+      title: `${actor?.username || "Someone"} started following you`,
+      body: "Open their profile from ScripticX.",
+      href: actor?.username ? `/u/${actor.username}` : "/profile",
+      metadata: {
+        username: actor?.username || null,
+      },
+    });
+  }
+}
+
+class NotificationsApi {
+  constructor(
+    private readonly client: SupabaseClient,
+    private readonly profiles: ProfilesApi
+  ) {}
+
+  static async createWithClient(
+    client: SupabaseClient,
+    input: CreateNotificationInput
+  ) {
+    const { error } = await client.from("notifications").insert({
+      user_id: input.userId,
+      actor_id: input.actorId || null,
+      type: input.type,
+      title: input.title,
+      body: input.body || null,
+      href: input.href || null,
+      metadata: input.metadata || {},
+    });
+
+    if (error) {
+      console.warn("Could not create notification.", error);
+    }
+  }
+
+  async create(input: CreateNotificationInput) {
+    await NotificationsApi.createWithClient(this.client, input);
+  }
+
+  async list(userId: string, limit = 30): Promise<AppNotification[]> {
+    const { data, error } = await this.client
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error?.code === "42P01" || error?.code === "PGRST205") {
+      console.warn("Notifications table is not available yet.", error);
+      return [];
+    }
+
+    if (error) throw error;
+
+    const notifications = (data || []) as AppNotification[];
+    const actorIds = [
+      ...new Set(
+        notifications
+          .map((notification) => notification.actor_id)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
+    const actors = await this.profiles.listSummaries(actorIds);
+    const actorMap = new Map(actors.map((actor) => [actor.id, actor]));
+
+    return notifications.map((notification) => ({
+      ...notification,
+      actor: notification.actor_id
+        ? actorMap.get(notification.actor_id) || null
+        : null,
+    }));
+  }
+
+  async unreadCount(userId: string): Promise<number> {
+    const { count, error } = await this.client
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .is("read_at", null);
+
+    if (error?.code === "42P01" || error?.code === "PGRST205") {
+      console.warn("Notifications table is not available yet.", error);
+      return 0;
+    }
+
+    if (error) throw error;
+
+    return count || 0;
+  }
+
+  async markAsRead(notificationId: string, userId: string) {
+    const { error } = await this.client
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", notificationId)
+      .eq("user_id", userId);
+
+    if (error) throw error;
+  }
+
+  async markAllAsRead(userId: string) {
+    const { error } = await this.client
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .is("read_at", null);
 
     if (error) throw error;
   }
@@ -731,17 +910,156 @@ class LiveApi {
   }
 }
 
+class DailyChallengesApi {
+  constructor(private readonly client: SupabaseClient) {}
+
+  getTodayKey(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  async getForDate(dateKey = this.getTodayKey()): Promise<DailyChallenge | null> {
+    const { data, error } = await this.client
+      .from("daily_challenges")
+      .select(`
+        *,
+        problems (
+          id,
+          code,
+          title_i18n,
+          description_i18n,
+          difficulty
+        )
+      `)
+      .eq("challenge_date", dateKey)
+      .eq("is_active", true)
+      .maybeSingle<DailyChallenge>();
+
+    if (error?.code === "42P01" || error?.code === "PGRST205") {
+      console.warn("Daily challenges table is not available yet.", error);
+      return null;
+    }
+
+    if (error) throw error;
+
+    return data || null;
+  }
+
+  async list(limit = 20): Promise<DailyChallenge[]> {
+    const { data, error } = await this.client
+      .from("daily_challenges")
+      .select(`
+        *,
+        problems (
+          id,
+          code,
+          title_i18n,
+          description_i18n,
+          difficulty
+        )
+      `)
+      .order("challenge_date", { ascending: false })
+      .limit(limit);
+
+    if (error?.code === "42P01" || error?.code === "PGRST205") {
+      console.warn("Daily challenges table is not available yet.", error);
+      return [];
+    }
+
+    if (error) throw error;
+
+    return (data || []) as DailyChallenge[];
+  }
+
+  async schedule(input: {
+    date: string;
+    problemId: string;
+    bonusPoints: number;
+    createdBy: string;
+  }) {
+    const { error } = await this.client.from("daily_challenges").upsert(
+      {
+        challenge_date: input.date,
+        problem_id: input.problemId,
+        bonus_points: input.bonusPoints,
+        created_by: input.createdBy,
+        is_active: true,
+      },
+      { onConflict: "challenge_date" }
+    );
+
+    if (error) throw error;
+  }
+
+  async ensureTodayNotification(userId: string, locale = "en") {
+    const today = this.getTodayKey();
+    const challenge = await this.getForDate(today);
+
+    if (!challenge?.problem_id) return null;
+
+    const { data: existing, error: existingError } = await this.client
+      .from("notifications")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("type", "daily_challenge")
+      .contains("metadata", { challengeDate: today })
+      .limit(1);
+
+    if (existingError?.code !== "42P01" && existingError?.code !== "PGRST205" && existingError) {
+      throw existingError;
+    }
+
+    if (existing?.length) return challenge;
+
+    const title =
+      locale === "ro"
+        ? "Challenge-ul zilei este disponibil"
+        : "Today's challenge is ready";
+    const problemTitle =
+      challenge.problems?.title_i18n?.[locale] ||
+      challenge.problems?.title_i18n?.en ||
+      challenge.problems?.title_i18n?.ro ||
+      "Daily coding challenge";
+
+    await NotificationsApi.createWithClient(this.client, {
+      userId,
+      actorId: userId,
+      type: "daily_challenge",
+      title,
+      body:
+        locale === "ro"
+          ? `Rezolvă: ${problemTitle}`
+          : `Solve: ${problemTitle}`,
+      href: `/problems/${challenge.problem_id}`,
+      metadata: {
+        challengeId: challenge.id,
+        challengeDate: today,
+        problemId: challenge.problem_id,
+      },
+    });
+
+    return challenge;
+  }
+}
+
 class AppApi {
   readonly auth: AuthApi;
   readonly profiles: ProfilesApi;
   readonly feed: FeedApi;
   readonly live: LiveApi;
+  readonly notifications: NotificationsApi;
+  readonly dailyChallenges: DailyChallengesApi;
 
   constructor(private readonly client: SupabaseClient) {
     this.auth = new AuthApi(client);
     this.profiles = new ProfilesApi(client);
     this.feed = new FeedApi(client, this.profiles);
     this.live = new LiveApi(client);
+    this.notifications = new NotificationsApi(client, this.profiles);
+    this.dailyChallenges = new DailyChallengesApi(client);
   }
 }
 

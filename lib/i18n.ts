@@ -42,6 +42,20 @@ export const translations = {
       },
     },
 
+    notifications: {
+      title: "Notifications",
+      open: "Open notifications",
+      unread: "{count} unread",
+      allCaughtUp: "All caught up",
+      markAllRead: "Mark all as read",
+      enableBrowser: "Enable browser notifications",
+      browserEnabledTitle: "ScripticX notifications enabled",
+      browserEnabledBody: "You will receive browser alerts for new notifications while the app is open.",
+      browserBlocked: "The browser accepted permission, but the system blocked the notification.",
+      empty: "No notifications yet",
+      emptyHint: "Invites, follows and important updates will appear here.",
+    },
+
     learn: {
       docs: "Docs",
       pages: {
@@ -1145,6 +1159,20 @@ export const translations = {
         liveSessions: "Sesiuni live",
         participants: "Participanți în sesiuni",
       },
+    },
+
+    notifications: {
+      title: "Notificări",
+      open: "Deschide notificările",
+      unread: "{count} necitite",
+      allCaughtUp: "Ești la zi",
+      markAllRead: "Marchează toate ca citite",
+      enableBrowser: "Activează notificările browserului",
+      browserEnabledTitle: "Notificările ScripticX sunt active",
+      browserEnabledBody: "Vei primi alerte în browser pentru notificări noi cât timp aplicația este deschisă.",
+      browserBlocked: "Browserul a acceptat permisiunea, dar sistemul a blocat notificarea.",
+      empty: "Nu ai notificări încă",
+      emptyHint: "Invitațiile, urmăririle și update-urile importante vor apărea aici.",
     },
 
     learn: {
