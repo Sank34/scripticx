@@ -13,6 +13,7 @@ import {
   type ProblemTestResult,
 } from "@/components/problems/TestResultCard";
 import { useAuth } from "@/hooks/useAuth";
+import { api, type DailyChallenge } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { checkAchievements } from "@/lib/achievements";
@@ -29,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CheckCircle2, Loader2, Play, Send, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 type EvaluationStatus = {
   status: "pending" | "evaluating" | "passed" | "failed";
@@ -71,27 +73,50 @@ function ProblemContent() {
   const [editorLine, setEditorLine] = useState(1);
   const [tabSize, setTabSize] = useState(2);
   const [activeTab, setActiveTab] = useState<"description" | "solution">("description");
+  const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
+  const [dailyCompleted, setDailyCompleted] = useState(false);
 
   useEffect(() => {
     if (!id || typeof id !== "string") return;
 
     async function fetchProblem() {
-      const { data } = await supabase
-        .from("problems")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const [{ data }, todayChallenge] = await Promise.all([
+        supabase
+          .from("problems")
+          .select("*")
+          .eq("id", id)
+          .single(),
+        api.dailyChallenges.getForDate(),
+      ]);
 
       if (data) {
         setProblem(data);
         setCode(data.starter_code);
       }
 
+      const matchingDailyChallenge =
+        todayChallenge?.problem_id === id ? todayChallenge : null;
+
+      if (matchingDailyChallenge) {
+        setDailyChallenge(matchingDailyChallenge);
+
+        if (user?.id) {
+          const completion = await api.dailyChallenges.getCompletion(
+            matchingDailyChallenge.id,
+            user.id
+          );
+          setDailyCompleted(Boolean(completion));
+        }
+      } else {
+        setDailyChallenge(null);
+        setDailyCompleted(false);
+      }
+
       setLoading(false);
     }
 
     fetchProblem();
-  }, [id]);
+  }, [id, user?.id]);
 
   async function runCode() {
     if (!problem || !user) return;
@@ -206,9 +231,26 @@ function ProblemContent() {
         },
       ]);
 
-      if (score > bestPrevious) {
-        const diff = score - bestPrevious;
+      let bonusAwarded = false;
 
+      if (score === 100 && dailyChallenge && !dailyCompleted) {
+        bonusAwarded = await api.dailyChallenges.complete({
+          challengeId: dailyChallenge.id,
+          userId: user.id,
+          problemId: String(id),
+          bonusPoints: dailyChallenge.bonus_points || 0,
+        });
+
+        if (bonusAwarded) {
+          setDailyCompleted(true);
+        }
+      }
+
+      const scoreIncrement = score > bestPrevious ? score - bestPrevious : 0;
+      const bonusIncrement = bonusAwarded ? dailyChallenge?.bonus_points || 0 : 0;
+      const totalIncrement = scoreIncrement + bonusIncrement;
+
+      if (totalIncrement > 0) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("total_score")
@@ -218,12 +260,20 @@ function ProblemContent() {
         await supabase
           .from("profiles")
           .update({
-            total_score: (profile?.total_score || 0) + diff,
+            total_score: (profile?.total_score || 0) + totalIncrement,
           })
           .eq("id", user.id);
       }
 
       await checkAchievements(user.id, score);
+
+      if (bonusAwarded && bonusIncrement > 0) {
+        toast.success(
+          locale === "ro"
+            ? `Daily challenge rezolvat! Ai primit ${bonusIncrement} puncte bonus.`
+            : `Daily challenge solved! You received ${bonusIncrement} bonus points.`
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -294,6 +344,16 @@ function ProblemContent() {
               )}
               {localizedTitle}
             </h1>
+            {dailyChallenge && (
+              <Badge className="hidden bg-orange-600 hover:bg-orange-600 md:inline-flex">
+                Daily code challenge
+              </Badge>
+            )}
+            {dailyCompleted && (
+              <Badge className="hidden bg-emerald-600 hover:bg-emerald-600 md:inline-flex">
+                {t("problems.status.solved")}
+              </Badge>
+            )}
             {testResults.length > 0 && (
               <Badge
                 variant={passedCount === testResults.length ? "default" : "secondary"}
@@ -405,6 +465,21 @@ function ProblemContent() {
                 <h2 className="text-xl font-bold tracking-tight">
                   {localizedTitle}
                 </h2>
+                {dailyChallenge && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="bg-orange-600 hover:bg-orange-600">
+                      Daily code challenge
+                    </Badge>
+                    <Badge variant="secondary">
+                      +{dailyChallenge.bonus_points || 0} pts
+                    </Badge>
+                    {dailyCompleted && (
+                      <Badge className="bg-emerald-600 hover:bg-emerald-600">
+                        {t("problems.status.solved")}
+                      </Badge>
+                    )}
+                  </div>
+                )}
                 <div className="text-sm leading-relaxed text-zinc-700">
                   <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
                 </div>
@@ -465,6 +540,20 @@ function ProblemContent() {
                 {!isSubmitting && testResults.length > 0 && (
                   <>
                     <div>
+                      {dailyChallenge && (
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                          <Badge className="bg-orange-600 hover:bg-orange-600">
+                            Daily code challenge
+                          </Badge>
+                          <Badge variant="secondary">
+                            {dailyCompleted
+                              ? locale === "ro"
+                                ? "Bonus revendicat"
+                                : "Bonus claimed"
+                              : `+${dailyChallenge.bonus_points || 0} pts`}
+                          </Badge>
+                        </div>
+                      )}
                       <h2 className={`text-3xl font-bold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
                         {score} {t("problemPage.solution.points") || "puncte"}
                       </h2>

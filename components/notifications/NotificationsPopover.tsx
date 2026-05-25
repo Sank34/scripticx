@@ -177,6 +177,27 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!user?.id) return;
+
+    let cancelled = false;
+
+    api.dailyChallenges
+      .ensureTodayNotification(user.id, locale)
+      .then((challenge) => {
+        if (!cancelled && challenge) {
+          void queryClient.invalidateQueries({ queryKey });
+        }
+      })
+      .catch((error) => {
+        console.warn("Could not ensure daily challenge notification.", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locale, queryClient, queryKey, user?.id]);
+
+  useEffect(() => {
     if (!notifications.length) {
       initializedNotifications.current = true;
       return;

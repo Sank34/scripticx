@@ -14,10 +14,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
 import { markdownPreview } from "@/lib/markdownPreview";
+import { api, type DailyChallenge } from "@/lib/api";
+import { CalendarDays } from "lucide-react";
 
 type ProblemsData = {
   problems: any[];
   progress: Record<string, number>;
+  dailyChallenge: DailyChallenge | null;
+  dailySolved: boolean;
 };
 
 export default function ProblemsPage() {
@@ -42,13 +46,18 @@ export default function ProblemsPage() {
       return {
         problems,
         progress: {},
+        dailyChallenge: await api.dailyChallenges.getForDate(),
+        dailySolved: false,
       };
     }
 
-    const { data: submissions } = await supabase
-      .from("submissions")
-      .select("problem_id, score")
-      .eq("user_id", user.id);
+    const [{ data: submissions }, dailyChallenge] = await Promise.all([
+      supabase
+        .from("submissions")
+        .select("problem_id, score")
+        .eq("user_id", user.id),
+      api.dailyChallenges.getForDate(),
+    ]);
 
     const bestScores: Record<string, number> = {};
 
@@ -61,9 +70,15 @@ export default function ProblemsPage() {
       }
     });
 
+    const dailyCompletion = dailyChallenge
+      ? await api.dailyChallenges.getCompletion(dailyChallenge.id, user.id)
+      : null;
+
     return {
       problems,
       progress: bestScores,
+      dailyChallenge,
+      dailySolved: Boolean(dailyCompletion),
     };
   }
 
@@ -77,6 +92,8 @@ export default function ProblemsPage() {
 
   const problems = problemsData?.problems || [];
   const progress = problemsData?.progress || {};
+  const dailyChallenge = problemsData?.dailyChallenge || null;
+  const dailySolved = problemsData?.dailySolved || false;
 
   const filteredProblems = problems.filter((p) => {
     if (filter !== "all" && p.difficulty !== filter) return false;
@@ -100,11 +117,54 @@ export default function ProblemsPage() {
 
       <h1 className="text-3xl font-bold">{t("problems.title")}</h1>
 
-      <Input
-        placeholder={t("problems.searchPlaceholder")}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      {dailyChallenge?.problems && (
+        <Link href={`/problems/${dailyChallenge.problem_id}`} className="block">
+          <Card className="border-orange-200 bg-orange-50/60 transition hover:shadow-md">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-orange-700">
+                  <CalendarDays className="h-4 w-4" />
+                  {locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
+                </div>
+                <h2 className="truncate text-lg font-semibold">
+                  {dailyChallenge.problems.code != null && (
+                    <span className="mr-2 font-mono text-muted-foreground">
+                      #{dailyChallenge.problems.code}
+                    </span>
+                  )}
+                  {getLocalized(dailyChallenge.problems.title_i18n, locale)}
+                </h2>
+                <p className="line-clamp-1 text-sm text-muted-foreground">
+                  {markdownPreview(
+                    getLocalized(dailyChallenge.problems.description_i18n, locale)
+                  )}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {dailySolved && (
+                  <Badge className="bg-emerald-600 hover:bg-emerald-600">
+                    {t("problems.status.solved")}
+                  </Badge>
+                )}
+                <Badge variant="secondary">
+                  +{dailyChallenge.bonus_points || 0} pts
+                </Badge>
+                <Badge>
+                  {t(`problems.filters.${dailyChallenge.problems.difficulty}`)}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
+
+      <div className="pt-1">
+        <Input
+          placeholder={t("problems.searchPlaceholder")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
       <div className="flex gap-2">
         {["all", "easy", "medium", "hard"].map((f) => (

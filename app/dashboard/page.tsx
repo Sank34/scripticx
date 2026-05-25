@@ -9,12 +9,14 @@ import { SectionCard } from "@/components/common/SectionCard";
 import { StatCard } from "@/components/common/StatCard";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
-import { Flame, Trophy, Activity } from "lucide-react";
+import { Flame, Trophy, Activity, CalendarDays } from "lucide-react";
 import { getLocalized } from "@/lib/getLocalized";
 import { useLanguage } from "@/components/LanguageProvider";
+import { api, type DailyChallenge } from "@/lib/api";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 type DashboardStats = {
   solved: number;
@@ -27,6 +29,8 @@ type DashboardData = {
   recent: any[];
   leaderboard: any[];
   feed: any[];
+  dailyChallenge: DailyChallenge | null;
+  dailySolved: boolean;
 };
 
 function DashboardContent() {
@@ -44,19 +48,24 @@ function DashboardContent() {
         recent: [],
         leaderboard: [],
         feed: [],
+        dailyChallenge: null,
+        dailySolved: false,
       };
     }
 
-    const { data } = await supabase
-      .from("submissions")
-      .select(`
-        *,
-        problems (
-          title_i18n
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    const [{ data }, dailyChallenge] = await Promise.all([
+      supabase
+        .from("submissions")
+        .select(`
+          *,
+          problems (
+            title_i18n
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      api.dailyChallenges.getForDate(),
+    ]);
 
     if (!data) {
       return {
@@ -68,6 +77,8 @@ function DashboardContent() {
         recent: [],
         leaderboard: [],
         feed: [],
+        dailyChallenge,
+        dailySolved: false,
       };
     }
 
@@ -147,11 +158,17 @@ function DashboardContent() {
       }
     }
 
+    const dailyCompletion = dailyChallenge
+      ? await api.dailyChallenges.getCompletion(dailyChallenge.id, user.id)
+      : null;
+
     return {
       stats,
       recent,
       leaderboard,
       feed,
+      dailyChallenge,
+      dailySolved: Boolean(dailyCompletion),
     };
   }
 
@@ -173,6 +190,8 @@ function DashboardContent() {
   const recent = dashboardData?.recent || [];
   const leaderboard = dashboardData?.leaderboard || [];
   const feed = dashboardData?.feed || [];
+  const dailyChallenge = dashboardData?.dailyChallenge || null;
+  const dailySolved = dashboardData?.dailySolved || false;
 
   if (loading || !user) {
     return (
@@ -198,6 +217,50 @@ function DashboardContent() {
         title={t("dashboard.title")}
         subtitle={user.email}
       />
+
+      {dailyChallenge?.problems && (
+        <SectionCard
+          icon={<CalendarDays className="h-4 w-4 text-orange-500" />}
+          title={locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
+          action={
+            <Button asChild size="sm">
+              <a href={`/problems/${dailyChallenge.problem_id}`}>
+                {locale === "ro" ? "Rezolvă" : "Solve"}
+              </a>
+            </Button>
+          }
+          contentClassName="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-semibold">
+              {dailyChallenge.problems.code != null && (
+                <span className="mr-2 font-mono text-muted-foreground">
+                  #{dailyChallenge.problems.code}
+                </span>
+              )}
+              {getLocalized(dailyChallenge.problems.title_i18n, locale)}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {locale === "ro"
+                ? "O problemă nouă în fiecare zi pentru streak și puncte bonus."
+                : "A fresh problem every day for streaks and bonus points."}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {dailySolved && (
+              <Badge className="bg-emerald-600 hover:bg-emerald-600">
+                {t("problems.status.solved")}
+              </Badge>
+            )}
+            <Badge variant="secondary">
+              +{dailyChallenge.bonus_points || 0} pts
+            </Badge>
+            <Badge>
+              {t(`problems.filters.${dailyChallenge.problems.difficulty}`)}
+            </Badge>
+          </div>
+        </SectionCard>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 

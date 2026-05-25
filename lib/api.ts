@@ -974,6 +974,44 @@ class DailyChallengesApi {
     return (data || []) as DailyChallenge[];
   }
 
+  async getCompletion(challengeId: string, userId: string) {
+    const { data, error } = await this.client
+      .from("daily_challenge_completions")
+      .select("id")
+      .eq("challenge_id", challengeId)
+      .eq("user_id", userId)
+      .maybeSingle<{ id: string }>();
+
+    if (error?.code === "42P01" || error?.code === "PGRST205") {
+      console.warn("Daily challenge completions table is not available yet.", error);
+      return null;
+    }
+
+    if (error) throw error;
+
+    return data || null;
+  }
+
+  async complete(input: {
+    challengeId: string;
+    userId: string;
+    problemId: string;
+    bonusPoints: number;
+  }) {
+    const { error } = await this.client.from("daily_challenge_completions").insert({
+      challenge_id: input.challengeId,
+      user_id: input.userId,
+      problem_id: input.problemId,
+      bonus_points: input.bonusPoints,
+    });
+
+    if (error?.code === "23505") return false;
+
+    if (error) throw error;
+
+    return true;
+  }
+
   async schedule(input: {
     date: string;
     problemId: string;
