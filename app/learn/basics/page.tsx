@@ -1,14 +1,5 @@
 "use client";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-
 import { Card, CardContent } from "@/components/ui/card";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -31,18 +22,6 @@ export default function BasicsPage() {
 
   return (
     <div className="space-y-6">
-
-      {/* <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/learn">Docs</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Basics</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb> */}
 
       <div className="space-y-2">
         <h1 className="text-4xl font-bold">{t("learn.basicsPage.title")}</h1>
@@ -100,7 +79,7 @@ PRINT B`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 10
 IF X > 5 THEN
-PRINT "Big"
+  PRINT "Big"
 END`}
             </pre>
           </div>

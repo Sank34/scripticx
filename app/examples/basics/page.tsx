@@ -117,7 +117,7 @@ PRINT B`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 10
 IF X > 5 THEN
-PRINT "Big"
+  PRINT "Big"
 END`}
             </pre>
 
@@ -125,7 +125,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`X = 10\nIF X > 5 THEN\nPRINT "Big"\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`X = 10\nIF X > 5 THEN\n  PRINT "Big"\nEND`)}`)
               }
             >
               {t("examples.basics.run")}

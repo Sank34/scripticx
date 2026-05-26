@@ -1,0 +1,643 @@
+\documentclass[12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[romanian]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{graphicx}
+
+\geometry{a4paper, margin=2.2cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.65em}
+
+\title{\textbf{Model matematic pentru motorul MiniScript+}}
+\author{Andrei Sanke Evergreen}
+\date{Mai 2026}
+
+\begin{document}
+
+\geometry{a4paper, margin=2.2cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.65em}
+
+\title{\textbf{Model matematic pentru motorul MiniScript+}}
+\author{Andrei Sanke Evergreen}
+\date{Mai 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introducere}
+
+MiniScript+ este un limbaj educațional proiectat pentru a simplifica procesul de învățare a programării. Din punct de vedere matematic, un program MiniScript+ poate fi privit ca o structură formală alcătuită din instrucțiuni, expresii și o stare internă care se modifică în timpul execuției.
+
+Motorul MiniScript+ funcționează ca un interpretor: primește codul sursă, îl transformă într-o reprezentare internă, apoi execută instrucțiunile pas cu pas. Fluxul principal este:
+
+\[
+\text{Cod sursă}
+\longrightarrow
+\text{Tokenizare}
+\longrightarrow
+\text{Parsare}
+\longrightarrow
+\text{AST}
+\longrightarrow
+\text{Evaluare}
+\longrightarrow
+\text{Output}
+\]
+
+Această structură permite atât rularea programului, cât și vizualizarea execuției, debugging-ul și estimarea complexității algoritmului.
+
+\section{Modelul formal al programului}
+
+Un program MiniScript+ poate fi modelat ca o secvență finită de instrucțiuni:
+
+\[
+P = (I_1, I_2, \ldots, I_n)
+\]
+
+unde fiecare instrucțiune \(I_i\) aparține unei mulțimi de instrucțiuni admise:
+
+\[
+I_i \in \mathcal{I}
+\]
+
+Mulțimea instrucțiunilor poate fi descrisă astfel:
+
+\[
+\mathcal{I} =
+\{
+\text{INPUT},
+\text{PRINT},
+\text{ASSIGN},
+\text{IF},
+\text{ELSE},
+\text{WHILE},
+\text{END}
+\}
+\]
+
+Astfel, un program nu este tratat doar ca text, ci ca o listă ordonată de operații care pot modifica starea internă a interpretorului.
+
+\section{Starea internă a interpretorului}
+
+În timpul execuției, interpretorul păstrează o stare internă. Aceasta poate fi modelată printr-un tuplu:
+
+\[
+\sigma = (V, O, l, s, Q)
+\]
+
+unde:
+
+\[
+\begin{aligned}
+V &= \text{tabelul variabilelor definite în program} \\
+O &= \text{lista valorilor afișate la output} \\
+l &= \text{linia curentă executată} \\
+s &= \text{numărul de pași executați} \\
+Q &= \text{coada valorilor de input}
+\end{aligned}
+\]
+
+Tabelul variabilelor poate fi privit ca o funcție parțială:
+
+\[
+V : \text{Identificator} \rightarrow \text{Valoare}
+\]
+
+De exemplu, dacă în program apare instrucțiunea:
+
+\[
+X = 5
+\]
+
+atunci starea variabilelor se modifică astfel:
+
+\[
+V'(X) = 5
+\]
+
+iar pentru orice altă variabilă \(Y \neq X\):
+
+\[
+V'(Y) = V(Y)
+\]
+
+\section{Funcția de tranziție}
+
+Execuția programului poate fi descrisă printr-o funcție de tranziție:
+
+\[
+\delta(\sigma, I_i) = \sigma'
+\]
+
+Aceasta înseamnă că, pornind de la o stare curentă \(\sigma\) și executând instrucțiunea \(I_i\), interpretorul obține o stare nouă \(\sigma'\).
+
+Pentru o atribuire de forma:
+
+\[
+X = expr
+\]
+
+tranziția poate fi descrisă prin:
+
+\[
+\delta(\sigma, X = expr) =
+(V[X \leftarrow eval(expr, V)], O, l+1, s+1, Q)
+\]
+
+unde \(eval(expr, V)\) este valoarea expresiei calculate folosind variabilele curente.
+
+Pentru o instrucțiune de afișare:
+
+\[
+PRINT \ expr
+\]
+
+tranziția devine:
+
+\[
+\delta(\sigma, PRINT \ expr) =
+(V, O \cup \{eval(expr, V)\}, l+1, s+1, Q)
+\]
+
+Prin urmare, instrucțiunile MiniScript+ pot fi analizate riguros ca transformări asupra unei stări interne.
+
+\section{Tokenizarea}
+
+Tokenizarea este etapa în care codul sursă este parcurs caracter cu caracter și împărțit în unități lexicale numite token-uri.
+
+Dacă notăm codul sursă printr-un șir de caractere:
+
+\[
+C = c_1c_2 \ldots c_n
+\]
+
+atunci lexerul construiește o secvență de token-uri:
+
+\[
+L(C) = (t_1, t_2, \ldots, t_m)
+\]
+
+unde fiecare token \(t_i\) poate fi un identificator, un număr, un string, un operator, o paranteză sau un cuvânt cheie.
+
+Exemplu:
+
+\[
+\texttt{X = X + 1}
+\]
+
+devine:
+
+\[
+(\text{IDENT}(X), \text{OP}(=), \text{IDENT}(X), \text{OP}(+), \text{NUMBER}(1))
+\]
+
+Deoarece fiecare caracter este citit cel mult de un număr constant de ori, complexitatea tokenizării este:
+
+\[
+T_{tokenizare}(n) = O(n)
+\]
+
+unde \(n\) este numărul de caractere din codul sursă.
+
+\section{Parsarea și construirea structurii programului}
+
+Parsarea verifică dacă token-urile respectă regulile limbajului și construiește reprezentarea internă a programului.
+
+La nivel simplificat, gramatica limbajului poate fi exprimată astfel:
+
+\[
+\begin{aligned}
+Program &\rightarrow Instr^* \\
+Instr &\rightarrow Assign \mid Print \mid Input \mid If \mid While \\
+Assign &\rightarrow id = Expr \\
+Print &\rightarrow PRINT \ Expr \\
+Input &\rightarrow INPUT \ id \\
+If &\rightarrow IF \ Expr \ THEN \ Program \ (ELSE \ Program)? \ END \\
+While &\rightarrow WHILE \ Expr \ Program \ END
+\end{aligned}
+\]
+
+Expresiile sunt analizate ținând cont de prioritatea operatorilor. De exemplu:
+
+\[
+X + 2 \cdot Y
+\]
+
+trebuie interpretat ca:
+
+\[
+X + (2 \cdot Y)
+\]
+
+nu ca:
+
+\[
+(X + 2) \cdot Y
+\]
+
+Parserul citește token-urile și construiește structuri pentru instrucțiuni, condiții, bucle și expresii. Dacă există \(m\) token-uri, iar fiecare token este procesat o singură dată sau de un număr constant de ori, atunci:
+
+\[
+T_{parsare}(m) = O(m)
+\]
+
+\section{Reprezentarea expresiilor prin AST}
+
+Expresiile MiniScript+ sunt reprezentate printr-un arbore sintactic abstract:
+
+\[
+AST_{expr} = (N, E, r)
+\]
+
+unde:
+
+\[
+\begin{aligned}
+N &= \text{mulțimea nodurilor arborelui} \\
+E &= \text{mulțimea muchiilor părinte-copil} \\
+r &= \text{rădăcina arborelui}
+\end{aligned}
+\]
+
+Nodurile interne reprezintă operatori, iar frunzele reprezintă valori sau variabile. Pentru expresia:
+
+\[
+X + 2 \cdot Y
+\]
+
+AST-ul are forma conceptuală:
+
+\[
+\begin{array}{c}
++ \\
+/ \ \backslash \\
+X \quad * \\
+\quad / \ \backslash \\
+\quad 2 \quad Y
+\end{array}
+\]
+
+Această reprezentare este importantă deoarece păstrează ordinea corectă de evaluare și prioritatea operatorilor.
+
+\section{Evaluarea recursivă a expresiilor}
+
+Evaluarea unei expresii se face recursiv pe AST. Definim funcția:
+
+\[
+eval : AST \times V \rightarrow \text{Valoare}
+\]
+
+Pentru o constantă numerică:
+
+\[
+eval(c, V) = c
+\]
+
+Pentru o variabilă:
+
+\[
+eval(x, V) = V(x)
+\]
+
+Pentru o expresie binară:
+
+\[
+eval(a \ op \ b, V) =
+eval(a, V) \ op \ eval(b, V)
+\]
+
+De exemplu:
+
+\[
+eval(X + 2 \cdot Y, V)
+=
+V(X) + 2 \cdot V(Y)
+\]
+
+Dacă AST-ul unei expresii are \(k\) noduri, fiecare nod este vizitat o singură dată, deci:
+
+\[
+T_{evaluare\_expr}(k) = O(k)
+\]
+
+Spațiul suplimentar folosit de evaluarea recursivă depinde de înălțimea arborelui:
+
+\[
+S_{recursie} = O(h)
+\]
+
+unde \(h\) este înălțimea AST-ului.
+
+\section{Execuția instrucțiunilor}
+
+După parsare, programul este executat instrucțiune cu instrucțiune. Dacă notăm prin \(p\) numărul de instrucțiuni efectiv executate, atunci:
+
+\[
+T_{executie} = O(p)
+\]
+
+Valoarea lui \(p\) nu este întotdeauna egală cu numărul de linii din program, deoarece buclele pot executa aceeași instrucțiune de mai multe ori.
+
+Pentru o buclă:
+
+\[
+WHILE \ cond \ DO \ B
+\]
+
+dacă blocul \(B\) are costul \(T_B\), iar condiția este adevărată de \(q\) ori, atunci costul total este aproximativ:
+
+\[
+T_{while} = O(q \cdot (T_{cond} + T_B))
+\]
+
+Pentru două bucle imbricate, cu \(q_1\) și \(q_2\) iterații:
+
+\[
+T_{nested} = O(q_1 \cdot q_2 \cdot T_B)
+\]
+
+Dacă ambele depind de aceeași dimensiune \(n\), obținem:
+
+\[
+T_{nested} = O(n^2)
+\]
+
+\section{Limitarea buclelor infinite}
+
+Pentru siguranță, motorul folosește o limită maximă de pași:
+
+\[
+s \leq MAX\_STEPS
+\]
+
+La fiecare instrucțiune executată, contorul \(s\) crește:
+
+\[
+s' = s + 1
+\]
+
+Dacă:
+
+\[
+s > MAX\_STEPS
+\]
+
+execuția este oprită și programul este considerat potențial blocat într-o buclă infinită. Această măsură nu demonstrează matematic existența unei bucle infinite, dar previne blocarea aplicației în browser.
+
+\section{Complexitatea totală a motorului}
+
+Procesarea completă a unui program MiniScript+ include tokenizare, parsare, construire AST și execuție:
+
+\[
+T_{total} =
+T_{tokenizare} +
+T_{parsare} +
+T_{AST} +
+T_{executie}
+\]
+
+Prin înlocuire:
+
+\[
+T_{total} = O(n) + O(m) + O(k) + O(p)
+\]
+
+deci:
+
+\[
+T_{total} = O(n + m + k + p)
+\]
+
+unde:
+
+\[
+\begin{aligned}
+n &= \text{numărul de caractere din codul sursă} \\
+m &= \text{numărul de token-uri generate} \\
+k &= \text{numărul de noduri din AST} \\
+p &= \text{numărul de instrucțiuni executate}
+\end{aligned}
+\]
+
+Dacă toate aceste mărimi sunt raportate la dimensiunea totală a programului, notată cu \(N\), atunci pentru etapa de procesare statică:
+
+\[
+T_{static} = O(N)
+\]
+
+Execuția poate deveni mai mare decât \(O(N)\) dacă programul conține bucle care rulează de multe ori.
+
+\section{Complexitatea în spațiu}
+
+Spațiul folosit de motor provine din mai multe structuri interne:
+
+\[
+S_{total} =
+S_{tokens} +
+S_{AST} +
+S_{variabile} +
+S_{recursie} +
+S_{output}
+\]
+
+Prin aproximare:
+
+\[
+S_{total} = O(m + k + v + h + o)
+\]
+
+unde:
+
+\[
+\begin{aligned}
+m &= \text{numărul de token-uri} \\
+k &= \text{numărul de noduri din AST} \\
+v &= \text{numărul de variabile distincte} \\
+h &= \text{înălțimea maximă a AST-ului} \\
+o &= \text{numărul de valori afișate la output}
+\end{aligned}
+\]
+
+În multe programe educaționale simple, output-ul și numărul de variabile sunt mici, iar spațiul este dominat de token-uri și AST:
+
+\[
+S_{total} \approx O(m + k)
+\]
+
+\section{Analizatorul de complexitate}
+
+Analizatorul de complexitate nu execută programul pentru toate valorile posibile de input. În schimb, el estimează complexitatea pe baza structurii sintactice a codului. Acesta identifică:
+
+\[
+\begin{aligned}
+L &= \text{numărul total de bucle} \\
+d &= \text{adâncimea maximă a buclelor imbricate} \\
+v &= \text{numărul de variabile folosite} \\
+b &= \text{numărul de blocuri condiționale}
+\end{aligned}
+\]
+
+O estimare simplificată pentru complexitatea în timp este:
+
+\[
+C_{time} \approx O(n^d)
+\]
+
+unde \(d\) este adâncimea maximă a buclelor imbricate detectate.
+
+\[
+\begin{array}{|c|c|}
+\hline
+\textbf{Structura programului} & \textbf{Complexitate estimată} \\
+\hline
+\text{fără bucle relevante} & O(1) \\
+\hline
+\text{o buclă simplă} & O(n) \\
+\hline
+\text{două bucle imbricate} & O(n^2) \\
+\hline
+\text{trei bucle imbricate} & O(n^3) \\
+\hline
+\end{array}
+\]
+
+Pentru spațiu, analizatorul urmărește variabilele și structurile auxiliare:
+
+\[
+C_{space} \approx O(v + a)
+\]
+
+unde \(a\) reprezintă eventuale structuri auxiliare detectate. În versiunea educațională a MiniScript+, unde accentul este pus pe variabile simple și control de flux, estimarea spațiului este de obicei:
+
+\[
+C_{space} = O(1)
+\]
+
+dacă nu există structuri care cresc odată cu input-ul.
+
+\section{Scorul de eficiență}
+
+Pentru a oferi feedback vizual, analizatorul poate transforma informațiile structurale într-un scor de eficiență:
+
+\[
+Score = 100 - \alpha L - \beta d - \gamma b
+\]
+
+unde:
+
+\[
+\begin{aligned}
+L &= \text{numărul de bucle} \\
+d &= \text{adâncimea maximă a buclelor} \\
+b &= \text{numărul de blocuri condiționale} \\
+\alpha,\beta,\gamma &= \text{coeficienți de penalizare}
+\end{aligned}
+\]
+
+Acest scor nu reprezintă o demonstrație formală a performanței, ci o măsură educațională care ajută utilizatorul să observe dacă soluția are multe bucle sau blocuri imbricate.
+
+\section{Exemplu de analiză}
+
+Pentru programul:
+
+\[
+\begin{array}{l}
+\texttt{X = 0} \\
+\texttt{WHILE X < N} \\
+\quad \texttt{PRINT X} \\
+\quad \texttt{X = X + 1} \\
+\texttt{END}
+\end{array}
+\]
+
+există o singură buclă, deci:
+
+\[
+d = 1
+\]
+
+Dacă bucla rulează de \(N\) ori, complexitatea în timp este:
+
+\[
+T(N) = O(N)
+\]
+
+Numărul de variabile folosite este constant, deci:
+
+\[
+S(N) = O(1)
+\]
+
+Pentru două bucle imbricate:
+
+\[
+\begin{array}{l}
+\texttt{I = 0} \\
+\texttt{WHILE I < N} \\
+\quad \texttt{J = 0} \\
+\quad \texttt{WHILE J < N} \\
+\quad \quad \texttt{PRINT I + J} \\
+\quad \quad \texttt{J = J + 1} \\
+\quad \texttt{END} \\
+\quad \texttt{I = I + 1} \\
+\texttt{END}
+\end{array}
+\]
+
+adâncimea maximă este:
+
+\[
+d = 2
+\]
+
+iar complexitatea estimată este:
+
+\[
+T(N) = O(N^2)
+\]
+
+\section{Observații privind corectitudinea analizei}
+
+Analizatorul de complexitate oferă o estimare euristică. El folosește structura codului, nu o demonstrație matematică completă pentru orice input posibil. De exemplu, o buclă de forma:
+
+\[
+\texttt{WHILE X < 10}
+\]
+
+poate avea un număr constant de iterații, deci complexitatea ei poate fi tratată ca:
+
+\[
+O(1)
+\]
+
+în timp ce o buclă dependentă de input:
+
+\[
+\texttt{WHILE X < N}
+\]
+
+este estimată ca:
+
+\[
+O(n)
+\]
+
+Prin urmare, scopul analizatorului este educațional: să ofere elevului o aproximare clară a eficienței algoritmului și să evidențieze impactul buclelor, al imbricării și al structurii codului.
+
+\section{Concluzie}
+
+Motorul MiniScript+ poate fi descris matematic ca un interpretor bazat pe transformări succesive ale codului: tokenizare, parsare, construire AST și evaluare. Fiecare instrucțiune modifică o stare internă, iar expresiile sunt evaluate recursiv pe baza arborelui sintactic abstract.
+
+Această abordare permite rularea programelor, debugging pas cu pas, evidențierea liniei curente și estimarea complexității algoritmului. Astfel, MiniScript+ nu este doar un limbaj educațional simplificat, ci și un model practic pentru înțelegerea modului în care funcționează interpretoarele reale.
+
+\end{document}
+
+\end{document}

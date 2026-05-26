@@ -20,6 +20,7 @@ let variables: Record<string, Value> = {};
 let currentLine = 0;
 let steps = 0;
 const MAX_STEPS = 1000; 
+const validatedPrograms = new WeakSet<any[]>();
 
 export function reset() {
   variables = {};
@@ -290,7 +291,13 @@ function parseExpression(tokens: string[]): ASTNode {
     return node;
   }
 
-  return parseOr();
+  const expression = parseOr();
+
+  if (pos < tokens.length) {
+    throw new Error(`Unexpected token "${tokens[pos]}"`);
+  }
+
+  return expression;
 }
 
 function asNumber(value: Value, operator: string) {
@@ -488,9 +495,99 @@ export function parseLine(line: string) {
     let eqPos = line.indexOf("=");
     inst.var = trim(line.substring(0, eqPos));
     inst.value = trim(line.substring(eqPos + 1));
+  } else {
+    inst.type = "ERROR";
+    inst.message = `Unknown instruction "${line}"`;
   }
 
   return inst;
+}
+
+function createLineError(message: string, line: number) {
+  const err: any = new Error(message);
+  err.line = line;
+  return err;
+}
+
+export function validateProgram(program: any[]) {
+  const stack: Array<{ type: "IF" | "WHILE"; line: number; hasElse?: boolean }> = [];
+
+  program.forEach((inst, index) => {
+    const line = index + 1;
+
+    if (!inst?.type) {
+      throw createLineError("Unknown instruction", line);
+    }
+
+    if (inst.type === "ERROR") {
+      throw createLineError(inst.message || "Invalid instruction", line);
+    }
+
+    if (inst.type === "ASSIGN") {
+      if (!inst.var) {
+        throw createLineError("Assignment is missing a variable name", line);
+      }
+
+      if (!inst.value) {
+        throw createLineError(`Assignment to "${inst.var}" is missing a value`, line);
+      }
+    }
+
+    if (inst.type === "INPUT" && !inst.var) {
+      throw createLineError("INPUT is missing a variable name", line);
+    }
+
+    if (inst.type === "PRINT" && !inst.value) {
+      throw createLineError("PRINT is missing an expression", line);
+    }
+
+    if (inst.type === "IF") {
+      if (!inst.condition) {
+        throw createLineError("IF is missing a condition", line);
+      }
+
+      stack.push({ type: "IF", line });
+    }
+
+    if (inst.type === "WHILE") {
+      if (!inst.condition) {
+        throw createLineError("WHILE is missing a condition", line);
+      }
+
+      stack.push({ type: "WHILE", line });
+    }
+
+    if (inst.type === "ELSE") {
+      const current = stack.at(-1);
+
+      if (!current || current.type !== "IF") {
+        throw createLineError("ELSE without matching IF", line);
+      }
+
+      if (current.hasElse) {
+        throw createLineError("IF block can only contain one ELSE", line);
+      }
+
+      current.hasElse = true;
+    }
+
+    if (inst.type === "END") {
+      const current = stack.pop();
+
+      if (!current) {
+        throw createLineError("END without matching block", line);
+      }
+    }
+  });
+
+  const unclosed = stack.at(-1);
+
+  if (unclosed) {
+    throw createLineError(
+      `Missing END for ${unclosed.type} statement`,
+      unclosed.line
+    );
+  }
 }
 
 function evaluate(expr: string): Value {
@@ -578,6 +675,11 @@ function findMatchingEndForBlock(program: any[], line: number) {
 }
 
 export function step(program: any[]): StepResult {
+  if (!validatedPrograms.has(program)) {
+    validateProgram(program);
+    validatedPrograms.add(program);
+  }
+
   if (currentLine >= program.length) return null;
 
   steps++;
@@ -591,9 +693,7 @@ export function step(program: any[]): StepResult {
   let output: any = null;
 
   if (inst.type === "ERROR") {
-    const err: any = new Error(inst.message);
-    err.line = currentLine;
-    throw err;
+    throw createLineError(inst.message, currentLine + 1);
   }
   if (inst.type === "EMPTY") {
     currentLine++;

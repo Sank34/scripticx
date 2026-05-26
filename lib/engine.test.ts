@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { parseLine, reset, setVariable, step } from "@/lib/engine";
+import { parseLine, reset, setVariable, step, validateProgram } from "@/lib/engine";
 
 function compile(code: string) {
   return code
@@ -294,5 +294,46 @@ END
 `);
 
     expect(() => step(program)).toThrow("Missing THEN in IF statement");
+  });
+
+  it("throws before execution when WHILE is missing END", () => {
+    const program = compile(`
+X = 0
+WHILE X < 2
+PRINT X
+`);
+
+    expect(() => validateProgram(program)).toThrow(
+      "Missing END for WHILE statement"
+    );
+    expect(() => step(program)).toThrow("Missing END for WHILE statement");
+  });
+
+  it("throws before execution when IF is missing END", () => {
+    const program = compile(`
+X = 1
+IF X > 0 THEN
+PRINT X
+`);
+
+    expect(() => validateProgram(program)).toThrow(
+      "Missing END for IF statement"
+    );
+  });
+
+  it("throws readable structural errors for ELSE and END", () => {
+    expect(() =>
+      validateProgram(compile(`
+ELSE
+PRINT 1
+`))
+    ).toThrow("ELSE without matching IF");
+
+    expect(() =>
+      validateProgram(compile(`
+PRINT 1
+END
+`))
+    ).toThrow("END without matching block");
   });
 });

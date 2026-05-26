@@ -486,6 +486,16 @@ export default function LiveRoomPage() {
     return [...online, ...offline];
   }, [allParticipants, participants, profilesMap]);
 
+  const inviteCandidates = useMemo(
+    () =>
+      users
+        .filter((profile) => profile.id !== user?.id)
+        .filter((profile) =>
+          profile.username?.toLowerCase().includes(search.toLowerCase())
+        ),
+    [search, user?.id, users]
+  );
+
   useEffect(() => {
     let active = true;
     let localChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -1808,7 +1818,7 @@ export default function LiveRoomPage() {
       )}
 
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="flex max-h-[min(560px,calc(100dvh-2rem))] flex-col overflow-hidden sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("live.inviteTitle")}</DialogTitle>
           </DialogHeader>
@@ -1816,14 +1826,17 @@ export default function LiveRoomPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t("live.searchPlaceholder")}
+            className="shrink-0"
           />
-          <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
-            {users
-              .filter((profile) => profile.id !== user?.id)
-              .filter((profile) =>
-                profile.username?.toLowerCase().includes(search.toLowerCase())
-              )
-              .map((profile) => {
+          <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="space-y-2">
+              {inviteCandidates.length === 0 && (
+                <div className="rounded-lg border border-dashed border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
+                  {t("live.noInviteUsers")}
+                </div>
+              )}
+
+              {inviteCandidates.map((profile) => {
                 const isAlreadyInSession = participants.some(
                   (participant) => participant.user_id === profile.id
                 );
@@ -1850,6 +1863,7 @@ export default function LiveRoomPage() {
                   </div>
                 );
               })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

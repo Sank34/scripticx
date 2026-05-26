@@ -56,6 +56,11 @@ export const translations = {
       emptyHint: "Invites, follows and important updates will appear here.",
     },
 
+    network: {
+      offlineTitle: "No network available",
+      reconnecting: "Trying to reconnect in {seconds}s...",
+    },
+
     learn: {
       docs: "Docs",
       pages: {
@@ -72,12 +77,12 @@ export const translations = {
       inputOutput: "Input / Output",
 
       title: "MiniScript+ Documentation",
-      subtitle: "Learn how to use MiniScript+ step by step with examples and explanations.",
+      subtitle: "Learn MiniScript+ through small examples, visual execution, debugging and the tools built into ScripticX.",
 
       sections: {
         what: {
           title: "What is MiniScript+?",
-          text: "MiniScript+ is a simple interpreted language designed to help you learn programming logic. It focuses on clarity and step-by-step execution.",
+          text: "MiniScript+ is a small interpreted language made for learning programming logic. It keeps the syntax readable, then shows what happens inside the program through variables, output, AST views and step-by-step execution.",
         },
         example: {
           title: "Example",
@@ -85,38 +90,49 @@ export const translations = {
         how: {
           title: "How it works",
           bullets: [
-            "Code is executed line by line",
-            "Variables store values",
-            "Loops repeat logic",
-            "Input/Output lets you interact with programs",
+            "The engine parses each line into structured instructions",
+            "Expressions are evaluated through an AST, so operator priority stays correct",
+            "The debugger shows the current line, variables and output while the program runs",
+            "The analyzer estimates time and space complexity from the program structure",
+          ],
+        },
+        platform: {
+          title: "What ScripticX adds around the language",
+          text: "The language is only one part of the learning flow. ScripticX also gives students a modern workspace where they can test code, save multi-file snippet projects, solve problems and collaborate live.",
+          bullets: [
+            "Automatic tests with per-case feedback",
+            "Daily code challenges with bonus points",
+            "AST and flowchart visualization for understanding program structure",
+            "Live coding sessions with chat, presence and shared code",
+            "RO/EN interface and localized educational content",
           ],
         },
       },
       basicsPage: {
         title: "Basics",
-        subtitle: "Learn the fundamental building blocks of MiniScript+.",
+        subtitle: "Start with the instructions you will use most often in MiniScript+.",
         sections: {
           statements: {
             title: "Statements",
-            text: "A program is made of statements executed from top to bottom."
+            text: "A program is made of clear statements. The engine reads them in order, unless an IF or WHILE changes the flow."
           },
           variables: {
             title: "Variables",
-            text: "Variables store values that you can use later."
+            text: "Variables store values that can be reused, printed or updated while the program runs."
           },
           math: {
             title: "Math Operations",
-            text: "You can perform calculations using operators."
+            text: "MiniScript+ supports arithmetic expressions, comparisons and helper functions such as INT, TRUNC and ROUND."
           },
           conditions: {
             title: "Conditions",
-            text: "Use IF statements to control program flow."
+            text: "Use IF statements when the program needs to choose between different paths."
           }
         }
       },
       variablesPage: {
         title: "Variables",
-        subtitle: "Variables store values that can be used and modified throughout your program.",
+        subtitle: "Variables are the program's memory: they keep the values you want to reuse or change.",
         sections: {
           what: {
             title: "What is a Variable?",
@@ -128,7 +144,7 @@ export const translations = {
           },
           updating: {
             title: "Updating Variables",
-            text: "You can change the value of a variable anytime."
+            text: "You can update a variable by assigning it a new expression. The debugger is useful here because it shows the value changing after each step."
           },
           types: {
             title: "Variable Types",
@@ -148,7 +164,7 @@ export const translations = {
       },
       loopsPage: {
         title: "Loops",
-        subtitle: "Loops allow you to repeat a block of code multiple times.",
+        subtitle: "Loops repeat a block of code and are the first place where algorithmic thinking becomes visible.",
         sections: {
           while: {
             title: "WHILE Loop",
@@ -168,19 +184,19 @@ export const translations = {
           },
           infinite: {
             title: "Infinite Loops",
-            text: "If the condition never becomes false, the loop will run forever.",
-            note: "Be careful — this will never stop unless manually interrupted."
+            text: "If the condition never becomes false, the loop would run forever. ScripticX stops suspicious executions and reports a runtime error instead of freezing the page.",
+            note: "Use the step debugger to check whether the variable inside the loop actually changes."
           },
           mistake: {
             title: "Common Mistake",
             text: "Forgetting to update the variable inside the loop.",
-            warning: "This will cause an infinite loop"
+            warning: "This can cause an infinite loop"
           }
         }
       },
       inputOutputPage: {
         title: "Input / Output",
-        subtitle: "Programs interact with users through input and output.",
+        subtitle: "INPUT and PRINT make programs interactive and easy to test with multiple cases.",
         sections: {
           output: {
             title: "Output (PRINT)",
@@ -202,7 +218,8 @@ export const translations = {
             bullets: [
               "The program pauses and waits for input",
               "The value is stored in a variable",
-              "Execution continues after input is provided"
+              "Execution continues after input is provided",
+              "In problem solving, each test case supplies its own input automatically"
             ]
           },
           types: {
@@ -631,6 +648,7 @@ export const translations = {
 
       inviteTitle: "Invite Users",
       searchPlaceholder: "Search users...",
+      noInviteUsers: "No users found",
       inSession: "In session",
       inviteButton: "Invite",
 
@@ -693,7 +711,7 @@ export const translations = {
 
     examples: {
       title: "Examples",
-      subtitle: "Explore practical coding examples and learn by doing",
+      subtitle: "Explore practical MiniScript+ programs, then open them in the editor to run, debug and analyze them.",
 
       pages: {
         basics: "Basics",
@@ -705,25 +723,25 @@ export const translations = {
       sections: {
         basics: {
           title: "Basics",
-          description: "Simple programs and syntax examples",
+          description: "Small examples for PRINT, variables, math and simple IF statements",
         },
         loops: {
           title: "Loops",
-          description: "Practice with loops and iterations",
+          description: "Practice repeated logic, counters, sums and input loops",
         },
         conditions: {
           title: "Conditions",
-          description: "If statements and logic",
+          description: "Use IF / ELSE to make decisions inside a program",
         },
         algorithms: {
           title: "Algorithms",
-          description: "Classic problems and solutions",
+          description: "Classic patterns such as prime checks, Fibonacci, GCD and maximum search",
         },
       },
 
       basics: {
         title: "Basics",
-        subtitle: "Simple examples to understand how the language works",
+        subtitle: "Simple examples to understand how the language works before moving to larger problems",
         run: "Run",
         print: {
           title: "Printing text",
@@ -739,7 +757,7 @@ export const translations = {
         },
         conditions: {
           title: "Conditions",
-          description: "Use IF statements to control program flow.",
+          description: "Use IF statements to control the path of execution.",
         },
       },
       loops: {
@@ -752,7 +770,7 @@ export const translations = {
         },
         sum: {
           title: "Sum from 1 to N",
-          description: "Calculate the sum of numbers from 1 to N.",
+          description: "Calculate a running total and watch it change in the debugger.",
         },
         countdown: {
           title: "Countdown",
@@ -790,7 +808,7 @@ export const translations = {
         run: "Run",
         prime: {
           title: "Prime number check",
-          description: "Check if a number is prime.",
+          description: "Check if a number is prime using a divisor loop. Try the complexity analyzer after running it.",
         },
         fibonacci: {
           title: "Fibonacci sequence",
@@ -1175,6 +1193,11 @@ export const translations = {
       emptyHint: "Invitațiile, urmăririle și update-urile importante vor apărea aici.",
     },
 
+    network: {
+      offlineTitle: "Nu există conexiune la internet",
+      reconnecting: "Încerc reconectarea în {seconds}s...",
+    },
+
     learn: {
       docs: "Documentație",
       pages: {
@@ -1191,12 +1214,12 @@ export const translations = {
       inputOutput: "Intrare / Ieșire",
 
       title: "Documentație MiniScript+",
-      subtitle: "Învață cum să folosești MiniScript+ pas cu pas, cu exemple și explicații.",
+      subtitle: "Învață MiniScript+ prin exemple mici, execuție vizuală, debugging și instrumentele integrate în ScripticX.",
 
       sections: {
         what: {
           title: "Ce este MiniScript+?",
-          text: "MiniScript+ este un limbaj interpretat simplu, creat pentru a te ajuta să înveți logica programării. Se concentrează pe claritate și execuție pas cu pas.",
+          text: "MiniScript+ este un limbaj interpretat mic, construit pentru învățarea logicii de programare. Păstrează sintaxa ușor de citit, apoi arată ce se întâmplă în interiorul programului prin variabile, output, AST și execuție pas cu pas.",
         },
         example: {
           title: "Exemplu",
@@ -1204,38 +1227,49 @@ export const translations = {
         how: {
           title: "Cum funcționează",
           bullets: [
-            "Codul este executat linie cu linie",
-            "Variabilele stochează valori",
-            "Buclele repetă logica",
-            "Intrare/Ieșire îți permite să interacționezi cu programele",
+            "Engine-ul parsează fiecare linie în instrucțiuni structurate",
+            "Expresiile sunt evaluate prin AST, astfel încât prioritatea operatorilor rămâne corectă",
+            "Debugger-ul arată linia curentă, variabilele și output-ul în timpul execuției",
+            "Analizatorul estimează complexitatea în timp și spațiu din structura programului",
+          ],
+        },
+        platform: {
+          title: "Ce adaugă ScripticX în jurul limbajului",
+          text: "Limbajul este doar o parte din procesul de învățare. ScripticX oferă elevilor un workspace modern în care pot testa cod, salva proiecte cu mai multe fișiere, rezolva probleme și colabora live.",
+          bullets: [
+            "Teste automate cu feedback pentru fiecare caz",
+            "Daily code challenges cu puncte bonus",
+            "Vizualizare AST și flowchart pentru înțelegerea structurii programului",
+            "Sesiuni live coding cu chat, prezență și cod partajat",
+            "Interfață RO/EN și conținut educațional localizat",
           ],
         },
       },
       basicsPage: {
         title: "Elemente de Bază",
-        subtitle: "Învață elementele fundamentale ale MiniScript+.",
+        subtitle: "Începe cu instrucțiunile pe care le vei folosi cel mai des în MiniScript+.",
         sections: {
           statements: {
             title: "Instrucțiuni",
-            text: "Un program este format din instrucțiuni executate de sus în jos."
+            text: "Un program este format din instrucțiuni clare. Engine-ul le citește în ordine, cu excepția cazurilor în care IF sau WHILE schimbă fluxul."
           },
           variables: {
             title: "Variabile",
-            text: "Variabilele stochează valori pe care le poți folosi ulterior."
+            text: "Variabilele stochează valori care pot fi refolosite, afișate sau actualizate în timpul execuției."
           },
           math: {
             title: "Operații matematice",
-            text: "Poți efectua calcule folosind operatori."
+            text: "MiniScript+ suportă expresii aritmetice, comparații și funcții utile precum INT, TRUNC și ROUND."
           },
           conditions: {
             title: "Condiții",
-            text: "Folosește instrucțiuni IF pentru a controla fluxul programului."
+            text: "Folosește instrucțiuni IF atunci când programul trebuie să aleagă între mai multe căi."
           }
         }
       },
       variablesPage: {
         title: "Variabile",
-        subtitle: "Variabilele stochează valori care pot fi folosite și modificate în program.",
+        subtitle: "Variabilele sunt memoria programului: păstrează valorile pe care vrei să le refolosești sau să le modifici.",
         sections: {
           what: {
             title: "Ce este o variabilă?",
@@ -1247,7 +1281,7 @@ export const translations = {
           },
           updating: {
             title: "Actualizarea variabilelor",
-            text: "Poți modifica valoarea unei variabile oricând."
+            text: "Poți actualiza o variabilă atribuindu-i o expresie nouă. Debugger-ul este util aici, pentru că arată cum se schimbă valoarea după fiecare pas."
           },
           types: {
             title: "Tipuri de variabile",
@@ -1267,7 +1301,7 @@ export const translations = {
       },
       loopsPage: {
         title: "Bucle",
-        subtitle: "Buclele îți permit să repeți un bloc de cod de mai multe ori.",
+        subtitle: "Buclele repetă un bloc de cod și fac vizibilă logica algoritmică.",
         sections: {
           while: {
             title: "Bucla WHILE",
@@ -1287,19 +1321,19 @@ export const translations = {
           },
           infinite: {
             title: "Bucle infinite",
-            text: "Dacă condiția nu devine niciodată falsă, bucla va rula la infinit.",
-            note: "Ai grijă — aceasta nu se va opri fără întrerupere manuală."
+            text: "Dacă o condiție nu devine niciodată falsă, bucla ar rula la infinit. ScripticX oprește execuțiile suspecte și afișează o eroare de runtime, fără să blocheze pagina.",
+            note: "Folosește debugger-ul pas cu pas ca să verifici dacă variabila din buclă chiar se modifică."
           },
           mistake: {
             title: "Greșeală comună",
             text: "Uitarea actualizării variabilei în interiorul buclei.",
-            warning: "Aceasta va cauza o buclă infinită"
+            warning: "Aceasta poate cauza o buclă infinită"
           }
         }
       },
       inputOutputPage: {
         title: "Intrare / Ieșire",
-        subtitle: "Programele interacționează cu utilizatorii prin intrare și ieșire.",
+        subtitle: "INPUT și PRINT fac programele interactive și ușor de testat cu mai multe cazuri.",
         sections: {
           output: {
             title: "Ieșire (PRINT)",
@@ -1321,7 +1355,8 @@ export const translations = {
             bullets: [
               "Programul se oprește și așteaptă input",
               "Valoarea este stocată într-o variabilă",
-              "Execuția continuă după ce inputul este oferit"
+              "Execuția continuă după ce inputul este oferit",
+              "În probleme, fiecare test case furnizează automat propriile date de intrare"
             ]
           },
           types: {
@@ -1750,6 +1785,7 @@ export const translations = {
 
       inviteTitle: "Invită utilizatori",
       searchPlaceholder: "Caută utilizatori...",
+      noInviteUsers: "Nu am găsit utilizatori",
       inSession: "În sesiune",
       inviteButton: "Invită",
 
@@ -1812,7 +1848,7 @@ export const translations = {
 
     examples: {
       title: "Exemple",
-      subtitle: "Explorează exemple practice de cod și învață făcând",
+      subtitle: "Explorează programe MiniScript+ practice, apoi deschide-le în editor ca să le rulezi, depanezi și analizezi.",
 
       pages: {
         basics: "Elemente de bază",
@@ -1824,25 +1860,25 @@ export const translations = {
       sections: {
         basics: {
           title: "Elemente de bază",
-          description: "Programe simple și exemple de sintaxă",
+          description: "Exemple mici pentru PRINT, variabile, matematică și IF simplu",
         },
         loops: {
           title: "Bucle",
-          description: "Practică cu bucle și iterații",
+          description: "Exersează logica repetitivă, contoare, sume și input în buclă",
         },
         conditions: {
           title: "Condiții",
-          description: "Instrucțiuni IF și logică",
+          description: "Folosește IF / ELSE ca să iei decizii în program",
         },
         algorithms: {
           title: "Algoritmi",
-          description: "Probleme clasice și soluții",
+          description: "Modele clasice: numere prime, Fibonacci, CMMDC și căutarea maximului",
         },
       },
 
       basics: {
         title: "Elemente de bază",
-        subtitle: "Exemple simple pentru a înțelege cum funcționează limbajul",
+        subtitle: "Exemple simple pentru a înțelege limbajul înainte de probleme mai mari",
         run: "Rulează",
         print: {
           title: "Afișarea textului",
@@ -1858,7 +1894,7 @@ export const translations = {
         },
         conditions: {
           title: "Condiții",
-          description: "Folosește instrucțiuni IF pentru a controla fluxul programului.",
+          description: "Folosește IF pentru a controla direcția execuției.",
         },
       },
       loops: {
@@ -1871,7 +1907,7 @@ export const translations = {
         },
         sum: {
           title: "Suma de la 1 la N",
-          description: "Calculează suma numerelor de la 1 la N.",
+          description: "Calculează o sumă progresivă și urmărește cum se schimbă în debugger.",
         },
         countdown: {
           title: "Numărătoare inversă",
@@ -1909,7 +1945,7 @@ export const translations = {
         run: "Rulează",
         prime: {
           title: "Verificare număr prim",
-          description: "Verifică dacă un număr este prim.",
+          description: "Verifică dacă un număr este prim folosind o buclă cu divizori. Încearcă apoi analizatorul de complexitate.",
         },
         fibonacci: {
           title: "Șirul Fibonacci",

@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Markdown } from "@/components/Markdown";
+import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 
 export function ProblemForm({ initialData, onSuccess }: any) {
   const { t } = useLanguage();
@@ -246,12 +247,26 @@ export function ProblemForm({ initialData, onSuccess }: any) {
         </Tabs>
       </div>
 
-      <Textarea
-        placeholder={t("admin.problems.form.starterCode")}
-        value={starterCode}
-        onChange={(e) => setStarterCode(e.target.value)}
-        className="font-mono"
-      />
+      <div className="overflow-hidden rounded-lg border border-input bg-background">
+        <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2 text-sm">
+          <span className="font-medium">{t("admin.problems.form.starterCode")}</span>
+          <span className="text-muted-foreground">MiniScript+</span>
+        </div>
+        <MiniScriptMonacoEditor
+          height="260px"
+          value={starterCode}
+          onChange={setStarterCode}
+          options={{
+            lineNumbers: "on",
+            folding: false,
+            glyphMargin: false,
+            lineDecorationsWidth: 8,
+            lineNumbersMinChars: 3,
+            padding: { top: 12, bottom: 12 },
+            wordWrap: "on",
+          }}
+        />
+      </div>
 
       <div className="space-y-2">
         <p className="text-lg font-medium">

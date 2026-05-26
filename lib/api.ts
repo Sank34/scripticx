@@ -948,7 +948,7 @@ class DailyChallengesApi {
     return data || null;
   }
 
-  async list(limit = 20): Promise<DailyChallenge[]> {
+  async list(limit = 20, fromDate = this.getTodayKey()): Promise<DailyChallenge[]> {
     const { data, error } = await this.client
       .from("daily_challenges")
       .select(`
@@ -961,7 +961,8 @@ class DailyChallengesApi {
           difficulty
         )
       `)
-      .order("challenge_date", { ascending: false })
+      .gte("challenge_date", fromDate)
+      .order("challenge_date", { ascending: true })
       .limit(limit);
 
     if (error?.code === "42P01" || error?.code === "PGRST205") {
@@ -1018,6 +1019,10 @@ class DailyChallengesApi {
     bonusPoints: number;
     createdBy: string;
   }) {
+    if (input.date < this.getTodayKey()) {
+      throw new Error("Daily challenges can only be scheduled from today onward.");
+    }
+
     const { error } = await this.client.from("daily_challenges").upsert(
       {
         challenge_date: input.date,

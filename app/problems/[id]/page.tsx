@@ -248,7 +248,7 @@ function ProblemContent() {
 
       const scoreIncrement = score > bestPrevious ? score - bestPrevious : 0;
       const bonusIncrement = bonusAwarded ? dailyChallenge?.bonus_points || 0 : 0;
-      const totalIncrement = scoreIncrement + bonusIncrement;
+      const totalIncrement = dailyChallenge ? bonusIncrement : scoreIncrement;
 
       if (totalIncrement > 0) {
         const { data: profile } = await supabase
@@ -379,7 +379,7 @@ function ProblemContent() {
         </Button>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_390px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(320px,46vh)_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_390px] md:grid-rows-1">
         <main className="flex min-h-0 min-w-0 flex-col bg-white">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-zinc-200 bg-white md:border-b-0 md:border-r">
             <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">

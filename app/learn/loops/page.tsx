@@ -1,14 +1,5 @@
 "use client";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-
 import { Card, CardContent } from "@/components/ui/card";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -32,18 +23,6 @@ export default function LoopsPage() {
   return (
     <div className="space-y-6">
 
-      {/* <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/learn">Docs</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Loops</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb> */}
-
       <div className="space-y-2">
         <h1 className="text-4xl font-bold">{t("learn.loopsPage.title")}</h1>
         <p className="text-muted-foreground">
@@ -63,8 +42,8 @@ export default function LoopsPage() {
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 0
 WHILE X < 3
-PRINT X
-X = X + 1
+  PRINT X
+  X = X + 1
 END`}
             </pre>
           </div>
@@ -84,8 +63,8 @@ END`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 0        # start
 WHILE X < 3   # check condition
-PRINT X       # output
-X = X + 1     # update
+  PRINT X     # output
+  X = X + 1   # update
 END`}
             </pre>
 
@@ -108,7 +87,7 @@ END`}
 
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`WHILE true
-PRINT "Hello"
+  PRINT "Hello"
 END`}
             </pre>
 
@@ -126,7 +105,7 @@ END`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 0
 WHILE X < 5
-PRINT X
+  PRINT X
 END`}
             </pre>
 

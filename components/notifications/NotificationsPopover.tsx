@@ -29,6 +29,159 @@ type NotificationsData = {
   unreadCount: number;
 };
 
+function getNotificationGroupKey(notification: AppNotification) {
+  if (notification.type !== "daily_challenge") {
+    return notification.id;
+  }
+
+  const metadata = notification.metadata || {};
+  const challengeId = metadata.challengeId;
+  const challengeDate = metadata.challengeDate;
+  const problemId = metadata.problemId;
+
+  return [
+    "daily_challenge",
+    typeof challengeId === "string" ? challengeId : "",
+    typeof challengeDate === "string" ? challengeDate : "",
+    typeof problemId === "string" ? problemId : notification.href || "",
+  ].join(":");
+}
+
+function dedupeNotifications(notifications: AppNotification[]) {
+  const grouped = new Map<string, AppNotification>();
+  const duplicateIds = new Map<string, string[]>();
+
+  notifications.forEach((notification) => {
+    const key = getNotificationGroupKey(notification);
+    const existing = grouped.get(key);
+
+    duplicateIds.set(key, [...(duplicateIds.get(key) || []), notification.id]);
+
+    if (!existing) {
+      grouped.set(key, notification);
+      return;
+    }
+
+    const shouldPreferCurrent =
+      new Date(notification.created_at).getTime() >
+      new Date(existing.created_at).getTime();
+    const nextNotification = shouldPreferCurrent ? notification : existing;
+    const hasUnreadDuplicate = !existing.read_at || !notification.read_at;
+
+    grouped.set(key, {
+      ...nextNotification,
+      read_at: hasUnreadDuplicate ? null : nextNotification.read_at,
+    });
+  });
+
+  return {
+    duplicateIds,
+    notifications: Array.from(grouped.values()),
+  };
+}
+
+function getStringMetadata(
+  metadata: AppNotification["metadata"],
+  key: string
+) {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+function stripNotificationPrefix(value: string | null | undefined) {
+  if (!value) return null;
+  return value.replace(/^(Solve|Rezolvă|Rezolva):\s*/i, "");
+}
+
+function getLocalizedNotification(
+  notification: AppNotification,
+  locale: string
+) {
+  const ro = locale === "ro";
+  const username =
+    getStringMetadata(notification.metadata, "username") ||
+    notification.actor?.username ||
+    (ro ? "Cineva" : "Someone");
+
+  if (notification.type === "daily_challenge") {
+    const problemTitle = stripNotificationPrefix(notification.body);
+
+    return {
+      title: ro
+        ? "Challenge-ul zilei este disponibil"
+        : "Today's challenge is ready",
+      body: problemTitle
+        ? ro
+          ? `Rezolvă: ${problemTitle}`
+          : `Solve: ${problemTitle}`
+        : notification.body,
+    };
+  }
+
+  if (notification.type === "live_invite") {
+    const roomName =
+      getStringMetadata(notification.metadata, "roomName") ||
+      notification.body ||
+      (ro ? "sesiunea live" : "the live session");
+
+    return {
+      title: ro
+        ? `${username} te-a invitat la o sesiune live`
+        : `${username} invited you to a live session`,
+      body: roomName,
+    };
+  }
+
+  if (notification.type === "post_like") {
+    return {
+      title: ro
+        ? `${username} ți-a apreciat postarea`
+        : `${username} liked your post`,
+      body:
+        notification.body ||
+        (ro ? "Deschide postarea în ScripticX." : "Open your post on ScripticX."),
+    };
+  }
+
+  if (notification.type === "post_comment") {
+    return {
+      title: ro
+        ? `${username} a comentat la postarea ta`
+        : `${username} commented on your post`,
+      body: notification.body,
+    };
+  }
+
+  if (notification.type === "follow") {
+    return {
+      title: ro
+        ? `${username} a început să te urmărească`
+        : `${username} started following you`,
+      body: ro
+        ? "Deschide profilul său în ScripticX."
+        : "Open their profile from ScripticX.",
+    };
+  }
+
+  if (notification.type === "new_assignment") {
+    const className =
+      getStringMetadata(notification.metadata, "className") ||
+      (ro ? "clasa ta" : "your class");
+
+    return {
+      title: ro
+        ? `Temă nouă în ${className}`
+        : `New assignment in ${className}`,
+      body: notification.body,
+    };
+  }
+
+  return {
+    title: notification.title,
+    body: notification.body,
+  };
+}
+
 function formatNotificationTime(value: string, locale: string) {
   const formatter = new Intl.DateTimeFormat(locale === "ro" ? "ro-RO" : "en-US", {
     day: "numeric",
@@ -133,8 +286,18 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
     },
   });
 
-  const notifications = useMemo(() => data?.items || [], [data?.items]);
-  const unreadCount = data?.unreadCount || 0;
+  const rawNotifications = useMemo(() => data?.items || [], [data?.items]);
+  const {
+    duplicateIds: notificationDuplicateIds,
+    notifications,
+  } = useMemo(
+    () => dedupeNotifications(rawNotifications),
+    [rawNotifications]
+  );
+  const unreadCount = useMemo(
+    () => notifications.filter((notification) => !notification.read_at).length,
+    [notifications]
+  );
 
   useEffect(() => {
     if (!user?.id) return;
@@ -156,8 +319,9 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
 
           const notification = payload.new as AppNotification;
           if (browserNotifiedIds.current.has(notification.id)) return;
+          const content = getLocalizedNotification(notification, locale);
 
-          if (notifyBrowser(notification)) {
+          if (notifyBrowser({ ...notification, ...content })) {
             browserNotifiedIds.current.add(notification.id);
             playNotificationSound();
           }
@@ -168,7 +332,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [queryClient, queryKey, user?.id]);
+  }, [locale, queryClient, queryKey, user?.id]);
 
   useEffect(() => {
     knownNotificationIds.current = new Set();
@@ -223,13 +387,14 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
 
     newUnreadNotifications.forEach((notification) => {
       if (browserNotifiedIds.current.has(notification.id)) return;
+      const content = getLocalizedNotification(notification, locale);
 
-      if (notifyBrowser(notification)) {
+      if (notifyBrowser({ ...notification, ...content })) {
         browserNotifiedIds.current.add(notification.id);
         playNotificationSound();
       }
     });
-  }, [notifications]);
+  }, [locale, notifications]);
 
   async function requestBrowserNotifications() {
     if (!("Notification" in window)) {
@@ -256,7 +421,16 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   async function markAsRead(notification: AppNotification) {
     if (!user?.id || notification.read_at) return;
 
-    await api.notifications.markAsRead(notification.id, user.id);
+    const duplicateIds =
+      notificationDuplicateIds.get(getNotificationGroupKey(notification)) || [
+        notification.id,
+      ];
+
+    await Promise.all(
+      duplicateIds.map((notificationId) =>
+        api.notifications.markAsRead(notificationId, user.id)
+      )
+    );
     await queryClient.invalidateQueries({ queryKey });
   }
 
@@ -352,6 +526,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
             <div className="divide-y">
               {notifications.map((notification) => {
                 const unread = !notification.read_at;
+                const content = getLocalizedNotification(notification, locale);
 
                 return (
                   <button
@@ -371,7 +546,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start gap-2">
                         <p className="min-w-0 flex-1 text-sm font-medium leading-snug">
-                          {notification.title}
+                          {content.title}
                         </p>
 
                         {unread ? (
@@ -379,9 +554,9 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                         ) : null}
                       </div>
 
-                      {notification.body ? (
+                      {content.body ? (
                         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                          {notification.body}
+                          {content.body}
                         </p>
                       ) : null}
 

@@ -9,6 +9,7 @@ create table if not exists public.daily_challenges (
   updated_at timestamptz not null default now()
 );
 
+-- insert index in query
 create index if not exists daily_challenges_date_idx
   on public.daily_challenges (challenge_date desc);
 

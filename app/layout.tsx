@@ -9,6 +9,7 @@ import { Toaster } from "sonner";
 import { MobileDrawer } from "@/components/MobileDrawer";
 import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
+import { NetworkStatus } from "@/components/NetworkStatus";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,6 +59,7 @@ export default function RootLayout({
               </div>
             </SidebarProvider>
             <MobileDrawer />
+            <NetworkStatus />
           </LanguageProvider>
         </Providers>
 

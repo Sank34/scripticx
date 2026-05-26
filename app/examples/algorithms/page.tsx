@@ -48,16 +48,16 @@ DIV = 2
 IS_PRIME = 1
 
 WHILE DIV < N
-IF N % DIV = 0 THEN
-IS_PRIME = 0
-END
-DIV = DIV + 1
+  IF N % DIV = 0 THEN
+    IS_PRIME = 0
+  END
+  DIV = DIV + 1
 END
 
 IF IS_PRIME = 1 THEN
-PRINT "Prime"
+  PRINT "Prime"
 ELSE
-PRINT "Not Prime"
+  PRINT "Not Prime"
 END`}
             </pre>
 
@@ -65,7 +65,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`N = 7\nDIV = 2\nIS_PRIME = 1\n\nWHILE DIV < N\nIF N % DIV = 0 THEN\nIS_PRIME = 0\nEND\nDIV = DIV + 1\nEND\n\nIF IS_PRIME = 1 THEN\nPRINT "Prime"\nELSE\nPRINT "Not Prime"\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`N = 7\nDIV = 2\nIS_PRIME = 1\n\nWHILE DIV < N\n  IF N % DIV = 0 THEN\n    IS_PRIME = 0\n  END\n  DIV = DIV + 1\nEND\n\nIF IS_PRIME = 1 THEN\n  PRINT "Prime"\nELSE\n  PRINT "Not Prime"\nEND`)}`)
               }
             >
               {t("examples.algorithms.run")}
@@ -85,11 +85,11 @@ B = 1
 COUNT = 0
 
 WHILE COUNT < N
-PRINT A
-TEMP = A + B
-A = B
-B = TEMP
-COUNT = COUNT + 1
+  PRINT A
+  TEMP = A + B
+  A = B
+  B = TEMP
+  COUNT = COUNT + 1
 END`}
             </pre>
 
@@ -97,7 +97,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`N = 5\nA = 0\nB = 1\nCOUNT = 0\n\nWHILE COUNT < N\nPRINT A\nTEMP = A + B\nA = B\nB = TEMP\nCOUNT = COUNT + 1\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`N = 5\nA = 0\nB = 1\nCOUNT = 0\n\nWHILE COUNT < N\n  PRINT A\n  TEMP = A + B\n  A = B\n  B = TEMP\n  COUNT = COUNT + 1\nEND`)}`)
               }
             >
               {t("examples.algorithms.run")}
@@ -115,11 +115,11 @@ END`}
 B = 8
 
 WHILE A != B
-IF A > B THEN
-A = A - B
-ELSE
-B = B - A
-END
+  IF A > B THEN
+    A = A - B
+  ELSE
+    B = B - A
+  END
 END
 
 PRINT A`}
@@ -129,7 +129,7 @@ PRINT A`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`A = 12\nB = 8\n\nWHILE A != B\nIF A > B THEN\nA = A - B\nELSE\nB = B - A\nEND\nEND\n\nPRINT A`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`A = 12\nB = 8\n\nWHILE A != B\n  IF A > B THEN\n    A = A - B\n  ELSE\n    B = B - A\n  END\nEND\n\nPRINT A`)}`)
               }
             >
               {t("examples.algorithms.run")}
@@ -150,11 +150,11 @@ C = 5
 MAX = A
 
 IF B > MAX THEN
-MAX = B
+  MAX = B
 END
 
 IF C > MAX THEN
-MAX = C
+  MAX = C
 END
 
 PRINT MAX`}
@@ -164,7 +164,7 @@ PRINT MAX`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`A = 3\nB = 7\nC = 5\n\nMAX = A\n\nIF B > MAX THEN\nMAX = B\nEND\n\nIF C > MAX THEN\nMAX = C\nEND\n\nPRINT MAX`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`A = 3\nB = 7\nC = 5\n\nMAX = A\n\nIF B > MAX THEN\n  MAX = B\nEND\n\nIF C > MAX THEN\n  MAX = C\nEND\n\nPRINT MAX`)}`)
               }
             >
               {t("examples.algorithms.run")}

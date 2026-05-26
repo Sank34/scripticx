@@ -115,13 +115,6 @@ export function Topbar() {
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 justify-center px-3 sm:hidden">
-        <PlatformCommandMenu
-          isAdmin={profile?.role === "admin"}
-          user={user}
-        />
-      </div>
-
       <div className="flex shrink-0 items-center gap-2">
 
         {user ? (

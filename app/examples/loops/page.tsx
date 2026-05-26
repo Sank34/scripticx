@@ -45,8 +45,8 @@ export default function LoopsPage() {
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 0
 WHILE X < 5
-PRINT X
-X = X + 1
+  PRINT X
+  X = X + 1
 END`}
             </pre>
 
@@ -54,7 +54,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`X = 0\nWHILE X < 5\nPRINT X\nX = X + 1\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`X = 0\nWHILE X < 5\n  PRINT X\n  X = X + 1\nEND`)}`)
               }
             >
               {t("examples.loops.run")}
@@ -73,8 +73,8 @@ SUM = 0
 X = 1
 
 WHILE X <= N
-SUM = SUM + X
-X = X + 1
+  SUM = SUM + X
+  X = X + 1
 END
 
 PRINT SUM`}
@@ -84,7 +84,7 @@ PRINT SUM`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`N = 5\nSUM = 0\nX = 1\n\nWHILE X <= N\nSUM = SUM + X\nX = X + 1\nEND\n\nPRINT SUM`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`N = 5\nSUM = 0\nX = 1\n\nWHILE X <= N\n  SUM = SUM + X\n  X = X + 1\nEND\n\nPRINT SUM`)}`)
               }
             >
               {t("examples.loops.run")}
@@ -100,8 +100,8 @@ PRINT SUM`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 5
 WHILE X >= 0
-PRINT X
-X = X - 1
+  PRINT X
+  X = X - 1
 END`}
             </pre>
 
@@ -109,7 +109,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`X = 5\nWHILE X >= 0\nPRINT X\nX = X - 1\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`X = 5\nWHILE X >= 0\n  PRINT X\n  X = X - 1\nEND`)}`)
               }
             >
               {t("examples.loops.run")}
@@ -125,9 +125,9 @@ END`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 0
 WHILE X < 3
-INPUT A
-PRINT A
-X = X + 1
+  INPUT A
+  PRINT A
+  X = X + 1
 END`}
             </pre>
 
@@ -135,7 +135,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`X = 0\nWHILE X < 3\nINPUT A\nPRINT A\nX = X + 1\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`X = 0\nWHILE X < 3\n  INPUT A\n  PRINT A\n  X = X + 1\nEND`)}`)
               }
             >
               {t("examples.loops.run")}

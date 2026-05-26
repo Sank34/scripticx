@@ -1,12 +1,4 @@
 "use client";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -31,18 +23,6 @@ export default function LearnPage() {
   return (
     <div className="space-y-6">
 
-      {/* <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/learn">Docs</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Introduction</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb> */}
-
       <div className="space-y-2">
         <h1 className="text-4xl font-bold">{t("learn.title")}</h1>
         <p className="text-muted-foreground">
@@ -66,8 +46,8 @@ export default function LearnPage() {
             <pre className="bg-muted p-4 rounded text-sm font-mono overflow-auto">
 {`X = 0
 WHILE X < 3
-PRINT X
-X = X + 1
+  PRINT X
+  X = X + 1
 END`}
             </pre>
 
@@ -77,6 +57,18 @@ END`}
             <h2 className="text-xl font-semibold">{t("learn.sections.how.title")}</h2>
             <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1 mt-2">
               {t("learn.sections.how.bullets").map((item: string, i: number) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-semibold">{t("learn.sections.platform.title")}</h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              {t("learn.sections.platform.text")}
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc ml-5 space-y-1 mt-2">
+              {t("learn.sections.platform.bullets").map((item: string, i: number) => (
                 <li key={i}>{item}</li>
               ))}
             </ul>

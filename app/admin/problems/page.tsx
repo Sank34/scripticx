@@ -70,19 +70,23 @@ function parseDateKey(dateKey: string) {
 function AdminProblemsContent() {
   const router = useRouter();
   const { locale, t } = useLanguage();
+  const todayKey = api.dailyChallenges.getTodayKey();
 
   const [problems, setProblems] = useState<any[]>([]);
   const [dailyChallenges, setDailyChallenges] = useState<DailyChallenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [schedulingDaily, setSchedulingDaily] = useState(false);
-  const [dailyDate, setDailyDate] = useState(() =>
-    api.dailyChallenges.getTodayKey()
-  );
+  const [dailyDate, setDailyDate] = useState(() => todayKey);
   const [dailyProblemId, setDailyProblemId] = useState("");
   const [dailyBonusPoints, setDailyBonusPoints] = useState(25);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [openCreate, setOpenCreate] = useState(false);
+  const scheduledDateKeys = new Set(
+    dailyChallenges
+      .filter((challenge) => challenge.is_active)
+      .map((challenge) => challenge.challenge_date)
+  );
 
   useEffect(() => {
     async function fetchProblems() {
@@ -91,7 +95,7 @@ function AdminProblemsContent() {
           .from("problems")
           .select("*")
           .order("created_at", { ascending: false }),
-        api.dailyChallenges.list(10),
+        api.dailyChallenges.list(90),
       ]);
 
       setProblems(data || []);
@@ -127,6 +131,12 @@ function AdminProblemsContent() {
       return;
     }
 
+    if (dailyDate < todayKey) {
+      setDailyDate(todayKey);
+      toast.error("Daily challenges can only be scheduled from today onward");
+      return;
+    }
+
     setSchedulingDaily(true);
 
     try {
@@ -143,7 +153,7 @@ function AdminProblemsContent() {
         createdBy: user.id,
       });
 
-      setDailyChallenges(await api.dailyChallenges.list(10));
+      setDailyChallenges(await api.dailyChallenges.list(90));
       toast.success("Daily challenge scheduled");
     } catch {
       toast.error("Could not schedule daily challenge");
@@ -187,8 +197,21 @@ function AdminProblemsContent() {
                 <Calendar
                   mode="single"
                   selected={parseDateKey(dailyDate)}
+                  modifiers={{
+                    scheduled: (date) => scheduledDateKeys.has(formatDateKey(date)),
+                  }}
+                  modifiersClassNames={{
+                    scheduled:
+                      "bg-emerald-500/15 text-emerald-900 font-semibold hover:bg-emerald-500/25",
+                  }}
+                  disabled={(date) => formatDateKey(date) < todayKey}
                   onSelect={(date) => {
-                    if (date) setDailyDate(formatDateKey(date));
+                    if (!date) return;
+
+                    const dateKey = formatDateKey(date);
+                    if (dateKey < todayKey) return;
+
+                    setDailyDate(dateKey);
                   }}
                 />
               </PopoverContent>

@@ -45,7 +45,7 @@ export default function ConditionsPage() {
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 10
 IF X > 5 THEN
-PRINT "Big"
+  PRINT "Big"
 END`}
             </pre>
 
@@ -53,7 +53,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`X = 10\nIF X > 5 THEN\nPRINT "Big"\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`X = 10\nIF X > 5 THEN\n  PRINT "Big"\nEND`)}`)
               }
             >
               {t("examples.conditions.run")}
@@ -69,9 +69,9 @@ END`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 3
 IF X > 5 THEN
-PRINT "Big"
+  PRINT "Big"
 ELSE
-PRINT "Small"
+  PRINT "Small"
 END`}
             </pre>
 
@@ -79,7 +79,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`X = 3\nIF X > 5 THEN\nPRINT "Big"\nELSE\nPRINT "Small"\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`X = 3\nIF X > 5 THEN\n  PRINT "Big"\nELSE\n  PRINT "Small"\nEND`)}`)
               }
             >
               {t("examples.conditions.run")}
@@ -95,9 +95,9 @@ END`}
             <pre className="bg-muted p-4 rounded text-sm font-mono mt-3">
 {`X = 4
 IF X % 2 = 0 THEN
-PRINT "Even"
+  PRINT "Even"
 ELSE
-PRINT "Odd"
+  PRINT "Odd"
 END`}
             </pre>
 
@@ -105,7 +105,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`X = 4\nIF X % 2 = 0 THEN\nPRINT "Even"\nELSE\nPRINT "Odd"\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`X = 4\nIF X % 2 = 0 THEN\n  PRINT "Even"\nELSE\n  PRINT "Odd"\nEND`)}`)
               }
             >
               {t("examples.conditions.run")}
@@ -123,9 +123,9 @@ END`}
 B = 8
 
 IF A > B THEN
-PRINT A
+  PRINT A
 ELSE
-PRINT B
+  PRINT B
 END`}
             </pre>
 
@@ -133,7 +133,7 @@ END`}
               size="sm"
               className="mt-2"
               onClick={() =>
-                router.push(`/editor?code=${encodeURIComponent(`A = 5\nB = 8\n\nIF A > B THEN\nPRINT A\nELSE\nPRINT B\nEND`)}`)
+                router.push(`/editor?code=${encodeURIComponent(`A = 5\nB = 8\n\nIF A > B THEN\n  PRINT A\nELSE\n  PRINT B\nEND`)}`)
               }
             >
               {t("examples.conditions.run")}

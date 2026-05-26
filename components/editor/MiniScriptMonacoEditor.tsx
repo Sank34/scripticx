@@ -77,6 +77,7 @@ export function MiniScriptMonacoEditor({
       ],
       colors: {},
     });
+
   }, [monaco]);
 
   return (
@@ -90,6 +91,7 @@ export function MiniScriptMonacoEditor({
       options={{
         fontSize: 14,
         fontFamily: "JetBrains Mono, monospace",
+        fontLigatures: false,
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
         readOnly,
