@@ -308,7 +308,7 @@ export default function EditorSnippetPage() {
 
         <CardContent>
           {files.length > 1 && (
-            <div className="mb-3 flex gap-2 overflow-x-auto">
+            <div className="mb-3 flex gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {files.map((file) => (
                 <button
                   key={file.id}

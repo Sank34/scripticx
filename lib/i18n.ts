@@ -264,6 +264,24 @@ export const translations = {
         share: "Share snippet",
       },
 
+      githubImport: {
+        action: "Import from GitHub",
+        title: "Import .msp files from GitHub",
+        description: "Paste a public GitHub repository link and ScripticX will add only the MiniScript+ files to the current project.",
+        label: "GitHub repository link",
+        placeholder: "https://github.com/user/repository",
+        hint: "Public repositories are supported in this quick version. Up to 30 .msp files are imported.",
+        import: "Import files",
+        importing: "Importing...",
+        cancel: "Cancel",
+        toast: {
+          invalidUrl: "Paste a valid GitHub repository link.",
+          noFiles: "No .msp files were found in this repository.",
+          failed: "Could not import files from GitHub.",
+          imported: "Imported {count} .msp file(s) from GitHub.",
+        },
+      },
+
       complexity: {
         title: "Complexity Analyzer",
         empty: "Run the analyzer to estimate time complexity, space complexity and optimization score.",
@@ -1399,6 +1417,24 @@ export const translations = {
         save: "Salvează snippet",
         update: "Actualizează snippet",
         share: "Distribuie snippet",
+      },
+
+      githubImport: {
+        action: "Importă din GitHub",
+        title: "Importă fișiere .msp din GitHub",
+        description: "Introdu linkul unui repository public GitHub, iar ScripticX va adăuga doar fișierele MiniScript+ în proiectul curent.",
+        label: "Link repository GitHub",
+        placeholder: "https://github.com/user/repository",
+        hint: "În varianta rapidă sunt acceptate repository-uri publice. Se importă maximum 30 de fișiere .msp.",
+        import: "Importă fișiere",
+        importing: "Se importă...",
+        cancel: "Anulează",
+        toast: {
+          invalidUrl: "Introdu un link valid de repository GitHub.",
+          noFiles: "Nu am găsit fișiere .msp în acest repository.",
+          failed: "Nu am putut importa fișierele din GitHub.",
+          imported: "Am importat {count} fișier(e) .msp din GitHub.",
+        },
       },
 
       complexity: {

@@ -7,9 +7,13 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Markdown } from "@/components/Markdown";
+import { useLanguage } from "@/components/LanguageProvider";
+import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 
 export default function SolvePage() {
   const params = useParams();
+  const { locale, t } = useLanguage();
 
   const assignmentId = Array.isArray(params.assignmentId)
     ? params.assignmentId[0]
@@ -68,8 +72,14 @@ export default function SolvePage() {
       if (problemData) {
         setProblem({
           ...problemData,
-          title: problemData.title_i18n?.en || "Untitled",
-          description: problemData.description_i18n?.en || "",
+          title:
+            problemData.title_i18n?.[locale] ||
+            problemData.title_i18n?.en ||
+            "Untitled",
+          description:
+            problemData.description_i18n?.[locale] ||
+            problemData.description_i18n?.en ||
+            "",
         });
       }
     }
@@ -165,42 +175,64 @@ export default function SolvePage() {
       <div>
         <h1 className="text-3xl font-bold">{assignment.title}</h1>
         <p className="text-sm text-muted-foreground">
-          Solve the problem and submit your solution
+          {t("classes.solve.subtitle")}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
 
         {/* Problem */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{problem?.title || "Problem"}</CardTitle>
+        <Card className="h-[520px] overflow-hidden">
+          <CardHeader className="shrink-0 border-b bg-white">
+            <CardTitle>
+              {problem?.title || t("classes.solve.problemFallback")}
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm whitespace-pre-wrap text-muted-foreground">
-            {problem?.description || "No problem description"}
-          </CardContent>
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">
+            <Markdown>
+              {problem?.description || t("classes.solve.noDescription")}
+            </Markdown>
+          </div>
         </Card>
 
         {/* Editor */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Solution</CardTitle>
+        <Card className="h-[520px] overflow-hidden">
+          <CardHeader className="shrink-0 border-b bg-white">
+            <CardTitle>{t("classes.solve.yourSolution")}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-6">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-xl border">
+              <MiniScriptMonacoEditor
+                key={problem?.id}
+                height="100%"
+                value={code}
+                onChange={(nextCode) => setCode(nextCode)}
+                options={{
+                  readOnly: submitted,
+                  padding: { top: 16, bottom: 16 },
+                  smoothScrolling: true,
+                  wordWrap: "on",
+                  automaticLayout: true,
+                  cursorSmoothCaretAnimation: "on",
+                  cursorBlinking: "smooth",
+                  glyphMargin: true,
+                  minimap: { enabled: false },
+                  scrollbar: {
+                    verticalScrollbarSize: 8,
+                    horizontalScrollbarSize: 8,
+                  },
+                  tabSize: 2,
+                  insertSpaces: true,
+                  wrappingIndent: "same",
+                }}
+              />
+            </div>
 
-            <textarea
-              key={problem?.id}
-              className="w-full h-64 p-3 border rounded font-mono text-sm"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder={`PRINT "Hello World"`}
-              readOnly={submitted}
-            />
-
-            <Button onClick={handleSubmit} disabled={submitted}>
-              {submitted ? "Submitted!" : "Submit"}
-            </Button>
-
+            <div className="shrink-0">
+              <Button onClick={handleSubmit} disabled={submitted}>
+                {submitted ? t("classes.solve.submitted") : t("classes.solve.submit")}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

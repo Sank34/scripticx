@@ -106,6 +106,41 @@ type Value = string | number | boolean;
 type ProgramInstruction = ReturnType<typeof parseLine>;
 type MonacoEditorInstance = Parameters<OnMount>[0];
 
+type GitHubRepoTarget = {
+  owner: string;
+  repo: string;
+  branch?: string;
+  path: string;
+};
+
+type GitHubRepoResponse = {
+  default_branch?: string;
+};
+
+type GitHubContentItem = {
+  type?: string;
+  name?: string;
+  path?: string;
+  download_url?: string | null;
+};
+
+const MAX_GITHUB_IMPORT_FILES = 30;
+const MAX_GITHUB_IMPORT_BYTES = 350_000;
+
+function GitHubIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="currentColor"
+    >
+      <path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.71 0 0 .84-.28 2.75 1.05A9.28 9.28 0 0 1 12 6.98c.85 0 1.71.12 2.51.35 1.9-1.33 2.74-1.05 2.74-1.05.55 1.4.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.95.68 1.92 0 1.38-.01 2.49-.01 2.83 0 .27.18.59.69.49A10.08 10.08 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" />
+    </svg>
+  );
+}
+
 function getErrorDetails(error: unknown) {
   if (error && typeof error === "object") {
     const candidate = error as { message?: unknown; line?: unknown };
@@ -202,6 +237,73 @@ function getSnippetFileCount(snippet: SnippetItem) {
     : 1;
 }
 
+function parseGitHubRepoUrl(rawUrl: string): GitHubRepoTarget | null {
+  const trimmedUrl = rawUrl.trim();
+  if (!trimmedUrl) return null;
+
+  try {
+    const url = new URL(trimmedUrl.replace(/\.git$/, ""));
+
+    if (url.hostname !== "github.com") return null;
+
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) return null;
+
+    const [owner, repo] = parts;
+    const marker = parts[2];
+    const hasScopedPath = (marker === "tree" || marker === "blob") && parts[3];
+
+    return {
+      owner,
+      repo,
+      branch: hasScopedPath ? parts[3] : undefined,
+      path:
+        hasScopedPath && marker === "tree"
+          ? parts.slice(4).join("/")
+          : hasScopedPath && marker === "blob"
+            ? parts.slice(4, -1).join("/")
+            : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function encodeGitHubPath(path: string) {
+  return path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+}
+
+function createUniqueImportedFileName(path: string, usedNames: Set<string>) {
+  const pathParts = path.split("/").filter(Boolean);
+  const baseName = pathParts.at(-1) || "main.msp";
+  const folderName = pathParts.length > 1 ? pathParts.at(-2) : null;
+  const candidates = [
+    baseName,
+    folderName ? `${folderName}-${baseName}` : null,
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    if (!usedNames.has(candidate)) {
+      usedNames.add(candidate);
+      return candidate;
+    }
+  }
+
+  const extensionIndex = baseName.lastIndexOf(".");
+  const namePart = extensionIndex >= 0 ? baseName.slice(0, extensionIndex) : baseName;
+  const extension = extensionIndex >= 0 ? baseName.slice(extensionIndex) : "";
+  let index = 2;
+  let candidate = `${namePart}-${index}${extension}`;
+
+  while (usedNames.has(candidate)) {
+    index += 1;
+    candidate = `${namePart}-${index}${extension}`;
+  }
+
+  usedNames.add(candidate);
+  return candidate;
+}
+
 function EditorContent() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
@@ -247,6 +349,9 @@ END`
   const [createFileOpen, setCreateFileOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("file-2.msp");
   const [newFileError, setNewFileError] = useState("");
+  const [githubImportOpen, setGithubImportOpen] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [githubImporting, setGithubImporting] = useState(false);
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
@@ -592,6 +697,131 @@ END`
     resetRuntimeState();
   }
 
+  async function collectGithubMspFiles(target: GitHubRepoTarget, branch: string) {
+    const pendingPaths = [target.path];
+    const collectedFiles: Array<{ path: string; downloadUrl: string }> = [];
+
+    while (pendingPaths.length > 0 && collectedFiles.length < MAX_GITHUB_IMPORT_FILES) {
+      const currentPath = pendingPaths.shift() ?? "";
+      const encodedPath = encodeGitHubPath(currentPath);
+      const contentsUrl = `https://api.github.com/repos/${target.owner}/${target.repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`;
+      const response = await fetch(contentsUrl, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub contents request failed: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as
+        | GitHubContentItem
+        | GitHubContentItem[];
+      const items = Array.isArray(payload) ? payload : [payload];
+
+      for (const item of items) {
+        if (!item.path || !item.name) continue;
+
+        if (item.type === "dir") {
+          pendingPaths.push(item.path);
+          continue;
+        }
+
+        if (
+          item.type === "file" &&
+          item.name.toLowerCase().endsWith(".msp") &&
+          item.download_url
+        ) {
+          collectedFiles.push({
+            path: item.path,
+            downloadUrl: item.download_url,
+          });
+
+          if (collectedFiles.length >= MAX_GITHUB_IMPORT_FILES) break;
+        }
+      }
+    }
+
+    return collectedFiles;
+  }
+
+  async function importFromGithub() {
+    const target = parseGitHubRepoUrl(githubUrl);
+
+    if (!target) {
+      toast.error(t("editor.githubImport.toast.invalidUrl"));
+      return;
+    }
+
+    setGithubImporting(true);
+
+    try {
+      let branch = target.branch;
+
+      if (!branch) {
+        const repoResponse = await fetch(
+          `https://api.github.com/repos/${target.owner}/${target.repo}`,
+          { headers: { Accept: "application/vnd.github+json" } }
+        );
+
+        if (!repoResponse.ok) {
+          throw new Error(`GitHub repo request failed: ${repoResponse.status}`);
+        }
+
+        const repoData = (await repoResponse.json()) as GitHubRepoResponse;
+        branch = repoData.default_branch ?? "main";
+      }
+
+      const githubFiles = await collectGithubMspFiles(target, branch);
+
+      if (githubFiles.length === 0) {
+        toast.error(t("editor.githubImport.toast.noFiles"));
+        return;
+      }
+
+      let totalBytes = 0;
+      const usedNames = new Set(files.map((file) => file.name));
+      const importedFiles: ProjectFile[] = [];
+
+      for (const githubFile of githubFiles) {
+        const response = await fetch(githubFile.downloadUrl);
+
+        if (!response.ok) {
+          throw new Error(`GitHub raw file request failed: ${response.status}`);
+        }
+
+        const content = await response.text();
+        totalBytes += content.length;
+
+        if (totalBytes > MAX_GITHUB_IMPORT_BYTES) {
+          throw new Error("GitHub import size limit exceeded");
+        }
+
+        importedFiles.push(
+          createProjectFile(
+            createUniqueImportedFileName(githubFile.path, usedNames),
+            content
+          )
+        );
+      }
+
+      setFiles((currentFiles) => [...currentFiles, ...importedFiles]);
+      setActiveFileId(importedFiles[0]?.id ?? activeFileId);
+      setGithubImportOpen(false);
+      setGithubUrl("");
+      resetRuntimeState(true);
+      toast.success(
+        t("editor.githubImport.toast.imported").replace(
+          "{count}",
+          String(importedFiles.length)
+        )
+      );
+    } catch {
+      toast.error(t("editor.githubImport.toast.failed"));
+    } finally {
+      setGithubImporting(false);
+    }
+  }
+
   function renameEditorFile(fileId: string) {
     const file = files.find((item) => item.id === fileId);
     if (!file) return;
@@ -903,6 +1133,12 @@ END`
               {toolbarButton(t("editor.actions.step"), <StepForward size={16} />, handleStep, "outline", stopped)}
               {toolbarButton(t("editor.actions.run"), <Play size={16} />, handleRun, "default")}
               <div className="hidden items-center gap-1.5 sm:flex">
+                {toolbarButton(
+                  t("editor.githubImport.action"),
+                  <GitHubIcon size={16} />,
+                  () => setGithubImportOpen(true),
+                  "outline"
+                )}
                 {toolbarButton(t("editor.actions.download"), <FileDown size={16} />, handleSaveFile)}
                 {toolbarButton(
                   savedId ? t("editor.actions.update") : t("editor.actions.save"),
@@ -926,6 +1162,12 @@ END`
           </header>
 
           <div className="flex h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-zinc-200 bg-zinc-50 px-3 sm:hidden">
+            {toolbarButton(
+              t("editor.githubImport.action"),
+              <GitHubIcon size={16} />,
+              () => setGithubImportOpen(true),
+              "outline"
+            )}
             {toolbarButton(t("editor.actions.download"), <FileDown size={16} />, handleSaveFile)}
             {toolbarButton(
               savedId ? t("editor.actions.update") : t("editor.actions.save"),
@@ -963,7 +1205,7 @@ END`
                 </div>
               </div>
 
-              <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-zinc-200 bg-white px-2">
+              <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-zinc-200 bg-white px-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 {files.map((file) => {
                   const isActive = file.id === activeFile?.id;
 
@@ -1172,6 +1414,66 @@ END`
           </div>
         </div>
       </TooltipProvider>
+
+      <Dialog open={githubImportOpen} onOpenChange={setGithubImportOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("editor.githubImport.title")}</DialogTitle>
+            <DialogDescription>
+              {t("editor.githubImport.description")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void importFromGithub();
+            }}
+          >
+            <label
+              htmlFor="editor-github-url"
+              className="flex items-center gap-2 text-sm font-medium text-zinc-700"
+            >
+              <GitHubIcon size={16} />
+              {t("editor.githubImport.label")}
+            </label>
+            <Input
+              id="editor-github-url"
+              autoFocus
+              value={githubUrl}
+              onChange={(event) => setGithubUrl(event.target.value)}
+              placeholder={t("editor.githubImport.placeholder")}
+              disabled={githubImporting}
+            />
+            <p className="text-xs text-zinc-500">
+              {t("editor.githubImport.hint")}
+            </p>
+          </form>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setGithubImportOpen(false)}
+              disabled={githubImporting}
+            >
+              {t("editor.githubImport.cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void importFromGithub()}
+              disabled={githubImporting}
+              className="gap-2"
+            >
+              <GitHubIcon size={16} />
+              {githubImporting
+                ? t("editor.githubImport.importing")
+                : t("editor.githubImport.import")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createFileOpen} onOpenChange={setCreateFileOpen}>
         <DialogContent className="sm:max-w-md">

@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { Markdown } from "@/components/Markdown";
 import { translations } from "@/lib/i18n";
 
 export default function AssignmentPage() {
@@ -134,8 +135,8 @@ export default function AssignmentPage() {
         setProblems(
           problemsData.map((p: any) => ({
             ...p,
-            title: p.title_i18n?.en || "Untitled",
-            description: p.description_i18n?.en || "",
+            title: p.title_i18n?.[locale] || p.title_i18n?.en || "Untitled",
+            description: p.description_i18n?.[locale] || p.description_i18n?.en || "",
           }))
         );
       }
@@ -151,8 +152,14 @@ export default function AssignmentPage() {
         setProblems([
           {
             ...problemData,
-            title: problemData.title_i18n?.en || "Untitled",
-            description: problemData.description_i18n?.en || "",
+            title:
+              problemData.title_i18n?.[locale] ||
+              problemData.title_i18n?.en ||
+              "Untitled",
+            description:
+              problemData.description_i18n?.[locale] ||
+              problemData.description_i18n?.en ||
+              "",
           },
         ]);
       }
@@ -267,8 +274,8 @@ export default function AssignmentPage() {
         )}
 
         {problems.map((p, i) => (
-          <Card key={p.id}>
-            <CardHeader>
+          <Card key={p.id} className="flex h-[430px] overflow-hidden">
+            <CardHeader className="shrink-0 border-b bg-white">
               <CardTitle className="flex items-center gap-2">
                 <span>{t("classes.assignment.problems.problemPrefix")} {i + 1}: {p.title}</span>
                 {submissions.some((s) => s.problem_id === p.id && s.user_id === userId) && (
@@ -291,18 +298,17 @@ export default function AssignmentPage() {
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-6">
+              <Markdown>{p.description || t("classes.assignment.problems.empty")}</Markdown>
+            </div>
 
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {p.description}
-              </p>
+            {!isTeacher && (() => {
+              const isSolved = submissions.some(
+                (s) => s.problem_id === p.id && s.user_id === userId
+              );
 
-              {!isTeacher && (() => {
-                const isSolved = submissions.some(
-                  (s) => s.problem_id === p.id && s.user_id === userId
-                );
-
-                return (
+              return (
+                <div className="shrink-0 border-t bg-white p-4">
                   <Button
                     disabled={isSolved}
                     variant={isSolved ? "secondary" : "default"}
@@ -312,10 +318,9 @@ export default function AssignmentPage() {
                   >
                     {isSolved ? t("classes.assignment.status.solved") : t("classes.assignment.problems.solve")}
                   </Button>
-                );
-              })()}
-
-            </CardContent>
+                </div>
+              );
+            })()}
           </Card>
         ))}
       </div>
