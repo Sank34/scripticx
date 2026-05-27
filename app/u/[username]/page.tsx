@@ -12,17 +12,12 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
-
 import { Flame, Globe, Trophy, Check, Rocket, Brain } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 
 import { getLocalized } from "@/lib/getLocalized";
 import { translations } from "@/lib/i18n";
+import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -186,12 +181,12 @@ export default async function PublicProfile({
 
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
-          <Avatar className="w-16 h-16">
-            {profile.avatar_url && (
-              <AvatarImage src={profile.avatar_url} />
-            )}
-            <AvatarFallback>{initial}</AvatarFallback>
-          </Avatar>
+          <ProfileImagePreview
+            alt={`${profile.username} profile picture`}
+            avatarUrl={profile.avatar_url}
+            className="h-16 w-16"
+            fallback={initial}
+          />
 
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-bold">

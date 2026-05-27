@@ -22,13 +22,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
+import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -424,10 +420,12 @@ function ProfileContent() {
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Avatar className="w-16 h-16">
-            {avatar && <AvatarImage src={avatar} />}
-            <AvatarFallback>{initial}</AvatarFallback>
-          </Avatar>
+          <ProfileImagePreview
+            alt={`${displayName} profile picture`}
+            avatarUrl={avatar}
+            className="h-16 w-16"
+            fallback={initial}
+          />
 
           <div>
             <h1 className="text-2xl font-bold">
