@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment, useEffect, useState } from "react";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import {
@@ -37,9 +38,14 @@ function isProbablyId(segment: string) {
 }
 
 export function TopbarBreadcrumbs() {
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || "/";
   const { t } = useLanguage();
   const segments = pathname.split("/").filter(Boolean);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const labelBySegment: Record<string, string> = {
     admin: t("nav.admin"),
@@ -101,43 +107,59 @@ export function TopbarBreadcrumbs() {
       ? [crumbs[0], crumbs[crumbs.length - 2], crumbs[crumbs.length - 1]]
       : crumbs;
   const hiddenCrumbs = crumbs.length > 4 ? crumbs.slice(1, -2) : [];
+  const breadcrumbEntries =
+    hiddenCrumbs.length > 0
+      ? [
+          { type: "crumb" as const, crumb: visibleCrumbs[0], strong: true },
+          { type: "menu" as const, crumbs: hiddenCrumbs },
+          ...visibleCrumbs.slice(1).map((crumb) => ({
+            type: "crumb" as const,
+            crumb,
+            strong: false,
+          })),
+        ]
+      : visibleCrumbs.map((crumb, index) => ({
+          type: "crumb" as const,
+          crumb,
+          strong: index === 0,
+        }));
+
+  if (!mounted) {
+    return <div className="hidden h-7 min-w-0 md:block" />;
+  }
 
   return (
     <Breadcrumb className="hidden min-w-0 md:block">
       <BreadcrumbList className="flex-nowrap gap-1.5 text-xs text-zinc-500">
-        {visibleCrumbs.map((crumb, index) => {
-          const isFirstVisible = index === 0;
-          const isLast = index === visibleCrumbs.length - 1;
+        {breadcrumbEntries.map((entry, index) => {
+          const isLast = index === breadcrumbEntries.length - 1;
 
           return (
-            <BreadcrumbItem key={`${crumb.label}-${index}`} className="min-w-0">
-              {!isFirstVisible && (
+            <Fragment
+              key={
+                entry.type === "crumb"
+                  ? `${entry.crumb.label}-${index}`
+                  : `hidden-crumbs-${index}`
+              }
+            >
+              {index > 0 && (
                 <BreadcrumbSeparator className="text-zinc-300">
                   <span>/</span>
                 </BreadcrumbSeparator>
               )}
 
-              {isFirstVisible && hiddenCrumbs.length > 0 && (
-                <>
-                  <CrumbNode crumb={crumb} isLast={false} strong />
-                  <BreadcrumbSeparator className="text-zinc-300">
-                    <span>/</span>
-                  </BreadcrumbSeparator>
-                  <HiddenCrumbsMenu crumbs={hiddenCrumbs} />
-                  <BreadcrumbSeparator className="text-zinc-300">
-                    <span>/</span>
-                  </BreadcrumbSeparator>
-                </>
-              )}
-
-              {!(isFirstVisible && hiddenCrumbs.length > 0) && (
-                <CrumbNode
-                  crumb={crumb}
-                  isLast={isLast}
-                  strong={isFirstVisible}
-                />
-              )}
-            </BreadcrumbItem>
+              <BreadcrumbItem className="min-w-0">
+                {entry.type === "menu" ? (
+                  <HiddenCrumbsMenu crumbs={entry.crumbs} />
+                ) : (
+                  <CrumbNode
+                    crumb={entry.crumb}
+                    isLast={isLast}
+                    strong={entry.strong}
+                  />
+                )}
+              </BreadcrumbItem>
+            </Fragment>
           );
         })}
       </BreadcrumbList>

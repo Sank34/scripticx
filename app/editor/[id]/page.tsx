@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/common/EmptyState";
+import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 
 import { Copy, ExternalLink, Share2 } from "lucide-react";
 import { toast } from "sonner";
@@ -326,9 +327,11 @@ export default function EditorSnippetPage() {
             </div>
           )}
 
-          <pre className="bg-muted p-4 rounded text-sm overflow-auto whitespace-pre-wrap break-words">
-            {activeFile?.content ?? snippet.code}
-          </pre>
+          <HighlightedCodeBlock
+            code={activeFile?.content ?? snippet.code ?? ""}
+            copyLabel={t("snippetPage.actions.copy")}
+            languageLabel={activeFile?.name ?? "MiniScript+"}
+          />
         </CardContent>
       </Card>
 
