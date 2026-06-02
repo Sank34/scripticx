@@ -65,6 +65,7 @@ import {
   Square,
   Terminal,
   UserMinus,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -1451,7 +1452,20 @@ export default function LiveRoomPage() {
 
   const peoplePanel = (
     <div className="h-full overflow-y-auto p-4">
-      <div className="space-y-2">
+      <div className="space-y-3">
+        {isOwner && !isClosed && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-center gap-2 md:hidden"
+            onClick={() => setInviteOpen(true)}
+          >
+            <UserPlus size={16} />
+            {t("live.invite")}
+          </Button>
+        )}
+
+        <div className="space-y-2">
         {participantProfiles.map((profile) => (
           <div
             key={profile.id}
@@ -1490,6 +1504,7 @@ export default function LiveRoomPage() {
             )}
           </div>
         ))}
+        </div>
       </div>
     </div>
   );

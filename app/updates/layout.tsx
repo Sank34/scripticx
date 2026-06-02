@@ -34,7 +34,53 @@ export default function UpdatesLayout({
   }, [latestSlug]);
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-5 md:flex-row md:gap-6">
+
+      <section className="md:hidden">
+        <div className="mb-2 flex items-center gap-2 px-1">
+          <Sparkles size={16} className="text-zinc-500" />
+          <span className="text-sm font-semibold text-zinc-900">
+            {title}
+          </span>
+        </div>
+
+        {isLoading ? (
+          <div className="flex gap-2 overflow-hidden px-1">
+            <Skeleton className="h-10 w-32 shrink-0 rounded-full" />
+            <Skeleton className="h-10 w-32 shrink-0 rounded-full" />
+            <Skeleton className="h-10 w-32 shrink-0 rounded-full" />
+          </div>
+        ) : (
+          <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {updates.map((u) => {
+              const href = `/updates/${u.slug}`;
+              const active = pathname === href;
+              return (
+                <Link
+                  key={u.slug}
+                  href={href}
+                  className={`flex max-w-44 shrink-0 flex-col rounded-xl border px-3 py-2 text-left text-xs transition ${
+                    active
+                      ? "border-zinc-900 bg-zinc-950 text-white"
+                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-950"
+                  }`}
+                >
+                  <span className="line-clamp-1 font-medium">
+                    {getLocalized(u.title_i18n, locale)}
+                  </span>
+                  <span
+                    className={`mt-0.5 text-[11px] ${
+                      active ? "text-white/65" : "text-zinc-400"
+                    }`}
+                  >
+                    {u.date}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
+      </section>
 
       <aside className="hidden md:block w-64 shrink-0">
         <div className="sticky top-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto py-1 pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
