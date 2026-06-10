@@ -102,11 +102,11 @@ export function TopbarBreadcrumbs() {
     });
   });
 
-  const visibleCrumbs =
-    crumbs.length > 4
-      ? [crumbs[0], crumbs[crumbs.length - 2], crumbs[crumbs.length - 1]]
-      : crumbs;
-  const hiddenCrumbs = crumbs.length > 4 ? crumbs.slice(1, -2) : [];
+  const shouldCollapse = crumbs.length > 2;
+  const visibleCrumbs = shouldCollapse
+    ? [crumbs[0], crumbs[crumbs.length - 1]]
+    : crumbs;
+  const hiddenCrumbs = shouldCollapse ? crumbs.slice(1, -1) : [];
   const breadcrumbEntries =
     hiddenCrumbs.length > 0
       ? [
@@ -129,8 +129,8 @@ export function TopbarBreadcrumbs() {
   }
 
   return (
-    <Breadcrumb className="hidden min-w-0 md:block">
-      <BreadcrumbList className="flex-nowrap gap-1.5 text-xs text-zinc-500">
+    <Breadcrumb className="hidden w-full min-w-0 overflow-hidden md:block">
+      <BreadcrumbList className="w-full min-w-0 flex-nowrap gap-1.5 overflow-hidden text-xs text-zinc-500">
         {breadcrumbEntries.map((entry, index) => {
           const isLast = index === breadcrumbEntries.length - 1;
 
@@ -148,7 +148,7 @@ export function TopbarBreadcrumbs() {
                 </BreadcrumbSeparator>
               )}
 
-              <BreadcrumbItem className="min-w-0">
+              <BreadcrumbItem className="min-w-0 shrink">
                 {entry.type === "menu" ? (
                   <HiddenCrumbsMenu crumbs={entry.crumbs} />
                 ) : (
@@ -209,7 +209,7 @@ function CrumbNode({
   strong?: boolean;
 }) {
   const className = cn(
-    "max-w-[9rem] truncate rounded-md px-1.5 py-1 transition-colors",
+    "block max-w-[6rem] truncate rounded-md px-1.5 py-1 transition-colors lg:max-w-[8rem] xl:max-w-[10rem]",
     strong && "font-semibold text-zinc-800",
     isLast && "bg-zinc-100 text-zinc-950"
   );

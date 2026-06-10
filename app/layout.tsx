@@ -10,6 +10,7 @@ import { MobileDrawer } from "@/components/MobileDrawer";
 import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
 import { NetworkStatus } from "@/components/NetworkStatus";
+import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,8 +23,70 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ScripticX Platform | Learn Programming",
-  description: "Welcome to ScripticX ! Begin your programming journey with us.",
+  metadataBase: new URL(siteConfig.url),
+  applicationName: siteConfig.name,
+  title: {
+    default: "ScripticX | Învață programare interactiv",
+    template: "%s | ScripticX",
+  },
+  description: siteConfig.description,
+  keywords: [...siteConfig.keywords],
+  authors: [{ name: "Echipa ScripticX", url: siteConfig.url }],
+  creator: "ScripticX",
+  publisher: "ScripticX",
+  category: "education",
+  alternates: {
+    canonical: "/",
+  },
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      {
+        url: "/icons/notification-icon-72.png",
+        sizes: "72x72",
+        type: "image/png",
+      },
+      {
+        url: "/icons/notification-icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+    apple: "/icons/notification-icon-512.png",
+  },
+  manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "ScripticX | Învață programare interactiv",
+    description: siteConfig.description,
+    url: absoluteUrl("/"),
+    siteName: siteConfig.name,
+    locale: "ro_RO",
+    alternateLocale: ["en_US"],
+    type: "website",
+    images: [absoluteUrl(siteConfig.socialImage)],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ScripticX | Învață programare interactiv",
+    description: siteConfig.description,
+    images: [absoluteUrl(siteConfig.socialImage)],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 };
 
 export default function RootLayout({
@@ -39,6 +102,38 @@ export default function RootLayout({
       <body
         className={`${geistSans.className} h-screen overflow-hidden bg-zinc-100 antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              name: siteConfig.name,
+              alternateName: "Platforma ScripticX",
+              url: siteConfig.url,
+              description: siteConfig.description,
+              applicationCategory: "EducationalApplication",
+              operatingSystem: "Any",
+              browserRequirements: "Requires a modern web browser",
+              inLanguage: ["ro", "en"],
+              image: absoluteUrl(siteConfig.socialImage),
+              logo: absoluteUrl(siteConfig.logo),
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "RON",
+              },
+              featureList: [
+                "Editor MiniScript+",
+                "Execuție pas cu pas",
+                "Evaluare automată",
+                "Analiză de complexitate",
+                "Vizualizare AST și flowchart",
+                "Programare colaborativă în timp real",
+              ],
+            }).replace(/</g, "\\u003c"),
+          }}
+        />
         <Providers>
           <LanguageProvider>
             <SidebarProvider>

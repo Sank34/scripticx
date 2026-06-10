@@ -1,11 +1,18 @@
+import type { Metadata } from "next";
+
 import { createServerSupabase } from "@/lib/supabaseServer";
 import ClientPost from "@/app/post/[id]/ClientPost";
+import {
+  createNotFoundMetadata,
+  createPageMetadata,
+  metadataExcerpt,
+} from "@/lib/metadata";
 
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
-}) {
+}): Promise<Metadata> {
   const supabase = createServerSupabase();
 
   const resolvedParams = await params;
@@ -17,7 +24,7 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle();
 
-  if (!post) return { title: "Post not found" };
+  if (!post) return createNotFoundMetadata("Postarea");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -25,22 +32,20 @@ export async function generateMetadata({
     .eq("id", post.user_id)
     .maybeSingle();
 
-  const title = `${profile?.username || "User"} on ScripticX`;
-  const description = post.content?.slice(0, 120) || "View post";
+  const username = profile?.username || "Membru ScripticX";
+  const title = `Postare de ${username}`;
 
-  return {
+  return createPageMetadata({
     title,
-    description,
-    openGraph: {
-      title,
-      description,
-      images: post.image_url
-        ? [post.image_url]
-        : profile?.avatar_url
-        ? [profile.avatar_url]
-        : [],
-    },
-  };
+    description: metadataExcerpt(
+      post.content,
+      `Descoperă o postare publicată de ${username} în comunitatea ScripticX.`
+    ),
+    path: `/post/${id}`,
+    image: post.image_url || null,
+    type: "article",
+    keywords: ["comunitate programare", "postare ScripticX", username],
+  });
 }
 
 export default function PostPage(props: { params: Promise<{ id: string }> }) {

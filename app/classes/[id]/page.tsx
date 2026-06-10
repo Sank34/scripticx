@@ -225,25 +225,24 @@ export default function ClassPage() {
 
     if (data) {
       setAssignments((prev) => [data, ...prev]);
-      await Promise.all(
-        members
-          .filter((member) => member.id !== userId && member.role !== "teacher")
-          .map((member) =>
-            api.notifications.create({
-              userId: member.id,
-              actorId: userId,
-              type: "new_assignment",
-              title: `New assignment in ${cls?.name || "your class"}`,
-              body: assignmentTitle,
-              href: `/classes/${cls?.id}/assignments/${data.id}`,
-              metadata: {
-                assignmentId: data.id,
-                classId: cls?.id || null,
-                className: cls?.name || null,
-              },
-            })
-          )
-      );
+
+      if (userId && cls?.id) {
+        try {
+          await api.notifications.createForNewAssignment({
+            actorId: userId,
+            assignmentId: data.id,
+            assignmentTitle,
+            classId: cls.id,
+            className: cls.name,
+          });
+        } catch (notificationError) {
+          console.warn(
+            "Assignment created, but participant notifications failed.",
+            notificationError
+          );
+        }
+      }
+
       setAssignmentTitle("");
       setAssignmentDescription("");
       setAssignmentDeadline("");

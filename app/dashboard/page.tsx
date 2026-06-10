@@ -223,11 +223,17 @@ function DashboardContent() {
           icon={<CalendarDays className="h-4 w-4 text-orange-500" />}
           title={locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
           action={
-            <Button asChild size="sm">
-              <a href={`/problems/${dailyChallenge.problem_id}`}>
-                {locale === "ro" ? "Rezolvă" : "Solve"}
-              </a>
-            </Button>
+            dailySolved ? (
+              <Button size="sm" variant="secondary" disabled>
+                {t("problems.status.solved")}
+              </Button>
+            ) : (
+              <Button asChild size="sm">
+                <a href={`/problems/${dailyChallenge.problem_id}`}>
+                  {locale === "ro" ? "Rezolvă" : "Solve"}
+                </a>
+              </Button>
+            )
           }
           contentClassName="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
         >

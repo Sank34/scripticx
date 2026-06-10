@@ -100,14 +100,14 @@ export function Topbar() {
   )[0]?.toUpperCase();
 
   return (
-    <header className="relative flex h-14 items-center justify-between border-b border-zinc-200/70 bg-white px-5">
+    <header className="grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-zinc-200/70 bg-white px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
 
-      <div className="flex min-w-0 shrink-0 items-center gap-3 md:w-[22rem] lg:w-[28rem]">
+      <div className="flex min-w-0 items-center overflow-hidden pr-3">
         <TopbarBreadcrumbs />
       </div>
 
-      <div className="pointer-events-none absolute left-1/2 hidden w-[min(28rem,42vw)] -translate-x-1/2 justify-center sm:flex">
-        <div className="pointer-events-auto w-full">
+      <div className="hidden min-w-0 justify-center lg:flex">
+        <div className="w-full">
           <PlatformCommandMenu
             isAdmin={profile?.role === "admin"}
             user={user}
@@ -115,7 +115,7 @@ export function Topbar() {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center justify-self-end gap-2 pl-3">
 
         {user ? (
           <>

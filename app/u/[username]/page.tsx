@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import PublicProfileHeader from "@/components/PublicProfileHeader";
@@ -18,6 +19,11 @@ import { siGithub, siX } from "simple-icons";
 import { getLocalized } from "@/lib/getLocalized";
 import { translations } from "@/lib/i18n";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
+import {
+  createNotFoundMetadata,
+  createPageMetadata,
+  metadataExcerpt,
+} from "@/lib/metadata";
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -37,7 +43,7 @@ export async function generateMetadata({
   params,
 }: {
   params: Promise<{ username: string }>;
-}) {
+}): Promise<Metadata> {
   const supabase = createServerSupabase();
 
   const resolvedParams = await params;
@@ -49,25 +55,21 @@ export async function generateMetadata({
     .eq("username", username)
     .maybeSingle();
 
-  if (!profile) {
-    return {
-      title: "User not found",
-    };
-  }
+  if (!profile) return createNotFoundMetadata("Profilul");
 
-  const title = `${profile.username} on ScripticX`;
-  const description =
-    profile.bio || `Check out ${profile.username}'s profile on ScripticX`;
+  const title = `${profile.username} — profil`;
 
-  return {
+  return createPageMetadata({
     title,
-    description,
-    openGraph: {
-      title,
-      description,
-      images: profile.avatar_url ? [profile.avatar_url] : [],
-    },
-  };
+    description: metadataExcerpt(
+      profile.bio,
+      `Vezi progresul și activitatea lui ${profile.username} în comunitatea ScripticX.`
+    ),
+    path: `/u/${encodeURIComponent(profile.username)}`,
+    image: profile.avatar_url || null,
+    type: "profile",
+    keywords: ["profil programator", "comunitate ScripticX", profile.username],
+  });
 }
 
 export default async function PublicProfile({

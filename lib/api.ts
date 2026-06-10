@@ -466,6 +466,58 @@ class NotificationsApi {
     await NotificationsApi.createWithClient(this.client, input);
   }
 
+  async createForNewAssignment(input: {
+    actorId: string;
+    assignmentId: string;
+    assignmentTitle: string;
+    classId: string;
+    className?: string | null;
+  }) {
+    const { data: memberRows, error: membersError } = await this.client
+      .from("class_members")
+      .select("user_id, role")
+      .eq("class_id", input.classId);
+
+    if (membersError) throw membersError;
+
+    const recipientIds = [
+      ...new Set(
+        (memberRows || [])
+          .filter(
+            (member) =>
+              member.user_id !== input.actorId && member.role !== "teacher"
+          )
+          .map((member) => member.user_id)
+          .filter((userId): userId is string => Boolean(userId))
+      ),
+    ];
+
+    if (recipientIds.length === 0) return 0;
+
+    const href = `/classes/${input.classId}/assignments/${input.assignmentId}`;
+    const metadata = {
+      assignmentId: input.assignmentId,
+      classId: input.classId,
+      className: input.className || null,
+    };
+
+    const { error } = await this.client.from("notifications").insert(
+      recipientIds.map((userId) => ({
+        user_id: userId,
+        actor_id: input.actorId,
+        type: "new_assignment",
+        title: `New assignment in ${input.className || "your class"}`,
+        body: input.assignmentTitle,
+        href,
+        metadata,
+      }))
+    );
+
+    if (error) throw error;
+
+    return recipientIds.length;
+  }
+
   async list(userId: string, limit = 30): Promise<AppNotification[]> {
     const { data, error } = await this.client
       .from("notifications")
