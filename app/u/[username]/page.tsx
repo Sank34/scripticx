@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import PublicProfileHeader from "@/components/PublicProfileHeader";
 import { StatCard } from "@/components/common/StatCard";
@@ -20,9 +21,11 @@ import { getLocalized } from "@/lib/getLocalized";
 import { translations } from "@/lib/i18n";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
 import {
+  absoluteUrl,
   createNotFoundMetadata,
   createPageMetadata,
   metadataExcerpt,
+  siteConfig,
 } from "@/lib/metadata";
 
 function BrandIcon({ icon }: { icon: any }) {
@@ -51,24 +54,29 @@ export async function generateMetadata({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, bio, avatar_url")
+    .select("username, bio, avatar_url, github, twitter, website")
     .eq("username", username)
     .maybeSingle();
 
   if (!profile) return createNotFoundMetadata("Profilul");
 
-  const title = `${profile.username} — profil`;
+  const title = `${profile.username} (@${profile.username}) — profil de programare`;
 
   return createPageMetadata({
     title,
     description: metadataExcerpt(
       profile.bio,
-      `Vezi progresul și activitatea lui ${profile.username} în comunitatea ScripticX.`
+      `Descoperă profilul lui ${profile.username} pe ScripticX: progres, probleme rezolvate, realizări și activitate în comunitatea de programare.`
     ),
     path: `/u/${encodeURIComponent(profile.username)}`,
     image: profile.avatar_url || null,
     type: "profile",
-    keywords: ["profil programator", "comunitate ScripticX", profile.username],
+    keywords: [
+      profile.username,
+      `${profile.username} ScripticX`,
+      "profil programator",
+      "comunitate ScripticX",
+    ],
   });
 }
 
@@ -96,13 +104,7 @@ export default async function PublicProfile({
     .eq("username", username)
     .maybeSingle();
 
-  if (!profile) {
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-bold">{t("publicProfile.notFound")}</h1>
-      </div>
-    );
-  }
+  if (!profile) notFound();
 
   const { data: submissions } = await supabase
     .from("submissions")
@@ -177,9 +179,54 @@ export default async function PublicProfile({
   }
 
   const initial = (profile.username || "U")[0]?.toUpperCase();
+  const profileUrl = absoluteUrl(
+    `/u/${encodeURIComponent(profile.username)}`
+  );
+  const sameAs = [profile.github, profile.twitter, profile.website]
+    .filter((value): value is string => Boolean(value))
+    .map(normalizeUrl);
+  const profileJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    "@id": `${profileUrl}#profile-page`,
+    url: profileUrl,
+    name: `${profile.username} pe ${siteConfig.name}`,
+    description: metadataExcerpt(
+      profile.bio,
+      `Profilul public al utilizatorului ${profile.username} în comunitatea ScripticX.`
+    ),
+    inLanguage: ["ro", "en"],
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": `${siteConfig.url}/#website`,
+      name: siteConfig.name,
+      url: siteConfig.url,
+    },
+    mainEntity: {
+      "@type": "Person",
+      "@id": `${profileUrl}#person`,
+      name: profile.username,
+      identifier: profile.username,
+      url: profileUrl,
+      image: profile.avatar_url || undefined,
+      description: profile.bio || undefined,
+      sameAs: sameAs.length > 0 ? sameAs : undefined,
+      memberOf: {
+        "@type": "Organization",
+        name: siteConfig.name,
+        url: siteConfig.url,
+      },
+    },
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(profileJsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
 
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
@@ -297,6 +344,7 @@ export default async function PublicProfile({
                 {p.image_url && (
                   <img
                     src={p.image_url}
+                    alt={`Imagine din postarea publicată de ${profile.username}`}
                     className="mt-2 rounded max-h-[120px] w-full object-cover"
                   />
                 )}

@@ -10,6 +10,7 @@ export default function robots(): MetadataRoute.Robots {
         "/",
         "/problems",
         "/leaderboard",
+        "/community",
         "/learn",
         "/examples",
         "/help",

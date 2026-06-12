@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -49,10 +50,18 @@ export default function LeaderboardPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
 
-      <PageHeader
-        title={t("leaderboard.title")}
-        subtitle={t("leaderboard.description")}
-      />
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <PageHeader
+          title={t("leaderboard.title")}
+          subtitle={t("leaderboard.description")}
+        />
+        <Link
+          href="/community"
+          className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {t("leaderboard.community")}
+        </Link>
+      </div>
 
       {loading && (
         <div className="space-y-4">

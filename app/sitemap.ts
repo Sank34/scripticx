@@ -7,6 +7,7 @@ const publicRoutes = [
   "/",
   "/problems",
   "/leaderboard",
+  "/community",
   "/learn",
   "/learn/basics",
   "/learn/variables",
@@ -23,10 +24,8 @@ const publicRoutes = [
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const lastModified = new Date();
   const staticEntries: MetadataRoute.Sitemap = publicRoutes.map((route) => ({
     url: absoluteUrl(route),
-    lastModified,
     changeFrequency: route === "/updates" ? "weekly" : "monthly",
     priority: route === "/" ? 1 : route === "/problems" ? 0.9 : 0.7,
   }));
@@ -56,7 +55,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const updateEntries: MetadataRoute.Sitemap = (updatesResult.data || []).map(
       (update) => ({
         url: absoluteUrl(`/updates/${update.slug}`),
-        lastModified: update.date ? new Date(update.date) : lastModified,
+        lastModified: update.date ? new Date(update.date) : undefined,
         changeFrequency: "monthly",
         priority: 0.7,
       })
@@ -77,7 +76,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: absoluteUrl(`/post/${post.id}`),
         lastModified: post.created_at
           ? new Date(post.created_at)
-          : lastModified,
+          : undefined,
         changeFrequency: "monthly",
         priority: 0.5,
       })

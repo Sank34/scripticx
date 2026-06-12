@@ -437,6 +437,7 @@ export const translations = {
       title: "Leaderboard",
       description: "Top users ranked by total score",
       points: "pts",
+      community: "ScripticX Community",
     },
 
     dashboard: {
@@ -1592,6 +1593,7 @@ export const translations = {
       title: "Clasament",
       description: "Cei mai buni utilizatori după scor total",
       points: "pct",
+      community: "Comunitatea ScripticX",
     },
 
     dashboard: {
