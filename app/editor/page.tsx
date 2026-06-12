@@ -316,8 +316,8 @@ function EditorContent() {
         searchParams.get("code") ??
           `X = 0
 WHILE X < 3
-PRINT X
-X = X + 1
+  PRINT X
+  X = X + 1
 END`
       ),
     ],
