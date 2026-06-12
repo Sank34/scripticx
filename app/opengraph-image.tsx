@@ -91,7 +91,7 @@ export default function OpenGraphImage() {
                 width: "12px",
               }}
             />
-            platform.scripticx.ro
+            platform.scripticx.org
           </div>
         </div>
       </div>

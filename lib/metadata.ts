@@ -5,7 +5,7 @@ export const siteConfig = {
   shortName: "ScripticX",
   url:
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-    "https://platform.scripticx.ro",
+    "https://platform.scripticx.org",
   description:
     "Platformă educațională pentru învățarea programării cu MiniScript+, editor interactiv, execuție pas cu pas, evaluare automată, analiză de complexitate și colaborare live.",
   descriptionEn:
