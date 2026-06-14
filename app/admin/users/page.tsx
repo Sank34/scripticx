@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import Link from "next/link";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/hooks/useAuth";
 
 import {
   Card,
@@ -43,27 +44,39 @@ import {
   AlertDialogFooter,
 } from "@/components/ui/alert-dialog";
 
+type AdminUser = {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  role: string;
+  banned: boolean;
+};
+
 function AdminUsersContent() {
   const { t } = useLanguage();
-  const [users, setUsers] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
+  const { user } = useAuth();
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  async function fetchUsers() {
+  const fetchUsers = useCallback(async () => {
+    if (!user) return;
+
     const { data } = await supabase
       .from("profiles")
       .select("id, username, avatar_url, role, banned")
+      .neq("id", user.id)
       .order("username", { ascending: true });
 
-    setUsers(data || []);
-    setFiltered(data || []);
+    setUsers((data || []) as AdminUser[]);
     setLoading(false);
-  }
+  }, [user]);
 
   async function toggleAdmin(userId: string, currentRole: string) {
+    if (userId === user?.id) return;
+
     const newRole = currentRole === "admin" ? "user" : "admin";
 
     await supabase
@@ -79,6 +92,8 @@ function AdminUsersContent() {
   }
 
   async function toggleBan(userId: string, banned: boolean) {
+    if (userId === user?.id) return;
+
     await supabase
       .from("profiles")
       .update({ banned: !banned })
@@ -92,6 +107,8 @@ function AdminUsersContent() {
   }
 
   async function deleteUser(userId: string) {
+    if (userId === user?.id) return;
+
     await supabase.from("profiles").delete().eq("id", userId);
 
     setUsers((prev) => prev.filter((u) => u.id !== userId));
@@ -99,16 +116,15 @@ function AdminUsersContent() {
   }
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    void fetchUsers();
+  }, [fetchUsers]);
 
-  useEffect(() => {
-    const q = search.toLowerCase();
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return users;
 
-    setFiltered(
-      users.filter((u) =>
-        u.username?.toLowerCase().includes(q)
-      )
+    return users.filter((listedUser) =>
+      listedUser.username?.toLowerCase().includes(query)
     );
   }, [search, users]);
 
@@ -166,7 +182,7 @@ function AdminUsersContent() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {filtered.length} {t("admin.users.page.usersCount")}
+            {users.length} {t("admin.users.page.usersCount")}
           </CardTitle>
         </CardHeader>
 

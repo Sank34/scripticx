@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type FeedData } from "@/lib/api";
+import { api, type FeedData, type FeedPost } from "@/lib/api";
 import RouteGuard from "@/components/RouteGuard";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -27,6 +27,16 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { Code2, MessageCircle } from "lucide-react";
 
@@ -34,7 +44,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 function FeedContent() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -61,6 +71,8 @@ function FeedContent() {
   const [code, setCode] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [image, setImage] = useState<File | null>(null);
+  const [postToDelete, setPostToDelete] = useState<FeedPost | null>(null);
+  const [deletingPost, setDeletingPost] = useState(false);
 
   async function fetchFeedData(): Promise<FeedData> {
     if (!user) {
@@ -150,6 +162,51 @@ function FeedContent() {
     await queryClient.invalidateQueries({
       queryKey: ["feed", user.id],
     });
+  }
+
+  async function deletePost() {
+    if (!user || !isAdmin || !postToDelete || deletingPost) return;
+
+    setDeletingPost(true);
+
+    try {
+      await api.feed.deletePost(postToDelete.id);
+
+      queryClient.setQueryData<FeedData>(
+        ["feed", user.id],
+        (current) => {
+          if (!current) return current;
+
+          const nextLikes = { ...current.likes };
+          const nextLiked = { ...current.liked };
+          const nextCommentCounts = { ...current.commentCounts };
+
+          delete nextLikes[postToDelete.id];
+          delete nextLiked[postToDelete.id];
+          delete nextCommentCounts[postToDelete.id];
+
+          return {
+            ...current,
+            posts: current.posts.filter((post) => post.id !== postToDelete.id),
+            likes: nextLikes,
+            liked: nextLiked,
+            commentCounts: nextCommentCounts,
+          };
+        }
+      );
+
+      setPostToDelete(null);
+      toast.success(t("feed.deleted"));
+
+      await queryClient.invalidateQueries({
+        queryKey: ["feed", user.id],
+      });
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      toast.error(t("feed.deleteFailed"));
+    } finally {
+      setDeletingPost(false);
+    }
   }
 
   return (
@@ -315,18 +372,54 @@ function FeedContent() {
           <FeedPostCard
             key={p.id}
             commentCount={commentCounts[p.id] || 0}
+            isAdmin={isAdmin}
             isLiked={Boolean(liked[p.id])}
             labels={{
+              deletePost: t("feed.deletePost"),
               share: t("feed.share"),
             }}
             likeCount={likes[p.id] || 0}
             onAuthorOpen={(username) => router.push(`/u/${username}`)}
             onCommentsOpen={(postId) => router.push(`/post/${postId}`)}
+            onDelete={setPostToDelete}
             onShare={handleShare}
             onToggleLike={toggleLike}
             post={p}
           />
         ))}
+
+      <AlertDialog
+        open={Boolean(postToDelete)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !deletingPost) setPostToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("feed.deleteDialog.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("feed.deleteDialog.description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingPost}>
+              {t("feed.deleteDialog.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deletingPost}
+              onClick={(event) => {
+                event.preventDefault();
+                void deletePost();
+              }}
+            >
+              {deletingPost
+                ? t("feed.deleteDialog.deleting")
+                : t("feed.deleteDialog.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

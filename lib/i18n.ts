@@ -488,6 +488,17 @@ export const translations = {
       posted: "Posted!",
       followed: "Followed!",
       unfollowed: "Unfollowed",
+      deletePost: "Delete post",
+      deleted: "Post deleted.",
+      deleteFailed: "The post could not be deleted.",
+      deleteDialog: {
+        title: "Delete this post?",
+        description:
+          "This action is permanent and will remove the post from the feed.",
+        cancel: "Cancel",
+        confirm: "Delete",
+        deleting: "Deleting...",
+      },
 
       title: "Feed",
       postsCount: "{count} posts",
@@ -1710,6 +1721,17 @@ export const translations = {
       posted: "Postat!",
       followed: "Urmărit!",
       unfollowed: "Nu mai urmărești",
+      deletePost: "Șterge postarea",
+      deleted: "Postarea a fost ștearsă.",
+      deleteFailed: "Postarea nu a putut fi ștearsă.",
+      deleteDialog: {
+        title: "Ștergi această postare?",
+        description:
+          "Acțiunea este permanentă și va elimina postarea din feed.",
+        cancel: "Anulează",
+        confirm: "Șterge",
+        deleting: "Se șterge...",
+      },
 
       title: "Feed",
       postsCount: "{count} postări",

@@ -339,7 +339,7 @@ function AdminProblemsContent() {
       </AlertDialog>
 
       <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <DialogHeader>
             <DialogTitle>{t("admin.problems.dialog.createTitle")}</DialogTitle>
           </DialogHeader>

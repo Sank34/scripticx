@@ -398,6 +398,15 @@ class FeedApi {
     if (error) throw error;
   }
 
+  async deletePost(postId: string) {
+    const { error } = await this.client
+      .from("posts")
+      .delete()
+      .eq("id", postId);
+
+    if (error) throw error;
+  }
+
   async toggleFollow(
     followerId: string,
     followingId: string,

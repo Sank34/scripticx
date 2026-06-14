@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, MessageCircle, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Share2, Trash2 } from "lucide-react";
 
 import type { FeedPost } from "@/lib/api";
 import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
@@ -9,16 +9,19 @@ import { UserAvatar } from "@/components/user/UserAvatar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 type FeedPostCardLabels = {
+  deletePost: string;
   share: string;
 };
 
 type FeedPostCardProps = {
   commentCount: number;
   isLiked: boolean;
+  isAdmin: boolean;
   labels: FeedPostCardLabels;
   likeCount: number;
   onAuthorOpen: (username: string) => void;
   onCommentsOpen: (postId: string) => void;
+  onDelete: (post: FeedPost) => void;
   onShare: (postId: string) => void;
   onToggleLike: (postId: string) => void;
   post: FeedPost;
@@ -27,10 +30,12 @@ type FeedPostCardProps = {
 export function FeedPostCard({
   commentCount,
   isLiked,
+  isAdmin,
   labels,
   likeCount,
   onAuthorOpen,
   onCommentsOpen,
+  onDelete,
   onShare,
   onToggleLike,
   post,
@@ -38,9 +43,21 @@ export function FeedPostCard({
   const username = post.profiles?.username || "User";
 
   return (
-    <Card className="hover:shadow-sm transition">
+    <Card className="relative transition hover:shadow-sm">
+      {isAdmin && (
+        <button
+          type="button"
+          title={labels.deletePost}
+          aria-label={labels.deletePost}
+          onClick={() => onDelete(post)}
+          className="absolute right-4 top-4 z-10 inline-flex size-8 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      )}
+
       <Link href={`/post/${post.id}`}>
-        <CardHeader className="flex flex-row items-center gap-3 cursor-pointer">
+        <CardHeader className="flex cursor-pointer flex-row items-center gap-3 pr-14">
           <UserAvatar
             avatarUrl={post.profiles?.avatar_url}
             username={username}
