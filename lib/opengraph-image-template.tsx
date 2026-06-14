@@ -10,7 +10,7 @@ export const size = {
 };
 export const contentType = "image/png";
 
-export default function OpenGraphImage() {
+export default function OpenGraphImageTemplate() {
   return new ImageResponse(
     (
       <div
@@ -40,6 +40,8 @@ export default function OpenGraphImage() {
             width: "100%",
           }}
         >
+          {/* ImageResponse renders standard image elements instead of next/image. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             alt="ScripticX"
             height="82"

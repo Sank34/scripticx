@@ -11,7 +11,7 @@ export const siteConfig = {
   descriptionEn:
     "A programming learning platform with MiniScript+, an interactive editor, step-by-step execution, automatic evaluation, complexity analysis, and live collaboration.",
   logo: "/scripticx-logo-lung.png",
-  socialImage: "/opengraph-image",
+  socialImage: "/social-card.png",
   keywords: [
     "ScripticX",
     "MiniScript+",
