@@ -318,7 +318,9 @@ function EditorContent() {
 WHILE X < 3
   PRINT X
   X = X + 1
-END`
+END
+# this is an example code
+# add your code here`
       ),
     ],
     [searchParams]
