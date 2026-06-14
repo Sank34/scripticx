@@ -62,11 +62,11 @@ function AdminContent() {
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500" />
-              <h2 className="text-xl font-semibold">Updates</h2>
+              <h2 className="text-xl font-semibold">{t("admin.updates.title")}</h2>
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Write and publish changelog posts in Markdown.
+              {t("admin.updates.description")}
             </p>
 
             <Button
@@ -74,7 +74,7 @@ function AdminContent() {
               className="bg-amber-500 hover:bg-amber-600"
               onClick={() => router.push("/admin/updates")}
             >
-              Manage updates
+              {t("admin.updates.action")}
             </Button>
           </CardContent>
         </Card>
@@ -83,11 +83,11 @@ function AdminContent() {
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-2">
               <Mail className="w-5 h-5 text-rose-500" />
-              <h2 className="text-xl font-semibold">Contact</h2>
+              <h2 className="text-xl font-semibold">{t("admin.contact.cardTitle")}</h2>
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Read and manage messages from the contact form.
+              {t("admin.contact.cardDescription")}
             </p>
 
             <Button
@@ -95,7 +95,7 @@ function AdminContent() {
               className="bg-rose-500 hover:bg-rose-600"
               onClick={() => router.push("/admin/contact")}
             >
-              View messages
+              {t("admin.contact.cardAction")}
             </Button>
           </CardContent>
         </Card>

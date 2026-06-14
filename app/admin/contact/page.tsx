@@ -86,7 +86,7 @@ function statusStyle(s: Status) {
 }
 
 function AdminContactContent() {
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
   const queryClient = useQueryClient();
 
   const topicLabel = (topic: Topic) => t(`admin.contact.topics.${topic}`);
@@ -245,7 +245,9 @@ function AdminContactContent() {
                     {m.description}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(m.created_at).toLocaleString()}
+                    {new Date(m.created_at).toLocaleString(
+                      locale === "ro" ? "ro-RO" : "en-US"
+                    )}
                   </p>
                 </button>
 
@@ -333,7 +335,11 @@ function AdminContactContent() {
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Clock size={12} />
-                      <span>{new Date(viewing.created_at).toLocaleString()}</span>
+                      <span>
+                        {new Date(viewing.created_at).toLocaleString(
+                          locale === "ro" ? "ro-RO" : "en-US"
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>

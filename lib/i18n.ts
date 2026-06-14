@@ -1024,7 +1024,73 @@ export const translations = {
         },
       },
 
+      updates: {
+        title: "Updates",
+        description: "Write and publish changelog posts in Markdown.",
+        action: "Manage updates",
+        page: {
+          title: "Updates",
+          subtitle: "Write and publish changelog posts. Markdown is supported.",
+        },
+        actions: {
+          new: "New update",
+        },
+        empty: {
+          title: "No updates yet",
+          subtitle: "Publish your first changelog entry to see it here.",
+        },
+        dialog: {
+          createTitle: "New update",
+          editTitle: "Edit update",
+        },
+        deleteDialog: {
+          title: "Delete this update?",
+          description: "This will permanently remove \"{title}\". This action cannot be undone.",
+          cancel: "Cancel",
+          confirm: "Delete",
+        },
+        form: {
+          addLanguage: "Add language",
+          removeLanguage: "Remove {language}",
+          languages: {
+            en: "English",
+            ro: "Romanian",
+          },
+          title: "Title",
+          titlePlaceholder: "What's new in this release?",
+          slug: "Slug",
+          date: "Date",
+          pickDate: "Pick a date",
+          tag: "Tag",
+          tags: {
+            none: "No tag",
+            new: "New",
+            fix: "Fix",
+            improved: "Improved",
+          },
+          content: "Content",
+          edit: "Edit",
+          preview: "Preview",
+          contentPlaceholder: "# Heading\n\nWrite your update in **Markdown**…",
+          nothingToPreview: "Nothing to preview yet.",
+          saving: "Saving…",
+          saveChanges: "Save changes",
+          publish: "Publish update",
+          validation: {
+            required: "Fill in the title, slug, date, and content.",
+          },
+        },
+        toast: {
+          deleted: "Update deleted",
+          saved: "Update saved",
+          published: "Update published",
+        },
+      },
+
       contact: {
+        cardTitle: "Contact",
+        cardDescription: "Read and manage messages from the contact form.",
+        cardAction: "View messages",
         title: "Contact messages",
         subtitle: "Messages submitted from the contact form.",
         newBadge: "{count} new",
@@ -2180,7 +2246,73 @@ export const translations = {
         },
       },
 
+      updates: {
+        title: "Noutăți",
+        description: "Scrie și publică articole de changelog folosind Markdown.",
+        action: "Gestionează noutățile",
+        page: {
+          title: "Noutăți",
+          subtitle: "Scrie și publică articole despre schimbările platformei. Poți folosi Markdown.",
+        },
+        actions: {
+          new: "Noutate nouă",
+        },
+        empty: {
+          title: "Nu există noutăți încă",
+          subtitle: "Publică prima intrare din changelog pentru a o vedea aici.",
+        },
+        dialog: {
+          createTitle: "Noutate nouă",
+          editTitle: "Editează noutatea",
+        },
+        deleteDialog: {
+          title: "Ștergi această noutate?",
+          description: "Noutatea „{title}” va fi ștearsă definitiv. Acțiunea nu poate fi anulată.",
+          cancel: "Anulează",
+          confirm: "Șterge",
+        },
+        form: {
+          addLanguage: "Adaugă limbă",
+          removeLanguage: "Elimină {language}",
+          languages: {
+            en: "Engleză",
+            ro: "Română",
+          },
+          title: "Titlu",
+          titlePlaceholder: "Ce este nou în această versiune?",
+          slug: "Adresă URL",
+          date: "Data publicării",
+          pickDate: "Alege o dată",
+          tag: "Etichetă",
+          tags: {
+            none: "Fără etichetă",
+            new: "Nou",
+            fix: "Remediere",
+            improved: "Îmbunătățire",
+          },
+          content: "Conținut",
+          edit: "Editează",
+          preview: "Previzualizare",
+          contentPlaceholder: "# Titlu\n\nScrie noutatea folosind **Markdown**…",
+          nothingToPreview: "Nu există încă nimic de previzualizat.",
+          saving: "Se salvează…",
+          saveChanges: "Salvează modificările",
+          publish: "Publică noutatea",
+          validation: {
+            required: "Completează titlul, adresa URL, data și conținutul.",
+          },
+        },
+        toast: {
+          deleted: "Noutate ștearsă",
+          saved: "Noutate salvată",
+          published: "Noutate publicată",
+        },
+      },
+
       contact: {
+        cardTitle: "Contact",
+        cardDescription: "Citește și gestionează mesajele trimise prin formularul de contact.",
+        cardAction: "Vezi mesajele",
         title: "Mesaje de contact",
         subtitle: "Mesaje trimise din formularul de contact.",
         newBadge: "{count} noi",

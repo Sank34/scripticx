@@ -39,7 +39,7 @@ import Link from "next/link";
 
 function AdminUpdatesContent() {
   const queryClient = useQueryClient();
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
 
   const { data: updates = [], isLoading } = useQuery({
     queryKey: ["updates"],
@@ -77,7 +77,7 @@ function AdminUpdatesContent() {
       return;
     }
 
-    toast.success("Update deleted");
+    toast.success(t("admin.updates.toast.deleted"));
     setDeleting(null);
     invalidate();
   }
@@ -94,15 +94,15 @@ function AdminUpdatesContent() {
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Updates</h1>
+          <h1 className="text-3xl font-bold">{t("admin.updates.page.title")}</h1>
           <p className="text-muted-foreground">
-            Write and publish changelog posts. Markdown supported.
+            {t("admin.updates.page.subtitle")}
           </p>
         </div>
 
         <Button onClick={openCreate} className="rounded-xl">
           <Plus size={16} />
-          New update
+          {t("admin.updates.actions.new")}
         </Button>
       </div>
 
@@ -115,13 +115,13 @@ function AdminUpdatesContent() {
       ) : updates.length === 0 ? (
         <Card>
           <CardContent className="p-10 text-center space-y-3">
-            <h2 className="font-semibold">No updates yet</h2>
+            <h2 className="font-semibold">{t("admin.updates.empty.title")}</h2>
             <p className="text-sm text-muted-foreground">
-              Publish your first changelog entry to see it here.
+              {t("admin.updates.empty.subtitle")}
             </p>
             <Button onClick={openCreate} className="rounded-xl">
               <Plus size={16} />
-              New update
+              {t("admin.updates.actions.new")}
             </Button>
           </CardContent>
         </Card>
@@ -136,7 +136,7 @@ function AdminUpdatesContent() {
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-medium ${tagStyle(u.tag)}`}
                       >
-                        {u.tag}
+                        {t(`admin.updates.form.tags.${u.tag}`)}
                       </span>
                     )}
                     <h2 className="truncate font-semibold">{getLocalized(u.title_i18n, locale)}</h2>
@@ -183,7 +183,9 @@ function AdminUpdatesContent() {
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {editing ? "Edit update" : "New update"}
+              {editing
+                ? t("admin.updates.dialog.editTitle")
+                : t("admin.updates.dialog.createTitle")}
             </DialogTitle>
           </DialogHeader>
           <UpdateForm
@@ -202,18 +204,21 @@ function AdminUpdatesContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this update?</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.updates.deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove "{deleting ? getLocalized(deleting.title_i18n, locale) : ""}". This action cannot be undone.
+              {t("admin.updates.deleteDialog.description").replace(
+                "{title}",
+                deleting ? getLocalized(deleting.title_i18n, locale) : ""
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("admin.updates.deleteDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              {t("admin.updates.deleteDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

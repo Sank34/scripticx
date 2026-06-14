@@ -27,6 +27,7 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 
 import { Markdown } from "@/components/Markdown";
+import { useLanguage } from "@/components/LanguageProvider";
 import { toast } from "sonner";
 
 type Props = {
@@ -46,12 +47,13 @@ function slugify(s: string) {
 }
 
 export function UpdateForm({ initialData, onSaved }: Props) {
+  const { locale, t } = useLanguage();
   const isEdit = !!initialData?.id;
 
   const [languages, setLanguages] = useState<string[]>(
     initialData?.title_i18n
       ? Object.keys(initialData.title_i18n)
-      : ["en"]
+      : [locale]
   );
 
   const [activeLang, setActiveLang] = useState<string>(languages[0]);
@@ -119,7 +121,7 @@ export function UpdateForm({ initialData, onSaved }: Props) {
     const hasContent = Object.values(contentI18n).some((v) => v?.trim());
 
     if (!hasTitle || !hasContent || !slug.trim() || !date) {
-      toast.error("Fill in title, slug, date, and content.");
+      toast.error(t("admin.updates.form.validation.required"));
       return;
     }
 
@@ -144,7 +146,11 @@ export function UpdateForm({ initialData, onSaved }: Props) {
       return;
     }
 
-    toast.success(isEdit ? "Update saved" : "Update published");
+    toast.success(
+      isEdit
+        ? t("admin.updates.toast.saved")
+        : t("admin.updates.toast.published")
+    );
     onSaved();
   }
 
@@ -168,14 +174,14 @@ export function UpdateForm({ initialData, onSaved }: Props) {
           {languages.length < 2 && (
             <Select onValueChange={(val) => addLanguage(val)}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Add language" />
+                <SelectValue placeholder={t("admin.updates.form.addLanguage")} />
               </SelectTrigger>
               <SelectContent>
                 {!languages.includes("en") && (
-                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="en">{t("admin.updates.form.languages.en")}</SelectItem>
                 )}
                 {!languages.includes("ro") && (
-                  <SelectItem value="ro">Română</SelectItem>
+                  <SelectItem value="ro">{t("admin.updates.form.languages.ro")}</SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -188,7 +194,10 @@ export function UpdateForm({ initialData, onSaved }: Props) {
               size="sm"
               onClick={() => removeLanguage(activeLang)}
             >
-              Remove {activeLang.toUpperCase()}
+              {t("admin.updates.form.removeLanguage").replace(
+                "{language}",
+                activeLang.toUpperCase()
+              )}
             </Button>
           )}
         </div>
@@ -197,17 +206,17 @@ export function UpdateForm({ initialData, onSaved }: Props) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">
-            Title ({activeLang})
+            {t("admin.updates.form.title")} ({activeLang.toUpperCase()})
           </label>
           <Input
             value={titleI18n[activeLang] || ""}
             onChange={(e) => updateTitle(activeLang, e.target.value)}
-            placeholder="What's new in this release?"
+            placeholder={t("admin.updates.form.titlePlaceholder")}
           />
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Slug</label>
+          <label className="text-sm font-medium">{t("admin.updates.form.slug")}</label>
           <Input
             value={slug}
             onChange={(e) => {
@@ -221,7 +230,7 @@ export function UpdateForm({ initialData, onSaved }: Props) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Date</label>
+          <label className="text-sm font-medium">{t("admin.updates.form.date")}</label>
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -230,7 +239,7 @@ export function UpdateForm({ initialData, onSaved }: Props) {
                 className="w-full justify-start text-left font-normal"
               >
                 <CalendarIcon size={16} className="mr-2 opacity-60" />
-                {date ? format(new Date(date), "PPP") : "Pick a date"}
+                {date ? format(new Date(date), "PPP") : t("admin.updates.form.pickDate")}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -250,19 +259,19 @@ export function UpdateForm({ initialData, onSaved }: Props) {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Tag</label>
+          <label className="text-sm font-medium">{t("admin.updates.form.tag")}</label>
           <Select
             value={tag || NO_TAG}
             onValueChange={(v) => setTag(v === NO_TAG ? "" : (v as UpdateTag))}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="No tag" />
+              <SelectValue placeholder={t("admin.updates.form.tags.none")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_TAG}>No tag</SelectItem>
-              <SelectItem value="new">New</SelectItem>
-              <SelectItem value="fix">Fix</SelectItem>
-              <SelectItem value="improved">Improved</SelectItem>
+              <SelectItem value={NO_TAG}>{t("admin.updates.form.tags.none")}</SelectItem>
+              <SelectItem value="new">{t("admin.updates.form.tags.new")}</SelectItem>
+              <SelectItem value="fix">{t("admin.updates.form.tags.fix")}</SelectItem>
+              <SelectItem value="improved">{t("admin.updates.form.tags.improved")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -270,18 +279,18 @@ export function UpdateForm({ initialData, onSaved }: Props) {
 
       <div className="space-y-1.5">
         <label className="text-sm font-medium">
-          Content ({activeLang}, Markdown)
+          {t("admin.updates.form.content")} ({activeLang.toUpperCase()}, Markdown)
         </label>
         <Tabs defaultValue="edit">
           <TabsList>
-            <TabsTrigger value="edit">Edit</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
+            <TabsTrigger value="edit">{t("admin.updates.form.edit")}</TabsTrigger>
+            <TabsTrigger value="preview">{t("admin.updates.form.preview")}</TabsTrigger>
           </TabsList>
           <TabsContent value="edit">
             <Textarea
               value={contentI18n[activeLang] || ""}
               onChange={(e) => updateContent(activeLang, e.target.value)}
-              placeholder={"# Heading\n\nWrite your update in **Markdown**…"}
+              placeholder={t("admin.updates.form.contentPlaceholder")}
               rows={16}
               className="font-mono text-sm field-sizing-fixed max-h-[400px]"
             />
@@ -293,7 +302,7 @@ export function UpdateForm({ initialData, onSaved }: Props) {
                   <Markdown>{contentI18n[activeLang]}</Markdown>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Nothing to preview yet.
+                    {t("admin.updates.form.nothingToPreview")}
                   </p>
                 )}
               </div>
@@ -304,7 +313,11 @@ export function UpdateForm({ initialData, onSaved }: Props) {
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="submit" disabled={submitting} className="rounded-xl">
-          {submitting ? "Saving…" : isEdit ? "Save changes" : "Publish update"}
+          {submitting
+            ? t("admin.updates.form.saving")
+            : isEdit
+              ? t("admin.updates.form.saveChanges")
+              : t("admin.updates.form.publish")}
         </Button>
       </div>
 
