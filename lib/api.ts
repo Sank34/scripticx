@@ -1,4 +1,4 @@
-import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 export type ProfileSummary = {
@@ -180,10 +180,108 @@ class AuthApi {
   refreshSession() {
     return this.client.auth.refreshSession();
   }
+
+  signInWithPassword(email: string, password: string) {
+    return this.client.auth.signInWithPassword({ email, password });
+  }
+
+  signUp(email: string, password: string) {
+    return this.client.auth.signUp({ email, password });
+  }
+
+  signInWithGoogle(redirectTo: string) {
+    return this.client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: "offline",
+          prompt: "select_account",
+        },
+      },
+    });
+  }
+
+  resetPasswordForEmail(email: string, redirectTo: string) {
+    return this.client.auth.resetPasswordForEmail(email, { redirectTo });
+  }
+
+  updatePassword(password: string) {
+    return this.client.auth.updateUser({ password });
+  }
 }
 
 class ProfilesApi {
   constructor(private readonly client: SupabaseClient) {}
+
+  private normalizeUsername(value: string) {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 24);
+  }
+
+  async ensureForUser(user: User): Promise<ProfileSummary> {
+    const existing = await this.getProfile(user.id);
+    if (existing) return existing;
+
+    const metadata = user.user_metadata || {};
+    const emailPrefix = user.email?.split("@")[0] || "";
+    const preferredName =
+      String(metadata.preferred_username || metadata.user_name || emailPrefix);
+    const baseUsername = this.normalizeUsername(preferredName) || "user";
+
+    const { data: usernameOwner, error: usernameError } = await this.client
+      .from("profiles")
+      .select("id")
+      .eq("username", baseUsername)
+      .maybeSingle<{ id: string }>();
+
+    if (usernameError) throw usernameError;
+
+    const username =
+      usernameOwner && usernameOwner.id !== user.id
+        ? `${baseUsername.slice(0, 17)}-${user.id.slice(0, 6)}`
+        : baseUsername;
+
+    const avatarUrl =
+      typeof metadata.avatar_url === "string"
+        ? metadata.avatar_url
+        : typeof metadata.picture === "string"
+          ? metadata.picture
+          : null;
+
+    const { data, error } = await this.client
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          username,
+          avatar_url: avatarUrl,
+          role: "user",
+        },
+        { onConflict: "id" }
+      )
+      .select("*")
+      .single<ProfileSummary>();
+
+    if (error) throw error;
+
+    return data;
+  }
+
+  async saveRegistrationProfile(userId: string, username: string) {
+    const { error } = await this.client.from("profiles").upsert({
+      id: userId,
+      username: username.trim().toLowerCase(),
+      role: "user",
+    });
+
+    if (error) throw error;
+  }
 
   async getProfile(id: string): Promise<ProfileSummary | null> {
     const { data, error } = await this.client

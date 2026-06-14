@@ -1164,13 +1164,51 @@ export const translations = {
       username: "Username",
       loginButton: "Login",
       registerButton: "Create Account",
+      googleButton: "Continue with Google",
+      or: "or continue with email",
+      forgotPassword: "Forgot your password?",
       modal: {
         loginErrorTitle: "Unable to sign in",
         registerErrorTitle: "Unable to sign up",
+        googleErrorTitle: "Google sign-in could not start",
         usernameRequired: "Username is required",
+        profileError: "Your account was created, but the profile could not be saved.",
         accountCreatedTitle: "Account created",
-        accountCreatedDescription: "You can now log in.",
+        accountCreatedDescription: "Check your inbox to confirm your email, then you can sign in.",
       }
+    },
+
+    authCallback: {
+      title: "Signing you in",
+      description: "We are securely connecting your Google account to ScripticX.",
+      errorTitle: "Sign-in could not be completed",
+      profileError: "Your Google account was connected, but the ScripticX profile could not be created.",
+      timeout: "The sign-in response took too long. Please try again.",
+      backToLogin: "Back to login",
+    },
+
+    forgotPassword: {
+      title: "Reset your password",
+      description: "Enter your email and we will send you a secure password reset link.",
+      sendButton: "Send reset link",
+      sentTitle: "Check your inbox",
+      sentDescription: "If an account exists for this email, you will receive a password reset link shortly.",
+      backToLogin: "Back to login",
+    },
+
+    resetPassword: {
+      title: "Choose a new password",
+      description: "Use at least 8 characters and choose a password you do not use elsewhere.",
+      newPassword: "New password",
+      confirmPassword: "Confirm new password",
+      updateButton: "Update password",
+      passwordTooShort: "The password must contain at least 8 characters.",
+      passwordMismatch: "The passwords do not match.",
+      invalidLink: "This reset link is invalid or has expired.",
+      requestNewLink: "Request a new link",
+      successTitle: "Password updated",
+      successDescription: "Your new password is active. You can continue using ScripticX.",
+      continueButton: "Continue to dashboard",
     },
 
     settings: {
@@ -2397,13 +2435,51 @@ export const translations = {
       username: "Nume utilizator",
       loginButton: "Autentificare",
       registerButton: "Creează cont",
+      googleButton: "Continuă cu Google",
+      or: "sau continuă cu email",
+      forgotPassword: "Ai uitat parola?",
       modal: {
         loginErrorTitle: "Nu te-ai putut autentifica",
         registerErrorTitle: "Nu te-ai putut înregistra",
+        googleErrorTitle: "Autentificarea Google nu a putut porni",
         usernameRequired: "Numele de utilizator este necesar",
+        profileError: "Contul a fost creat, dar profilul nu a putut fi salvat.",
         accountCreatedTitle: "Cont creat",
-        accountCreatedDescription: "Te poți autentifica acum.",
+        accountCreatedDescription: "Verifică emailul pentru confirmarea contului, apoi te poți autentifica.",
       }
+    },
+
+    authCallback: {
+      title: "Te autentificăm",
+      description: "Conectăm în siguranță contul Google la ScripticX.",
+      errorTitle: "Autentificarea nu a putut fi finalizată",
+      profileError: "Contul Google a fost conectat, dar profilul ScripticX nu a putut fi creat.",
+      timeout: "Răspunsul de autentificare a durat prea mult. Încearcă din nou.",
+      backToLogin: "Înapoi la autentificare",
+    },
+
+    forgotPassword: {
+      title: "Resetează parola",
+      description: "Introdu adresa de email și îți vom trimite un link securizat pentru resetarea parolei.",
+      sendButton: "Trimite linkul",
+      sentTitle: "Verifică emailul",
+      sentDescription: "Dacă există un cont pentru această adresă, vei primi în curând linkul de resetare.",
+      backToLogin: "Înapoi la autentificare",
+    },
+
+    resetPassword: {
+      title: "Alege o parolă nouă",
+      description: "Folosește cel puțin 8 caractere și alege o parolă pe care nu o utilizezi în altă parte.",
+      newPassword: "Parolă nouă",
+      confirmPassword: "Confirmă parola nouă",
+      updateButton: "Actualizează parola",
+      passwordTooShort: "Parola trebuie să conțină cel puțin 8 caractere.",
+      passwordMismatch: "Parolele nu coincid.",
+      invalidLink: "Linkul de resetare este invalid sau a expirat.",
+      requestNewLink: "Solicită un link nou",
+      successTitle: "Parolă actualizată",
+      successDescription: "Noua parolă este activă. Poți continua să folosești ScripticX.",
+      continueButton: "Continuă la panou",
     },
 
     settings: {

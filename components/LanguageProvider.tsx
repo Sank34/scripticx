@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { translations, Locale } from "@/lib/i18n";
 
 type LanguageContextType = {
@@ -25,7 +31,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("lang", locale);
   }, [locale]);
 
-  function t(path: string): string {
+  const t = useCallback((path: string): string => {
     const keys = path.split(".");
     let value: any = translations[locale];
 
@@ -34,7 +40,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
 
     return value || path;
-  }
+  }, [locale]);
 
   return (
     <LanguageContext.Provider value={{ locale, setLocale, t }}>
