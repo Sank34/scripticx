@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export function Footer() {
@@ -65,15 +66,22 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-4">
 
           <div className="space-y-3">
-            <Link href="/" className="flex items-center gap-2">
-              <img
-                src="/logoSCX.svg"
-                alt="ScripticX"
-                className="h-9 w-9 object-contain"
-              />
-              <span className="font-semibold text-lg tracking-tight">
-                ScripticX
+            <Link
+              href="/"
+              aria-label="ScripticX"
+              className="inline-flex items-center"
+            >
+              <span className="text-xl font-semibold tracking-tight">
+                Scriptic
               </span>
+              <Image
+                src="/logoSCX.svg"
+                alt=""
+                aria-hidden="true"
+                width={48}
+                height={34}
+                className="h-6 w-auto shrink-0 object-contain"
+              />
             </Link>
             <p className="text-sm text-muted-foreground max-w-[220px]">
               {copy.tagline}
