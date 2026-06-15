@@ -5,7 +5,7 @@ import { createPageMetadata } from "@/lib/metadata";
 export const metadata: Metadata = createPageMetadata({
   title: "Feed",
   description:
-    "Descoperă soluții, fragmente de cod și progresul comunității ScripticX.",
+    "Discover solutions, code snippets, and progress shared by the ScripticX community.",
   path: "/feed",
   noIndex: true,
 });

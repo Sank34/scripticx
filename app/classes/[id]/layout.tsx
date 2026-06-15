@@ -19,13 +19,13 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle();
 
-  if (!classData) return createNotFoundMetadata("Clasa");
+  if (!classData) return createNotFoundMetadata("Class");
 
-  const className = classData.name?.trim() || "Clasă";
+  const className = classData.name?.trim() || "Class";
 
   return createPageMetadata({
-    title: `${className} — clasă`,
-    description: `Temele, membrii și activitatea clasei „${className}” pe ScripticX.`,
+    title: `${className} — Class`,
+    description: `Assignments, members, and learning activity for the “${className}” class on ScripticX.`,
     path: `/classes/${id}`,
     noIndex: true,
   });

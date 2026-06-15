@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Clasament",
+  title: "Leaderboard",
   description:
-    "Urmărește clasamentul comunității ScripticX și progresul obținut prin probleme și challenge-uri.",
+    "Follow the ScripticX community leaderboard and progress earned through problems and daily challenges.",
   path: "/leaderboard",
 });
 

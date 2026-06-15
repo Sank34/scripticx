@@ -5,7 +5,7 @@ import { createPageMetadata } from "@/lib/metadata";
 export const metadata: Metadata = createPageMetadata({
   title: "Contact",
   description:
-    "Trimite echipei ScripticX întrebări, sugestii sau feedback despre platformă.",
+    "Send questions, suggestions, or platform feedback to the ScripticX team.",
   path: "/contact",
 });
 

@@ -19,16 +19,16 @@ export async function generateMetadata({
     .eq("id", roomId)
     .maybeSingle();
 
-  if (!room) return createNotFoundMetadata("Sesiunea");
+  if (!room) return createNotFoundMetadata("Live session");
 
-  const roomName = room.name?.trim() || "Sesiune live";
+  const roomName = room.name?.trim() || "Live session";
 
   return createPageMetadata({
-    title: `${roomName} — programare live`,
+    title: `${roomName} — Live Coding`,
     description:
       room.status === "active"
-        ? `Colaborează în timp real în sesiunea MiniScript+ „${roomName}”.`
-        : `Vezi sesiunea MiniScript+ încheiată „${roomName}”.`,
+        ? `Collaborate in real time in the “${roomName}” MiniScript+ session.`
+        : `View the completed “${roomName}” MiniScript+ session.`,
     path: `/live/${roomId}`,
     noIndex: true,
   });

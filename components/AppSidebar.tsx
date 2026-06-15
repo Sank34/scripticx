@@ -126,7 +126,10 @@ export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { t } = useLanguage();
-  const hasUnreadUpdates = useUnreadUpdates();
+  const {
+    hasUnread: hasUnreadUpdates,
+    latestSlug: latestUpdateSlug,
+  } = useUnreadUpdates();
 
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -416,7 +419,10 @@ export function AppSidebar() {
               collapsed ? "justify-center px-2" : "justify-start px-3"
             } ${pathname.startsWith("/updates") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
           >
-            <Link href="/updates">
+            <Link
+              href={latestUpdateSlug ? `/updates/${latestUpdateSlug}` : "/updates"}
+              prefetch={false}
+            >
               <span className="relative inline-flex">
                 <Sparkles size={17} />
                 {hasUnreadUpdates && (

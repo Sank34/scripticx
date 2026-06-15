@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Profilul meu",
+  title: "My Profile",
   description:
-    "Vezi progresul, realizările și activitatea profilului tău ScripticX.",
+    "View your ScripticX progress, achievements, and community activity.",
   path: "/profile",
   noIndex: true,
 });

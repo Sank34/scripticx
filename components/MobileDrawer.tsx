@@ -46,7 +46,10 @@ type MobileNavItem = {
 export function MobileDrawer() {
   const pathname = usePathname();
   const { t } = useLanguage();
-  const hasUnreadUpdates = useUnreadUpdates();
+  const {
+    hasUnread: hasUnreadUpdates,
+    latestSlug: latestUpdateSlug,
+  } = useUnreadUpdates();
   const { user, isAdmin } = useAuth();
 
   if (pathname.startsWith("/live/")) {
@@ -118,7 +121,7 @@ export function MobileDrawer() {
 
   const footerItems = [
     {
-      href: "/updates",
+      href: latestUpdateSlug ? `/updates/${latestUpdateSlug}` : "/updates",
       icon: Sparkles,
       label: t("nav.whatsNew"),
       unread: hasUnreadUpdates,

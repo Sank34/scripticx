@@ -58,15 +58,15 @@ export async function generateMetadata({
     .eq("username", username)
     .maybeSingle();
 
-  if (!profile) return createNotFoundMetadata("Profilul");
+  if (!profile) return createNotFoundMetadata("Profile");
 
-  const title = `${profile.username} (@${profile.username}) — profil de programare`;
+  const title = `${profile.username} (@${profile.username}) — Programming Profile`;
 
   return createPageMetadata({
     title,
     description: metadataExcerpt(
       profile.bio,
-      `Descoperă profilul lui ${profile.username} pe ScripticX: progres, probleme rezolvate, realizări și activitate în comunitatea de programare.`
+      `Explore ${profile.username}'s ScripticX profile, including progress, solved problems, achievements, and community activity.`
     ),
     path: `/u/${encodeURIComponent(profile.username)}`,
     image: profile.avatar_url || null,
@@ -74,8 +74,8 @@ export async function generateMetadata({
     keywords: [
       profile.username,
       `${profile.username} ScripticX`,
-      "profil programator",
-      "comunitate ScripticX",
+      "programming profile",
+      "ScripticX community",
     ],
   });
 }
@@ -190,12 +190,12 @@ export default async function PublicProfile({
     "@type": "ProfilePage",
     "@id": `${profileUrl}#profile-page`,
     url: profileUrl,
-    name: `${profile.username} pe ${siteConfig.name}`,
+    name: `${profile.username} on ${siteConfig.name}`,
     description: metadataExcerpt(
       profile.bio,
-      `Profilul public al utilizatorului ${profile.username} în comunitatea ScripticX.`
+      `${profile.username}'s public profile in the ScripticX programming community.`
     ),
-    inLanguage: ["ro", "en"],
+    inLanguage: "en",
     isPartOf: {
       "@type": "WebSite",
       "@id": `${siteConfig.url}/#website`,

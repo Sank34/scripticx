@@ -2,15 +2,15 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ScripticX — Platformă educațională de programare",
+    name: "ScripticX — Interactive Programming Platform",
     short_name: "ScripticX",
     description:
-      "Învață programare cu MiniScript+, execuție pas cu pas, evaluare automată și colaborare live.",
+      "Learn programming with MiniScript+, step-by-step execution, automatic evaluation, and live collaboration.",
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#f4f4f5",
     theme_color: "#ffffff",
-    lang: "ro",
+    lang: "en",
     categories: ["education", "developer tools", "productivity"],
     icons: [
       {

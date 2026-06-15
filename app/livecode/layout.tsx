@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Programare live",
+  title: "Live Coding",
   description:
-    "Creează sau accesează sesiuni ScripticX pentru programare colaborativă în timp real.",
+    "Create or join ScripticX sessions for real-time collaborative programming.",
   path: "/livecode",
   noIndex: true,
 });

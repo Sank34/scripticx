@@ -11,6 +11,8 @@ export function useUnreadUpdates() {
   const { data: latestSlug = null } = useQuery({
     queryKey: ["updates", "latest-slug"],
     queryFn: fetchLatestSlug,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const [hasUnread, setHasUnread] = useState(false);
@@ -33,7 +35,7 @@ export function useUnreadUpdates() {
     };
   }, [latestSlug]);
 
-  return hasUnread;
+  return { hasUnread, latestSlug };
 }
 
 export function markUpdatesSeen(slug: string) {

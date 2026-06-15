@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Bazele MiniScript+",
+  title: "MiniScript+ Fundamentals",
   description:
-    "Descoperă structura unui program MiniScript+, instrucțiunile de bază și primele reguli de sintaxă.",
+    "Discover the structure of a MiniScript+ program, its core instructions, and foundational syntax rules.",
   path: "/learn/basics",
 });
 

@@ -5,7 +5,7 @@ import { createPageMetadata } from "@/lib/metadata";
 export const metadata: Metadata = createPageMetadata({
   title: "Dashboard",
   description:
-    "Vezi progresul tău, challenge-ul zilei, scorul, activitatea recentă și clasamentul ScripticX.",
+    "Track your progress, daily challenge, score, recent activity, and ScripticX leaderboard position.",
   path: "/dashboard",
   noIndex: true,
 });

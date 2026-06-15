@@ -20,7 +20,7 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle();
 
-  if (!snippet) return createNotFoundMetadata("Snippet-ul");
+  if (!snippet) return createNotFoundMetadata("Snippet");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -28,19 +28,19 @@ export async function generateMetadata({
     .eq("id", snippet.user_id)
     .maybeSingle();
 
-  const title = snippet.title?.trim() || "Proiect MiniScript+";
-  const author = profile?.username ? ` de ${profile.username}` : "";
+  const title = snippet.title?.trim() || "MiniScript+ Project";
+  const author = profile?.username ? ` by ${profile.username}` : "";
 
   return createPageMetadata({
-    title: `${title} — snippet MiniScript+`,
+    title: `${title} — MiniScript+ Snippet`,
     description: metadataExcerpt(
       snippet.description,
-      `Explorează proiectul MiniScript+ „${title}”${author} pe ScripticX.`
+      `Explore the “${title}” MiniScript+ project${author} on ScripticX.`
     ),
     path: `/editor/${id}`,
     noIndex: !snippet.is_public,
     type: "article",
-    keywords: ["snippet MiniScript+", "proiect de programare", title],
+    keywords: ["MiniScript+ snippet", "programming project", title],
   });
 }
 

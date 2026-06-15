@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Variabile în MiniScript+",
+  title: "Variables in MiniScript+",
   description:
-    "Învață cum se declară, actualizează și folosesc variabilele și valorile în programele MiniScript+.",
+    "Learn how variables and values are declared, updated, and used in MiniScript+ programs.",
   path: "/learn/variables",
 });
 

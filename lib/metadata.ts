@@ -7,21 +7,19 @@ export const siteConfig = {
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
     "https://platform.scripticx.org",
   description:
-    "Platformă educațională pentru învățarea programării cu MiniScript+, editor interactiv, execuție pas cu pas, evaluare automată, analiză de complexitate și colaborare live.",
-  descriptionEn:
     "A programming learning platform with MiniScript+, an interactive editor, step-by-step execution, automatic evaluation, complexity analysis, and live collaboration.",
   logo: "/scripticx-logo-lung.png",
   socialImage: "/social-card.png",
   keywords: [
     "ScripticX",
     "MiniScript+",
-    "învățare programare",
-    "platformă educațională",
-    "editor de cod online",
-    "algoritmică",
-    "evaluare automată",
-    "analiză complexitate",
-    "debugger pas cu pas",
+    "learn programming",
+    "programming education platform",
+    "online code editor",
+    "algorithmic thinking",
+    "automatic code evaluation",
+    "complexity analysis",
+    "step-by-step debugger",
     "live coding",
   ],
 } as const;
@@ -66,8 +64,7 @@ export function createPageMetadata({
       description,
       url: canonical,
       siteName: siteConfig.name,
-      locale: "ro_RO",
-      alternateLocale: ["en_US"],
+      locale: "en_US",
       type,
       images,
     },
@@ -85,16 +82,16 @@ export function createPageMetadata({
         }
       : {
           index: true,
-      follow: true,
-    },
+          follow: true,
+        },
   };
 }
 
 export function createNotFoundMetadata(entity: string): Metadata {
   return {
-    title: `${entity} indisponibil`,
+    title: `${entity} unavailable`,
     description:
-      "Conținutul solicitat nu este disponibil sau nu mai poate fi accesat.",
+      "The requested content is unavailable or can no longer be accessed.",
     robots: {
       index: false,
       follow: false,
@@ -111,7 +108,7 @@ export function localizedMetadataText(
   if (!value || typeof value !== "object") return fallback;
 
   const localized = value as Record<string, unknown>;
-  const candidate = localized.ro || localized.en || Object.values(localized)[0];
+  const candidate = localized.en;
 
   return typeof candidate === "string" && candidate.trim()
     ? candidate.trim()

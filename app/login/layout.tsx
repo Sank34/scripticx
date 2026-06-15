@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Autentificare",
+  title: "Sign In",
   description:
-    "Autentifică-te sau creează un cont pentru a începe experiența ScripticX.",
+    "Sign in or create an account to start learning and building with ScripticX.",
   path: "/login",
   noIndex: true,
 });

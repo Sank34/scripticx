@@ -4,14 +4,14 @@ import LearnLayoutClient from "@/components/learn/LearnLayoutClient";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Documentație MiniScript+",
+  title: "MiniScript+ Documentation",
   description:
-    "Învață sintaxa MiniScript+, variabilele, condițiile, buclele și operațiile de intrare-ieșire prin explicații și exemple practice.",
+    "Learn MiniScript+ syntax, variables, conditions, loops, and input-output operations through practical explanations and examples.",
   path: "/learn",
   keywords: [
-    "documentație MiniScript+",
-    "tutorial programare începători",
-    "sintaxă MiniScript+",
+    "MiniScript+ documentation",
+    "beginner programming tutorial",
+    "MiniScript+ syntax",
   ],
 });
 

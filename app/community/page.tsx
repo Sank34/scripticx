@@ -7,14 +7,14 @@ import { createServerSupabase } from "@/lib/supabaseServer";
 export const revalidate = 3600;
 
 export const metadata = createPageMetadata({
-  title: "Comunitatea ScripticX",
+  title: "ScripticX Community",
   description:
-    "Descoperă profilurile publice ale membrilor ScripticX, progresul lor în programare și activitatea din comunitate.",
+    "Discover public ScripticX member profiles, programming progress, and community activity.",
   path: "/community",
   keywords: [
-    "utilizatori ScripticX",
-    "comunitate programare",
-    "profiluri programatori",
+    "ScripticX users",
+    "programming community",
+    "programmer profiles",
   ],
 });
 
@@ -43,9 +43,9 @@ export default async function CommunityPage() {
     "@type": "CollectionPage",
     "@id": `${communityUrl}#collection`,
     url: communityUrl,
-    name: "Comunitatea ScripticX",
+    name: "ScripticX Community",
     description:
-      "Directorul profilurilor publice ale membrilor comunității ScripticX.",
+      "A directory of public profiles from the ScripticX programming community.",
     isPartOf: {
       "@type": "WebSite",
       "@id": `${siteConfig.url}/#website`,

@@ -4,14 +4,14 @@ import ExamplesLayoutClient from "@/components/examples/ExamplesLayoutClient";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Exemple MiniScript+",
+  title: "MiniScript+ Examples",
   description:
-    "Explorează programe MiniScript+ pentru noțiuni de bază, condiții, bucle și algoritmi, gata de urmărit și rulat în platformă.",
+    "Explore runnable MiniScript+ programs covering fundamentals, conditions, loops, and algorithms.",
   path: "/examples",
   keywords: [
-    "exemple MiniScript+",
-    "algoritmi pentru începători",
-    "exemple cod programare",
+    "MiniScript+ examples",
+    "beginner programming algorithms",
+    "programming code examples",
   ],
 });
 

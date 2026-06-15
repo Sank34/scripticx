@@ -21,11 +21,11 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle();
 
-  if (!problem) return createNotFoundMetadata("Problema");
+  if (!problem) return createNotFoundMetadata("Problem");
 
   const title = localizedMetadataText(
     problem.title_i18n,
-    "Problemă MiniScript+"
+    "MiniScript+ Problem"
   );
   const codePrefix =
     problem.code === null || problem.code === undefined
@@ -36,12 +36,12 @@ export async function generateMetadata({
     title: `${codePrefix}${title}`,
     description: metadataExcerpt(
       problem.description_i18n,
-      `Rezolvă problema „${title}” în MiniScript+ și verifică soluția prin cazuri de test.`
+      `Solve the “${title}” MiniScript+ problem and validate your solution against automated test cases.`
     ),
     path: `/problems/${id}`,
     keywords: [
-      "problemă MiniScript+",
-      `problemă ${problem.difficulty || "programare"}`,
+      "MiniScript+ problem",
+      `${problem.difficulty || "programming"} coding problem`,
       title,
     ],
   });

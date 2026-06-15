@@ -21,19 +21,19 @@ export async function generateMetadata({
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!update) return createNotFoundMetadata("Noutatea");
+  if (!update) return createNotFoundMetadata("Update");
 
-  const title = localizedMetadataText(update.title_i18n, "Noutăți ScripticX");
+  const title = localizedMetadataText(update.title_i18n, "ScripticX Update");
 
   return createPageMetadata({
     title,
     description: metadataExcerpt(
       update.content_i18n,
-      "Descoperă cele mai recente funcționalități și îmbunătățiri ScripticX."
+      "Discover the latest ScripticX features, improvements, and platform changes."
     ),
     path: `/updates/${slug}`,
     type: "article",
-    keywords: ["noutăți ScripticX", "actualizare platformă", title],
+    keywords: ["ScripticX updates", "platform update", title],
   });
 }
 

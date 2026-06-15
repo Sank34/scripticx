@@ -24,7 +24,7 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle();
 
-  if (!post) return createNotFoundMetadata("Postarea");
+  if (!post) return createNotFoundMetadata("Post");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -32,19 +32,19 @@ export async function generateMetadata({
     .eq("id", post.user_id)
     .maybeSingle();
 
-  const username = profile?.username || "Membru ScripticX";
-  const title = `Postare de ${username}`;
+  const username = profile?.username || "ScripticX member";
+  const title = `Post by ${username}`;
 
   return createPageMetadata({
     title,
     description: metadataExcerpt(
       post.content,
-      `Descoperă o postare publicată de ${username} în comunitatea ScripticX.`
+      `Discover a post published by ${username} in the ScripticX programming community.`
     ),
     path: `/post/${id}`,
     image: post.image_url || null,
     type: "article",
-    keywords: ["comunitate programare", "postare ScripticX", username],
+    keywords: ["programming community", "ScripticX post", username],
   });
 }
 

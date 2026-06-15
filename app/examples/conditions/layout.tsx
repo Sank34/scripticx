@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Exemple cu condiții MiniScript+",
+  title: "MiniScript+ Condition Examples",
   description:
-    "Înțelege ramificarea programelor prin exemple IF, ELSE și expresii logice în MiniScript+.",
+    "Understand program branching through MiniScript+ examples using IF, ELSE, and logical expressions.",
   path: "/examples/conditions",
 });
 

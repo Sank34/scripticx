@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Bucle în MiniScript+",
+  title: "Loops in MiniScript+",
   description:
-    "Învață să repeți instrucțiuni cu WHILE și să urmărești pas cu pas evoluția variabilelor.",
+    "Learn how to repeat instructions with WHILE and follow variable changes step by step.",
   path: "/learn/loops",
 });
 

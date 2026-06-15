@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Căutare",
-  description: "Găsește utilizatori și conținut în comunitatea ScripticX.",
+  title: "Search",
+  description: "Find users and content across the ScripticX community.",
   path: "/search",
   noIndex: true,
 });

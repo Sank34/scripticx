@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 export const alt =
-  "ScripticX — platformă educațională pentru programare cu MiniScript+";
+  "ScripticX — interactive programming platform powered by MiniScript+";
 export const size = {
   width: 1200,
   height: 630,
@@ -60,7 +60,7 @@ export default function OpenGraphImageTemplate() {
                 maxWidth: "900px",
               }}
             >
-              Învață programare înțelegând cum funcționează codul.
+              Learn programming by understanding how code works.
             </div>
             <div
               style={{
@@ -70,7 +70,7 @@ export default function OpenGraphImageTemplate() {
                 maxWidth: "900px",
               }}
             >
-              MiniScript+ · execuție pas cu pas · evaluare automată · live coding
+              MiniScript+ · step-by-step execution · automatic evaluation · live coding
             </div>
           </div>
 

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import { UpdatesEmptyState } from "./empty-state";
 
+export const dynamic = "force-dynamic";
+
 export default async function UpdatesIndex() {
   const supabase = createServerSupabase();
   const { data } = await supabase

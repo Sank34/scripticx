@@ -4,11 +4,11 @@ import UpdatesLayoutClient from "@/components/updates/UpdatesLayoutClient";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Noutăți și actualizări",
+  title: "What's New",
   description:
-    "Descoperă funcționalitățile noi, îmbunătățirile și corecțiile lansate în platforma ScripticX.",
+    "Explore new features, improvements, and fixes released across the ScripticX platform.",
   path: "/updates",
-  keywords: ["noutăți ScripticX", "changelog ScripticX", "actualizări platformă"],
+  keywords: ["ScripticX updates", "ScripticX changelog", "platform releases"],
 });
 
 export default function UpdatesLayout({
