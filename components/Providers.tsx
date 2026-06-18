@@ -18,6 +18,7 @@ const realtimeInvalidationTargets = [
   "problems",
   "classes",
   "updates",
+  "community",
   "contact_messages",
   "editor-snippets",
   "notifications",

@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { Heart, MessageCircle, Share2, Trash2 } from "lucide-react";
 
 import type { FeedPost } from "@/lib/api";
 import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { MentionText } from "@/components/feed/MentionText";
 
 type FeedPostCardLabels = {
   deletePost: string;
@@ -56,8 +56,19 @@ export function FeedPostCard({
         </button>
       )}
 
-      <Link href={`/post/${post.id}`}>
-        <CardHeader className="flex cursor-pointer flex-row items-center gap-3 pr-14">
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={() => onCommentsOpen(post.id)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onCommentsOpen(post.id);
+          }
+        }}
+        className="cursor-pointer"
+      >
+        <CardHeader className="flex flex-row items-center gap-3 pr-14">
           <UserAvatar
             avatarUrl={post.profiles?.avatar_url}
             username={username}
@@ -80,8 +91,12 @@ export function FeedPostCard({
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3 cursor-pointer pt-4">
-          <p className="whitespace-pre-wrap">{post.content}</p>
+        <CardContent className="space-y-3 pt-4">
+          <MentionText
+            content={post.content}
+            className="whitespace-pre-wrap"
+            onMentionOpen={onAuthorOpen}
+          />
 
           {post.image_url && (
             // Feed images are uploaded by users, so plain img avoids extra remote image config.
@@ -97,7 +112,7 @@ export function FeedPostCard({
             <HighlightedCodeBlock code={post.code} />
           )}
         </CardContent>
-      </Link>
+      </div>
 
       <div className="px-6 pb-5 pt-1 flex items-center gap-4 text-sm">
         <button

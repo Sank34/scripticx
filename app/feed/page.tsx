@@ -7,6 +7,7 @@ import RouteGuard from "@/components/RouteGuard";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
 import { FeedPostCard } from "@/components/feed/FeedPostCard";
+import { MentionTextarea } from "@/components/feed/MentionTextarea";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -248,12 +249,18 @@ function FeedContent() {
                     </div>
                   </div>
 
-                  <Textarea
-                    placeholder={t("feed.whatsOnYourMind")}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    className="min-h-[120px]"
-                  />
+                  {user ? (
+                    <MentionTextarea
+                      emptyLabel={t("feed.mentions.empty")}
+                      followedLabel={t("feed.mentions.following")}
+                      loadingLabel={t("feed.mentions.loading")}
+                      onChange={setContent}
+                      placeholder={t("feed.whatsOnYourMind")}
+                      searchLabel={t("feed.mentions.search")}
+                      userId={user.id}
+                      value={content}
+                    />
+                  ) : null}
 
                   <div className="flex items-center justify-between">
                     <button

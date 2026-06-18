@@ -17,6 +17,7 @@ import {
   AvatarFallback,
 } from "@/components/ui/avatar";
 import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
+import { MentionText } from "@/components/feed/MentionText";
 import PostComments from "@/components/PostComments";
 
 import { Heart, MessageCircle, Share2 } from "lucide-react";
@@ -172,7 +173,10 @@ function ClientPost({
         </CardHeader>
 
         <CardContent className="space-y-3">
-          <p className="whitespace-pre-wrap">{post.content}</p>
+          <MentionText
+            content={post.content}
+            className="whitespace-pre-wrap"
+          />
 
           {post.image_url && (
             <img

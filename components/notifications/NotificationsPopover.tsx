@@ -152,6 +152,17 @@ function getLocalizedNotification(
     };
   }
 
+  if (notification.type === "post_mention") {
+    return {
+      title: ro
+        ? `${username} te-a menționat într-o postare`
+        : `${username} mentioned you in a post`,
+      body:
+        notification.body ||
+        (ro ? "Deschide postarea în ScripticX." : "Open the post on ScripticX."),
+    };
+  }
+
   if (notification.type === "follow") {
     return {
       title: ro

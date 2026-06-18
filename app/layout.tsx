@@ -5,7 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { Topbar } from "@/components/Topbar";
 import "./globals.css";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { MobileDrawer } from "@/components/MobileDrawer";
 import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
@@ -157,7 +157,22 @@ export default function RootLayout({
           </LanguageProvider>
         </Providers>
 
-        <Toaster position="bottom-right" richColors />
+        <Toaster
+          position="top-center"
+          richColors={false}
+          closeButton
+          toastOptions={{
+            classNames: {
+              toast:
+                "border-zinc-200 bg-white text-zinc-900 shadow-lg",
+              description: "text-zinc-500",
+              actionButton: "bg-zinc-950 text-white",
+              cancelButton: "bg-zinc-100 text-zinc-700",
+              closeButton:
+                "border-zinc-200 bg-white text-zinc-500 hover:text-zinc-950",
+            },
+          }}
+        />
       </body>
     </html>
   );

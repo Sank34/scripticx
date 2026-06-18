@@ -440,6 +440,18 @@ export const translations = {
       community: "ScripticX Community",
     },
 
+    community: {
+      title: "ScripticX Community",
+      description:
+        "Discover community members, their progress, and the projects they have published on ScripticX.",
+      publicProfiles: "{count} public profiles",
+      sectionLabel: "Public ScripticX profiles",
+      avatarLabel: "{username}'s profile picture",
+      memberFallback: "ScripticX community member",
+      points: "pts",
+      empty: "Public profiles are currently unavailable.",
+    },
+
     dashboard: {
       title: "Dashboard",
       overview: "Overview",
@@ -491,6 +503,12 @@ export const translations = {
       deletePost: "Delete post",
       deleted: "Post deleted.",
       deleteFailed: "The post could not be deleted.",
+      mentions: {
+        following: "People you follow",
+        search: "Search ScripticX users",
+        loading: "Searching users...",
+        empty: "No matching users found.",
+      },
       deleteDialog: {
         title: "Delete this post?",
         description:
@@ -1711,6 +1729,18 @@ export const translations = {
       community: "Comunitatea ScripticX",
     },
 
+    community: {
+      title: "Comunitatea ScripticX",
+      description:
+        "Descoperă membrii comunității, progresul lor și proiectele publicate pe ScripticX.",
+      publicProfiles: "{count} profiluri publice",
+      sectionLabel: "Profiluri publice ScripticX",
+      avatarLabel: "Imaginea de profil a utilizatorului {username}",
+      memberFallback: "Membru al comunității ScripticX",
+      points: "pct",
+      empty: "Profilurile publice nu sunt disponibile momentan.",
+    },
+
     dashboard: {
       title: "Panou",
       overview: "Prezentare",
@@ -1762,6 +1792,12 @@ export const translations = {
       deletePost: "Șterge postarea",
       deleted: "Postarea a fost ștearsă.",
       deleteFailed: "Postarea nu a putut fi ștearsă.",
+      mentions: {
+        following: "Persoane pe care le urmărești",
+        search: "Caută utilizatori ScripticX",
+        loading: "Se caută utilizatori...",
+        empty: "Nu am găsit utilizatori potriviți.",
+      },
       deleteDialog: {
         title: "Ștergi această postare?",
         description:

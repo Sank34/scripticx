@@ -189,3 +189,20 @@ nextjs-portal {
   top: 9px;
   width: 6px !important;
 }
+
+[data-sonner-toaster] {
+  --toast-close-button-start: unset;
+  --toast-close-button-end: 0;
+  --toast-close-button-transform: translate(35%, -35%);
+}
+
+.cn-toast [data-close-button] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cn-toast:hover [data-close-button],
+.cn-toast:focus-within [data-close-button] {
+  opacity: 1;
+  pointer-events: auto;
+}

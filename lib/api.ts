@@ -1,5 +1,6 @@
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { extractMentionUsernames } from "@/lib/mentions";
 
 export type ProfileSummary = {
   id: string;
@@ -9,6 +10,13 @@ export type ProfileSummary = {
   banned?: boolean | null;
   total_score?: number | null;
   [key: string]: unknown;
+};
+
+export type MentionCandidate = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  isFollowing: boolean;
 };
 
 export type FeedPost = {
@@ -330,6 +338,64 @@ class ProfilesApi {
 
     return data || [];
   }
+
+  async searchMentionCandidates(
+    userId: string,
+    query: string,
+    limit = 12
+  ): Promise<MentionCandidate[]> {
+    const normalizedQuery = query.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+    const { data: followRows, error: followsError } = await this.client
+      .from("follows")
+      .select("following_id")
+      .eq("follower_id", userId);
+
+    if (followsError) throw followsError;
+
+    const followingIds = new Set(
+      ((followRows || []) as FollowRow[]).map((row) => row.following_id)
+    );
+
+    let profilesQuery = this.client
+      .from("profiles")
+      .select("id, username, avatar_url")
+      .neq("id", userId)
+      .not("username", "is", null)
+      .order("username", { ascending: true })
+      .limit(Math.max(limit * 3, 30));
+
+    if (normalizedQuery) {
+      profilesQuery = profilesQuery.ilike(
+        "username",
+        `%${normalizedQuery}%`
+      );
+    } else if (followingIds.size > 0) {
+      profilesQuery = profilesQuery.in("id", [...followingIds]);
+    } else {
+      return [];
+    }
+
+    const { data, error } = await profilesQuery;
+    if (error) throw error;
+
+    return ((data || []) as ProfileSummary[])
+      .filter(
+        (profile): profile is ProfileSummary & { username: string } =>
+          Boolean(profile.username)
+      )
+      .map((profile) => ({
+        id: profile.id,
+        username: profile.username,
+        avatar_url: profile.avatar_url || null,
+        isFollowing: followingIds.has(profile.id),
+      }))
+      .sort(
+        (left, right) =>
+          Number(right.isFollowing) - Number(left.isFollowing) ||
+          left.username.localeCompare(right.username)
+      )
+      .slice(0, limit);
+  }
 }
 
 class FeedApi {
@@ -484,16 +550,68 @@ class FeedApi {
       imageUrl = data.publicUrl;
     }
 
-    const { error } = await this.client.from("posts").insert([
-      {
+    const { data: post, error } = await this.client
+      .from("posts")
+      .insert({
         user_id: userId,
         content,
         code: code || null,
         image_url: imageUrl,
-      },
-    ]);
+      })
+      .select("id, user_id, content, code, image_url, created_at")
+      .single<FeedPost>();
 
     if (error) throw error;
+
+    const mentionedUsernames = extractMentionUsernames(content);
+
+    if (mentionedUsernames.length > 0) {
+      const [{ data: mentionedProfiles, error: profilesError }, actor] =
+        await Promise.all([
+          this.client
+            .from("profiles")
+            .select("id, username")
+            .in("username", mentionedUsernames),
+          this.profiles.getSummary(userId),
+        ]);
+
+      if (profilesError) {
+        console.warn("Could not resolve mentioned users.", profilesError);
+      } else {
+        const recipients = (mentionedProfiles || []).filter(
+          (profile) => profile.id !== userId
+        );
+
+        if (recipients.length > 0) {
+          const { error: notificationError } = await this.client
+            .from("notifications")
+            .insert(
+              recipients.map((profile) => ({
+                user_id: profile.id,
+                actor_id: userId,
+                type: "post_mention",
+                title: `${actor?.username || "Someone"} mentioned you in a post`,
+                body: content.slice(0, 160),
+                href: `/post/${post.id}`,
+                metadata: {
+                  postId: post.id,
+                  username: actor?.username || null,
+                  mentionedUsername: profile.username,
+                },
+              }))
+            );
+
+          if (notificationError) {
+            console.warn(
+              "Could not create mention notifications.",
+              notificationError
+            );
+          }
+        }
+      }
+    }
+
+    return post;
   }
 
   async deletePost(postId: string) {
