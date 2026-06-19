@@ -3,11 +3,19 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-const Toaster = ({ ...props }: ToasterProps) => {
+import { cn } from "@/lib/utils"
+
+const Toaster = ({
+  className,
+  style,
+  toastOptions,
+  ...props
+}: ToasterProps) => {
   return (
     <Sonner
+      {...props}
       theme="light"
-      className="toaster group"
+      className={cn("toaster group", className)}
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
@@ -31,14 +39,23 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "#18181b",
           "--normal-border": "#e4e4e7",
           "--border-radius": "var(--radius)",
+          "--toast-close-button-start": "unset",
+          "--toast-close-button-end": "0",
+          "--toast-close-button-transform": "translate(35%, -35%)",
+          ...style,
         } as React.CSSProperties
       }
       toastOptions={{
+        ...toastOptions,
         classNames: {
-          toast: "cn-toast",
+          ...toastOptions?.classNames,
+          toast: cn("cn-toast", toastOptions?.classNames?.toast),
+          closeButton: cn(
+            "sonner-close-button",
+            toastOptions?.classNames?.closeButton
+          ),
         },
       }}
-      {...props}
     />
   )
 }
