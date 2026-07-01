@@ -56,17 +56,20 @@ function EditProblemContent() {
           {t("admin.problems.editPage.title")}
         </h1>
         {problem.author?.username && (
-          <Link
-            href={`/u/${problem.author.username}`}
-            className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:underline"
-          >
-            <UserAvatar
-              avatarUrl={problem.author.avatar_url}
-              username={problem.author.username}
-              className="h-5 w-5"
-            />
-            @{problem.author.username}
-          </Link>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {t("admin.problems.editPage.publishedBy")}
+            <Link
+              href={`/u/${problem.author.username}`}
+              className="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline"
+            >
+              <UserAvatar
+                avatarUrl={problem.author.avatar_url}
+                username={problem.author.username}
+                className="h-5 w-5"
+              />
+              {problem.author.username}
+            </Link>
+          </p>
         )}
       </div>
 

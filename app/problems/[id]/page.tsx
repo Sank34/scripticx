@@ -466,17 +466,20 @@ function ProblemContent() {
               <div className="space-y-4 px-5 py-5">
                 <div className="space-y-1.5">
                   {problem.author?.username && (
-                    <Link
-                      href={`/u/${problem.author.username}`}
-                      className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:underline"
-                    >
-                      <UserAvatar
-                        avatarUrl={problem.author.avatar_url}
-                        username={problem.author.username}
-                        className="h-5 w-5"
-                      />
-                      @{problem.author.username}
-                    </Link>
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {t("problemPage.publishedBy")}
+                      <Link
+                        href={`/u/${problem.author.username}`}
+                        className="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline"
+                      >
+                        <UserAvatar
+                          avatarUrl={problem.author.avatar_url}
+                          username={problem.author.username}
+                          className="h-5 w-5"
+                        />
+                        {problem.author.username}
+                      </Link>
+                    </p>
                   )}
                   <h2 className="text-xl font-bold tracking-tight">
                     {localizedTitle}

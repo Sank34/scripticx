@@ -388,6 +388,7 @@ export const translations = {
 
     problemPage: {
       notFound: "Problem not found",
+      publishedBy: "Published by",
 
       actions: {
         submit: "Submit",
@@ -999,6 +1000,7 @@ export const translations = {
         editPage: {
           title: "Edit Problem",
           notFound: "Problem not found",
+          publishedBy: "Published by",
         },
         form: {
           addLanguage: "Add language",
@@ -1677,6 +1679,7 @@ export const translations = {
 
     problemPage: {
       notFound: "Problema nu a fost găsită",
+      publishedBy: "Publicat de",
 
       actions: {
         submit: "Trimite",
@@ -2288,6 +2291,7 @@ export const translations = {
         editPage: {
           title: "Editează problemă",
           notFound: "Problema nu a fost găsită",
+          publishedBy: "Publicat de",
         },
         form: {
           addLanguage: "Adaugă limbă",
