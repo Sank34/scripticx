@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useParams, useRouter } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
 import { ProblemForm } from "@/components/admin/ProblemForm";
+import { UserAvatar } from "@/components/user/UserAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -22,7 +24,7 @@ function EditProblemContent() {
     async function fetchProblem() {
       const { data } = await supabase
         .from("problems")
-        .select("*")
+        .select("*, author:profiles!problems_author_id_fkey(id, username, avatar_url)")
         .eq("id", id)
         .single();
 
@@ -49,9 +51,24 @@ function EditProblemContent() {
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
 
-      <h1 className="text-2xl font-bold">
-        {t("admin.problems.editPage.title")}
-      </h1>
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-bold">
+          {t("admin.problems.editPage.title")}
+        </h1>
+        {problem.author?.username && (
+          <Link
+            href={`/u/${problem.author.username}`}
+            className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:underline"
+          >
+            <UserAvatar
+              avatarUrl={problem.author.avatar_url}
+              username={problem.author.username}
+              className="h-5 w-5"
+            />
+            @{problem.author.username}
+          </Link>
+        )}
+      </div>
 
       <ProblemForm
         initialData={problem}

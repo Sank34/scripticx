@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
 import type { OnMount } from "@monaco-editor/react";
@@ -19,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { checkAchievements } from "@/lib/achievements";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
+import { UserAvatar } from "@/components/user/UserAvatar";
 import { Markdown } from "@/components/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,7 +85,7 @@ function ProblemContent() {
       const [{ data }, todayChallenge] = await Promise.all([
         supabase
           .from("problems")
-          .select("*")
+          .select("*, author:profiles!problems_author_id_fkey(id, username, avatar_url)")
           .eq("id", id)
           .single(),
         api.dailyChallenges.getForDate(),
@@ -462,9 +464,24 @@ function ProblemContent() {
 
             <TabsContent value="description" className="mt-0 min-h-0 flex-1 overflow-y-auto">
               <div className="space-y-4 px-5 py-5">
-                <h2 className="text-xl font-bold tracking-tight">
-                  {localizedTitle}
-                </h2>
+                <div className="space-y-1.5">
+                  {problem.author?.username && (
+                    <Link
+                      href={`/u/${problem.author.username}`}
+                      className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:underline"
+                    >
+                      <UserAvatar
+                        avatarUrl={problem.author.avatar_url}
+                        username={problem.author.username}
+                        className="h-5 w-5"
+                      />
+                      @{problem.author.username}
+                    </Link>
+                  )}
+                  <h2 className="text-xl font-bold tracking-tight">
+                    {localizedTitle}
+                  </h2>
+                </div>
                 {dailyChallenge && (
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="bg-orange-600 hover:bg-orange-600">
