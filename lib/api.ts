@@ -112,6 +112,113 @@ export type DailyChallenge = {
   } | null;
 };
 
+export type StudyGroup = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  visibility?: "public" | "private" | string | null;
+  owner_id: string;
+  avatar_url?: string | null;
+  created_at?: string | null;
+  member_count?: number | null;
+  channel_count?: number | null;
+  role?: string | null;
+  status?: string | null;
+  owner?: ProfileSummary | null;
+};
+
+export type StudyGroupActivitySummary = {
+  groupId: string;
+  latestMessageAt: string | null;
+  unreadMentionCount: number;
+  channels: Array<{
+    channelId: string;
+    latestMessageAt: string | null;
+    unreadMentionCount: number;
+  }>;
+};
+
+export type StudyGroupMember = {
+  id?: string;
+  group_id: string;
+  user_id: string;
+  role?: "owner" | "admin" | "member" | string | null;
+  status?: "active" | "pending" | "invited" | string | null;
+  created_at?: string | null;
+  profiles?: ProfileSummary | ProfileSummary[] | null;
+};
+
+export type StudyGroupChannel = {
+  id: string;
+  group_id: string;
+  name: string;
+  type?: "text" | "code" | string | null;
+  position?: number | null;
+  created_at?: string | null;
+};
+
+export type StudyGroupMessage = {
+  id: string;
+  group_id: string;
+  channel_id: string;
+  user_id: string;
+  content: string;
+  kind?: "message" | "system" | string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+  profiles?: ProfileSummary | ProfileSummary[] | null;
+  reactions?: StudyGroupMessageReaction[];
+};
+
+export type StudyGroupMessageReaction = {
+  id?: string;
+  group_id?: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at?: string | null;
+  profiles?: ProfileSummary | ProfileSummary[] | null;
+};
+
+export type StudyGroupInvite = {
+  id: string;
+  group_id: string;
+  token: string;
+  created_by: string;
+  created_at?: string | null;
+  expires_at?: string | null;
+  max_uses?: number | null;
+  uses?: number | null;
+  active?: boolean | null;
+  study_groups?: StudyGroup | StudyGroup[] | null;
+};
+
+export type StudyGroupInvitePreview = {
+  userId: string | null;
+  invite: StudyGroupInvite | null;
+  group: StudyGroup | null;
+  membership: StudyGroupMember | null;
+  memberCount: number;
+  channelCount: number;
+  expired: boolean;
+  full: boolean;
+};
+
+export type StudyGroupsData = {
+  userId: string | null;
+  myGroups: StudyGroup[];
+  publicGroups: StudyGroup[];
+};
+
+export type StudyGroupWorkspace = {
+  userId: string | null;
+  group: StudyGroup | null;
+  membership: StudyGroupMember | null;
+  channels: StudyGroupChannel[];
+  members: StudyGroupMember[];
+};
+
 type SupabaseAuthSubscription = ReturnType<
   SupabaseClient["auth"]["onAuthStateChange"]
 >["data"]["subscription"];
@@ -813,6 +920,38 @@ class NotificationsApi {
 
     if (error) throw error;
   }
+
+  async markGroupMentionsAsRead(userId: string, groupId: string) {
+    const { data, error } = await this.client
+      .from("notifications")
+      .select("id, metadata")
+      .eq("user_id", userId)
+      .eq("type", "group_message")
+      .is("read_at", null);
+
+    if (error?.code === "42P01" || error?.code === "PGRST205") {
+      console.warn("Notifications table is not available yet.", error);
+      return;
+    }
+
+    if (error) throw error;
+
+    const ids = (data || [])
+      .filter((notification: { id: string; metadata?: Record<string, unknown> | null }) => {
+        return notification.metadata?.groupId === groupId;
+      })
+      .map((notification: { id: string }) => notification.id);
+
+    if (!ids.length) return;
+
+    const { error: updateError } = await this.client
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .in("id", ids);
+
+    if (updateError) throw updateError;
+  }
 }
 
 class LiveApi {
@@ -1365,6 +1504,1139 @@ class DailyChallengesApi {
   }
 }
 
+function normalizeGroupSlug(value: string) {
+  const slug = value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+
+  return slug || `group-${Date.now().toString(36)}`;
+}
+
+function createInviteToken() {
+  const randomPart =
+    globalThis.crypto?.randomUUID?.().replace(/-/g, "") ||
+    Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+  return randomPart.slice(0, 18);
+}
+
+function getJoinedProfile<T>(
+  value: T | T[] | null | undefined
+): T | null {
+  return Array.isArray(value) ? value[0] || null : value || null;
+}
+
+class StudyGroupsApi {
+  constructor(private readonly client: SupabaseClient) {}
+
+  private async getGroupIdentity(groupId: string) {
+    const { data, error } = await this.client
+      .from("study_groups")
+      .select("id, name, slug")
+      .eq("id", groupId)
+      .maybeSingle<{ id: string; name: string; slug: string }>();
+
+    if (error) throw error;
+
+    return data || null;
+  }
+
+  private async getDefaultChannelId(groupId: string) {
+    const { data, error } = await this.client
+      .from("study_group_channels")
+      .select("id, name")
+      .eq("group_id", groupId)
+      .order("position", { ascending: true });
+
+    if (error) throw error;
+
+    return (
+      data?.find((channel) => channel.name === "general")?.id ||
+      data?.[0]?.id ||
+      null
+    );
+  }
+
+  private async insertSystemMessage(input: {
+    groupId: string;
+    channelId?: string | null;
+    userId: string;
+    content: string;
+    metadata?: Record<string, unknown>;
+  }) {
+    const channelId =
+      input.channelId || (await this.getDefaultChannelId(input.groupId));
+
+    if (!channelId) return;
+
+    const { error } = await this.client.from("study_group_messages").insert({
+      group_id: input.groupId,
+      channel_id: channelId,
+      user_id: input.userId,
+      content: input.content,
+      kind: "system",
+      metadata: input.metadata || {},
+    });
+
+    if (error) throw error;
+  }
+
+  private async notifyGroupMembers(input: {
+    groupId: string;
+    channelId: string;
+    messageId?: string | null;
+    senderId: string;
+    content: string;
+    locale?: "en" | "ro" | string;
+  }) {
+    const mentionedUsernames = extractMentionUsernames(input.content);
+
+    if (!mentionedUsernames.length) return;
+
+    const mentionedSet = new Set(mentionedUsernames);
+    const [{ data: members, error: membersError }, group, sender] =
+      await Promise.all([
+        this.client
+          .from("study_group_members")
+          .select("user_id, profiles:user_id(username)")
+          .eq("group_id", input.groupId)
+          .eq("status", "active"),
+        this.getGroupIdentity(input.groupId),
+        new ProfilesApi(this.client).getSummary(input.senderId),
+      ]);
+
+    if (membersError) throw membersError;
+    if (!group) return;
+
+    const recipientIds = [
+      ...new Set(
+        (members || [])
+          .filter(
+            (member: {
+              user_id?: string | null;
+              profiles?:
+                | { username?: string | null }
+                | { username?: string | null }[]
+                | null;
+            }) => {
+              const profile = getJoinedProfile(member.profiles);
+              const username = profile?.username?.toLowerCase();
+
+              return (
+                Boolean(member.user_id) &&
+                member.user_id !== input.senderId &&
+                Boolean(username) &&
+                mentionedSet.has(username || "")
+              );
+            }
+          )
+          .map((member: { user_id?: string | null }) => member.user_id)
+          .filter(
+            (userId): userId is string =>
+              Boolean(userId) && userId !== input.senderId
+          )
+      ),
+    ];
+
+    if (!recipientIds.length) return;
+
+    const actorName = sender?.username || "Someone";
+    const preview =
+      input.content.length > 120
+        ? `${input.content.slice(0, 117).trim()}...`
+        : input.content;
+    const isRo = input.locale === "ro";
+
+    const { error } = await this.client.from("notifications").insert(
+      recipientIds.map((userId) => ({
+        user_id: userId,
+        actor_id: input.senderId,
+        type: "group_message",
+        title: isRo
+          ? `${actorName} te-a menționat în ${group.name}`
+          : `${actorName} mentioned you in ${group.name}`,
+        body: preview,
+        href: `/groups/${group.slug}`,
+        metadata: {
+          groupId: input.groupId,
+          channelId: input.channelId,
+          messageId: input.messageId || null,
+          mentionedUsernames,
+        },
+      }))
+    );
+
+    if (error) {
+      console.warn("Could not create group message notifications.", error);
+    }
+  }
+
+  private async enrichGroups(
+    groups: StudyGroup[],
+    userId?: string | null
+  ): Promise<StudyGroup[]> {
+    if (!groups.length) return [];
+
+    const groupIds = groups.map((group) => group.id);
+
+    const [
+      { data: memberRows, error: membersError },
+      { data: channelRows, error: channelsError },
+      { data: membershipRows, error: membershipError },
+    ] = await Promise.all([
+      this.client
+        .from("study_group_members")
+        .select("group_id")
+        .in("group_id", groupIds)
+        .eq("status", "active"),
+      this.client
+        .from("study_group_channels")
+        .select("group_id")
+        .in("group_id", groupIds),
+      userId
+        ? this.client
+            .from("study_group_members")
+            .select("group_id, role, status")
+            .in("group_id", groupIds)
+            .eq("user_id", userId)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (membersError) throw membersError;
+    if (channelsError) throw channelsError;
+    if (membershipError) throw membershipError;
+
+    const memberCounts = new Map<string, number>();
+    const channelCounts = new Map<string, number>();
+    const memberships = new Map<
+      string,
+      { group_id: string; role?: string | null; status?: string | null }
+    >();
+
+    (memberRows || []).forEach((row: { group_id: string }) => {
+      memberCounts.set(row.group_id, (memberCounts.get(row.group_id) || 0) + 1);
+    });
+
+    (channelRows || []).forEach((row: { group_id: string }) => {
+      channelCounts.set(row.group_id, (channelCounts.get(row.group_id) || 0) + 1);
+    });
+
+    (
+      (membershipRows || []) as Array<{
+        group_id: string;
+        role?: string | null;
+        status?: string | null;
+      }>
+    ).forEach((row) => {
+      memberships.set(row.group_id, row);
+    });
+
+    return groups.map((group) => {
+      const membership = memberships.get(group.id);
+
+      return {
+        ...group,
+        member_count: memberCounts.get(group.id) || 0,
+        channel_count: channelCounts.get(group.id) || 0,
+        role: membership?.role || null,
+        status: membership?.status || null,
+      };
+    });
+  }
+
+  async getGroupsData(): Promise<StudyGroupsData> {
+    const { data: sessionData } = await this.client.auth.getSession();
+    const userId = sessionData.session?.user?.id || null;
+
+    const { data: publicData, error: publicError } = await this.client
+      .from("study_groups")
+      .select("*")
+      .eq("visibility", "public")
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (publicError) throw publicError;
+
+    let myGroups: StudyGroup[] = [];
+
+    if (userId) {
+      const { data: memberships, error: membershipError } = await this.client
+        .from("study_group_members")
+        .select("group_id, role, status, study_groups(*)")
+        .eq("user_id", userId)
+        .in("status", ["active", "pending", "invited"]);
+
+      if (membershipError) throw membershipError;
+
+      myGroups = ((memberships || []) as Array<{
+        role?: string | null;
+        status?: string | null;
+        study_groups?: StudyGroup | StudyGroup[] | null;
+      }>)
+        .flatMap((row) => {
+          const group = Array.isArray(row.study_groups)
+            ? row.study_groups[0]
+            : row.study_groups;
+
+          if (!group) return [];
+
+          return [{
+            ...group,
+            role: row.role || null,
+            status: row.status || null,
+          }];
+        });
+    }
+
+    return {
+      userId,
+      myGroups: await this.enrichGroups(myGroups, userId),
+      publicGroups: await this.enrichGroups(
+        (publicData || []) as StudyGroup[],
+        userId
+      ),
+    };
+  }
+
+  async listActivity(userId: string): Promise<StudyGroupActivitySummary[]> {
+    const { data: memberships, error: membershipError } = await this.client
+      .from("study_group_members")
+      .select("group_id")
+      .eq("user_id", userId)
+      .eq("status", "active");
+
+    if (membershipError) throw membershipError;
+
+    const groupIds = [
+      ...new Set(
+        (memberships || [])
+          .map((row: { group_id?: string | null }) => row.group_id)
+          .filter((groupId): groupId is string => Boolean(groupId))
+      ),
+    ];
+
+    if (!groupIds.length) return [];
+
+    const [
+      { data: messageRows, error: messagesError },
+      { data: notificationRows, error: notificationsError },
+    ] = await Promise.all([
+      this.client
+        .from("study_group_messages")
+        .select("group_id, channel_id, created_at, user_id")
+        .in("group_id", groupIds)
+        .neq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(300),
+      this.client
+        .from("notifications")
+        .select("id, metadata")
+        .eq("user_id", userId)
+        .eq("type", "group_message")
+        .is("read_at", null),
+    ]);
+
+    if (messagesError) throw messagesError;
+
+    if (
+      notificationsError &&
+      notificationsError.code !== "42P01" &&
+      notificationsError.code !== "PGRST205"
+    ) {
+      throw notificationsError;
+    }
+
+    const latestMessageByGroup = new Map<string, string>();
+    const latestMessageByChannel = new Map<string, Map<string, string>>();
+    for (const row of (messageRows || []) as Array<{
+      group_id?: string | null;
+      channel_id?: string | null;
+      created_at?: string | null;
+    }>) {
+      if (!row.group_id || !row.created_at) continue;
+      if (!latestMessageByGroup.has(row.group_id)) {
+        latestMessageByGroup.set(row.group_id, row.created_at);
+      }
+
+      if (row.channel_id) {
+        const groupChannels =
+          latestMessageByChannel.get(row.group_id) || new Map<string, string>();
+
+        if (!groupChannels.has(row.channel_id)) {
+          groupChannels.set(row.channel_id, row.created_at);
+        }
+
+        latestMessageByChannel.set(row.group_id, groupChannels);
+      }
+    }
+
+    const mentionCounts = new Map<string, number>();
+    const mentionCountsByChannel = new Map<string, Map<string, number>>();
+    for (const notification of (notificationRows || []) as Array<{
+      metadata?: Record<string, unknown> | null;
+    }>) {
+      const groupId =
+        typeof notification.metadata?.groupId === "string"
+          ? notification.metadata.groupId
+          : null;
+      const channelId =
+        typeof notification.metadata?.channelId === "string"
+          ? notification.metadata.channelId
+          : null;
+
+      if (!groupId) continue;
+
+      mentionCounts.set(groupId, (mentionCounts.get(groupId) || 0) + 1);
+
+      if (channelId) {
+        const groupChannels =
+          mentionCountsByChannel.get(groupId) || new Map<string, number>();
+
+        groupChannels.set(channelId, (groupChannels.get(channelId) || 0) + 1);
+        mentionCountsByChannel.set(groupId, groupChannels);
+      }
+    }
+
+    return groupIds.map((groupId) => {
+      const channelIds = new Set<string>([
+        ...Array.from(latestMessageByChannel.get(groupId)?.keys() || []),
+        ...Array.from(mentionCountsByChannel.get(groupId)?.keys() || []),
+      ]);
+
+      return {
+        groupId,
+        latestMessageAt: latestMessageByGroup.get(groupId) || null,
+        unreadMentionCount: mentionCounts.get(groupId) || 0,
+        channels: Array.from(channelIds).map((channelId) => ({
+          channelId,
+          latestMessageAt:
+            latestMessageByChannel.get(groupId)?.get(channelId) || null,
+          unreadMentionCount:
+            mentionCountsByChannel.get(groupId)?.get(channelId) || 0,
+        })),
+      };
+    });
+  }
+
+  async createGroup(input: {
+    ownerId: string;
+    name: string;
+    description?: string | null;
+    visibility: "public" | "private";
+  }) {
+    const baseSlug = normalizeGroupSlug(input.name);
+    const slug = `${baseSlug}-${Date.now().toString(36).slice(-5)}`;
+
+    const { data: group, error: groupError } = await this.client
+      .from("study_groups")
+      .insert({
+        name: input.name.trim(),
+        slug,
+        description: input.description?.trim() || null,
+        visibility: input.visibility,
+        owner_id: input.ownerId,
+      })
+      .select()
+      .single<StudyGroup>();
+
+    if (groupError) throw groupError;
+
+    const { error: memberError } = await this.client
+      .from("study_group_members")
+      .insert({
+        group_id: group.id,
+        user_id: input.ownerId,
+        role: "owner",
+        status: "active",
+      });
+
+    if (memberError) throw memberError;
+
+    const defaultChannels = [
+      { name: "general", type: "text", position: 0 },
+      { name: "help", type: "text", position: 1 },
+      { name: "solutions", type: "text", position: 2 },
+      { name: "live-code", type: "code", position: 3 },
+    ];
+
+    const { error: channelError } = await this.client
+      .from("study_group_channels")
+      .insert(
+        defaultChannels.map((channel) => ({
+          ...channel,
+          group_id: group.id,
+        }))
+      );
+
+    if (channelError) throw channelError;
+
+    return group;
+  }
+
+  async updateGroup(input: {
+    groupId: string;
+    name: string;
+    description?: string | null;
+    visibility: "public" | "private";
+  }) {
+    const { data, error } = await this.client
+      .from("study_groups")
+      .update({
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        visibility: input.visibility,
+      })
+      .eq("id", input.groupId)
+      .select()
+      .single<StudyGroup>();
+
+    if (error) throw error;
+
+    return data;
+  }
+
+  async createInviteLink(input: {
+    groupId: string;
+    userId: string;
+    expiresAt?: string | null;
+  }) {
+    const token = createInviteToken();
+
+    const { data, error } = await this.client
+      .from("study_group_invites")
+      .insert({
+        group_id: input.groupId,
+        token,
+        created_by: input.userId,
+        expires_at: input.expiresAt || null,
+        active: true,
+      })
+      .select()
+      .single<StudyGroupInvite>();
+
+    if (error) throw error;
+
+    return data;
+  }
+
+  async getInvitePreview(token: string): Promise<StudyGroupInvitePreview> {
+    const { data: sessionData } = await this.client.auth.getSession();
+    const userId = sessionData.session?.user?.id || null;
+
+    const { data: invite, error: inviteError } = await this.client
+      .from("study_group_invites")
+      .select("*, study_groups(*)")
+      .eq("token", token)
+      .eq("active", true)
+      .maybeSingle<StudyGroupInvite>();
+
+    if (inviteError) throw inviteError;
+
+    const group = getJoinedProfile(invite?.study_groups);
+
+    if (!invite || !group) {
+      return {
+        userId,
+        invite: invite || null,
+        group: null,
+        membership: null,
+        memberCount: 0,
+        channelCount: 0,
+        expired: false,
+        full: false,
+      };
+    }
+
+    const [
+      { count: memberCount, error: memberError },
+      { count: channelCount, error: channelError },
+      { data: membership, error: membershipError },
+    ] = await Promise.all([
+      this.client
+        .from("study_group_members")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", group.id)
+        .eq("status", "active"),
+      this.client
+        .from("study_group_channels")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", group.id),
+      userId
+        ? this.client
+            .from("study_group_members")
+            .select("*")
+            .eq("group_id", group.id)
+            .eq("user_id", userId)
+            .maybeSingle<StudyGroupMember>()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (memberError) throw memberError;
+    if (channelError) throw channelError;
+    if (membershipError) throw membershipError;
+
+    const expired = Boolean(
+      invite.expires_at && Date.parse(invite.expires_at) < Date.now()
+    );
+    const full = Boolean(
+      typeof invite.max_uses === "number" &&
+        typeof invite.uses === "number" &&
+        invite.uses >= invite.max_uses
+    );
+
+    return {
+      userId,
+      invite,
+      group: {
+        ...group,
+        member_count: memberCount || 0,
+        channel_count: channelCount || 0,
+        role: membership?.role || null,
+        status: membership?.status || null,
+      },
+      membership: membership || null,
+      memberCount: memberCount || 0,
+      channelCount: channelCount || 0,
+      expired,
+      full,
+    };
+  }
+
+  async acceptInviteLink(token: string) {
+    const { data, error } = await this.client.rpc(
+      "accept_study_group_invite",
+      { p_token: token }
+    );
+
+    if (error) throw error;
+
+    const result = Array.isArray(data) ? data[0] : data;
+
+    return result as {
+      group_id: string;
+      slug: string;
+      status: string;
+    } | null;
+  }
+
+  async getWorkspace(slug: string): Promise<StudyGroupWorkspace> {
+    const { data: sessionData } = await this.client.auth.getSession();
+    const userId = sessionData.session?.user?.id || null;
+
+    const { data: group, error: groupError } = await this.client
+      .from("study_groups")
+      .select("*")
+      .eq("slug", slug)
+      .maybeSingle<StudyGroup>();
+
+    if (groupError) throw groupError;
+
+    if (!group) {
+      return {
+        userId,
+        group: null,
+        membership: null,
+        channels: [],
+        members: [],
+      };
+    }
+
+    const [
+      { data: channels, error: channelError },
+      { data: members, error: memberError },
+      { data: membership, error: membershipError },
+    ] = await Promise.all([
+      this.client
+        .from("study_group_channels")
+        .select("*")
+        .eq("group_id", group.id)
+        .order("position", { ascending: true }),
+      this.client
+        .from("study_group_members")
+        .select("*, profiles(id, username, avatar_url, role)")
+        .eq("group_id", group.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: true }),
+      userId
+        ? this.client
+            .from("study_group_members")
+            .select("*")
+            .eq("group_id", group.id)
+            .eq("user_id", userId)
+            .maybeSingle<StudyGroupMember>()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (channelError) throw channelError;
+    if (memberError) throw memberError;
+    if (membershipError) throw membershipError;
+
+    return {
+      userId,
+      group: {
+        ...group,
+        member_count: (members || []).length,
+        channel_count: (channels || []).length,
+        role: membership?.role || null,
+        status: membership?.status || null,
+      },
+      membership: membership || null,
+      channels: (channels || []) as StudyGroupChannel[],
+      members: (members || []) as StudyGroupMember[],
+    };
+  }
+
+  async listMessages(channelId: string): Promise<StudyGroupMessage[]> {
+    const { data, error } = await this.client
+      .from("study_group_messages")
+      .select("*, profiles(id, username, avatar_url)")
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    if (error) throw error;
+
+    const messages = (data || []) as StudyGroupMessage[];
+    const messageIds = messages.map((message) => message.id);
+
+    if (!messageIds.length) return messages;
+
+    const { data: reactions, error: reactionsError } = await this.client
+      .from("study_group_message_reactions")
+      .select("*, profiles(id, username, avatar_url)")
+      .eq("group_id", messages[0]?.group_id)
+      .in("message_id", messageIds);
+
+    if (reactionsError) {
+      console.warn("Could not load group message reactions:", reactionsError);
+      return messages;
+    }
+
+    const reactionsByMessage = new Map<string, StudyGroupMessageReaction[]>();
+    for (const reaction of (reactions || []) as StudyGroupMessageReaction[]) {
+      const current = reactionsByMessage.get(reaction.message_id) || [];
+      current.push(reaction);
+      reactionsByMessage.set(reaction.message_id, current);
+    }
+
+    return messages.map((message) => ({
+      ...message,
+      reactions: reactionsByMessage.get(message.id) || [],
+    }));
+  }
+
+  async sendMessage(input: {
+    groupId: string;
+    channelId: string;
+    userId: string;
+    content: string;
+    kind?: "message" | "system";
+    metadata?: Record<string, unknown>;
+    notify?: boolean;
+    locale?: "en" | "ro" | string;
+  }) {
+    const kind = input.kind || "message";
+    const { data, error } = await this.client
+      .from("study_group_messages")
+      .insert({
+        group_id: input.groupId,
+        channel_id: input.channelId,
+        user_id: input.userId,
+        content: input.content,
+        kind,
+        metadata: input.metadata || {},
+      })
+      .select("id")
+      .single<{ id: string }>();
+
+    if (error) throw error;
+
+    if (kind === "message" && input.notify !== false) {
+      await this.notifyGroupMembers({
+        groupId: input.groupId,
+        channelId: input.channelId,
+        messageId: data?.id || null,
+        senderId: input.userId,
+        content: input.content,
+        locale: input.locale,
+      });
+    }
+  }
+
+  async toggleMessageReaction(input: {
+    groupId: string;
+    messageId: string;
+    userId: string;
+    emoji: string;
+  }) {
+    const emoji = input.emoji.trim();
+    if (!emoji) return;
+
+    const { data: existing, error: existingError } = await this.client
+      .from("study_group_message_reactions")
+      .select("id")
+      .eq("group_id", input.groupId)
+      .eq("message_id", input.messageId)
+      .eq("user_id", input.userId)
+      .eq("emoji", emoji)
+      .maybeSingle<{ id: string }>();
+
+    if (existingError) throw existingError;
+
+    if (existing?.id) {
+      const { error } = await this.client
+        .from("study_group_message_reactions")
+        .delete()
+        .eq("id", existing.id);
+
+      if (error) throw error;
+      return "removed";
+    }
+
+    const { error } = await this.client
+      .from("study_group_message_reactions")
+      .insert({
+        group_id: input.groupId,
+        message_id: input.messageId,
+        user_id: input.userId,
+        emoji,
+      });
+
+    if (error) throw error;
+    return "added";
+  }
+
+  async updateMessage(input: {
+    groupId: string;
+    messageId: string;
+    userId: string;
+    content: string;
+  }) {
+    const content = input.content.trim();
+    if (!content) throw new Error("Message cannot be empty");
+
+    const { data: existing, error: existingError } = await this.client
+      .from("study_group_messages")
+      .select("metadata, kind")
+      .eq("id", input.messageId)
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.userId)
+      .maybeSingle<{
+        metadata?: Record<string, unknown> | null;
+        kind?: string | null;
+      }>();
+
+    if (existingError) throw existingError;
+    if (!existing || existing.kind === "system") {
+      throw new Error("Message cannot be edited");
+    }
+
+    const { error } = await this.client
+      .from("study_group_messages")
+      .update({
+        content,
+        metadata: {
+          ...(existing.metadata || {}),
+          edited: true,
+          edited_at: new Date().toISOString(),
+        },
+      })
+      .eq("id", input.messageId)
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.userId);
+
+    if (error) throw error;
+  }
+
+  async deleteMessage(input: {
+    groupId: string;
+    messageId: string;
+  }) {
+    const { error: reactionsError } = await this.client
+      .from("study_group_message_reactions")
+      .delete()
+      .eq("group_id", input.groupId)
+      .eq("message_id", input.messageId);
+
+    if (reactionsError) throw reactionsError;
+
+    const { error } = await this.client
+      .from("study_group_messages")
+      .delete()
+      .eq("id", input.messageId)
+      .eq("group_id", input.groupId);
+
+    if (error) throw error;
+  }
+
+  async joinGroup(
+    groupId: string,
+    userId: string,
+    visibility?: string | null,
+    locale?: "en" | "ro" | string
+  ) {
+    const { data: existing, error: existingError } = await this.client
+      .from("study_group_members")
+      .select("status")
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .maybeSingle<{ status?: string | null }>();
+
+    if (existingError) throw existingError;
+
+    if (existing?.status === "active") {
+      return "active";
+    }
+
+    const status =
+      existing?.status === "invited"
+        ? "active"
+        : visibility === "private"
+          ? "pending"
+          : "active";
+
+    if (existing) {
+      const { error } = await this.client
+        .from("study_group_members")
+        .update({ status })
+        .eq("group_id", groupId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+    } else {
+      const { error } = await this.client.from("study_group_members").insert({
+        group_id: groupId,
+        user_id: userId,
+        role: "member",
+        status,
+      });
+
+      if (error) throw error;
+    }
+
+    if (status === "active") {
+      const profile = await new ProfilesApi(this.client).getSummary(userId);
+      const username = profile?.username || "user";
+      await this.insertSystemMessage({
+        groupId,
+        userId,
+        content:
+          locale === "ro"
+            ? `${username} a intrat în grup`
+            : `${username} joined the group`,
+        metadata: { event: "member_joined", userId },
+      });
+    }
+
+    return status;
+  }
+
+  async inviteMember(input: {
+    groupId: string;
+    inviterId: string;
+    inviteeId: string;
+    locale?: "en" | "ro" | string;
+  }) {
+    const [
+      group,
+      inviter,
+      invitee,
+      { data: existing, error: existingError },
+    ] = await Promise.all([
+      this.getGroupIdentity(input.groupId),
+      new ProfilesApi(this.client).getSummary(input.inviterId),
+      new ProfilesApi(this.client).getSummary(input.inviteeId),
+      this.client
+        .from("study_group_members")
+        .select("status")
+        .eq("group_id", input.groupId)
+        .eq("user_id", input.inviteeId)
+        .maybeSingle<{ status?: string | null }>(),
+    ]);
+
+    if (existingError) throw existingError;
+    if (!group) throw new Error("Group not found");
+
+    if (existing?.status === "active") {
+      return "active";
+    }
+
+    if (existing?.status === "invited") {
+      return "invited";
+    }
+
+    const { error } = await this.client
+      .from("study_group_members")
+      .upsert(
+        {
+          group_id: input.groupId,
+          user_id: input.inviteeId,
+          role: "member",
+          status: "invited",
+        },
+        { onConflict: "group_id,user_id" }
+      );
+
+    if (error) throw error;
+
+    const isRo = input.locale === "ro";
+    await NotificationsApi.createWithClient(this.client, {
+      userId: input.inviteeId,
+      actorId: input.inviterId,
+      type: "group_invite",
+      title: isRo
+        ? `Ai fost invitat în ${group.name}`
+        : `You were invited to ${group.name}`,
+      body: isRo
+        ? `${inviter?.username || "Someone"} te-a invitat să intri în grup.`
+        : `${inviter?.username || "Someone"} invited you to join this group.`,
+      href: `/groups/${group.slug}`,
+      metadata: {
+        groupId: input.groupId,
+        inviteeId: input.inviteeId,
+        inviteeUsername: invitee?.username || null,
+      },
+    });
+
+    return "invited";
+  }
+
+  async createChannel(input: {
+    groupId: string;
+    userId: string;
+    name: string;
+    type?: "text" | "code";
+  }) {
+    await this.ensureGroupOwner(input.groupId, input.userId);
+
+    const { data: existing, error: countError } = await this.client
+      .from("study_group_channels")
+      .select("id")
+      .eq("group_id", input.groupId);
+
+    if (countError) throw countError;
+
+    const { data, error } = await this.client
+      .from("study_group_channels")
+      .insert({
+        group_id: input.groupId,
+        name: normalizeGroupSlug(input.name),
+        type: input.type || "text",
+        position: existing?.length || 0,
+      })
+      .select()
+      .single<StudyGroupChannel>();
+
+    if (error) throw error;
+
+    return data;
+  }
+
+  async deleteChannel(input: {
+    groupId: string;
+    channelId: string;
+    userId: string;
+  }) {
+    await this.ensureGroupOwner(input.groupId, input.userId);
+
+    const { data: channels, error: channelsError } = await this.client
+      .from("study_group_channels")
+      .select("id")
+      .eq("group_id", input.groupId);
+
+    if (channelsError) throw channelsError;
+    if ((channels || []).length <= 1) {
+      throw new Error("Cannot delete the last channel");
+    }
+
+    const { data: messages, error: messagesError } = await this.client
+      .from("study_group_messages")
+      .select("id")
+      .eq("group_id", input.groupId)
+      .eq("channel_id", input.channelId);
+
+    if (messagesError) throw messagesError;
+
+    const messageIds = (messages || []).map((message) => message.id);
+
+    if (messageIds.length) {
+      const { error: reactionsError } = await this.client
+        .from("study_group_message_reactions")
+        .delete()
+        .eq("group_id", input.groupId)
+        .in("message_id", messageIds);
+
+      if (reactionsError) throw reactionsError;
+
+      const { error: messagesDeleteError } = await this.client
+        .from("study_group_messages")
+        .delete()
+        .eq("group_id", input.groupId)
+        .eq("channel_id", input.channelId);
+
+      if (messagesDeleteError) throw messagesDeleteError;
+    }
+
+    const { error } = await this.client
+      .from("study_group_channels")
+      .delete()
+      .eq("group_id", input.groupId)
+      .eq("id", input.channelId);
+
+    if (error) throw error;
+  }
+
+  private async ensureGroupOwner(groupId: string, userId: string) {
+    const { data, error } = await this.client
+      .from("study_group_members")
+      .select("role,status")
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .maybeSingle<{ role?: string | null; status?: string | null }>();
+
+    if (error) throw error;
+    if (data?.role !== "owner" || data?.status !== "active") {
+      throw new Error("Only the group owner can manage channels");
+    }
+  }
+
+  async startLiveSessionFromChannel(input: {
+    groupName: string;
+    groupId: string;
+    channelId: string;
+    userId: string;
+  }) {
+    const room = await new LiveApi(this.client).createRoom(
+      input.userId,
+      `${input.groupName} live`
+    );
+
+    await this.sendMessage({
+      groupId: input.groupId,
+      channelId: input.channelId,
+      userId: input.userId,
+      content: `Started a live coding session: /live/${room.id}`,
+      kind: "system",
+      metadata: { event: "live_session_started", roomId: room.id },
+      notify: false,
+    });
+
+    return room;
+  }
+
+  getMessageProfile(message: StudyGroupMessage) {
+    return getJoinedProfile(message.profiles);
+  }
+
+  getMemberProfile(member: StudyGroupMember) {
+    return getJoinedProfile(member.profiles);
+  }
+}
+
 class AppApi {
   readonly auth: AuthApi;
   readonly profiles: ProfilesApi;
@@ -1372,6 +2644,7 @@ class AppApi {
   readonly live: LiveApi;
   readonly notifications: NotificationsApi;
   readonly dailyChallenges: DailyChallengesApi;
+  readonly groups: StudyGroupsApi;
 
   constructor(private readonly client: SupabaseClient) {
     this.auth = new AuthApi(client);
@@ -1380,6 +2653,7 @@ class AppApi {
     this.live = new LiveApi(client);
     this.notifications = new NotificationsApi(client, this.profiles);
     this.dailyChallenges = new DailyChallengesApi(client);
+    this.groups = new StudyGroupsApi(client);
   }
 }
 

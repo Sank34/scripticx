@@ -22,6 +22,7 @@ import {
   Sparkles,
   SquareTerminal,
   Trophy,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -80,6 +81,7 @@ export function MobileDrawer() {
         ...(isLoggedIn
           ? [
               { href: "/feed", icon: MessageSquare, label: t("nav.feed") },
+              { href: "/groups", icon: UsersRound, label: t("nav.groups") },
               { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
               { href: "/search", icon: Search, label: t("nav.search") },
               ...(isAdmin

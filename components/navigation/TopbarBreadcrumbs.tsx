@@ -57,6 +57,7 @@ export function TopbarBreadcrumbs() {
     feed: t("nav.feed"),
     followers: "Followers",
     following: "Following",
+    groups: t("nav.groups"),
     help: t("nav.help"),
     leaderboard: t("nav.leaderboard"),
     learn: t("nav.docs"),

@@ -22,6 +22,7 @@ import {
 
 import {
   School,
+  UsersRound,
   SquareTerminal,
   MessageSquare,
   Search,
@@ -43,6 +44,7 @@ import { useEffect, useState, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { api, type ProfileSummary } from "@/lib/api";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useGroupActivity } from "@/hooks/useGroupActivity";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
 
 type NavItemProps = {
@@ -50,6 +52,8 @@ type NavItemProps = {
   icon: LucideIcon;
   label: string;
   active: boolean;
+  badgeCount?: number;
+  hasActivity?: boolean;
 };
 
 type SubItemProps = {
@@ -62,9 +66,12 @@ function NavItem({
   icon: Icon,
   label,
   active,
+  badgeCount = 0,
+  hasActivity = false,
 }: NavItemProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const hasBadge = badgeCount > 0;
 
   const content = (
     <Button
@@ -81,8 +88,26 @@ function NavItem({
       }`}
     >
       <Link href={href}>
-        <Icon size={18} />
-        {!collapsed && label}
+        <span className="relative inline-flex shrink-0">
+          <Icon size={18} />
+          {collapsed && hasBadge && (
+            <span className="absolute -right-2 -top-2 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--sidebar)]">
+              {badgeCount > 9 ? "9+" : badgeCount}
+            </span>
+          )}
+          {collapsed && !hasBadge && hasActivity && (
+            <span className="absolute -right-1 -top-1 size-2 rounded-full bg-zinc-400 ring-2 ring-[var(--sidebar)]" />
+          )}
+        </span>
+        {!collapsed && <span className="truncate">{label}</span>}
+        {!collapsed && hasBadge && (
+          <span className="ml-auto flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-semibold leading-none text-white">
+            {badgeCount > 99 ? "99+" : badgeCount}
+          </span>
+        )}
+        {!collapsed && !hasBadge && hasActivity && (
+          <span className="ml-auto size-2 rounded-full bg-zinc-400" />
+        )}
       </Link>
     </Button>
   );
@@ -133,6 +158,7 @@ export function AppSidebar() {
 
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const groupActivity = useGroupActivity(user?.id);
 
   const [docsOpenOverride, setDocsOpenOverride] = useState<boolean | null>(null);
   const [examplesOpenOverride, setExamplesOpenOverride] = useState<boolean | null>(null);
@@ -290,6 +316,16 @@ export function AppSidebar() {
             <NavItem href="/leaderboard" icon={Trophy} label={t("nav.leaderboard")} active={pathname.startsWith("/leaderboard")} />
             {user && (
               <NavItem href="/feed" icon={MessageSquare} label={t("nav.feed")} active={pathname.startsWith("/feed")} />
+            )}
+            {user && (
+              <NavItem
+                href="/groups"
+                icon={UsersRound}
+                label={t("nav.groups")}
+                active={pathname.startsWith("/groups")}
+                badgeCount={groupActivity.totalMentionCount}
+                hasActivity={groupActivity.hasActivity}
+              />
             )}
             {user && (
               <NavItem href="/dashboard" icon={LayoutDashboard} label={t("nav.dashboard")} active={pathname.startsWith("/dashboard")} />

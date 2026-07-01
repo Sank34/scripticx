@@ -18,6 +18,7 @@ import {
   Trophy,
   User,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -170,6 +171,12 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         icon: MessageSquare,
         label: t("nav.feed"),
         keywords: ["posts", "social"],
+      },
+      {
+        href: "/groups",
+        icon: UsersRound,
+        label: t("nav.groups"),
+        keywords: ["groups", "study", "community", "discord"],
       },
       {
         href: "/search",
