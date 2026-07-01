@@ -37,7 +37,7 @@ export default function ProblemsPage() {
   async function fetchProblemsData(): Promise<ProblemsData> {
     const { data: problemsData } = await supabase
       .from("problems")
-      .select("*")
+      .select("*, author:profiles!problems_author_id_fkey(id, username, avatar_url)")
       .order("code", { ascending: true });
 
     const problems = problemsData || [];
@@ -203,6 +203,18 @@ export default function ProblemsPage() {
                         )}
                         {getLocalized(p.title_i18n, locale)}
                       </h2>
+                      {p.author?.username && (
+                        <p className="text-xs text-muted-foreground">
+                          {locale === "ro" ? "de " : "by "}
+                          <Link
+                            href={`/u/${p.author.username}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:underline"
+                          >
+                            @{p.author.username}
+                          </Link>
+                        </p>
+                      )}
                       <p className="text-sm text-muted-foreground line-clamp-1">
                         {markdownPreview(getLocalized(p.description_i18n, locale))}
                       </p>

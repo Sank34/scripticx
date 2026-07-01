@@ -146,6 +146,10 @@ export function ProblemForm({ initialData, onSuccess }: any) {
         })
         .eq("id", initialData.id));
     } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       ({ error } = await supabase
         .from("problems")
         .insert([
@@ -155,6 +159,7 @@ export function ProblemForm({ initialData, onSuccess }: any) {
             starter_code: starterCode,
             difficulty,
             test_cases: testCases,
+            author_id: user?.id ?? null,
           },
         ]));
     }
