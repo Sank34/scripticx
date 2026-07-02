@@ -82,6 +82,15 @@ function AdminProblemsContent() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [openCreate, setOpenCreate] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  function handleCreateOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
+      setOpenCreate(true);
+      return;
+    }
+    setConfirmDiscard(true);
+  }
   const scheduledDateKeys = new Set(
     dailyChallenges
       .filter((challenge) => challenge.is_active)
@@ -338,7 +347,7 @@ function AdminProblemsContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+      <Dialog open={openCreate} onOpenChange={handleCreateOpenChange}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <DialogHeader>
             <DialogTitle>{t("admin.problems.dialog.createTitle")}</DialogTitle>
@@ -352,6 +361,33 @@ function AdminProblemsContent() {
           />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("admin.problems.dialog.discardTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("admin.problems.dialog.discardDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t("admin.problems.dialog.discardStay")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmDiscard(false);
+                setOpenCreate(false);
+              }}
+            >
+              {t("admin.problems.dialog.discardLeave")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
