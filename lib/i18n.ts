@@ -992,6 +992,11 @@ export const translations = {
           cancel: "Cancel",
           confirmDelete: "Delete",
           createTitle: "Create Problem",
+          discardTitle: "Discard your changes?",
+          discardDescription:
+            "You've started filling this out. If you close now, whatever you've typed won't be saved.",
+          discardStay: "Keep editing",
+          discardLeave: "Discard changes",
         },
         toast: {
           deleteError: "Failed to delete problem",
@@ -2283,6 +2288,11 @@ export const translations = {
           cancel: "Anulează",
           confirmDelete: "Șterge",
           createTitle: "Creează problemă",
+          discardTitle: "Renunți la modificări?",
+          discardDescription:
+            "Ai început deja să completezi. Dacă închizi acum, ce ai scris până acum nu se salvează.",
+          discardStay: "Continuă editarea",
+          discardLeave: "Renunță la modificări",
         },
         toast: {
           deleteError: "Eroare la ștergere problemă",
