@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { OnMount } from "@monaco-editor/react";
 import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
 import { useParams } from "next/navigation";
@@ -75,6 +75,36 @@ function ProblemContent() {
   const [editorLine, setEditorLine] = useState(1);
   const [tabSize, setTabSize] = useState(2);
   const [activeTab, setActiveTab] = useState<"description" | "solution">("description");
+  const [asideWidth, setAsideWidth] = useState(390);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const startAsideResize = useCallback((event: React.PointerEvent) => {
+    event.preventDefault();
+    const container = splitContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const minAside = 320;
+    const minEditor = 360;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const nextWidth = rect.right - moveEvent.clientX;
+      const maxAside = Math.max(minAside, rect.width - minEditor);
+      setAsideWidth(Math.min(Math.max(nextWidth, minAside), maxAside));
+    };
+
+    const handleUp = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
   const [dailyCompleted, setDailyCompleted] = useState(false);
 
@@ -381,9 +411,13 @@ function ProblemContent() {
         </Button>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(320px,46vh)_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_390px] md:grid-rows-1">
+      <div
+        ref={splitContainerRef}
+        className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(320px,46vh)_minmax(0,1fr)] md:grid-rows-1 md:[grid-template-columns:minmax(0,1fr)_6px_var(--problem-aside-width)]"
+        style={{ "--problem-aside-width": `${asideWidth}px` } as React.CSSProperties}
+      >
         <main className="flex min-h-0 min-w-0 flex-col bg-white">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-zinc-200 bg-white md:border-b-0 md:border-r">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-zinc-200 bg-white md:border-b-0">
             <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
@@ -441,6 +475,14 @@ function ProblemContent() {
             </div>
           </div>
         </main>
+
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("live.resizePanels")}
+          onPointerDown={startAsideResize}
+          className="hidden bg-zinc-200 transition-colors hover:bg-zinc-300 active:bg-zinc-400 md:block md:cursor-col-resize"
+        />
 
         <aside className="min-h-0 overflow-hidden border-t border-zinc-200 bg-white md:border-t-0">
           <Tabs

@@ -212,6 +212,36 @@ export default function LiveRoomPage() {
   const [isMobileEditor, setIsMobileEditor] = useState<boolean | null>(null);
   const [editorCursorLine, setEditorCursorLine] = useState(1);
   const [tabSize, setTabSize] = useState(2);
+  const [asideWidth, setAsideWidth] = useState(360);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const startAsideResize = useCallback((event: React.PointerEvent) => {
+    event.preventDefault();
+    const container = splitContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const minAside = 300;
+    const minEditor = 360;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const nextWidth = rect.right - moveEvent.clientX;
+      const maxAside = Math.max(minAside, rect.width - minEditor);
+      setAsideWidth(Math.min(Math.max(nextWidth, minAside), maxAside));
+    };
+
+    const handleUp = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
   const [cursorDebugEnabled, setCursorDebugEnabled] = useState(false);
   const [cursorDebugInfo, setCursorDebugInfo] = useState<CursorDebugInfo>({
     statusLine: 1,
@@ -1706,7 +1736,11 @@ export default function LiveRoomPage() {
         </header>
 
         {isMobileEditor === false && (
-          <div className="hidden min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px] md:grid">
+          <div
+            ref={splitContainerRef}
+            className="hidden min-h-0 flex-1 [grid-template-columns:minmax(0,1fr)_6px_var(--live-aside-width)] md:grid"
+            style={{ "--live-aside-width": `${asideWidth}px` } as React.CSSProperties}
+          >
             <main className="flex min-h-0 min-w-0 flex-col bg-white">
               {editorPanel}
               <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">
@@ -1718,7 +1752,14 @@ export default function LiveRoomPage() {
                 </div>
               </div>
             </main>
-            <aside className="min-h-0 border-l border-zinc-200 bg-white">
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={t("live.resizePanels")}
+              onPointerDown={startAsideResize}
+              className="cursor-col-resize bg-zinc-200 transition-colors hover:bg-zinc-300 active:bg-zinc-400"
+            />
+            <aside className="min-h-0 bg-white">
               {sidePanel}
             </aside>
           </div>

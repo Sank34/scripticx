@@ -250,6 +250,7 @@ export const translations = {
 
     editor: {
       title: "MiniScript+ Editor",
+      resizePanels: "Drag to resize panels",
       placeholderTitle: "Title",
       placeholderDescription: "Description",
 
@@ -681,6 +682,7 @@ export const translations = {
       console: "Console",
       debugger: "Debugger",
       tabSize: "Tab size",
+      resizePanels: "Drag to resize panels",
       spaces: "spaces",
       noOutput: "No output",
       inputPrompt: "Input",
@@ -1546,6 +1548,7 @@ export const translations = {
 
     editor: {
       title: "Editor MiniScript+",
+      resizePanels: "Trage pentru a redimensiona panourile",
       placeholderTitle: "Titlu",
       placeholderDescription: "Descriere",
 
@@ -1977,6 +1980,7 @@ export const translations = {
       console: "Consolă",
       debugger: "Debugger",
       tabSize: "Tab",
+      resizePanels: "Trage pentru a redimensiona panourile",
       spaces: "spații",
       noOutput: "Niciun output",
       inputPrompt: "Input",

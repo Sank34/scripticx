@@ -354,9 +354,39 @@ END
   const [githubImportOpen, setGithubImportOpen] = useState(false);
   const [githubUrl, setGithubUrl] = useState("");
   const [githubImporting, setGithubImporting] = useState(false);
+  const [asideWidth, setAsideWidth] = useState(420);
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const startAsideResize = useCallback((event: React.PointerEvent) => {
+    event.preventDefault();
+    const container = splitContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const minAside = 320;
+    const minEditor = 360;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const nextWidth = rect.right - moveEvent.clientX;
+      const maxAside = Math.max(minAside, rect.width - minEditor);
+      setAsideWidth(Math.min(Math.max(nextWidth, minAside), maxAside));
+    };
+
+    const handleUp = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
 
   const activeFile = useMemo(
     () => files.find((file) => file.id === activeFileId) ?? files[0],
@@ -1190,8 +1220,12 @@ END
             )}
           </div>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px]">
-            <main className="flex min-h-0 min-w-0 flex-col border-b border-zinc-200 bg-white xl:border-r xl:border-b-0">
+          <div
+            ref={splitContainerRef}
+            className="grid min-h-0 flex-1 grid-cols-1 xl:[grid-template-columns:minmax(0,1fr)_6px_var(--editor-aside-width)]"
+            style={{ "--editor-aside-width": `${asideWidth}px` } as React.CSSProperties}
+          >
+            <main className="flex min-h-0 min-w-0 flex-col border-b border-zinc-200 bg-white xl:border-b-0">
               <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400" />
@@ -1342,6 +1376,14 @@ END
                 </div>
               </div>
             </main>
+
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={t("editor.resizePanels")}
+              onPointerDown={startAsideResize}
+              className="hidden bg-zinc-200 transition-colors hover:bg-zinc-300 active:bg-zinc-400 xl:block xl:cursor-col-resize"
+            />
 
             <aside className="min-h-0 overflow-hidden bg-white">
               <Tabs
