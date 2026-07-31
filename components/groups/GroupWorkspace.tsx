@@ -17,6 +17,7 @@ import {
   Copy,
   ExternalLink,
   Hash,
+  ImagePlus,
   LinkIcon,
   Lock,
   MessageSquare,
@@ -41,6 +42,7 @@ import {
   type ProfileSummary,
   type StudyGroupMember,
   type StudyGroupMessage,
+  type StudyGroupSticker,
   type StudyGroupWorkspace as StudyGroupWorkspaceData,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -84,7 +86,14 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type GroupWorkspaceProps = {
   slug: string;
@@ -254,10 +263,20 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
   const initial = username.slice(0, 1).toUpperCase();
 
   return (
-    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-60 -translate-x-1/2 rounded-2xl border bg-white p-3 text-left text-zinc-950 shadow-xl group-hover/mention:block">
-      <span className="flex items-center gap-3">
+    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-64 -translate-x-1/2 overflow-hidden rounded-2xl border bg-white text-left text-zinc-950 shadow-xl group-hover/mention:block">
+      <span
+        className="block h-14 bg-gradient-to-br from-zinc-900 via-zinc-700 to-emerald-400 bg-cover bg-center"
+        style={
+          profile.banner_url
+            ? {
+                backgroundImage: `linear-gradient(120deg, rgba(9,9,11,0.34), rgba(16,185,129,0.08)), url("${profile.banner_url}")`,
+              }
+            : undefined
+        }
+      />
+      <span className="-mt-5 flex items-end gap-3 px-3 pb-3">
         <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 bg-cover bg-center text-sm font-semibold text-zinc-500 ring-1 ring-zinc-200"
+          className="flex size-12 shrink-0 items-center justify-center rounded-full border-4 border-white bg-zinc-100 bg-cover bg-center text-sm font-semibold text-zinc-500 shadow-sm"
           style={
             profile.avatar_url
               ? { backgroundImage: `url(${profile.avatar_url})` }
@@ -266,7 +285,7 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
         >
           {profile.avatar_url ? null : initial}
         </span>
-        <span className="min-w-0">
+        <span className="min-w-0 pb-1">
           <span className="block truncate text-sm font-semibold">
             {username}
           </span>
@@ -281,9 +300,10 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
 
 function renderMessageContent(
   content: string,
-  profilesByUsername: Map<string, ProfileSummary>
+  profilesByUsername: Map<string, ProfileSummary>,
+  stickersByToken: Map<string, StudyGroupSticker>
 ) {
-  const pattern = /(\/live\/[a-f0-9-]+|@[a-zA-Z0-9_-]+)/gi;
+  const pattern = /(\/live\/[a-f0-9-]+|@[a-zA-Z0-9_-]+|:sticker-[a-f0-9-]+:)/gi;
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
 
@@ -304,6 +324,21 @@ function renderMessageContent(
         >
           {token}
         </Link>
+      );
+    } else if (token.toLowerCase().startsWith(":sticker-")) {
+      const sticker = stickersByToken.get(token.toLowerCase());
+
+      nodes.push(
+        sticker ? (
+          <img
+            key={`${token}-${index}`}
+            src={sticker.image_url}
+            alt={sticker.name}
+            className="mx-0.5 inline-block size-8 object-contain align-middle"
+          />
+        ) : (
+          token
+        )
       );
     } else {
       const username = token.slice(1);
@@ -337,6 +372,20 @@ function renderMessageContent(
   }
 
   return <>{nodes}</>;
+}
+
+function getInlineStickerToken(sticker: Pick<StudyGroupSticker, "id">) {
+  return `:sticker-${sticker.id}:`;
+}
+
+function getStickerMessageData(item: StudyGroupMessage) {
+  const metadata = item.metadata || {};
+  const stickerUrl =
+    typeof metadata.stickerUrl === "string" ? metadata.stickerUrl : null;
+  const stickerName =
+    typeof metadata.stickerName === "string" ? metadata.stickerName : item.content;
+
+  return { stickerUrl, stickerName };
 }
 
 function getGroupRoleLabel(role: string | null | undefined, t: (key: string) => string) {
@@ -384,7 +433,16 @@ function StudyGroupMemberPreview({
         sideOffset={12}
         className="w-80 overflow-hidden rounded-3xl border-zinc-200 bg-white p-0 shadow-2xl"
       >
-        <div className="h-24 bg-gradient-to-br from-zinc-800 via-zinc-700 to-emerald-500" />
+        <div
+          className="h-24 bg-gradient-to-br from-zinc-800 via-zinc-700 to-emerald-500 bg-cover bg-center"
+          style={
+            profile?.banner_url
+              ? {
+                  backgroundImage: `linear-gradient(120deg, rgba(9,9,11,0.34), rgba(16,185,129,0.08)), url("${profile.banner_url}")`,
+                }
+              : undefined
+          }
+        />
         <div className="px-5 pb-5">
           <div className="-mt-10 flex items-end justify-between gap-3">
             <UserAvatar
@@ -471,6 +529,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const [emojiPickerMessageId, setEmojiPickerMessageId] = useState<
     string | null
   >(null);
+  const [composerPickerOpen, setComposerPickerOpen] = useState(false);
+  const [composerPickerTab, setComposerPickerTab] = useState("emoji");
+  const [composerEmojiSearch, setComposerEmojiSearch] = useState("");
+  const [stickerSearch, setStickerSearch] = useState("");
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -485,6 +547,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const [startingLive, setStartingLive] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [creatingInviteLink, setCreatingInviteLink] = useState(false);
+  const [stickerName, setStickerName] = useState("");
+  const [stickerFile, setStickerFile] = useState<File | null>(null);
+  const [savingSticker, setSavingSticker] = useState(false);
+  const [deletingStickerId, setDeletingStickerId] = useState<string | null>(null);
 
   const workspaceQuery = useQuery<StudyGroupWorkspaceData>({
     queryKey: ["groups", slug],
@@ -504,6 +570,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     () => workspace?.members || [],
     [workspace?.members]
   );
+  const stickers = useMemo(
+    () => workspace?.stickers || [],
+    [workspace?.stickers]
+  );
   const activeChannel =
     channels.find((channel) => channel.id === activeChannelId) ||
     channels[0] ||
@@ -511,7 +581,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const activeMembership = membership?.status === "active";
   const canManage =
     membership?.role === "owner" || membership?.role === "admin";
+  const canInvite = activeMembership;
   const canManageChannels = membership?.role === "owner";
+  const canManageStickers = membership?.role === "owner";
   const channelSlugPreview = normalizeChannelSlug(newChannelName);
   const groupActivity = useGroupActivity(userId);
   const currentMember = useMemo(
@@ -552,6 +624,40 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       item.label.toLowerCase().includes(query)
     );
   }, [emojiSearch]);
+  const filteredComposerEmojis = useMemo(() => {
+    const query = composerEmojiSearch.trim().toLowerCase();
+
+    if (!query) return EMOJI_REACTIONS;
+
+    return EMOJI_REACTIONS.filter(
+      (item) =>
+        item.emoji.includes(query) ||
+        item.label.toLowerCase().includes(query)
+    );
+  }, [composerEmojiSearch]);
+  const filteredStickers = useMemo(() => {
+    const query = stickerSearch.trim().toLowerCase();
+
+    if (!query) return stickers;
+
+    return stickers.filter((sticker) =>
+      sticker.name.toLowerCase().includes(query)
+    );
+  }, [stickerSearch, stickers]);
+  const stickersByInlineToken = useMemo(() => {
+    const map = new Map<string, StudyGroupSticker>();
+
+    for (const sticker of stickers) {
+      map.set(getInlineStickerToken(sticker).toLowerCase(), sticker);
+    }
+
+    return map;
+  }, [stickers]);
+  const closeComposerPicker = () => {
+    setComposerPickerOpen(false);
+    setComposerEmojiSearch("");
+    setStickerSearch("");
+  };
   const closeEmojiPicker = () => {
     flushSync(() => {
       setEmojiPickerMessageId(null);
@@ -660,7 +766,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       userId
         ? api.profiles.searchMentionCandidates(userId, inviteQuery, 20)
         : Promise.resolve([]),
-    enabled: Boolean(inviteDialogOpen && userId && canManage),
+    enabled: Boolean(inviteDialogOpen && userId && canInvite),
   });
 
   const inviteCandidates = (inviteCandidatesQuery.data || []).filter(
@@ -727,7 +833,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     !(
                       item.id.startsWith("optimistic-") &&
                       item.user_id === nextMessage.user_id &&
-                      item.content === nextMessage.content
+                      item.content === nextMessage.content &&
+                      item.kind === nextMessage.kind
                     )
                 );
 
@@ -761,6 +868,18 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           void queryClient.invalidateQueries({
             queryKey: ["groups", slug, "messages"],
           });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "study_group_stickers",
+          filter: `group_id=eq.${groupId}`,
+        },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["groups", slug] });
         }
       )
       .subscribe();
@@ -930,6 +1049,45 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     window.requestAnimationFrame(() => {
       messageInputRef.current?.focus();
       messageInputRef.current?.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
+  function insertComposerEmoji(emoji: string) {
+    const input = messageInputRef.current;
+    const start = input?.selectionStart ?? message.length;
+    const end = input?.selectionEnd ?? start;
+    const nextMessage = `${message.slice(0, start)}${emoji}${message.slice(end)}`;
+    const nextCursor = start + emoji.length;
+
+    setMessage(nextMessage);
+    closeComposerPicker();
+
+    window.requestAnimationFrame(() => {
+      messageInputRef.current?.focus();
+      messageInputRef.current?.setSelectionRange(nextCursor, nextCursor);
+      updateMentionSearch(nextMessage, nextCursor);
+    });
+  }
+
+  function insertComposerSticker(sticker: StudyGroupSticker) {
+    const input = messageInputRef.current;
+    const start = input?.selectionStart ?? message.length;
+    const end = input?.selectionEnd ?? start;
+    const before = message.slice(0, start);
+    const after = message.slice(end);
+    const leadingSpace = before.length && !/\s$/.test(before) ? " " : "";
+    const trailingSpace = after.length && !/^\s/.test(after) ? " " : "";
+    const insertion = `${leadingSpace}${getInlineStickerToken(sticker)}${trailingSpace}`;
+    const nextMessage = `${before}${insertion}${after}`;
+    const nextCursor = before.length + insertion.length;
+
+    setMessage(nextMessage);
+    closeComposerPicker();
+
+    window.requestAnimationFrame(() => {
+      messageInputRef.current?.focus();
+      messageInputRef.current?.setSelectionRange(nextCursor, nextCursor);
+      updateMentionSearch(nextMessage, nextCursor);
     });
   }
 
@@ -1199,6 +1357,60 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       toast.error(t("groups.toasts.updateFailed"));
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function createSticker() {
+    if (
+      !group ||
+      !userId ||
+      !canManageStickers ||
+      !stickerName.trim() ||
+      !stickerFile ||
+      savingSticker
+    ) {
+      return;
+    }
+
+    setSavingSticker(true);
+
+    try {
+      await api.groups.createSticker({
+        groupId: group.id,
+        userId,
+        name: stickerName,
+        file: stickerFile,
+      });
+      setStickerName("");
+      setStickerFile(null);
+      await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
+      toast.success(t("groups.toasts.stickerCreated"));
+    } catch (error) {
+      console.error("Could not create group sticker:", error);
+      toast.error(t("groups.toasts.stickerCreateFailed"));
+    } finally {
+      setSavingSticker(false);
+    }
+  }
+
+  async function deleteSticker(sticker: StudyGroupSticker) {
+    if (!group || !canManageStickers || deletingStickerId) return;
+
+    setDeletingStickerId(sticker.id);
+
+    try {
+      await api.groups.deleteSticker({
+        groupId: group.id,
+        stickerId: sticker.id,
+        storagePath: sticker.storage_path,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
+      toast.success(t("groups.toasts.stickerDeleted"));
+    } catch (error) {
+      console.error("Could not delete group sticker:", error);
+      toast.error(t("groups.toasts.stickerDeleteFailed"));
+    } finally {
+      setDeletingStickerId(null);
     }
   }
 
@@ -1479,7 +1691,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            {canManage && (
+            {canInvite && (
               <Button
                 size="sm"
                 variant="outline"
@@ -1522,7 +1734,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     ? `/u/${profile.username}`
                     : null;
                   const isEditing = editingMessageId === item.id;
-                  const canEditMessage = isMine && item.kind !== "system";
+                  const isStickerMessage = item.kind === "sticker";
+                  const stickerData = isStickerMessage
+                    ? getStickerMessageData(item)
+                    : null;
+                  const canEditMessage = isMine && item.kind === "message";
                   const canDeleteMessage =
                     item.kind !== "system" && (isMine || canManage);
                   const reactionGroups = buildReactionGroups(
@@ -1552,7 +1768,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           <span>
                             {renderMessageContent(
                               item.content,
-                              mentionProfilesByUsername
+                              mentionProfilesByUsername,
+                              stickersByInlineToken
                             )}
                           </span>
                           {time ? (
@@ -1665,17 +1882,28 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             >
                               <BubbleContent
                                 className={`min-w-[2.25rem] rounded-2xl border-transparent ${
-                                  isMine
+                                  isStickerMessage
+                                    ? "bg-transparent p-0 shadow-none"
+                                    : isMine
                                     ? "bg-zinc-950 text-white"
                                     : "bg-zinc-100 text-zinc-950"
                                 }`}
                               >
-                                <div className="whitespace-pre-wrap break-words">
-                                  {renderMessageContent(
-                                    item.content,
-                                    mentionProfilesByUsername
-                                  )}
-                                </div>
+                                {isStickerMessage && stickerData?.stickerUrl ? (
+                                  <img
+                                    src={stickerData.stickerUrl}
+                                    alt={stickerData.stickerName}
+                                    className="max-h-16 max-w-16 rounded-xl object-contain drop-shadow-sm"
+                                  />
+                                ) : (
+                                  <div className="inline-flex flex-wrap items-center whitespace-pre-wrap break-words align-middle">
+                                    {renderMessageContent(
+                                      item.content,
+                                      mentionProfilesByUsername,
+                                      stickersByInlineToken
+                                    )}
+                                  </div>
+                                )}
                               </BubbleContent>
                               {reactionGroups.length ? (
                                 <BubbleReactions
@@ -2049,6 +2277,119 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               placeholder={t("groups.workspace.messagePlaceholder")}
               className="max-h-32 min-h-10 resize-none rounded-xl"
             />
+            <Popover
+              open={composerPickerOpen}
+              onOpenChange={(open) => {
+                setComposerPickerOpen(open);
+                if (!open) {
+                  setComposerEmojiSearch("");
+                  setStickerSearch("");
+                }
+              }}
+            >
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        className="shrink-0 rounded-xl"
+                        aria-label={t("groups.actions.openStickerPicker")}
+                      >
+                        <SmilePlus className="size-4" />
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {t("groups.actions.openStickerPicker")}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <PopoverContent
+                align="end"
+                side="top"
+                sideOffset={10}
+                className="w-80 rounded-2xl p-3"
+              >
+                <Tabs
+                  value={composerPickerTab}
+                  onValueChange={setComposerPickerTab}
+                >
+                  <TabsList className="grid w-full grid-cols-2 rounded-xl">
+                    <TabsTrigger value="emoji" className="rounded-lg">
+                      {t("groups.stickers.emojiTab")}
+                    </TabsTrigger>
+                    <TabsTrigger value="stickers" className="rounded-lg">
+                      {t("groups.stickers.stickersTab")}
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="emoji" className="mt-3 space-y-2">
+                    <Input
+                      value={composerEmojiSearch}
+                      onChange={(event) =>
+                        setComposerEmojiSearch(event.target.value)
+                      }
+                      placeholder={t("groups.workspace.searchEmoji")}
+                      className="h-9 rounded-xl"
+                    />
+                    <div className="grid max-h-64 grid-cols-6 gap-1 overflow-y-auto pr-1">
+                      {filteredComposerEmojis.length ? (
+                        filteredComposerEmojis.map((item) => (
+                          <button
+                            key={`${item.emoji}-${item.label}`}
+                            type="button"
+                            onClick={() => insertComposerEmoji(item.emoji)}
+                            className="flex size-10 items-center justify-center rounded-xl text-xl transition hover:bg-zinc-100"
+                            aria-label={item.label}
+                          >
+                            {item.emoji}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="col-span-6 px-2 py-6 text-center text-sm text-muted-foreground">
+                          {t("groups.workspace.noEmojiResults")}
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="stickers" className="mt-3 space-y-2">
+                    <Input
+                      value={stickerSearch}
+                      onChange={(event) => setStickerSearch(event.target.value)}
+                      placeholder={t("groups.stickers.search")}
+                      className="h-9 rounded-xl"
+                    />
+                    <div className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
+                      {filteredStickers.length ? (
+                        filteredStickers.map((sticker) => (
+                          <button
+                            key={sticker.id}
+                            type="button"
+                            onClick={() => insertComposerSticker(sticker)}
+                            className="group flex min-h-24 flex-col items-center justify-center rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white via-white to-zinc-50/80 p-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_14px_32px_rgba(16,185,129,0.12)] disabled:translate-y-0 disabled:opacity-50"
+                          >
+                            <img
+                              src={sticker.image_url}
+                              alt={sticker.name}
+                              className="h-14 w-14 object-contain transition group-hover:scale-105"
+                            />
+                            <span className="mt-1 max-w-full truncate text-xs font-medium">
+                              {sticker.name}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="col-span-3 px-2 py-8 text-center text-sm text-muted-foreground">
+                          {t("groups.stickers.emptyPicker")}
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </PopoverContent>
+            </Popover>
             <Button
               size="icon"
               onClick={sendMessage}
@@ -2218,38 +2559,268 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       </Dialog>
 
       <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("groups.dialog.settingsTitle")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Input
-              value={settingsName}
-              onChange={(event) => setSettingsName(event.target.value)}
-              placeholder={t("groups.dialog.name")}
-            />
-            <Textarea
-              value={settingsDescription}
-              onChange={(event) => setSettingsDescription(event.target.value)}
-              placeholder={t("groups.dialog.description")}
-              className="min-h-24 resize-none"
-            />
-            <Select
-              value={settingsVisibility}
-              onValueChange={(value) =>
-                setSettingsVisibility(value as "public" | "private")
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="public">{t("groups.public")}</SelectItem>
-                <SelectItem value="private">{t("groups.private")}</SelectItem>
-              </SelectContent>
-            </Select>
+        <DialogContent className="max-h-[88vh] max-w-3xl overflow-hidden p-0">
+          <div className="border-b bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),linear-gradient(180deg,#ffffff,#fafafa)] px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">
+                {t("groups.dialog.settingsTitle")}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {t("groups.dialog.settingsSubtitle")}
+              </p>
+            </DialogHeader>
+            <div className="mt-5 rounded-2xl border bg-white/80 p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">
+                    {t("groups.dialog.serverPreview")}
+                  </p>
+                  <h3 className="mt-1 text-xl font-bold text-zinc-950">
+                    {settingsName || group?.name || t("groups.dialog.name")}
+                  </h3>
+                  <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                    {settingsDescription ||
+                      group?.description ||
+                      t("groups.dialog.description")}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
+                    <Users className="size-3.5" />
+                    {t("groups.dialog.membersCount").replace(
+                      "{count}",
+                      String(members.length)
+                    )}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
+                    <Hash className="size-3.5" />
+                    {t("groups.dialog.channelsCount").replace(
+                      "{count}",
+                      String(channels.length)
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
-          <DialogFooter>
+
+          <Tabs defaultValue="general" className="min-h-0">
+            <div className="border-b px-6 pt-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="general">
+                  {t("groups.dialog.settingsGeneralTab")}
+                </TabsTrigger>
+                <TabsTrigger value="stickers">
+                  {t("groups.dialog.settingsStickersTab")}
+                </TabsTrigger>
+                <TabsTrigger value="permissions">
+                  {t("groups.dialog.settingsPermissionsTab")}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <ScrollArea className="max-h-[52vh]">
+              <div className="p-6">
+                <TabsContent value="general" className="mt-0 space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
+                    <div className="space-y-3">
+                      <Input
+                        value={settingsName}
+                        onChange={(event) => setSettingsName(event.target.value)}
+                        placeholder={t("groups.dialog.name")}
+                      />
+                      <Textarea
+                        value={settingsDescription}
+                        onChange={(event) =>
+                          setSettingsDescription(event.target.value)
+                        }
+                        placeholder={t("groups.dialog.description")}
+                        className="min-h-28 resize-none"
+                      />
+                    </div>
+                    <div className="rounded-2xl border bg-zinc-50 p-4">
+                      <p className="text-sm font-semibold">
+                        {t("groups.dialog.visibility")}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t("groups.dialog.serverOverview")}
+                      </p>
+                      <Select
+                        value={settingsVisibility}
+                        onValueChange={(value) =>
+                          setSettingsVisibility(value as "public" | "private")
+                        }
+                      >
+                        <SelectTrigger className="mt-4 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">
+                            {t("groups.public")}
+                          </SelectItem>
+                          <SelectItem value="private">
+                            {t("groups.private")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="stickers" className="mt-0">
+                  {canManageStickers ? (
+                    <div className="rounded-2xl border bg-zinc-50/70 p-4">
+                      <div className="flex items-start gap-2">
+                        <ImagePlus className="mt-0.5 size-4 text-zinc-500" />
+                        <div>
+                          <p className="text-sm font-semibold">
+                            {t("groups.stickers.manageTitle")}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {t("groups.stickers.manageDescription")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1.2fr_auto]">
+                        <Input
+                          value={stickerName}
+                          onChange={(event) =>
+                            setStickerName(event.target.value)
+                          }
+                          placeholder={t("groups.stickers.namePlaceholder")}
+                          maxLength={32}
+                        />
+                        <Input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          onChange={(event) =>
+                            setStickerFile(event.target.files?.[0] || null)
+                          }
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => void createSticker()}
+                          disabled={
+                            !stickerName.trim() || !stickerFile || savingSticker
+                          }
+                          className="gap-2"
+                        >
+                          <ImagePlus className="size-4" />
+                          {savingSticker
+                            ? t("groups.actions.saving")
+                            : t("groups.stickers.add")}
+                        </Button>
+                      </div>
+                      <ScrollArea className="mt-3 max-h-56">
+                        <div className="grid grid-cols-2 gap-2 pr-2 sm:grid-cols-3">
+                          {stickers.length ? (
+                            stickers.map((sticker) => (
+                              <div
+                                key={sticker.id}
+                                className="group relative rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white via-white to-zinc-50/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-white/80 transition hover:border-emerald-200 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_14px_32px_rgba(16,185,129,0.12)]"
+                              >
+                                <div className="flex min-h-20 items-center justify-center rounded-xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_55%),linear-gradient(180deg,#ffffff,#fafafa)]">
+                                  <img
+                                    src={sticker.image_url}
+                                    alt={sticker.name}
+                                    className="h-16 w-16 object-contain"
+                                  />
+                                </div>
+                                <p className="mt-2 truncate text-xs font-medium">
+                                  {sticker.name}
+                                </p>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="absolute right-2 top-2 rounded-full bg-white/90 p-1 text-red-500 opacity-0 shadow-sm transition hover:bg-red-50 group-hover:opacity-100"
+                                      aria-label={t("groups.stickers.delete")}
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        {t("groups.stickers.deleteTitle")}
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        {t(
+                                          "groups.stickers.deleteDescription"
+                                        ).replace("{name}", sticker.name)}
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        {t("common.cancel")}
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        variant="destructive"
+                                        onClick={() => void deleteSticker(sticker)}
+                                        disabled={
+                                          deletingStickerId === sticker.id
+                                        }
+                                      >
+                                        {deletingStickerId === sticker.id
+                                          ? t("groups.actions.deleting")
+                                          : t("groups.stickers.delete")}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="col-span-full rounded-xl border border-dashed bg-white px-3 py-6 text-center text-sm text-muted-foreground">
+                              {t("groups.stickers.emptySettings")}
+                            </p>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  ) : (
+                    <EmptyState
+                      className="py-10"
+                      icon={<Lock className="size-7" />}
+                      title={t("groups.dialog.customStickers")}
+                      description={t("groups.dialog.permissionsDescription")}
+                    />
+                  )}
+                </TabsContent>
+
+                <TabsContent value="permissions" className="mt-0 space-y-3">
+                  <div className="rounded-2xl border bg-zinc-50 p-4">
+                    <p className="text-sm font-semibold">
+                      {t("groups.dialog.permissionsTitle")}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("groups.dialog.permissionsDescription")}
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      [Lock, t("groups.dialog.ownerControls")],
+                      [UserPlus, t("groups.dialog.memberInvites")],
+                      [Sparkles, t("groups.dialog.customStickers")],
+                    ].map(([Icon, label]) => {
+                      const PermissionIcon = Icon as typeof Lock;
+                      return (
+                        <div
+                          key={label as string}
+                          className="rounded-2xl border bg-white p-4 text-sm font-medium text-zinc-800 shadow-sm"
+                        >
+                          <PermissionIcon className="mb-3 size-5 text-emerald-600" />
+                          {label as string}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TabsContent>
+              </div>
+            </ScrollArea>
+          </Tabs>
+
+          <DialogFooter className="border-t bg-zinc-50 px-6 py-4">
             <Button
               onClick={updateSettings}
               disabled={!settingsName.trim() || savingSettings}

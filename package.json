@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npm run check && next dev --turbopack",
+    "dev": "npm run check && next dev",
+    "dev:turbo": "npm run check && next dev --turbopack",
+    "dev:clean": "rm -rf .next && npm run dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

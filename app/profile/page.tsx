@@ -42,6 +42,7 @@ type DifficultyStats = {
 
 type ProfileData = {
   avatar: string | null;
+  banner: string | null;
   username: string | null;
   bio: string;
   github: string;
@@ -98,6 +99,7 @@ function ProfileContent() {
     if (!user) {
       return {
         avatar: null,
+        banner: null,
         username: null,
         bio: "",
         github: "",
@@ -124,7 +126,7 @@ function ProfileContent() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, username, avatar_url, bio, github, twitter, website")
+      .select("*")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -132,6 +134,10 @@ function ProfileContent() {
       profile?.avatar_url &&
       profile.avatar_url !== "null" &&
       profile.avatar_url.startsWith("http");
+    const validBanner =
+      profile?.banner_url &&
+      profile.banner_url !== "null" &&
+      profile.banner_url.startsWith("http");
 
     const profileId = profile?.id;
 
@@ -168,6 +174,7 @@ function ProfileContent() {
     if (!data) {
       return {
         avatar: validAvatar ? profile.avatar_url : null,
+        banner: validBanner ? profile.banner_url : null,
         username: profile?.username || null,
         bio: profile?.bio || "",
         github: profile?.github || "",
@@ -260,6 +267,7 @@ function ProfileContent() {
 
     return {
       avatar: validAvatar ? profile.avatar_url : null,
+      banner: validBanner ? profile.banner_url : null,
       username: profile?.username || null,
       bio: profile?.bio || "",
       github: profile?.github || "",
@@ -286,6 +294,7 @@ function ProfileContent() {
   });
 
   const avatar = profileData?.avatar || null;
+  const banner = profileData?.banner || null;
   const username = profileData?.username || null;
   const bio = profileData?.bio || "";
   const github = profileData?.github || "";
@@ -418,20 +427,34 @@ function ProfileContent() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <ProfileImagePreview
-            alt={`${displayName} profile picture`}
-            avatarUrl={avatar}
-            className="h-16 w-16"
-            fallback={initial}
-          />
+      <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+        <div
+          className="h-36 bg-gradient-to-br from-emerald-50 via-white to-zinc-100"
+          style={
+            banner
+              ? {
+                  backgroundImage: `url("${banner}")`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }
+              : undefined
+          }
+        />
 
-          <div>
-            <h1 className="text-2xl font-bold">
-              {displayName}
-            </h1>
-            <p className="text-muted-foreground">{email}</p>
+        <div className="flex flex-col gap-4 px-6 pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="-mt-10 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <ProfileImagePreview
+              alt={`${displayName} profile picture`}
+              avatarUrl={avatar}
+              className="h-20 w-20 border-4 border-white shadow-sm"
+              fallback={initial}
+            />
+
+            <div className="pb-1">
+              <h1 className="text-2xl font-bold">
+                {displayName}
+              </h1>
+              <p className="text-muted-foreground">{email}</p>
 
             <div className="flex gap-4 mt-1 text-sm">
               <span><b>{followers}</b> {t("profile.followers")}</span>
@@ -469,9 +492,10 @@ function ProfileContent() {
           </div>
         </div>
 
-        <Button variant="outline" size="icon" onClick={handleShare}>
-          <Share2 size={16} />
-        </Button>
+          <Button variant="outline" size="icon" onClick={handleShare}>
+            <Share2 size={16} />
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
