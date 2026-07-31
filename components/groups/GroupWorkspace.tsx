@@ -12,8 +12,10 @@ import {
 import { flushSync } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Award,
   Check,
   Copy,
+  ExternalLink,
   Hash,
   LinkIcon,
   Lock,
@@ -37,6 +39,7 @@ import {
   api,
   type MentionCandidate,
   type ProfileSummary,
+  type StudyGroupMember,
   type StudyGroupMessage,
   type StudyGroupWorkspace as StudyGroupWorkspaceData,
 } from "@/lib/api";
@@ -334,6 +337,114 @@ function renderMessageContent(
   }
 
   return <>{nodes}</>;
+}
+
+function getGroupRoleLabel(role: string | null | undefined, t: (key: string) => string) {
+  if (role === "owner") return t("groups.roles.owner");
+  if (role === "admin") return t("groups.roles.admin");
+  return t("groups.roles.member");
+}
+
+function StudyGroupMemberPreview({
+  member,
+  profile,
+  t,
+}: {
+  member: StudyGroupMember;
+  profile: ProfileSummary | null;
+  t: (key: string) => string;
+}) {
+  const username = profile?.username || "user";
+  const profileHref = profile?.username ? `/u/${profile.username}` : null;
+  const roleLabel = getGroupRoleLabel(member.role, t);
+  const totalScore =
+    typeof profile?.total_score === "number" ? profile.total_score : null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-white"
+        >
+          <UserAvatar
+            avatarUrl={profile?.avatar_url}
+            username={username}
+            className="size-8"
+          />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-zinc-950">{username}</p>
+            <p className="text-xs text-muted-foreground">{roleLabel}</p>
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="left"
+        align="start"
+        sideOffset={12}
+        className="w-80 overflow-hidden rounded-3xl border-zinc-200 bg-white p-0 shadow-2xl"
+      >
+        <div className="h-24 bg-gradient-to-br from-zinc-800 via-zinc-700 to-emerald-500" />
+        <div className="px-5 pb-5">
+          <div className="-mt-10 flex items-end justify-between gap-3">
+            <UserAvatar
+              avatarUrl={profile?.avatar_url}
+              username={username}
+              className="size-20 border-4 border-white shadow-sm"
+            />
+            <span className="rounded-full border bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm">
+              {roleLabel}
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-1">
+            <h3 className="truncate text-2xl font-bold text-zinc-950">
+              {username}
+            </h3>
+            <p className="truncate text-sm text-muted-foreground">
+              @{username}
+            </p>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border bg-zinc-50 px-3 py-2">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                {t("groups.memberPreview.role")}
+              </p>
+              <p className="mt-1 truncate text-sm font-semibold text-zinc-950">
+                {roleLabel}
+              </p>
+            </div>
+            <div className="rounded-2xl border bg-zinc-50 px-3 py-2">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                {t("groups.memberPreview.score")}
+              </p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-zinc-950">
+                <Award className="size-3.5 text-amber-500" />
+                {totalScore ?? 0} pts
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            {t("groups.memberPreview.description").replace(
+              "{groupRole}",
+              roleLabel.toLowerCase()
+            )}
+          </p>
+
+          {profileHref ? (
+            <Button asChild className="mt-4 w-full gap-2" size="lg">
+              <Link href={profileHref}>
+                {t("groups.memberPreview.viewProfile")}
+                <ExternalLink className="size-4" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
@@ -1962,25 +2073,12 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               const profile = api.groups.getMemberProfile(member);
 
               return (
-                <Link
+                <StudyGroupMemberPreview
                   key={member.user_id}
-                  href={profile?.username ? `/u/${profile.username}` : "#"}
-                  className="flex items-center gap-3 rounded-xl px-2 py-2 text-sm hover:bg-white"
-                >
-                  <UserAvatar
-                    avatarUrl={profile?.avatar_url}
-                    username={profile?.username}
-                    className="size-8"
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">
-                      {profile?.username || "user"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {member.role || "member"}
-                    </p>
-                  </div>
-                </Link>
+                  member={member}
+                  profile={profile}
+                  t={t}
+                />
               );
             })}
           </div>

@@ -2157,7 +2157,7 @@ class StudyGroupsApi {
         .order("position", { ascending: true }),
       this.client
         .from("study_group_members")
-        .select("*, profiles(id, username, avatar_url, role)")
+        .select("*, profiles(id, username, avatar_url, role, total_score)")
         .eq("group_id", group.id)
         .eq("status", "active")
         .order("created_at", { ascending: true }),
