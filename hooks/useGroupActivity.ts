@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type StudyGroupActivitySummary } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 const GROUP_ACTIVITY_EVENT = "scripticx:group-activity-seen";
 const GROUP_SEEN_PREFIX = "scripticx:groups:last-seen";
@@ -60,12 +61,50 @@ export function markStudyGroupChannelSeen(
 
 export function useGroupActivity(userId?: string | null) {
   const [seenVersion, setSeenVersion] = useState(0);
+  const queryClient = useQueryClient();
 
   const query = useQuery<StudyGroupActivitySummary[]>({
     queryKey: ["groups", "activity", userId],
     queryFn: () => (userId ? api.groups.listActivity(userId) : Promise.resolve([])),
     enabled: Boolean(userId),
   });
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const invalidate = () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["groups", "activity", userId],
+      });
+    };
+
+    const channel = supabase
+      .channel(`group-activity:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        invalidate
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "study_group_messages",
+        },
+        invalidate
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [queryClient, userId]);
 
   const summaries = useMemo(() => query.data || [], [query.data]);
 
