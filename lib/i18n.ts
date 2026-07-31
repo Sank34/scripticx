@@ -51,6 +51,18 @@ export const translations = {
       invited: "Invited",
       private: "Private",
       public: "Public",
+      roles: {
+        owner: "Owner",
+        admin: "Admin",
+        member: "Member",
+      },
+      memberPreview: {
+        role: "Role",
+        score: "Score",
+        description:
+          "This member is a {groupRole} in the server and can collaborate in channels and live coding sessions.",
+        viewProfile: "View profile",
+      },
       searchPlaceholder: "Search public groups...",
       stats: {
         mine: "My groups",
@@ -1497,6 +1509,18 @@ export const translations = {
       invited: "Invitat",
       private: "Privat",
       public: "Public",
+      roles: {
+        owner: "Proprietar",
+        admin: "Admin",
+        member: "Membru",
+      },
+      memberPreview: {
+        role: "Rol",
+        score: "Scor",
+        description:
+          "Acest utilizator este {groupRole} în server și poate colabora în canale și sesiuni live de cod.",
+        viewProfile: "Vezi profilul",
+      },
       searchPlaceholder: "Caută grupuri publice...",
       stats: {
         mine: "Grupurile mele",
