@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 
 import {
   Breadcrumb,
@@ -23,12 +23,22 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
 
 const docsPages = [
-  { href: "/learn", key: "introduction" },
-  { href: "/learn/basics", key: "basics" },
-  { href: "/learn/variables", key: "variables" },
-  { href: "/learn/loops", key: "loops" },
-  { href: "/learn/input-output", key: "io" },
+  { href: "/docs/basics", key: "basics" },
+  { href: "/docs/variables", key: "variables" },
+  { href: "/docs/loops", key: "loops" },
+  { href: "/docs/input-output", key: "io" },
 ];
+
+function readTranslation(source: unknown, keys: string[]) {
+  let value: unknown = source;
+
+  for (const key of keys) {
+    if (!value || typeof value !== "object") return null;
+    value = (value as Record<string, unknown>)[key];
+  }
+
+  return typeof value === "string" ? value : null;
+}
 
 export default function LearnLayout({
   children,
@@ -42,33 +52,34 @@ export default function LearnLayout({
 
   const t = (key: string) => {
     const keys = key.split(".");
-    let value: any = translations[locale];
-
-    for (const k of keys) value = value?.[k];
-    if (value) return value;
-
-    let fallback: any = translations["en"];
-    for (const k of keys) fallback = fallback?.[k];
-    return fallback || key;
+    return (
+      readTranslation(translations[locale], keys) ??
+      readTranslation(translations.en, keys) ??
+      key
+    );
   };
 
-  const currentIndex = docsPages.findIndex(p => p.href === pathname);
+  if (pathname === "/learn" || pathname.startsWith("/learn/lesson")) {
+    return <div className="min-h-full">{children}</div>;
+  }
+
+  const currentIndex = docsPages.findIndex((page) => page.href === pathname);
 
   const prev = currentIndex > 0 ? docsPages[currentIndex - 1] : null;
   const next = currentIndex >= 0 ? docsPages[currentIndex + 1] : null;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 p-6">
 
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <Link href="/learn">{t("learn.docs")}</Link>
+              <Link href="/docs/basics">{t("learn.docs")}</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
 
-          {currentIndex > 0 && (
+          {currentIndex >= 0 && (
             <>
               <BreadcrumbSeparator />
               <BreadcrumbItem>

@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getLessonById, text, type LessonLocale } from "@/lib/learn-lessons";
 import { cn } from "@/lib/utils";
 
 type Crumb = {
@@ -40,7 +41,8 @@ function isProbablyId(segment: string) {
 export function TopbarBreadcrumbs() {
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || "/";
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
   const segments = pathname.split("/").filter(Boolean);
 
   useEffect(() => {
@@ -60,7 +62,8 @@ export function TopbarBreadcrumbs() {
     groups: t("nav.groups"),
     help: t("nav.help"),
     leaderboard: t("nav.leaderboard"),
-    learn: t("nav.docs"),
+    docs: t("nav.docs"),
+    learn: t("nav.learn"),
     live: t("nav.livecode"),
     livecode: t("nav.livecode"),
     login: "Login",
@@ -82,26 +85,39 @@ export function TopbarBreadcrumbs() {
     },
   ];
 
-  segments.forEach((segment, index) => {
-    const isLast = index === segments.length - 1;
-    const previous = segments[index - 1];
-    const label =
-      labelBySegment[segment] ??
-      (isProbablyId(segment)
-        ? previous === "post"
-          ? "Post"
-          : previous === "live"
-            ? "Session"
-            : previous === "problems"
-              ? "Problem"
-              : "Details"
-        : formatSegment(decodeURIComponent(segment)));
+  if (segments[0] === "learn" && segments[1] === "lesson") {
+    const lessonId = segments[2] ? decodeURIComponent(segments[2]) : "";
+    const lesson = getLessonById(lessonId);
 
     crumbs.push({
-      href: isLast ? undefined : resolveCrumbHref(segments, index),
-      label,
+      href: "/learn",
+      label: t("nav.learn"),
     });
-  });
+    crumbs.push({
+      label: lesson ? text(lesson.title, lessonLocale) : "Lesson",
+    });
+  } else {
+    segments.forEach((segment, index) => {
+      const isLast = index === segments.length - 1;
+      const previous = segments[index - 1];
+      const label =
+        labelBySegment[segment] ??
+        (isProbablyId(segment)
+          ? previous === "post"
+            ? "Post"
+            : previous === "live"
+              ? "Session"
+              : previous === "problems"
+                ? "Problem"
+                : "Details"
+          : formatSegment(decodeURIComponent(segment)));
+
+      crumbs.push({
+        href: isLast ? undefined : resolveCrumbHref(segments, index),
+        label,
+      });
+    });
+  }
 
   const shouldCollapse = crumbs.length > 2;
   const visibleCrumbs = shouldCollapse
@@ -179,6 +195,7 @@ function resolveCrumbHref(segments: string[], index: number) {
 
   if (segment === "post") return "/feed";
   if (segment === "live") return "/livecode";
+  if (segment === "learn") return "/learn";
   if (segment === "u") return "/search";
 
   if (segment === "assignments" && segments[0] === "classes") {

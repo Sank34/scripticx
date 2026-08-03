@@ -6,6 +6,7 @@ export type ProfileSummary = {
   id: string;
   username?: string | null;
   avatar_url?: string | null;
+  banner_url?: string | null;
   role?: string | null;
   banned?: boolean | null;
   total_score?: number | null;
@@ -120,6 +121,7 @@ export type StudyGroup = {
   visibility?: "public" | "private" | string | null;
   owner_id: string;
   avatar_url?: string | null;
+  banner_url?: string | null;
   created_at?: string | null;
   member_count?: number | null;
   channel_count?: number | null;
@@ -171,6 +173,16 @@ export type StudyGroupMessage = {
   reactions?: StudyGroupMessageReaction[];
 };
 
+export type StudyGroupSticker = {
+  id: string;
+  group_id: string;
+  created_by: string;
+  name: string;
+  image_url: string;
+  storage_path?: string | null;
+  created_at?: string | null;
+};
+
 export type StudyGroupMessageReaction = {
   id?: string;
   group_id?: string;
@@ -217,6 +229,7 @@ export type StudyGroupWorkspace = {
   membership: StudyGroupMember | null;
   channels: StudyGroupChannel[];
   members: StudyGroupMember[];
+  stickers: StudyGroupSticker[];
 };
 
 type SupabaseAuthSubscription = ReturnType<
@@ -413,7 +426,7 @@ class ProfilesApi {
   async getSummary(id: string): Promise<ProfileSummary | null> {
     const { data, error } = await this.client
       .from("profiles")
-      .select("id, username, avatar_url, role, banned, total_score")
+      .select("*")
       .eq("id", id)
       .maybeSingle<ProfileSummary>();
 
@@ -427,7 +440,7 @@ class ProfilesApi {
 
     const { data, error } = await this.client
       .from("profiles")
-      .select("id, username, avatar_url")
+      .select("*")
       .in("id", ids);
 
     if (error) throw error;
@@ -438,7 +451,7 @@ class ProfilesApi {
   async listSuggested(excludeUserId: string): Promise<ProfileSummary[]> {
     const { data, error } = await this.client
       .from("profiles")
-      .select("id, username, avatar_url")
+      .select("*")
       .neq("id", excludeUserId);
 
     if (error) throw error;
@@ -465,7 +478,7 @@ class ProfilesApi {
 
     let profilesQuery = this.client
       .from("profiles")
-      .select("id, username, avatar_url")
+      .select("*")
       .neq("id", userId)
       .not("username", "is", null)
       .order("username", { ascending: true })
@@ -984,7 +997,7 @@ class LiveApi {
   async listProfiles(limit = 50): Promise<ProfileSummary[]> {
     const { data, error } = await this.client
       .from("profiles")
-      .select("id, username, avatar_url")
+      .select("*")
       .limit(limit);
 
     if (error) throw error;
@@ -997,7 +1010,7 @@ class LiveApi {
 
     const { data, error } = await this.client
       .from("profiles")
-      .select("id, username, avatar_url, bio, github, twitter, website")
+      .select("*")
       .in("id", ids);
 
     if (error) throw error;
@@ -1524,6 +1537,15 @@ function createInviteToken() {
   return randomPart.slice(0, 18);
 }
 
+function isRlsError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "42501"
+  );
+}
+
 function getJoinedProfile<T>(
   value: T | T[] | null | undefined
 ): T | null {
@@ -1532,6 +1554,39 @@ function getJoinedProfile<T>(
 
 class StudyGroupsApi {
   constructor(private readonly client: SupabaseClient) {}
+
+  private async uploadGroupMedia(input: {
+    groupId: string;
+    file: File;
+    kind: "avatar" | "banner";
+  }) {
+    const extension = input.file.name.split(".").pop()?.toLowerCase() || "png";
+    const safeExtension = ["png", "jpg", "jpeg", "webp", "gif"].includes(
+      extension
+    )
+      ? extension
+      : "png";
+    const fileId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const storagePath = `${input.groupId}/${input.kind}-${fileId}.${safeExtension}`;
+
+    const { error: uploadError } = await this.client.storage
+      .from("study-group-media")
+      .upload(storagePath, input.file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = this.client.storage
+      .from("study-group-media")
+      .getPublicUrl(storagePath);
+
+    return data.publicUrl;
+  }
 
   private async getGroupIdentity(groupId: string) {
     const { data, error } = await this.client
@@ -1982,13 +2037,34 @@ class StudyGroupsApi {
     name: string;
     description?: string | null;
     visibility: "public" | "private";
+    avatarFile?: File | null;
+    bannerFile?: File | null;
   }) {
+    const [avatarUrl, bannerUrl] = await Promise.all([
+      input.avatarFile
+        ? this.uploadGroupMedia({
+            groupId: input.groupId,
+            file: input.avatarFile,
+            kind: "avatar",
+          })
+        : Promise.resolve(null),
+      input.bannerFile
+        ? this.uploadGroupMedia({
+            groupId: input.groupId,
+            file: input.bannerFile,
+            kind: "banner",
+          })
+        : Promise.resolve(null),
+    ]);
+
     const { data, error } = await this.client
       .from("study_groups")
       .update({
         name: input.name.trim(),
         description: input.description?.trim() || null,
         visibility: input.visibility,
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+        ...(bannerUrl ? { banner_url: bannerUrl } : {}),
       })
       .eq("id", input.groupId)
       .select()
@@ -2018,7 +2094,25 @@ class StudyGroupsApi {
       .select()
       .single<StudyGroupInvite>();
 
-    if (error) throw error;
+    if (error) {
+      if (isRlsError(error)) {
+        const { data: rpcData, error: rpcError } = await this.client.rpc(
+          "create_study_group_invite_link",
+          {
+            p_group_id: input.groupId,
+            p_token: token,
+            p_expires_at: input.expiresAt || null,
+          }
+        );
+
+        if (rpcError) throw rpcError;
+
+        const invite = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+        return invite as StudyGroupInvite;
+      }
+
+      throw error;
+    }
 
     return data;
   }
@@ -2127,13 +2221,37 @@ class StudyGroupsApi {
     const { data: sessionData } = await this.client.auth.getSession();
     const userId = sessionData.session?.user?.id || null;
 
-    const { data: group, error: groupError } = await this.client
+    let { data: group, error: groupError } = await this.client
       .from("study_groups")
       .select("*")
       .eq("slug", slug)
       .maybeSingle<StudyGroup>();
 
     if (groupError) throw groupError;
+
+    let membershipFromGroupLookup: StudyGroupMember | null = null;
+
+    if (!group && userId) {
+      const { data: groupMembership, error: groupMembershipError } =
+        await this.client
+          .from("study_group_members")
+          .select("*, study_groups!inner(*)")
+          .eq("user_id", userId)
+          .eq("study_groups.slug", slug)
+          .maybeSingle<
+            StudyGroupMember & {
+              study_groups?: StudyGroup | StudyGroup[] | null;
+            }
+          >();
+
+      if (groupMembershipError) throw groupMembershipError;
+
+      const joinedGroup = getJoinedProfile(groupMembership?.study_groups);
+      if (joinedGroup) {
+        group = joinedGroup as StudyGroup;
+        membershipFromGroupLookup = groupMembership as StudyGroupMember;
+      }
+    }
 
     if (!group) {
       return {
@@ -2142,6 +2260,7 @@ class StudyGroupsApi {
         membership: null,
         channels: [],
         members: [],
+        stickers: [],
       };
     }
 
@@ -2149,6 +2268,7 @@ class StudyGroupsApi {
       { data: channels, error: channelError },
       { data: members, error: memberError },
       { data: membership, error: membershipError },
+      { data: stickers, error: stickerError },
     ] = await Promise.all([
       this.client
         .from("study_group_channels")
@@ -2157,23 +2277,33 @@ class StudyGroupsApi {
         .order("position", { ascending: true }),
       this.client
         .from("study_group_members")
-        .select("*, profiles(id, username, avatar_url, role, total_score)")
+        .select("*, profiles(*)")
         .eq("group_id", group.id)
         .eq("status", "active")
         .order("created_at", { ascending: true }),
       userId
-        ? this.client
-            .from("study_group_members")
-            .select("*")
-            .eq("group_id", group.id)
-            .eq("user_id", userId)
-            .maybeSingle<StudyGroupMember>()
+        ? membershipFromGroupLookup
+          ? Promise.resolve({ data: membershipFromGroupLookup, error: null })
+          : this.client
+              .from("study_group_members")
+              .select("*")
+              .eq("group_id", group.id)
+              .eq("user_id", userId)
+              .maybeSingle<StudyGroupMember>()
         : Promise.resolve({ data: null, error: null }),
+      this.client
+        .from("study_group_stickers")
+        .select("*")
+        .eq("group_id", group.id)
+        .order("created_at", { ascending: true }),
     ]);
 
     if (channelError) throw channelError;
     if (memberError) throw memberError;
     if (membershipError) throw membershipError;
+    if (stickerError) {
+      console.warn("Could not load study group stickers:", stickerError);
+    }
 
     return {
       userId,
@@ -2187,13 +2317,14 @@ class StudyGroupsApi {
       membership: membership || null,
       channels: (channels || []) as StudyGroupChannel[],
       members: (members || []) as StudyGroupMember[],
+      stickers: stickerError ? [] : ((stickers || []) as StudyGroupSticker[]),
     };
   }
 
   async listMessages(channelId: string): Promise<StudyGroupMessage[]> {
     const { data, error } = await this.client
       .from("study_group_messages")
-      .select("*, profiles(id, username, avatar_url)")
+      .select("*, profiles(*)")
       .eq("channel_id", channelId)
       .order("created_at", { ascending: true })
       .limit(200);
@@ -2207,7 +2338,7 @@ class StudyGroupsApi {
 
     const { data: reactions, error: reactionsError } = await this.client
       .from("study_group_message_reactions")
-      .select("*, profiles(id, username, avatar_url)")
+      .select("*, profiles(*)")
       .eq("group_id", messages[0]?.group_id)
       .in("message_id", messageIds);
 
@@ -2234,7 +2365,7 @@ class StudyGroupsApi {
     channelId: string;
     userId: string;
     content: string;
-    kind?: "message" | "system";
+    kind?: "message" | "system" | "sticker";
     metadata?: Record<string, unknown>;
     notify?: boolean;
     locale?: "en" | "ro" | string;
@@ -2265,6 +2396,100 @@ class StudyGroupsApi {
         locale: input.locale,
       });
     }
+  }
+
+  async createSticker(input: {
+    groupId: string;
+    userId: string;
+    name: string;
+    file: File;
+  }): Promise<StudyGroupSticker> {
+    const name = input.name.trim().slice(0, 32);
+    if (!name) throw new Error("Sticker name is required");
+
+    const extension = input.file.name.split(".").pop()?.toLowerCase() || "png";
+    const safeExtension = ["png", "jpg", "jpeg", "webp", "gif"].includes(extension)
+      ? extension
+      : "png";
+    const fileId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const storagePath = `${input.groupId}/${fileId}.${safeExtension}`;
+
+    const { error: uploadError } = await this.client.storage
+      .from("study-group-stickers")
+      .upload(storagePath, input.file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = this.client.storage
+      .from("study-group-stickers")
+      .getPublicUrl(storagePath);
+
+    const { data, error } = await this.client
+      .from("study_group_stickers")
+      .insert({
+        group_id: input.groupId,
+        created_by: input.userId,
+        name,
+        image_url: publicUrlData.publicUrl,
+        storage_path: storagePath,
+      })
+      .select("*")
+      .single<StudyGroupSticker>();
+
+    if (error) throw error;
+
+    return data;
+  }
+
+  async deleteSticker(input: {
+    groupId: string;
+    stickerId: string;
+    storagePath?: string | null;
+  }) {
+    const { error } = await this.client
+      .from("study_group_stickers")
+      .delete()
+      .eq("id", input.stickerId)
+      .eq("group_id", input.groupId);
+
+    if (error) throw error;
+
+    if (input.storagePath) {
+      const { error: storageError } = await this.client.storage
+        .from("study-group-stickers")
+        .remove([input.storagePath]);
+
+      if (storageError) {
+        console.warn("Could not remove sticker file:", storageError);
+      }
+    }
+  }
+
+  async sendSticker(input: {
+    groupId: string;
+    channelId: string;
+    userId: string;
+    sticker: StudyGroupSticker;
+  }) {
+    await this.sendMessage({
+      groupId: input.groupId,
+      channelId: input.channelId,
+      userId: input.userId,
+      content: input.sticker.name,
+      kind: "sticker",
+      metadata: {
+        stickerId: input.sticker.id,
+        stickerName: input.sticker.name,
+        stickerUrl: input.sticker.image_url,
+      },
+      notify: false,
+    });
   }
 
   async toggleMessageReaction(input: {
@@ -2435,6 +2660,48 @@ class StudyGroupsApi {
     return status;
   }
 
+  async leaveGroup(input: {
+    groupId: string;
+    userId: string;
+    locale?: "en" | "ro" | string;
+  }) {
+    const { data: membership, error: membershipError } = await this.client
+      .from("study_group_members")
+      .select("role, status")
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.userId)
+      .maybeSingle<{ role?: string | null; status?: string | null }>();
+
+    if (membershipError) throw membershipError;
+    if (!membership || membership.status !== "active") return;
+
+    if (membership.role === "owner") {
+      throw new Error("OWNER_CANNOT_LEAVE_GROUP");
+    }
+
+    const profile = await new ProfilesApi(this.client).getSummary(input.userId);
+    const username = profile?.username || "user";
+
+    await this.insertSystemMessage({
+      groupId: input.groupId,
+      userId: input.userId,
+      content:
+        input.locale === "ro"
+          ? `${username} a ieșit din grup`
+          : `${username} left the group`,
+      metadata: { event: "member_left", userId: input.userId },
+    });
+
+    const { error } = await this.client
+      .from("study_group_members")
+      .delete()
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.userId)
+      .neq("role", "owner");
+
+    if (error) throw error;
+  }
+
   async inviteMember(input: {
     groupId: string;
     inviterId: string;
@@ -2458,7 +2725,6 @@ class StudyGroupsApi {
         .maybeSingle<{ status?: string | null }>(),
     ]);
 
-    if (existingError) throw existingError;
     if (!group) throw new Error("Group not found");
 
     if (existing?.status === "active") {
@@ -2469,19 +2735,35 @@ class StudyGroupsApi {
       return "invited";
     }
 
-    const { error } = await this.client
-      .from("study_group_members")
-      .upsert(
-        {
-          group_id: input.groupId,
-          user_id: input.inviteeId,
-          role: "member",
-          status: "invited",
-        },
-        { onConflict: "group_id,user_id" }
-      );
+    const { error } = existingError
+      ? { error: existingError }
+      : await this.client
+          .from("study_group_members")
+          .upsert(
+            {
+              group_id: input.groupId,
+              user_id: input.inviteeId,
+              role: "member",
+              status: "invited",
+            },
+            { onConflict: "group_id,user_id" }
+          );
 
-    if (error) throw error;
+    if (error) {
+      if (isRlsError(error)) {
+        const { error: rpcError } = await this.client.rpc(
+          "invite_study_group_member",
+          {
+            p_group_id: input.groupId,
+            p_invitee_id: input.inviteeId,
+          }
+        );
+
+        if (rpcError) throw rpcError;
+      } else {
+        throw error;
+      }
+    }
 
     const isRo = input.locale === "ro";
     await NotificationsApi.createWithClient(this.client, {
@@ -2590,6 +2872,74 @@ class StudyGroupsApi {
     if (error) throw error;
   }
 
+  async updateMemberRole(input: {
+    groupId: string;
+    actorId: string;
+    memberId: string;
+    role: "admin" | "member";
+  }) {
+    await this.ensureGroupOwner(input.groupId, input.actorId);
+
+    if (input.actorId === input.memberId) {
+      throw new Error("The owner cannot change their own role");
+    }
+
+    const { error } = await this.client
+      .from("study_group_members")
+      .update({ role: input.role })
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.memberId)
+      .neq("role", "owner");
+
+    if (error) throw error;
+  }
+
+  async transferOwnership(input: {
+    groupId: string;
+    currentOwnerId: string;
+    newOwnerId: string;
+  }) {
+    await this.ensureGroupOwner(input.groupId, input.currentOwnerId);
+
+    if (input.currentOwnerId === input.newOwnerId) return;
+
+    const { data: newOwner, error: newOwnerError } = await this.client
+      .from("study_group_members")
+      .select("role,status")
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.newOwnerId)
+      .maybeSingle<{ role?: string | null; status?: string | null }>();
+
+    if (newOwnerError) throw newOwnerError;
+    if (newOwner?.status !== "active") {
+      throw new Error("The new owner must be an active member");
+    }
+
+    const { error: promoteError } = await this.client
+      .from("study_group_members")
+      .update({ role: "owner" })
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.newOwnerId);
+
+    if (promoteError) throw promoteError;
+
+    const { error: groupError } = await this.client
+      .from("study_groups")
+      .update({ owner_id: input.newOwnerId })
+      .eq("id", input.groupId)
+      .eq("owner_id", input.currentOwnerId);
+
+    if (groupError) throw groupError;
+
+    const { error: demoteError } = await this.client
+      .from("study_group_members")
+      .update({ role: "admin" })
+      .eq("group_id", input.groupId)
+      .eq("user_id", input.currentOwnerId);
+
+    if (demoteError) throw demoteError;
+  }
+
   private async ensureGroupOwner(groupId: string, userId: string) {
     const { data, error } = await this.client
       .from("study_group_members")
@@ -2600,7 +2950,7 @@ class StudyGroupsApi {
 
     if (error) throw error;
     if (data?.role !== "owner" || data?.status !== "active") {
-      throw new Error("Only the group owner can manage channels");
+      throw new Error("Only the group owner can manage this server");
     }
   }
 

@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npm run check && next dev --turbopack",
+    "dev": "npm run check && next dev",
+    "dev:turbo": "npm run check && next dev --turbopack",
+    "dev:clean": "rm -rf .next && npm run dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -32,6 +34,7 @@
     "react-dom": "19.2.4",
     "react-easy-crop": "^5.5.7",
     "react-markdown": "^10.1.0",
+    "recharts": "^3.10.1",
     "remark-gfm": "^4.0.1",
     "shadcn": "^4.1.0",
     "simple-icons": "^16.13.0",

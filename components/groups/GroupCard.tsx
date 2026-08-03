@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Hash, Lock, MessageCircle, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  Hash,
+  Lock,
+  MessageCircle,
+  Users,
+} from "lucide-react";
 
 import type { StudyGroup } from "@/lib/api";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,46 +53,71 @@ export function GroupCard({
   const isPending = group.status === "pending";
   const isInvited = group.status === "invited";
   const isPrivate = group.visibility === "private";
+  const initial = group.name.charAt(0).toUpperCase();
+  const bannerStyle = group.banner_url
+    ? {
+        backgroundImage: `url("${group.banner_url}")`,
+      }
+    : undefined;
 
   return (
-    <Card className="transition hover:-translate-y-0.5 hover:shadow-sm">
-      <CardContent className="flex h-full flex-col gap-4 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-900">
-              <Hash className="size-5" />
+    <Card className="gap-0 overflow-hidden py-0 transition hover:-translate-y-0.5 hover:shadow-sm">
+      <CardContent className="flex h-full flex-col gap-4 p-0">
+        <div
+          className="h-20 w-full border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center"
+          style={bannerStyle}
+        />
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar className="-mt-9 size-16 border-4 border-background shadow-md">
+                <AvatarImage
+                  src={group.avatar_url || undefined}
+                  alt={group.name}
+                />
+                <AvatarFallback className="bg-zinc-950 text-lg font-semibold text-white">
+                  {initial}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-semibold">
+                  {group.name}
+                </h3>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Users className="size-3.5" />
+                    {group.member_count || 0}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Hash className="size-3.5" />
+                    {group.channel_count || 0}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-semibold">{group.name}</h3>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                <Users className="size-3.5" />
-                {group.member_count || 0}
-              </p>
+            <div className="flex shrink-0 items-center gap-2">
+              {mentionCount > 0 ? (
+                <Badge className="gap-1 bg-red-500 text-white hover:bg-red-500">
+                  <Bell className="size-3" />
+                  {mentionCount} {mentionLabel}
+                </Badge>
+              ) : hasActivity ? (
+                <Badge
+                  variant="secondary"
+                  className="gap-1 bg-zinc-100 text-zinc-600"
+                  title={activityLabel}
+                >
+                  <MessageCircle className="size-3" />
+                </Badge>
+              ) : null}
+
+              <Badge variant={isPrivate ? "outline" : "secondary"}>
+                {isPrivate ? privateLabel : publicLabel}
+              </Badge>
             </div>
           </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {mentionCount > 0 ? (
-              <Badge className="gap-1 bg-red-500 text-white hover:bg-red-500">
-                <Bell className="size-3" />
-                {mentionCount} {mentionLabel}
-              </Badge>
-            ) : hasActivity ? (
-              <Badge
-                variant="secondary"
-                className="gap-1 bg-zinc-100 text-zinc-600"
-                title={activityLabel}
-              >
-                <MessageCircle className="size-3" />
-              </Badge>
-            ) : null}
-
-            <Badge variant={isPrivate ? "outline" : "secondary"}>
-              {isPrivate ? privateLabel : publicLabel}
-            </Badge>
-          </div>
-        </div>
 
         {group.description ? (
           <p className="line-clamp-2 min-h-10 text-sm text-muted-foreground">
@@ -119,16 +152,20 @@ export function GroupCard({
           {isInvited ? (
             <Button
               size="sm"
-              variant="outline"
+              className="gap-2"
               onClick={() => onJoin?.(group)}
             >
               {acceptInviteLabel}
+              <ArrowRight className="size-3.5" />
             </Button>
           ) : (
-            <Button asChild size="sm" variant="ghost">
-              <Link href={`/groups/${group.slug}`}>{openLabel}</Link>
+            <Button asChild size="sm" variant="secondary" className="font-semibold">
+              <Link href={`/groups/${group.slug}`}>
+                {openLabel}
+              </Link>
             </Button>
           )}
+        </div>
         </div>
       </CardContent>
     </Card>

@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { ImagePlus } from "lucide-react";
 
 import {
   Avatar,
@@ -62,6 +63,7 @@ function SettingsContent() {
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [banner, setBanner] = useState<string | null>(null);
 
   const [bio, setBio] = useState("");
   const [github, setGithub] = useState("");
@@ -69,10 +71,13 @@ function SettingsContent() {
   const [website, setWebsite] = useState("");
 
   const [fileName, setFileName] = useState("");
+  const [bannerFileName, setBannerFileName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   const [cropOpen, setCropOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [cropTarget, setCropTarget] = useState<"avatar" | "banner">("avatar");
 
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -86,7 +91,7 @@ function SettingsContent() {
     async function loadProfile() {
       const { data } = await supabase
         .from("profiles")
-        .select("username, avatar_url, bio, github, twitter, website")
+        .select("*")
         .eq("id", userId)
         .maybeSingle();
 
@@ -98,8 +103,11 @@ function SettingsContent() {
 
       const validAvatar =
         data?.avatar_url && data.avatar_url.startsWith("http");
+      const validBanner =
+        data?.banner_url && data.banner_url.startsWith("http");
 
       setAvatar(validAvatar ? data.avatar_url : null);
+      setBanner(validBanner ? data.banner_url : null);
     }
 
     loadProfile();
@@ -154,20 +162,94 @@ function SettingsContent() {
 
     setFileName(file.name);
     const url = URL.createObjectURL(file);
+    setCropTarget("avatar");
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setRotation(0);
     setSelectedImage(url);
     setCropOpen(true);
   }
 
+  function handleSelectBanner(e: any) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("settings.banner.invalid"));
+      return;
+    }
+
+    setBannerFileName(file.name);
+    const url = URL.createObjectURL(file);
+    setCropTarget("banner");
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setRotation(0);
+    setSelectedImage(url);
+    setCropOpen(true);
+  }
+
+  async function uploadCroppedBanner(blob: Blob) {
+    if (!user) return;
+
+    setUploadingBanner(true);
+
+    const file = new File([blob], "banner.png", { type: "image/png" });
+    const fileNameFinal = `${user.id}/banners/${Date.now()}.png`;
+
+    const { error } = await supabase.storage
+      .from("avatars")
+      .upload(fileNameFinal, file, {
+        cacheControl: "3600",
+        upsert: true,
+        contentType: "image/png",
+      });
+
+    if (error) {
+      toast.error(error.message);
+      setUploadingBanner(false);
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(fileNameFinal);
+
+    const publicUrl = data.publicUrl;
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ banner_url: publicUrl })
+      .eq("id", user.id);
+
+    if (updateError) {
+      toast.error(updateError.message);
+      setUploadingBanner(false);
+      return;
+    }
+
+    setBanner(publicUrl);
+    window.dispatchEvent(new Event("profile-updated"));
+    toast.success(t("settings.banner.updated"));
+    setUploadingBanner(false);
+    setCropOpen(false);
+  }
+
   async function handleSaveCropped() {
     if (!selectedImage || !croppedAreaPixels || !user) return;
-
-    setUploading(true);
 
     const blob = await getCroppedImg(
       selectedImage,
       croppedAreaPixels,
       rotation
     );
+
+    if (cropTarget === "banner") {
+      await uploadCroppedBanner(blob);
+      return;
+    }
+
+    setUploading(true);
 
     const file = new File([blob], "avatar.png", { type: "image/png" });
     const fileNameFinal = `${user.id}/${Date.now()}.png`;
@@ -230,6 +312,29 @@ function SettingsContent() {
     toast.success(t("settings.avatar.removed"));
   }
 
+  async function removeBanner() {
+    if (!user) return;
+
+    setUploadingBanner(true);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ banner_url: null })
+      .eq("id", user.id);
+
+    if (error) {
+      toast.error(error.message);
+      setUploadingBanner(false);
+      return;
+    }
+
+    setBanner(null);
+    setBannerFileName("");
+    window.dispatchEvent(new Event("profile-updated"));
+    setUploadingBanner(false);
+    toast.success(t("settings.banner.removed"));
+  }
+
   async function updateProfile() {
     if (!user) return;
 
@@ -272,32 +377,88 @@ function SettingsContent() {
         <CardHeader>
           <CardTitle>{t("settings.profile")}</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-6">
-
-          <Avatar className="w-16 h-16">
-            {avatar && <AvatarImage src={avatar} />}
-            <AvatarFallback>{initial}</AvatarFallback>
-          </Avatar>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <label className="px-3 py-2 bg-muted rounded-md cursor-pointer text-sm">
-                {t("settings.upload")}
-                <input type="file" accept="image/*" onChange={handleSelectImage} className="hidden" />
-              </label>
-
-              {avatar && (
-                <Button size="sm" variant="destructive" onClick={removeAvatar}>
-                  {t("settings.remove")}
-                </Button>
+        <CardContent className="space-y-5">
+          <div className="overflow-hidden rounded-2xl border bg-zinc-50">
+            <div
+              className="relative h-36 bg-gradient-to-br from-zinc-950 via-zinc-800 to-emerald-400 bg-cover bg-center"
+              style={
+                banner
+                  ? {
+                      backgroundImage: `url("${banner}")`,
+                    }
+                  : undefined
+              }
+            >
+              {!banner && (
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(255,255,255,0.28),transparent_28%)]" />
               )}
+              <div className={banner ? "sr-only" : "absolute bottom-4 left-4 text-white"}>
+                <p className="text-sm font-semibold">
+                  {t("settings.banner.title")}
+                </p>
+                <p className="max-w-md text-xs text-white/75">
+                  {t("settings.banner.description")}
+                </p>
+              </div>
             </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                {bannerFileName || t("settings.banner.noFile")}
+              </p>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm transition hover:bg-muted/80">
+                  <ImagePlus className="size-4" />
+                  {uploadingBanner
+                    ? t("settings.banner.uploading")
+                    : t("settings.banner.upload")}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleSelectBanner}
+                    className="hidden"
+                    disabled={uploadingBanner}
+                  />
+                </label>
 
-            <p className="text-xs text-muted-foreground">
-              {fileName || t("settings.noFile")}
-            </p>
+                {banner && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={removeBanner}
+                    disabled={uploadingBanner}
+                  >
+                    {t("settings.banner.remove")}
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
 
+          <div className="flex items-center gap-6">
+            <Avatar className="w-16 h-16">
+              {avatar && <AvatarImage src={avatar} />}
+              <AvatarFallback>{initial}</AvatarFallback>
+            </Avatar>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <label className="px-3 py-2 bg-muted rounded-md cursor-pointer text-sm">
+                  {t("settings.upload")}
+                  <input type="file" accept="image/*" onChange={handleSelectImage} className="hidden" />
+                </label>
+
+                {avatar && (
+                  <Button size="sm" variant="destructive" onClick={removeAvatar}>
+                    {t("settings.remove")}
+                  </Button>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                {fileName || t("settings.noFile")}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -339,7 +500,11 @@ function SettingsContent() {
       <Dialog open={cropOpen} onOpenChange={setCropOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("settings.avatar.edit")}</DialogTitle>
+            <DialogTitle>
+              {cropTarget === "banner"
+                ? t("settings.banner.edit")
+                : t("settings.avatar.edit")}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="relative h-[300px] w-full bg-black">
@@ -349,8 +514,8 @@ function SettingsContent() {
                 crop={crop}
                 zoom={zoom}
                 rotation={rotation}
-                aspect={1}
-                cropShape="round"
+                aspect={cropTarget === "banner" ? 4 : 1}
+                cropShape={cropTarget === "banner" ? "rect" : "round"}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onRotationChange={setRotation}
@@ -361,7 +526,9 @@ function SettingsContent() {
 
           <DialogFooter>
             <Button onClick={handleSaveCropped}>
-              {t("settings.avatar.save")}
+              {cropTarget === "banner"
+                ? t("settings.banner.save")
+                : t("settings.avatar.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

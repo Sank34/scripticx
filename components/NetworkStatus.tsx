@@ -35,20 +35,21 @@ function hasNetworkErrorMessage(reason: unknown) {
 }
 
 async function canReachNetwork() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) return navigator.onLine;
+  if (!navigator.onLine) return false;
 
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 3500);
 
   try {
-    await fetch(`${url}/auth/v1/health?ts=${Date.now()}`, {
+    const response = await fetch(
+      `/icons/notification-icon-72.png?ts=${Date.now()}`,
+      {
       cache: "no-store",
-      mode: "no-cors",
       signal: controller.signal,
-    });
+      }
+    );
 
-    return true;
+    return response.ok;
   } catch {
     return false;
   } finally {

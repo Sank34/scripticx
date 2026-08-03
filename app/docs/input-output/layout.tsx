@@ -3,13 +3,13 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Loops in MiniScript+",
+  title: "Input and Output in MiniScript+",
   description:
-    "Learn how to repeat instructions with WHILE and follow variable changes step by step.",
-  path: "/learn/loops",
+    "Use INPUT and PRINT to read data, display results, and build interactive MiniScript+ programs.",
+  path: "/docs/input-output",
 });
 
-export default function LoopsLayout({
+export default function InputOutputLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return children;

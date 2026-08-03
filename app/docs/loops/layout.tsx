@@ -3,13 +3,13 @@ import type { Metadata } from "next";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Variables in MiniScript+",
+  title: "Loops in MiniScript+",
   description:
-    "Learn how variables and values are declared, updated, and used in MiniScript+ programs.",
-  path: "/learn/variables",
+    "Learn how to repeat instructions with WHILE and follow variable changes step by step.",
+  path: "/docs/loops",
 });
 
-export default function VariablesLayout({
+export default function LoopsLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return children;

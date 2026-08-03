@@ -54,7 +54,7 @@ export async function generateMetadata({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, bio, avatar_url, github, twitter, website")
+    .select("*")
     .eq("username", username)
     .maybeSingle();
 
@@ -69,7 +69,7 @@ export async function generateMetadata({
       `Explore ${profile.username}'s ScripticX profile, including progress, solved problems, achievements, and community activity.`
     ),
     path: `/u/${encodeURIComponent(profile.username)}`,
-    image: profile.avatar_url || null,
+    image: profile.banner_url || profile.avatar_url || null,
     type: "profile",
     keywords: [
       profile.username,
@@ -228,59 +228,75 @@ export default async function PublicProfile({
         }}
       />
 
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <ProfileImagePreview
-            alt={`${profile.username} profile picture`}
-            avatarUrl={profile.avatar_url}
-            className="h-16 w-16"
-            fallback={initial}
-          />
+      <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+        <div
+          className="relative h-44 bg-gradient-to-br from-zinc-950 via-zinc-800 to-emerald-400 bg-cover bg-center sm:h-52"
+          style={
+            profile.banner_url
+              ? {
+                  backgroundImage: `url("${profile.banner_url}")`,
+                }
+              : undefined
+          }
+        >
+          <div className="absolute inset-x-0 bottom-0 h-px bg-zinc-200/90 shadow-[0_1px_0_rgba(255,255,255,0.9)]" />
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">
-              {profile.username}
-            </h1>
+        <div className="px-6 py-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <ProfileImagePreview
+                alt={`${profile.username} profile picture`}
+                avatarUrl={profile.avatar_url}
+                className="h-20 w-20 border border-zinc-200 shadow-sm sm:h-24 sm:w-24"
+                fallback={initial}
+              />
 
-            <PublicProfileHeader
-              profileId={profile.id}
-              profileUsername={profile.username}
-            />
+              <div className="min-w-0 pb-1">
+                <h1 className="truncate text-3xl font-bold">
+                  {profile.username}
+                </h1>
+                <PublicProfileHeader
+                  profileId={profile.id}
+                  profileUsername={profile.username}
+                />
+              </div>
+            </div>
+          </div>
 
-            {profile.bio && (
-              <p className="text-sm text-muted-foreground">
-                {profile.bio}
-              </p>
+          {profile.bio && (
+            <p className="mt-4 max-w-2xl text-sm text-muted-foreground">
+              {profile.bio}
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+            {profile.github && (
+              <a href={normalizeUrl(profile.github)} target="_blank" rel="noopener noreferrer">
+                <span className="flex items-center gap-1">
+                  <BrandIcon icon={siGithub} />
+                  GitHub
+                </span>
+              </a>
             )}
 
-            <div className="flex gap-4 text-sm flex-wrap">
-              {profile.github && (
-                <a href={normalizeUrl(profile.github)} target="_blank" rel="noopener noreferrer">
-                  <span className="flex items-center gap-1">
-                    <BrandIcon icon={siGithub} />
-                    GitHub
-                  </span>
-                </a>
-              )}
+            {profile.twitter && (
+              <a href={normalizeUrl(profile.twitter)} target="_blank" rel="noopener noreferrer">
+                <span className="flex items-center gap-1">
+                  <BrandIcon icon={siX} />
+                  X
+                </span>
+              </a>
+            )}
 
-              {profile.twitter && (
-                <a href={normalizeUrl(profile.twitter)} target="_blank" rel="noopener noreferrer">
-                  <span className="flex items-center gap-1">
-                    <BrandIcon icon={siX} />
-                    X
-                  </span>
-                </a>
-              )}
-
-              {profile.website && (
-                <a href={normalizeUrl(profile.website)} target="_blank" rel="noopener noreferrer">
-                  <span className="flex items-center gap-1">
-                    <Globe size={16} />
-                    Website
-                  </span>
-                </a>
-              )}
-            </div>
+            {profile.website && (
+              <a href={normalizeUrl(profile.website)} target="_blank" rel="noopener noreferrer">
+                <span className="flex items-center gap-1">
+                  <Globe size={16} />
+                  Website
+                </span>
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api, type ProfileSummary } from "@/lib/api";
 import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
 import { useLanguage } from "@/components/LanguageProvider";
+import { ShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { TopbarBreadcrumbs } from "@/components/navigation/TopbarBreadcrumbs";
 import { NotificationsPopover } from "@/components/notifications/NotificationsPopover";
 
@@ -100,7 +101,7 @@ export function Topbar() {
   )[0]?.toUpperCase();
 
   return (
-    <header className="grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-zinc-200/70 bg-white px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
+    <header className="relative grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-zinc-200/70 bg-white px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
 
       <div className="flex min-w-0 items-center overflow-hidden pr-3">
         <TopbarBreadcrumbs />
@@ -247,6 +248,8 @@ export function Topbar() {
         )}
 
       </div>
+
+      <ShellRouteProgress />
 
     </header>
   );

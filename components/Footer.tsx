@@ -19,7 +19,7 @@ export function Footer() {
         ],
         resourcesTitle: "Resurse",
         resources: [
-          { href: "/learn", label: "Documentație" },
+          { href: "/docs/basics", label: "Documentație" },
           { href: "/examples", label: "Exemple" },
           { href: "/updates", label: "Noutăți" },
           { href: "/help", label: "Ajutor" },
@@ -43,7 +43,7 @@ export function Footer() {
         ],
         resourcesTitle: "Resources",
         resources: [
-          { href: "/learn", label: "Docs" },
+          { href: "/docs/basics", label: "Docs" },
           { href: "/examples", label: "Examples" },
           { href: "/updates", label: "What's new" },
           { href: "/help", label: "Help" },
