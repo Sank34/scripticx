@@ -1145,6 +1145,70 @@ export const translations = {
 
     admin: {
       title: "Admin Panel",
+      overview: {
+        subtitle: "Everything that needs your attention, in one place.",
+        unavailable: "Unavailable",
+        actions: {
+          refresh: "Refresh",
+          open: "Open",
+        },
+        badges: {
+          banned: "{count} banned",
+          new: "{count} new",
+        },
+        attention: {
+          title: "Needs attention",
+          empty: {
+            title: "All clear",
+            description:
+              "No pending messages, no bans and the daily challenge is scheduled.",
+          },
+          items: {
+            unresolvedMessages: {
+              title: "{count} unresolved messages",
+              description: "Contact messages waiting for a reply.",
+            },
+            noDailyToday: {
+              title: "No daily challenge today",
+              description: "Schedule a problem so today's streak stays alive.",
+            },
+            noProblems: {
+              title: "No problems published",
+              description: "Create your first problem to get students started.",
+            },
+            noDailyUpcoming: {
+              title: "Daily challenges running low",
+              description: "Fewer than 3 days are scheduled ahead.",
+            },
+            bannedUsers: {
+              title: "{count} banned users",
+              description: "Review bans and restore access if needed.",
+            },
+            staleChangelog: {
+              title: "Changelog is out of date",
+              description: "No update has been published in over 30 days.",
+            },
+          },
+        },
+        activity: {
+          title: "Recent activity",
+          empty: {
+            title: "Nothing yet",
+            description:
+              "Messages, changelog posts and scheduled challenges will show up here.",
+          },
+          types: {
+            message: "New contact message",
+            update: "Changelog published",
+            daily: "Daily challenge scheduled",
+          },
+        },
+        errors: {
+          title: "Couldn't load this section",
+          description: "Some data may be missing or restricted.",
+          retry: "Try again",
+        },
+      },
       problems: {
         title: "Problems",
         description: "Create, edit and manage problems",
@@ -2603,6 +2667,74 @@ export const translations = {
 
     admin: {
       title: "Panou Admin",
+      overview: {
+        subtitle: "Tot ce necesită atenția ta, într-un singur loc.",
+        unavailable: "Indisponibil",
+        actions: {
+          refresh: "Reîmprospătează",
+          open: "Deschide",
+        },
+        badges: {
+          banned: "{count} blocați",
+          new: "{count} noi",
+        },
+        attention: {
+          title: "Necesită atenție",
+          empty: {
+            title: "Totul e în regulă",
+            description:
+              "Niciun mesaj în așteptare, nicio blocare, iar provocarea zilei este programată.",
+          },
+          items: {
+            unresolvedMessages: {
+              title: "{count} mesaje nerezolvate",
+              description: "Mesaje de contact care așteaptă un răspuns.",
+            },
+            noDailyToday: {
+              title: "Nicio provocare zilnică astăzi",
+              description:
+                "Programează o problemă pentru ca seria de astăzi să continue.",
+            },
+            noProblems: {
+              title: "Nicio problemă publicată",
+              description:
+                "Creează prima problemă pentru ca elevii să poată începe.",
+            },
+            noDailyUpcoming: {
+              title: "Provocările zilnice se apropie de final",
+              description: "Sunt programate mai puțin de 3 zile în avans.",
+            },
+            bannedUsers: {
+              title: "{count} utilizatori blocați",
+              description:
+                "Verifică blocările și restabilește accesul dacă este necesar.",
+            },
+            staleChangelog: {
+              title: "Jurnalul de modificări este învechit",
+              description:
+                "Nicio actualizare nu a fost publicată de peste 30 de zile.",
+            },
+          },
+        },
+        activity: {
+          title: "Activitate recentă",
+          empty: {
+            title: "Nimic încă",
+            description:
+              "Mesajele, jurnalul de modificări și provocările programate vor apărea aici.",
+          },
+          types: {
+            message: "Mesaj de contact nou",
+            update: "Jurnal de modificări publicat",
+            daily: "Provocare zilnică programată",
+          },
+        },
+        errors: {
+          title: "Această secțiune nu a putut fi încărcată",
+          description: "Unele date pot lipsi sau pot fi restricționate.",
+          retry: "Încearcă din nou",
+        },
+      },
       problems: {
         title: "Probleme",
         description: "Creează, editează și gestionează probleme",

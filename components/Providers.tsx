@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 const realtimeInvalidationTargets = [
+  "admin",
   "livecode",
   "command-menu",
   "dashboard",
@@ -39,6 +40,7 @@ const realtimeTables = [
   "follows",
   "snippets",
   "submissions",
+  "problems",
   "classes",
   "class_members",
   "assignments",
