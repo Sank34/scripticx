@@ -1,15 +1,32 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+} from "recharts";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { EmptyState } from "@/components/common/EmptyState";
-import { PageHeader } from "@/components/common/PageHeader";
 import { SectionCard } from "@/components/common/SectionCard";
-import { StatCard } from "@/components/common/StatCard";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
-import { Flame, Trophy, Activity, CalendarDays } from "lucide-react";
+import {
+  Activity,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  Flame,
+  Target,
+  Trophy,
+} from "lucide-react";
 import { getLocalized } from "@/lib/getLocalized";
 import { useLanguage } from "@/components/LanguageProvider";
 import { api, type DailyChallenge } from "@/lib/api";
@@ -17,6 +34,7 @@ import { api, type DailyChallenge } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type DashboardStats = {
   solved: number;
@@ -192,6 +210,34 @@ function DashboardContent() {
   const feed = dashboardData?.feed || [];
   const dailyChallenge = dashboardData?.dailyChallenge || null;
   const dailySolved = dashboardData?.dailySolved || false;
+  const scoreTrend = recent
+    .slice()
+    .reverse()
+    .map((item, index) => ({
+      name: `${index + 1}`,
+      score: Number(item.score) || 0,
+    }));
+  const scoreDistribution = [
+    {
+      name: locale === "ro" ? "Perfecte" : "Perfect",
+      value: recent.filter((item) => Number(item.score) === 100).length,
+      color: "#10b981",
+    },
+    {
+      name: locale === "ro" ? "Parțiale" : "Partial",
+      value: recent.filter(
+        (item) => Number(item.score) > 0 && Number(item.score) < 100
+      ).length,
+      color: "#f97316",
+    },
+    {
+      name: locale === "ro" ? "De revăzut" : "Needs work",
+      value: recent.filter((item) => Number(item.score) === 0).length,
+      color: "#ef4444",
+    },
+  ];
+  const hasScoreDistribution = scoreDistribution.some((item) => item.value > 0);
+  const topUser = leaderboard[0];
 
   if (loading || !user) {
     return (
@@ -211,204 +257,271 @@ function DashboardContent() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-
-      <PageHeader
-        title={t("dashboard.title")}
-        subtitle={user.email}
-      />
-
-      {dailyChallenge?.problems && (
-        <SectionCard
-          icon={<CalendarDays className="h-4 w-4 text-orange-500" />}
-          title={locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
-          action={
-            dailySolved ? (
-              <Button size="sm" variant="secondary" disabled>
-                {t("problems.status.solved")}
-              </Button>
-            ) : (
-              <Button asChild size="sm">
-                <a href={`/problems/${dailyChallenge.problem_id}`}>
-                  {locale === "ro" ? "Rezolvă" : "Solve"}
-                </a>
-              </Button>
-            )
-          }
-          contentClassName="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold">
-              {dailyChallenge.problems.code != null && (
-                <span className="mr-2 font-mono text-muted-foreground">
-                  #{dailyChallenge.problems.code}
-                </span>
-              )}
-              {getLocalized(dailyChallenge.problems.title_i18n, locale)}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {locale === "ro"
-                ? "O problemă nouă în fiecare zi pentru streak și puncte bonus."
-                : "A fresh problem every day for streaks and bonus points."}
-            </p>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            {dailySolved && (
-              <Badge className="bg-emerald-600 hover:bg-emerald-600">
-                {t("problems.status.solved")}
+    <div className="space-y-6 p-4 sm:p-6">
+      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+        <Card className="relative overflow-hidden border-0 bg-zinc-950 text-white ring-0">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(16,185,129,0.35),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.25),transparent_30%)]" />
+          <CardContent className="relative flex min-h-56 flex-col justify-between gap-8 p-6">
+            <div>
+              <Badge className="mb-4 bg-white/10 text-white hover:bg-white/10">
+                {locale === "ro" ? "Workspace personal" : "Personal workspace"}
               </Badge>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
+                {t("dashboard.title")}
+              </h1>
+              <p className="mt-2 max-w-xl text-sm text-white/65 sm:text-base">
+                {locale === "ro"
+                  ? "Urmărește progresul, revino la provocarea zilei și vezi cum evoluează rezolvările tale."
+                  : "Track progress, jump back into today's challenge and see how your submissions evolve."}
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                {
+                  label: t("dashboard.stats.solved"),
+                  value: stats.solved,
+                  icon: CheckCircle2,
+                },
+                {
+                  label: t("dashboard.stats.score"),
+                  value: stats.total,
+                  icon: Target,
+                },
+                {
+                  label: t("dashboard.stats.streak"),
+                  value: `${stats.average}%`,
+                  icon: Flame,
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur"
+                >
+                  <div className="flex items-center justify-between text-white/60">
+                    <span className="text-xs font-medium">{item.label}</span>
+                    <item.icon className="size-4" />
+                  </div>
+                  <div className="mt-3 text-3xl font-semibold">
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-50 via-white to-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="size-4 text-orange-500" />
+              {locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col justify-between gap-5">
+            {dailyChallenge?.problems ? (
+              <>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">
+                    {dailySolved
+                      ? t("problems.status.solved")
+                      : locale === "ro"
+                      ? "Pregătit de rezolvat"
+                      : "Ready to solve"}
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold">
+                    {dailyChallenge.problems.code != null && (
+                      <span className="mr-2 font-mono text-muted-foreground">
+                        #{dailyChallenge.problems.code}
+                      </span>
+                    )}
+                    {getLocalized(dailyChallenge.problems.title_i18n, locale)}
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {locale === "ro"
+                      ? "Un exercițiu zilnic pentru streak, focus și puncte bonus."
+                      : "A daily exercise for streaks, focus and bonus points."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">
+                    +{dailyChallenge.bonus_points || 0} pts
+                  </Badge>
+                  <Badge>
+                    {t(`problems.filters.${dailyChallenge.problems.difficulty}`)}
+                  </Badge>
+                  {dailySolved ? (
+                    <Button size="sm" disabled>
+                      {t("problems.status.solved")}
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm">
+                      <a href={`/problems/${dailyChallenge.problem_id}`}>
+                        {locale === "ro" ? "Rezolvă" : "Solve"}
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <EmptyState className="py-4" title={t("dashboard.states.empty")} />
             )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_0.72fr]">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="size-4 text-emerald-600" />
+              {locale === "ro" ? "Evoluția scorurilor" : "Score trend"}
+            </CardTitle>
             <Badge variant="secondary">
-              +{dailyChallenge.bonus_points || 0} pts
+              {locale === "ro" ? "ultimele rezultate" : "latest results"}
             </Badge>
-            <Badge>
-              {t(`problems.filters.${dailyChallenge.problems.difficulty}`)}
-            </Badge>
-          </div>
-        </SectionCard>
-      )}
+          </CardHeader>
+          <CardContent>
+            {scoreTrend.length ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={scoreTrend}>
+                    <defs>
+                      <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                    <Tooltip />
+                    <Area
+                      type="monotone"
+                      dataKey="score"
+                      stroke="#059669"
+                      strokeWidth={2}
+                      fill="url(#scoreGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyState className="py-10" title={t("dashboard.states.empty")} />
+            )}
+          </CardContent>
+        </Card>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="size-4 text-blue-600" />
+              {locale === "ro" ? "Distribuția rezultatelor" : "Result mix"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-[180px_1fr] xl:grid-cols-1">
+            <div className="h-44">
+              {hasScoreDistribution ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={scoreDistribution}
+                      dataKey="value"
+                      innerRadius={48}
+                      outerRadius={72}
+                      paddingAngle={4}
+                    >
+                      {scoreDistribution.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState className="py-8" title={t("dashboard.states.empty")} />
+              )}
+            </div>
+            <div className="space-y-2">
+              {scoreDistribution.map((item) => (
+                <div
+                  key={item.name}
+                  className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2"
+                >
+                  <span className="flex items-center gap-2 text-sm">
+                    <span
+                      className="size-2 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    {item.name}
+                  </span>
+                  <span className="font-semibold">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
-        <StatCard
-          className="border-green-500/30"
-          icon={<Flame className="w-4 h-4 text-orange-500" />}
-          title={t("dashboard.stats.solved")}
-          value={stats.solved}
-          valueClassName="text-2xl font-bold text-orange-500"
-        />
-
-        <StatCard
-          className="border-blue-500/30"
-          title={t("dashboard.stats.score")}
-          value={stats.total}
-          valueClassName="text-2xl font-bold text-blue-500"
-        />
-
-        <StatCard
-          className="border-purple-500/30"
-          title={t("dashboard.stats.streak")}
-          value={`${stats.average}%`}
-          valueClassName="text-2xl font-bold text-green-500"
-        />
-
-      </div>
-
-      <SectionCard
-        icon={<Trophy className="w-4 h-4 text-yellow-500" />}
-        title={t("leaderboard.title")}
-        action={
-          <a
-            href="/leaderboard"
-            className="text-sm text-muted-foreground hover:underline"
-          >
-            {t("common.viewAll")}
-          </a>
-        }
-        contentClassName="space-y-3"
-      >
-
+      <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <SectionCard
+          icon={<Trophy className="size-4 text-yellow-500" />}
+          title={t("leaderboard.title")}
+          action={
+            <a
+              href="/leaderboard"
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              {t("common.viewAll")}
+              <ArrowUpRight className="size-3.5" />
+            </a>
+          }
+          contentClassName="space-y-3"
+        >
           {leaderboard.length === 0 && (
             <EmptyState className="py-4" title={t("dashboard.states.empty")} />
           )}
 
-          {leaderboard.map((u, i) => (
-            <div
-              key={u.id}
-              className="flex items-center justify-between"
-            >
+          {topUser && (
+            <div className="mb-2 rounded-2xl bg-gradient-to-r from-yellow-50 to-orange-50 p-4">
               <div className="flex items-center gap-3">
-
-                <span className="text-sm font-medium w-5">
-                  #{i + 1}
-                </span>
-
                 <UserAvatar
-                  avatarUrl={u.avatar_url}
-                  className="w-7 h-7"
-                  username={u.username}
+                  avatarUrl={topUser.avatar_url}
+                  className="size-10"
+                  username={topUser.username}
                 />
-
-                <span className="text-sm">
-                  {u.username}
-                </span>
-
+                <div>
+                  <p className="font-semibold">{topUser.username}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {topUser.total_score || 0} pts
+                  </p>
+                </div>
               </div>
-
-              <span className="text-sm font-semibold text-yellow-500">
-                {u.total_score || 0}
-              </span>
-
             </div>
-          ))}
-
-      </SectionCard>
-
-      <SectionCard
-        icon={<Activity className="w-4 h-4 text-orange-500" />}
-        title={t("dashboard.sections.activity")}
-        contentClassName="space-y-3"
-      >
-
-          {feed.length === 0 && (
-            <EmptyState className="py-4" title={t("dashboard.states.empty")} />
           )}
 
-          {feed.map((item, i) => (
-            <div key={i} className="flex items-center justify-between border-b pb-2">
-
+          {leaderboard.slice(0, 5).map((u, i) => (
+            <div key={u.id} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-
-                <a
-                  href={`/u/${item.profile?.username}`}
-                  className="flex items-center gap-3 hover:opacity-80 transition"
-                >
-                  <UserAvatar
-                    avatarUrl={item.profile?.avatar_url}
-                    className="w-7 h-7"
-                    username={item.profile?.username}
-                  />
-
-                  <span className="font-medium text-sm">
-                    {item.profile?.username}
-                  </span>
-
-                  {locale === "en" && (
-                    <span className="text-sm text-muted-foreground">
-                      {t("dashboard.activity.solvedPrefix")}
-                    </span>
-                  )}
-
-                  {locale === "ro" && (
-                    <span className="text-sm text-muted-foreground">
-                      {t("dashboard.activity.solvedMiddle")}
-                    </span>
-                  )}
-                </a>
-
-                <a
-                  href={`/problems/${item.problem_id}`}
-                  className="text-sm font-medium hover:underline"
-                >
-                  {getLocalized(item.problems?.title_i18n, locale)}
-                </a>
-
+                <span className="w-7 text-sm font-medium text-muted-foreground">
+                  #{i + 1}
+                </span>
+                <UserAvatar
+                  avatarUrl={u.avatar_url}
+                  className="size-7"
+                  username={u.username}
+                />
+                <span className="text-sm font-medium">{u.username}</span>
               </div>
-
-              <Badge>
-                {item.score}%
-              </Badge>
-
+              <span className="text-sm font-semibold text-yellow-600">
+                {u.total_score || 0}
+              </span>
             </div>
           ))}
+        </SectionCard>
 
-      </SectionCard>
-
-      <SectionCard
-        title={t("dashboard.sections.recent")}
-        contentClassName="space-y-3"
-      >
-
+        <SectionCard
+          title={t("dashboard.sections.recent")}
+          contentClassName="space-y-3"
+        >
           {recent.length === 0 && (
             <EmptyState className="py-4" title={t("dashboard.states.empty")} />
           )}
@@ -416,17 +529,17 @@ function DashboardContent() {
           {recent.map((r, i) => (
             <div
               key={i}
-              className="flex justify-between items-center border-b pb-2"
+              className="flex items-center justify-between gap-3 rounded-xl border p-3"
             >
-              <div>
-                <p className="font-medium">
-                  {getLocalized(r.problems?.title_i18n, locale) || t("dashboard.states.unknownProblem")}
+              <div className="min-w-0">
+                <p className="truncate font-medium">
+                  {getLocalized(r.problems?.title_i18n, locale) ||
+                    t("dashboard.states.unknownProblem")}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(r.created_at).toLocaleString()}
                 </p>
               </div>
-
               <Badge
                 variant={
                   r.score === 100
@@ -440,9 +553,53 @@ function DashboardContent() {
               </Badge>
             </div>
           ))}
+        </SectionCard>
+      </section>
 
+      <SectionCard
+        icon={<Activity className="size-4 text-orange-500" />}
+        title={t("dashboard.sections.activity")}
+        contentClassName="space-y-3"
+      >
+        {feed.length === 0 && (
+          <EmptyState className="py-4" title={t("dashboard.states.empty")} />
+        )}
+
+        {feed.map((item, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <a
+                href={`/u/${item.profile?.username}`}
+                className="flex min-w-0 items-center gap-3 transition hover:opacity-80"
+              >
+                <UserAvatar
+                  avatarUrl={item.profile?.avatar_url}
+                  className="size-8"
+                  username={item.profile?.username}
+                />
+                <span className="truncate text-sm font-medium">
+                  {item.profile?.username}
+                </span>
+              </a>
+              <span className="text-sm text-muted-foreground">
+                {locale === "ro"
+                  ? t("dashboard.activity.solvedMiddle")
+                  : t("dashboard.activity.solvedPrefix")}
+              </span>
+              <a
+                href={`/problems/${item.problem_id}`}
+                className="truncate text-sm font-medium hover:underline"
+              >
+                {getLocalized(item.problems?.title_i18n, locale)}
+              </a>
+            </div>
+            <Badge className="w-fit">{item.score}%</Badge>
+          </div>
+        ))}
       </SectionCard>
-
     </div>
   );
 }

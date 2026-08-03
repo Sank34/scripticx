@@ -1,14 +1,5 @@
 "use client";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-
 import { Card, CardContent } from "@/components/ui/card";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -31,19 +22,6 @@ export default function InputOutputPage() {
 
   return (
     <div className="space-y-6">
-
-      {/* <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/learn">Docs</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Input / Output</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb> */}
-
       <div className="space-y-2">
         <h1 className="text-4xl font-bold">{t("learn.inputOutputPage.title")}</h1>
         <p className="text-muted-foreground">

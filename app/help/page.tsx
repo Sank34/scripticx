@@ -53,7 +53,7 @@ export default function HelpPage() {
       };
 
   const quickLinks = [
-    { href: "/learn", icon: BookOpen, title: copy.docsTitle, text: copy.docsText },
+    { href: "/docs/basics", icon: BookOpen, title: copy.docsTitle, text: copy.docsText },
     { href: "/editor", icon: Code, title: copy.editorTitle, text: copy.editorText },
     { href: "/contact", icon: MessageSquare, title: copy.contactTitle, text: copy.contactText },
   ];

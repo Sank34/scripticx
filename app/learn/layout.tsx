@@ -1,22 +1,21 @@
 import type { Metadata } from "next";
 
-import LearnLayoutClient from "@/components/learn/LearnLayoutClient";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "MiniScript+ Documentation",
+  title: "Learning Roadmap",
   description:
-    "Learn MiniScript+ syntax, variables, conditions, loops, and input-output operations through practical explanations and examples.",
+    "Follow the ScripticX learning roadmap with guided lessons, interactive MiniScript+ examples, quick quizzes, and recommended problems.",
   path: "/learn",
   keywords: [
-    "MiniScript+ documentation",
+    "MiniScript+ roadmap",
     "beginner programming tutorial",
-    "MiniScript+ syntax",
+    "learn programming",
   ],
 });
 
 export default function LearnLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <LearnLayoutClient>{children}</LearnLayoutClient>;
+  return children;
 }

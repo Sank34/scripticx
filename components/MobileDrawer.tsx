@@ -16,6 +16,7 @@ import {
   List,
   Mail,
   MessageSquare,
+  Route,
   School,
   Search,
   Shield,
@@ -97,13 +98,21 @@ export function MobileDrawer() {
       items: [
         {
           href: "/learn",
+          icon: Route,
+          label: t("nav.learn"),
+          active: (currentPath: string) =>
+            currentPath === "/learn" || currentPath.startsWith("/learn/lesson"),
+        },
+        {
+          href: "/docs/basics",
           icon: BookOpen,
           label: t("nav.docs"),
+          active: (currentPath: string) => currentPath.startsWith("/docs"),
           children: [
-            { href: "/learn/basics", label: t("learn.basics") },
-            { href: "/learn/variables", label: t("learn.variables") },
-            { href: "/learn/loops", label: t("learn.loops") },
-            { href: "/learn/input-output", label: t("learn.inputOutput") },
+            { href: "/docs/basics", label: t("learn.basics") },
+            { href: "/docs/variables", label: t("learn.variables") },
+            { href: "/docs/loops", label: t("learn.loops") },
+            { href: "/docs/input-output", label: t("learn.inputOutput") },
           ],
         },
         {

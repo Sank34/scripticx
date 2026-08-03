@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   List,
   MessageSquare,
+  Route,
   Search,
   Settings,
   Shield,
@@ -36,6 +37,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { startShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { api, type LiveCodeData } from "@/lib/api";
 
 type PlatformCommandMenuProps = {
@@ -119,11 +121,17 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
       },
       {
         href: "/learn",
+        icon: Route,
+        label: t("nav.learn"),
+        keywords: ["roadmap", "learning path", "lessons"],
+      },
+      {
+        href: "/docs/basics",
         icon: BookOpen,
         label: t("nav.docs"),
         shortcut: "⌘ D",
         shortcutKey: "d",
-        keywords: ["documentation", "learn"],
+        keywords: ["documentation", "learn", "syntax"],
       },
       {
         href: "/examples",
@@ -253,6 +261,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
 
   const runCommand = useCallback((href: string) => {
     setOpen(false);
+    startShellRouteProgress();
     router.push(href);
   }, [router]);
 

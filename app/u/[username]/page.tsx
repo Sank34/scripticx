@@ -230,7 +230,7 @@ export default async function PublicProfile({
 
       <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
         <div
-          className="h-40 bg-gradient-to-br from-zinc-950 via-zinc-800 to-emerald-400 bg-cover bg-center"
+          className="relative h-44 bg-gradient-to-br from-zinc-950 via-zinc-800 to-emerald-400 bg-cover bg-center sm:h-52"
           style={
             profile.banner_url
               ? {
@@ -238,15 +238,17 @@ export default async function PublicProfile({
                 }
               : undefined
           }
-        />
+        >
+          <div className="absolute inset-x-0 bottom-0 h-px bg-zinc-200/90 shadow-[0_1px_0_rgba(255,255,255,0.9)]" />
+        </div>
 
-        <div className="px-6 pb-6">
-          <div className="-mt-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex min-w-0 items-end gap-4">
+        <div className="px-6 py-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
               <ProfileImagePreview
                 alt={`${profile.username} profile picture`}
                 avatarUrl={profile.avatar_url}
-                className="h-24 w-24 border-4 border-white shadow-sm"
+                className="h-20 w-20 border border-zinc-200 shadow-sm sm:h-24 sm:w-24"
                 fallback={initial}
               />
 

@@ -10,6 +10,7 @@ import { api, type AppNotification } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -272,6 +273,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
+  const isMobile = useIsMobile();
 
   const [open, setOpen] = useState(false);
   const [browserPermission, setBrowserPermission] = useState(getBrowserPermission);
@@ -481,9 +483,10 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
       </PopoverTrigger>
 
       <PopoverContent
-        align="end"
+        align={isMobile ? "center" : "end"}
         sideOffset={12}
-        className="w-[min(24rem,calc(100vw-2rem))] gap-0 overflow-hidden rounded-2xl p-0"
+        collisionPadding={isMobile ? 20 : 8}
+        className="w-[calc(100vw-3rem)] max-w-[23rem] gap-0 overflow-hidden rounded-2xl p-0 sm:w-96 sm:max-w-none"
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div>

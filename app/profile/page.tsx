@@ -429,24 +429,24 @@ function ProfileContent() {
 
       <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
         <div
-          className="h-36 bg-gradient-to-br from-emerald-50 via-white to-zinc-100"
+          className="relative h-44 bg-gradient-to-br from-emerald-50 via-white to-zinc-100 bg-cover bg-center sm:h-52"
           style={
             banner
               ? {
                   backgroundImage: `url("${banner}")`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
                 }
               : undefined
           }
-        />
+        >
+          <div className="absolute inset-x-0 bottom-0 h-px bg-zinc-200/90 shadow-[0_1px_0_rgba(255,255,255,0.9)]" />
+        </div>
 
-        <div className="flex flex-col gap-4 px-6 pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div className="-mt-10 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <ProfileImagePreview
               alt={`${displayName} profile picture`}
               avatarUrl={avatar}
-              className="h-20 w-20 border-4 border-white shadow-sm"
+              className="h-20 w-20 border border-zinc-200 shadow-sm"
               fallback={initial}
             />
 

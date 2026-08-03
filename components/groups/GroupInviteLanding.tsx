@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Hash, Lock, Server, Sparkles, Users } from "lucide-react";
+import { Hash, Lock, Sparkles, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, type StudyGroupInvitePreview } from "@/lib/api";
@@ -12,6 +12,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type GroupInviteLandingProps = {
@@ -33,6 +34,7 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
   const group = preview?.group || null;
   const membership = preview?.membership || null;
   const activeMember = membership?.status === "active";
+  const groupInitial = group?.name?.charAt(0).toUpperCase() || "S";
 
   async function acceptInvite() {
     if (!preview?.userId) {
@@ -101,14 +103,27 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
 
   return (
     <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_45%,#ffffff_100%)] p-6">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border bg-white/90 p-8 text-center shadow-2xl shadow-emerald-950/10 backdrop-blur">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border bg-white/90 text-center shadow-2xl shadow-emerald-950/10 backdrop-blur">
+        <div
+          className="h-28 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#e7fff5_42%,#eef2ff_100%)] bg-cover bg-center"
+          style={
+            group.banner_url
+              ? {
+                  backgroundImage: `url("${group.banner_url}")`,
+                }
+              : undefined
+          }
+        />
         <div className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-emerald-200/50 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-20 size-56 rounded-full bg-zinc-200/60 blur-3xl" />
 
-        <div className="relative">
-          <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-lg">
-            <Server className="size-8" />
-          </div>
+        <div className="relative px-8 pb-8">
+          <Avatar className="mx-auto -mt-10 size-20 border-4 border-background shadow-lg">
+            <AvatarImage src={group.avatar_url || undefined} alt={group.name} />
+            <AvatarFallback className="bg-zinc-950 text-2xl font-semibold text-white">
+              {groupInitial}
+            </AvatarFallback>
+          </Avatar>
           <p className="mt-5 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
             {t("groups.invitePage.eyebrow")}
           </p>

@@ -35,6 +35,7 @@ import {
   BookOpen,
   ChevronDown,
   HelpCircle,
+  Route,
   Sparkles,
   Mail,
   type LucideIcon,
@@ -162,7 +163,10 @@ export function AppSidebar() {
 
   const [docsOpenOverride, setDocsOpenOverride] = useState<boolean | null>(null);
   const [examplesOpenOverride, setExamplesOpenOverride] = useState<boolean | null>(null);
-  const openDocs = docsOpenOverride ?? pathname.startsWith("/learn");
+  const docsActive = pathname.startsWith("/docs");
+  const roadmapActive =
+    pathname === "/learn" || pathname.startsWith("/learn/lesson");
+  const openDocs = docsOpenOverride ?? docsActive;
   const openExamples = examplesOpenOverride ?? pathname.startsWith("/examples");
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -347,14 +351,20 @@ export function AppSidebar() {
           {!collapsed && <SidebarGroupLabel>{t("sidebar.learn")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
+            <NavItem
+              href="/learn"
+              icon={Route}
+              label={t("nav.learn")}
+              active={roadmapActive}
+            />
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <NavItem
-                  href="/learn"
+                  href="/docs/basics"
                   icon={BookOpen}
                   label={t("nav.docs")}
-                  active={pathname.startsWith("/learn")}
+                  active={docsActive}
                 />
 
                 {!collapsed && (
@@ -381,10 +391,10 @@ export function AppSidebar() {
                   }`}
                 >
                   <div className="ml-3 pl-3 space-y-1">
-                    <SubItem href="/learn/basics" label={t("learn.basics")} />
-                    <SubItem href="/learn/variables" label={t("learn.variables")} />
-                    <SubItem href="/learn/loops" label={t("learn.loops")} />
-                    <SubItem href="/learn/input-output" label={t("learn.inputOutput")} />
+                    <SubItem href="/docs/basics" label={t("learn.basics")} />
+                    <SubItem href="/docs/variables" label={t("learn.variables")} />
+                    <SubItem href="/docs/loops" label={t("learn.loops")} />
+                    <SubItem href="/docs/input-output" label={t("learn.inputOutput")} />
                   </div>
                 </div>
               )}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
@@ -20,6 +21,7 @@ import {
   ImagePlus,
   LinkIcon,
   Lock,
+  LogOut,
   MessageSquare,
   Pencil,
   Plus,
@@ -54,6 +56,7 @@ import {
   useGroupActivity,
 } from "@/hooks/useGroupActivity";
 import { UserAvatar } from "@/components/user/UserAvatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -98,6 +101,28 @@ import {
 type GroupWorkspaceProps = {
   slug: string;
 };
+
+function DeferredRender({
+  delayMs = 32,
+  fallback,
+  render,
+}: {
+  delayMs?: number;
+  fallback: ReactNode;
+  render: () => ReactNode;
+}) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setReady(true);
+    }, delayMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [delayMs]);
+
+  return ready ? <>{render()}</> : <>{fallback}</>;
+}
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🔥", "🎉"];
 const EMOJI_REACTIONS = [
@@ -394,6 +419,21 @@ function getGroupRoleLabel(role: string | null | undefined, t: (key: string) => 
   return t("groups.roles.member");
 }
 
+function getProfileDisplayName(
+  profile: ProfileSummary | null | undefined,
+  fallback: string
+) {
+  if (typeof profile?.username === "string" && profile.username.trim()) {
+    return profile.username;
+  }
+
+  if (typeof profile?.email === "string" && profile.email.trim()) {
+    return profile.email;
+  }
+
+  return fallback;
+}
+
 function StudyGroupMemberPreview({
   member,
   profile,
@@ -434,12 +474,14 @@ function StudyGroupMemberPreview({
         className="w-80 overflow-hidden rounded-3xl border-zinc-200 bg-white p-0 shadow-2xl"
       >
         <div
-          className="h-24 bg-gradient-to-br from-zinc-800 via-zinc-700 to-emerald-500 bg-cover bg-center"
+          className={
+            profile?.banner_url
+              ? "h-24 bg-cover bg-center"
+              : "h-24 bg-gradient-to-br from-zinc-800 via-zinc-700 to-emerald-500"
+          }
           style={
             profile?.banner_url
-              ? {
-                  backgroundImage: `linear-gradient(120deg, rgba(9,9,11,0.34), rgba(16,185,129,0.08)), url("${profile.banner_url}")`,
-                }
+              ? { backgroundImage: `url("${profile.banner_url}")` }
               : undefined
           }
         />
@@ -507,6 +549,7 @@ function StudyGroupMemberPreview({
 
 export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const { t, locale } = useLanguage();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -535,6 +578,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const [stickerSearch, setStickerSearch] = useState("");
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("general");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
@@ -543,6 +587,12 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const [settingsName, setSettingsName] = useState("");
   const [settingsDescription, setSettingsDescription] = useState("");
   const [settingsVisibility, setSettingsVisibility] = useState<"public" | "private">("public");
+  const [settingsAvatarFile, setSettingsAvatarFile] = useState<File | null>(null);
+  const [settingsBannerFile, setSettingsBannerFile] = useState<File | null>(null);
+  const [settingsAvatarPreviewUrl, setSettingsAvatarPreviewUrl] =
+    useState<string | null>(null);
+  const [settingsBannerPreviewUrl, setSettingsBannerPreviewUrl] =
+    useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [startingLive, setStartingLive] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
@@ -551,6 +601,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const [stickerFile, setStickerFile] = useState<File | null>(null);
   const [savingSticker, setSavingSticker] = useState(false);
   const [deletingStickerId, setDeletingStickerId] = useState<string | null>(null);
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [transferringOwnerId, setTransferringOwnerId] = useState<string | null>(null);
+  const [leavingGroup, setLeavingGroup] = useState(false);
 
   const workspaceQuery = useQuery<StudyGroupWorkspaceData>({
     queryKey: ["groups", slug],
@@ -584,7 +637,13 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const canInvite = activeMembership;
   const canManageChannels = membership?.role === "owner";
   const canManageStickers = membership?.role === "owner";
+  const isGroupOwner = membership?.role === "owner";
   const channelSlugPreview = normalizeChannelSlug(newChannelName);
+  const groupInitial = group?.name?.charAt(0).toUpperCase() || "S";
+  const settingsAvatarPreview =
+    settingsAvatarPreviewUrl || group?.avatar_url || null;
+  const settingsBannerPreview =
+    settingsBannerPreviewUrl || group?.banner_url || null;
   const groupActivity = useGroupActivity(userId);
   const currentMember = useMemo(
     () => members.find((member) => member.user_id === userId) || null,
@@ -593,6 +652,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const currentProfile = currentMember
     ? api.groups.getMemberProfile(currentMember)
     : null;
+  const activeMembers = useMemo(
+    () => members.filter((member) => member.status === "active"),
+    [members]
+  );
   const memberIds = useMemo(
     () => new Set(members.map((member) => member.user_id)),
     [members]
@@ -703,7 +766,33 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     setSettingsName(group.name);
     setSettingsDescription(group.description || "");
     setSettingsVisibility(group.visibility === "private" ? "private" : "public");
+    setSettingsAvatarFile(null);
+    setSettingsBannerFile(null);
   }, [group]);
+
+  useEffect(() => {
+    if (!settingsAvatarFile) {
+      setSettingsAvatarPreviewUrl(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(settingsAvatarFile);
+    setSettingsAvatarPreviewUrl(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [settingsAvatarFile]);
+
+  useEffect(() => {
+    if (!settingsBannerFile) {
+      setSettingsBannerPreviewUrl(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(settingsBannerFile);
+    setSettingsBannerPreviewUrl(url);
+
+    return () => URL.revokeObjectURL(url);
+  }, [settingsBannerFile]);
 
   useEffect(() => {
     if (!groupId || !userId || !activeMembership) return;
@@ -1347,7 +1436,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         name: settingsName,
         description: settingsDescription,
         visibility: settingsVisibility,
+        avatarFile: settingsAvatarFile,
+        bannerFile: settingsBannerFile,
       });
+      setSettingsAvatarFile(null);
+      setSettingsBannerFile(null);
       setSettingsDialogOpen(false);
       toast.success(t("groups.toasts.updated"));
       await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
@@ -1357,6 +1450,86 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       toast.error(t("groups.toasts.updateFailed"));
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function updateMemberRole(
+    member: StudyGroupMember,
+    role: "admin" | "member"
+  ) {
+    if (!group || !userId || !isGroupOwner || member.role === "owner") return;
+
+    setUpdatingMemberId(member.user_id);
+
+    try {
+      await api.groups.updateMemberRole({
+        groupId: group.id,
+        actorId: userId,
+        memberId: member.user_id,
+        role,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
+      toast.success(
+        role === "admin"
+          ? t("groups.toasts.memberPromoted")
+          : t("groups.toasts.memberDemoted")
+      );
+    } catch (error) {
+      console.error("Could not update group member role:", error);
+      toast.error(t("groups.toasts.memberRoleFailed"));
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  }
+
+  async function transferOwnership(member: StudyGroupMember) {
+    if (!group || !userId || !isGroupOwner || member.role === "owner") return;
+
+    setTransferringOwnerId(member.user_id);
+
+    try {
+      await api.groups.transferOwnership({
+        groupId: group.id,
+        currentOwnerId: userId,
+        newOwnerId: member.user_id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
+      await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      toast.success(t("groups.toasts.ownershipTransferred"));
+    } catch (error) {
+      console.error("Could not transfer group ownership:", error);
+      toast.error(t("groups.toasts.ownershipTransferFailed"));
+    } finally {
+      setTransferringOwnerId(null);
+    }
+  }
+
+  async function leaveGroup() {
+    if (!group || !userId || leavingGroup) return;
+
+    if (isGroupOwner) {
+      toast.error(t("groups.toasts.ownerLeaveBlocked"));
+      return;
+    }
+
+    setLeavingGroup(true);
+
+    try {
+      await api.groups.leaveGroup({
+        groupId: group.id,
+        userId,
+        locale,
+      });
+      setSettingsDialogOpen(false);
+      toast.success(t("groups.toasts.left"));
+      await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
+      await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      router.push("/groups");
+    } catch (error) {
+      console.error("Could not leave group:", error);
+      toast.error(t("groups.toasts.leaveFailed"));
+    } finally {
+      setLeavingGroup(false);
     }
   }
 
@@ -1704,6 +1877,47 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 </span>
               </Button>
             )}
+            {activeMembership && !isGroupOwner ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={leavingGroup}
+                    className="gap-2 border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <LogOut className="size-4" />
+                    <span className="hidden sm:inline">
+                      {leavingGroup
+                        ? t("groups.actions.leavingServer")
+                        : t("groups.actions.leaveServer")}
+                    </span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {t("groups.dialog.leaveServerConfirmTitle")}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("groups.dialog.leaveServerConfirmDescription")}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => void leaveGroup()}
+                      disabled={leavingGroup}
+                      className="bg-red-600 text-white hover:bg-red-700"
+                    >
+                      {leavingGroup
+                        ? t("groups.actions.leavingServer")
+                        : t("groups.actions.leaveServer")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : null}
             <Button
               size="sm"
               variant="outline"
@@ -1916,16 +2130,21 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                       <PopoverTrigger asChild>
                                         <button
                                           type="button"
-                                          className={`rounded-full px-1.5 py-0.5 transition hover:bg-zinc-200 ${
+                                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 leading-none transition hover:bg-zinc-200 ${
                                             reaction.reactedByMe
                                               ? "bg-emerald-50 text-emerald-700"
                                               : ""
                                           }`}
                                           aria-label={`${reaction.emoji} ${reaction.count}`}
                                         >
+                                          {reaction.count > 1 && isMine ? (
+                                            <span className="text-[11px] font-semibold tabular-nums">
+                                              {reaction.count}
+                                            </span>
+                                          ) : null}
                                           <span>{reaction.emoji}</span>
-                                          {reaction.count > 1 ? (
-                                            <span className="ml-1 text-[11px]">
+                                          {reaction.count > 1 && !isMine ? (
+                                            <span className="text-[11px] font-semibold tabular-nums">
                                               {reaction.count}
                                             </span>
                                           ) : null}
@@ -2558,9 +2777,39 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
-        <DialogContent className="max-h-[88vh] max-w-3xl overflow-hidden p-0">
-          <div className="border-b bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),linear-gradient(180deg,#ffffff,#fafafa)] px-6 py-5">
+      <Dialog
+        open={settingsDialogOpen}
+        onOpenChange={(open) => {
+          if (open) setSettingsTab("general");
+          setSettingsDialogOpen(open);
+        }}
+      >
+        {settingsDialogOpen ? (
+          <DialogContent className="max-h-[90vh] w-[min(1120px,calc(100vw-2rem))] !max-w-[min(1120px,calc(100vw-2rem))] overflow-hidden p-0 sm:!max-w-[min(1120px,calc(100vw-2rem))]">
+            <DeferredRender
+              fallback={
+                <div className="space-y-5 px-5 py-5 sm:px-7">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl">
+                      {t("groups.dialog.settingsTitle")}
+                    </DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {t("groups.dialog.settingsSubtitle")}
+                    </p>
+                  </DialogHeader>
+                  <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+                    <Skeleton className="h-24 rounded-none sm:h-32" />
+                    <div className="space-y-3 p-5">
+                      <Skeleton className="h-5 w-40" />
+                      <Skeleton className="h-4 w-64 max-w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                </div>
+              }
+              render={() => (
+                <>
+          <div className="border-b bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),linear-gradient(180deg,#ffffff,#fafafa)] px-5 py-5 sm:px-7">
             <DialogHeader>
               <DialogTitle className="text-2xl">
                 {t("groups.dialog.settingsTitle")}
@@ -2569,22 +2818,41 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 {t("groups.dialog.settingsSubtitle")}
               </p>
             </DialogHeader>
-            <div className="mt-5 rounded-2xl border bg-white/80 p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">
-                    {t("groups.dialog.serverPreview")}
-                  </p>
-                  <h3 className="mt-1 text-xl font-bold text-zinc-950">
-                    {settingsName || group?.name || t("groups.dialog.name")}
-                  </h3>
-                  <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                    {settingsDescription ||
-                      group?.description ||
-                      t("groups.dialog.description")}
-                  </p>
+            <div className="mt-5 overflow-hidden rounded-2xl border bg-white/90 shadow-sm">
+              <div
+                className="h-24 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center sm:h-32"
+                style={
+                  settingsBannerPreview
+                    ? { backgroundImage: `url("${settingsBannerPreview}")` }
+                    : undefined
+                }
+              />
+              <div className="flex flex-col gap-4 px-5 pb-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex min-w-0 items-end gap-4">
+                  <Avatar className="-mt-8 size-[72px] border-4 border-background shadow-md sm:-mt-10 sm:size-[88px]">
+                    <AvatarImage
+                      src={settingsAvatarPreview || undefined}
+                      alt={settingsName || group?.name || "Server"}
+                    />
+                    <AvatarFallback className="bg-zinc-950 text-2xl font-semibold text-white">
+                      {groupInitial}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">
+                      {t("groups.dialog.serverPreview")}
+                    </p>
+                    <h3 className="mt-1 truncate text-xl font-bold text-zinc-950">
+                      {settingsName || group?.name || t("groups.dialog.name")}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 max-w-2xl text-sm text-muted-foreground">
+                      {settingsDescription ||
+                        group?.description ||
+                        t("groups.dialog.description")}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 pb-1 sm:justify-end">
                   <span className="inline-flex items-center gap-1.5 rounded-full border bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
                     <Users className="size-3.5" />
                     {t("groups.dialog.membersCount").replace(
@@ -2604,25 +2872,45 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             </div>
           </div>
 
-          <Tabs defaultValue="general" className="min-h-0">
-            <div className="border-b px-6 pt-4">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="general">
-                  {t("groups.dialog.settingsGeneralTab")}
+          <Tabs
+            value={settingsTab}
+            onValueChange={setSettingsTab}
+            className="min-h-0"
+          >
+            <div className="px-5 py-4 sm:px-7">
+              <TabsList className="mx-auto grid h-11 w-full max-w-2xl grid-cols-3 overflow-hidden rounded-2xl bg-zinc-100 p-1">
+                <TabsTrigger
+                  value="general"
+                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-white data-active:shadow-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
+                  <span className="block max-w-full truncate">
+                    {t("groups.dialog.settingsGeneralTab")}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="stickers">
-                  {t("groups.dialog.settingsStickersTab")}
+                <TabsTrigger
+                  value="stickers"
+                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-white data-active:shadow-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
+                  <span className="block max-w-full truncate">
+                    {t("groups.dialog.settingsStickersTab")}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="permissions">
-                  {t("groups.dialog.settingsPermissionsTab")}
+                <TabsTrigger
+                  value="permissions"
+                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-white data-active:shadow-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
+                  <span className="block max-w-full truncate">
+                    {t("groups.dialog.settingsPermissionsTab")}
+                  </span>
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <ScrollArea className="max-h-[52vh]">
-              <div className="p-6">
+            <ScrollArea className="max-h-[56vh]">
+              <div className="p-5 sm:p-7">
+                {settingsTab === "general" ? (
                 <TabsContent value="general" className="mt-0 space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
                     <div className="space-y-3">
                       <Input
                         value={settingsName}
@@ -2637,6 +2925,54 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                         placeholder={t("groups.dialog.description")}
                         className="min-h-28 resize-none"
                       />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="rounded-2xl border bg-white p-4 text-sm shadow-sm transition hover:border-emerald-200">
+                          <div className="flex items-start gap-3">
+                            <ImagePlus className="mt-0.5 size-4 text-emerald-600" />
+                            <div>
+                              <p className="font-semibold">
+                                {t("groups.dialog.avatarImage")}
+                              </p>
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                {t("groups.dialog.avatarImageDescription")}
+                              </p>
+                            </div>
+                          </div>
+                          <Input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            className="mt-3"
+                            onChange={(event) =>
+                              setSettingsAvatarFile(
+                                event.target.files?.[0] || null
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="rounded-2xl border bg-white p-4 text-sm shadow-sm transition hover:border-emerald-200">
+                          <div className="flex items-start gap-3">
+                            <ImagePlus className="mt-0.5 size-4 text-emerald-600" />
+                            <div>
+                              <p className="font-semibold">
+                                {t("groups.dialog.bannerImage")}
+                              </p>
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                {t("groups.dialog.bannerImageDescription")}
+                              </p>
+                            </div>
+                          </div>
+                          <Input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            className="mt-3"
+                            onChange={(event) =>
+                              setSettingsBannerFile(
+                                event.target.files?.[0] || null
+                              )
+                            }
+                          />
+                        </label>
+                      </div>
                     </div>
                     <div className="rounded-2xl border bg-zinc-50 p-4">
                       <p className="text-sm font-semibold">
@@ -2666,7 +3002,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     </div>
                   </div>
                 </TabsContent>
+                ) : null}
 
+                {settingsTab === "stickers" ? (
                 <TabsContent value="stickers" className="mt-0">
                   {canManageStickers ? (
                     <div className="rounded-2xl border bg-zinc-50/70 p-4">
@@ -2787,40 +3125,203 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     />
                   )}
                 </TabsContent>
+                ) : null}
 
-                <TabsContent value="permissions" className="mt-0 space-y-3">
-                  <div className="rounded-2xl border bg-zinc-50 p-4">
-                    <p className="text-sm font-semibold">
+                {settingsTab === "permissions" ? (
+                <TabsContent value="permissions" className="mt-0 space-y-4">
+                  <div className="rounded-2xl border bg-zinc-50 p-4 sm:p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">
                       {t("groups.dialog.permissionsTitle")}
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                       {t("groups.dialog.permissionsDescription")}
                     </p>
+                      </div>
+                      <span className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-white px-3 py-1 text-xs font-medium text-zinc-700">
+                        <Lock className="size-3.5" />
+                        {isGroupOwner
+                          ? t("groups.dialog.ownerControls")
+                          : t("groups.dialog.ownerOnlyPermissions")}
+                      </span>
+                    </div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {[
-                      [Lock, t("groups.dialog.ownerControls")],
-                      [UserPlus, t("groups.dialog.memberInvites")],
-                      [Sparkles, t("groups.dialog.customStickers")],
-                    ].map(([Icon, label]) => {
-                      const PermissionIcon = Icon as typeof Lock;
+
+                  <div className="rounded-2xl border border-red-100 bg-red-50/60 p-4 sm:p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-red-950">
+                          {isGroupOwner
+                            ? t("groups.dialog.ownerLeaveTitle")
+                            : t("groups.dialog.leaveServerTitle")}
+                        </p>
+                        <p className="mt-1 max-w-2xl text-sm text-red-900/70">
+                          {isGroupOwner
+                            ? t("groups.dialog.ownerLeaveDescription")
+                            : t("groups.dialog.leaveServerDescription")}
+                        </p>
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            disabled={isGroupOwner || leavingGroup}
+                            className="w-fit"
+                          >
+                            <LogOut className="size-4" />
+                            {leavingGroup
+                              ? t("groups.actions.leavingServer")
+                              : t("groups.actions.leaveServer")}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {t("groups.dialog.leaveServerConfirmTitle")}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t("groups.dialog.leaveServerConfirmDescription")}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>
+                              {t("common.cancel")}
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => void leaveGroup()}
+                              disabled={leavingGroup}
+                              className="bg-red-600 text-white hover:bg-red-700"
+                            >
+                              {leavingGroup
+                                ? t("groups.actions.leavingServer")
+                                : t("groups.actions.leaveServer")}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {activeMembers.map((member) => {
+                      const profile = api.groups.getMemberProfile(member);
+                      const username = getProfileDisplayName(
+                        profile,
+                        t("user.user")
+                      );
+                      const isOwnerMember = member.role === "owner";
+                      const isAdminMember = member.role === "admin";
+                      const isUpdating = updatingMemberId === member.user_id;
+                      const isTransferring =
+                        transferringOwnerId === member.user_id;
+
                       return (
                         <div
-                          key={label as string}
-                          className="rounded-2xl border bg-white p-4 text-sm font-medium text-zinc-800 shadow-sm"
+                          key={member.user_id}
+                          className="flex flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                         >
-                          <PermissionIcon className="mb-3 size-5 text-emerald-600" />
-                          {label as string}
+                          <div className="flex min-w-0 items-center gap-3">
+                            <UserAvatar
+                              avatarUrl={profile?.avatar_url}
+                              username={username}
+                              className="size-11"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-zinc-950">
+                                {username}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {getGroupRoleLabel(member.role, t)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {isOwnerMember ? (
+                            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-zinc-950 px-3 py-1 text-xs font-semibold text-white">
+                              <Award className="size-3.5" />
+                              {t("groups.roles.owner")}
+                            </span>
+                          ) : isGroupOwner ? (
+                            <div className="flex flex-wrap gap-2 sm:justify-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={isUpdating || isTransferring}
+                                onClick={() =>
+                                  void updateMemberRole(
+                                    member,
+                                    isAdminMember ? "member" : "admin"
+                                  )
+                                }
+                              >
+                                {isUpdating
+                                  ? t("groups.actions.saving")
+                                  : isAdminMember
+                                    ? t("groups.actions.makeMember")
+                                    : t("groups.actions.makeAdmin")}
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isUpdating || isTransferring}
+                                  >
+                                    {t("groups.actions.transferOwnership")}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      {t(
+                                        "groups.dialog.transferOwnershipTitle"
+                                      )}
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      {t(
+                                        "groups.dialog.transferOwnershipDescription"
+                                      ).replace("{name}", username)}
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      {t("common.cancel")}
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() =>
+                                        void transferOwnership(member)
+                                      }
+                                      disabled={isTransferring}
+                                    >
+                                      {isTransferring
+                                        ? t("groups.actions.transferring")
+                                        : t("groups.actions.transferOwnership")}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          ) : (
+                            <span className="inline-flex w-fit rounded-full border bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-600">
+                              {getGroupRoleLabel(member.role, t)}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </TabsContent>
+                ) : null}
               </div>
             </ScrollArea>
           </Tabs>
 
-          <DialogFooter className="border-t bg-zinc-50 px-6 py-4">
+          <DialogFooter className="border-t bg-zinc-50 px-5 pb-6 pt-4 sm:px-7 sm:pb-7">
             <Button
               onClick={updateSettings}
               disabled={!settingsName.trim() || savingSettings}
@@ -2830,7 +3331,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 : t("groups.actions.save")}
             </Button>
           </DialogFooter>
-        </DialogContent>
+                </>
+              )}
+            />
+          </DialogContent>
+        ) : null}
       </Dialog>
     </div>
   );
