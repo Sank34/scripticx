@@ -30,6 +30,8 @@ type NotificationsData = {
   unreadCount: number;
 };
 
+let hasNotificationSoundGesture = false;
+
 function getNotificationGroupKey(notification: AppNotification) {
   if (notification.type !== "daily_challenge") {
     return notification.id;
@@ -233,6 +235,7 @@ function notifyBrowser(notification: Pick<AppNotification, "body" | "id" | "titl
 
 function playNotificationSound() {
   if (typeof window === "undefined") return;
+  if (!hasNotificationSoundGesture) return;
 
   const AudioContextClass =
     window.AudioContext ||
@@ -282,6 +285,20 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   const initializedNotifications = useRef(false);
 
   const queryKey = useMemo(() => ["notifications", user?.id], [user?.id]);
+
+  useEffect(() => {
+    function markGesture() {
+      hasNotificationSoundGesture = true;
+    }
+
+    window.addEventListener("pointerdown", markGesture, { once: true });
+    window.addEventListener("keydown", markGesture, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", markGesture);
+      window.removeEventListener("keydown", markGesture);
+    };
+  }, []);
 
   const { data, isLoading } = useQuery<NotificationsData>({
     queryKey,

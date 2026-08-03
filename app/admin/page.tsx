@@ -9,6 +9,7 @@ import {
   CalendarDays,
   CircleCheck,
   FileText,
+  GitBranch,
   Inbox,
   Mail,
   Megaphone,
@@ -235,6 +236,23 @@ function AdminContent() {
                 }
               : null
           }
+        />
+
+        <AdminNavCard
+          href="/admin/lessons"
+          icon={<GitBranch className="h-5 w-5 text-violet-500" />}
+          ringClassName="ring-violet-500/30"
+          title={locale === "ro" ? "Configurator lecții" : "Lesson configurator"}
+          description={
+            locale === "ro"
+              ? "Editează roadmap-ul, nodurile și quiz-urile lecțiilor."
+              : "Edit the roadmap, lesson nodes, and quizzes."
+          }
+          count={null}
+          accentBadge={{
+            className: "bg-violet-100 text-violet-700",
+            label: locale === "ro" ? "Frontend" : "Frontend",
+          }}
         />
       </div>
 

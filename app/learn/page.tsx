@@ -8,10 +8,12 @@ import {
   Check,
   Flame,
   Gem,
+  ListChecks,
   Lock,
   Play,
   Sparkles,
   Trophy,
+  Video,
 } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -21,12 +23,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
   getLessonRule,
+  getLessonKind,
   learnLessons,
-  learnSections,
   text,
   type LearnLesson,
   type LessonLocale,
 } from "@/lib/learn-lessons";
+import {
+  getRoadmapConfigData,
+  readRoadmapConfig,
+  readRemoteRoadmapConfig,
+  roadmapConfigEvent,
+  writeRoadmapConfig,
+} from "@/lib/roadmap-config";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -50,40 +59,6 @@ const getSectionCategoryId = (sectionId: string) =>
   sectionId.startsWith("complexity-")
     ? roadmapCategoryIds.complexity
     : roadmapCategoryIds.miniscript;
-
-const learnLessonById = new Map(
-  learnLessons.map((lesson) => [lesson.id, lesson])
-);
-
-const lessonIdsByCategory = learnSections.reduce((map, section) => {
-  const categoryId = getSectionCategoryId(section.id);
-  const lessonIds = map.get(categoryId) ?? [];
-
-  lessonIds.push(...section.lessonIds);
-  map.set(categoryId, lessonIds);
-
-  return map;
-}, new Map<string, string[]>());
-
-const categoryIdByLessonId = new Map<string, string>();
-
-learnSections.forEach((section) => {
-  const categoryId = getSectionCategoryId(section.id);
-  section.lessonIds.forEach((lessonId) =>
-    categoryIdByLessonId.set(lessonId, categoryId)
-  );
-});
-
-const getLessonCategoryIds = (lesson: LearnLesson) =>
-  lessonIdsByCategory.get(
-    categoryIdByLessonId.get(lesson.id) ?? roadmapCategoryIds.miniscript
-  ) ?? learnLessons.map((item) => item.id);
-
-const getLessonCategoryIndex = (lesson: LearnLesson) => {
-  const index = getLessonCategoryIds(lesson).indexOf(lesson.id);
-
-  return index < 0 ? 0 : index;
-};
 
 type LessonRow = {
   id: string;
@@ -131,6 +106,9 @@ const copy = {
     nextRecommended: "Next recommended",
     bonus: "Bonus",
     challenge: "Challenge",
+    theory: "Theory",
+    video: "Video",
+    assessment: "Evaluation",
     quizGate: "Answer the quiz correctly",
     practiceGate: "Practice required",
     practiced: "Practiced",
@@ -167,6 +145,9 @@ const copy = {
     nextRecommended: "Recomandată acum",
     bonus: "Bonus",
     challenge: "Challenge",
+    theory: "Teorie",
+    video: "Video",
+    assessment: "Evaluare",
     quizGate: "Răspunde corect la quiz",
     practiceGate: "Necesită practică",
     practiced: "Exersată",
@@ -276,6 +257,47 @@ export default function LearnRoadmapPage() {
   const c = copy[lessonLocale] ?? copy.en;
   const [progress, setProgress] = useState<StoredProgress>({});
   const [solvedProblemCodes, setSolvedProblemCodes] = useState<number[]>([]);
+  const [roadmapData, setRoadmapData] = useState(() =>
+    getRoadmapConfigData(null)
+  );
+  const lessons = roadmapData.lessons;
+  const sections = roadmapData.sections;
+  const categories = roadmapData.categories;
+
+  useEffect(() => {
+    const syncRoadmapConfig = () =>
+      setRoadmapData(getRoadmapConfigData(readRoadmapConfig()));
+    const syncRemoteRoadmapConfig = async () => {
+      try {
+        const remoteConfig = await readRemoteRoadmapConfig();
+        if (!remoteConfig) {
+          syncRoadmapConfig();
+          return;
+        }
+
+        writeRoadmapConfig(remoteConfig);
+        setRoadmapData(getRoadmapConfigData(remoteConfig));
+      } catch {
+        syncRoadmapConfig();
+      }
+    };
+    const syncVisibleRoadmapConfig = () => {
+      if (document.visibilityState === "visible") {
+        void syncRemoteRoadmapConfig();
+      }
+    };
+
+    void syncRemoteRoadmapConfig();
+    window.addEventListener(roadmapConfigEvent, syncRoadmapConfig);
+    window.addEventListener("focus", syncRemoteRoadmapConfig);
+    document.addEventListener("visibilitychange", syncVisibleRoadmapConfig);
+
+    return () => {
+      window.removeEventListener(roadmapConfigEvent, syncRoadmapConfig);
+      window.removeEventListener("focus", syncRemoteRoadmapConfig);
+      document.removeEventListener("visibilitychange", syncVisibleRoadmapConfig);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -399,6 +421,43 @@ export default function LearnRoadmapPage() {
     () => new Set(solvedProblemCodes),
     [solvedProblemCodes]
   );
+  const configuredLessonById = useMemo(
+    () => new Map(lessons.map((lesson) => [lesson.id, lesson])),
+    [lessons]
+  );
+  const configuredLessonIdsByCategory = useMemo(
+    () =>
+      sections.reduce((map, section) => {
+        const categoryId = getSectionCategoryId(section.id);
+        const lessonIds = map.get(categoryId) ?? [];
+
+        lessonIds.push(...section.lessonIds);
+        map.set(categoryId, lessonIds);
+
+        return map;
+      }, new Map<string, string[]>()),
+    [sections]
+  );
+  const configuredCategoryIdByLessonId = useMemo(() => {
+    const map = new Map<string, string>();
+
+    sections.forEach((section) => {
+      const categoryId = getSectionCategoryId(section.id);
+      section.lessonIds.forEach((lessonId) => map.set(lessonId, categoryId));
+    });
+
+    return map;
+  }, [sections]);
+  const getConfiguredLessonCategoryIds = (lesson: LearnLesson) =>
+    configuredLessonIdsByCategory.get(
+      configuredCategoryIdByLessonId.get(lesson.id) ??
+        roadmapCategoryIds.miniscript
+    ) ?? lessons.map((item) => item.id);
+  const getConfiguredLessonCategoryIndex = (lesson: LearnLesson) => {
+    const index = getConfiguredLessonCategoryIds(lesson).indexOf(lesson.id);
+
+    return index < 0 ? 0 : index;
+  };
   const hasPassingQuiz = (lesson: LearnLesson) => {
     const rule = getLessonRule(lesson);
     if (!rule.requiresCorrectQuiz || lesson.quiz.length === 0) return true;
@@ -421,16 +480,17 @@ export default function LearnRoadmapPage() {
 
   const getRequiredLessonIdsBefore = (lesson: LearnLesson) => {
     const categoryId =
-      categoryIdByLessonId.get(lesson.id) ?? roadmapCategoryIds.miniscript;
+      configuredCategoryIdByLessonId.get(lesson.id) ??
+      roadmapCategoryIds.miniscript;
     const requiredLessonIds: string[] = [];
 
-    for (const section of learnSections) {
+    for (const section of sections) {
       if (getSectionCategoryId(section.id) !== categoryId) continue;
 
       for (const lessonId of section.lessonIds) {
         if (lessonId === lesson.id) return requiredLessonIds;
 
-        const previousLesson = learnLessonById.get(lessonId);
+        const previousLesson = configuredLessonById.get(lessonId);
         if (!previousLesson) continue;
 
         const rule = getLessonRule(previousLesson);
@@ -446,18 +506,18 @@ export default function LearnRoadmapPage() {
   const canOpenLesson = (lesson: LearnLesson) => {
     if (progress[lesson.id]?.completed) return true;
 
-    const lessonIndex = getLessonCategoryIndex(lesson);
+    const lessonIndex = getConfiguredLessonCategoryIndex(lesson);
     if (lessonIndex <= 0) return true;
 
     return getRequiredLessonIdsBefore(lesson).every((previousLessonId) => {
-      const previousLesson = learnLessonById.get(previousLessonId);
+      const previousLesson = configuredLessonById.get(previousLessonId);
 
       return previousLesson ? isLessonCleared(previousLesson) : true;
     });
   };
   const getCurrentLessonForCategory = (categoryId: string) => {
-    const categoryLessons = (lessonIdsByCategory.get(categoryId) ?? [])
-      .map((lessonId) => learnLessonById.get(lessonId))
+    const categoryLessons = (configuredLessonIdsByCategory.get(categoryId) ?? [])
+      .map((lessonId) => configuredLessonById.get(lessonId))
       .filter((lesson): lesson is LearnLesson => Boolean(lesson));
 
     return (
@@ -473,37 +533,34 @@ export default function LearnRoadmapPage() {
       categoryLessons[categoryLessons.length - 1]
     );
   };
-  const completedCount = learnLessons.filter(
+  const completedCount = lessons.filter(
     (lesson) => progress[lesson.id]?.completed
   ).length;
-  const clearedCount = learnLessons.filter((lesson) => isLessonCleared(lesson)).length;
+  const clearedCount = lessons.filter((lesson) => isLessonCleared(lesson)).length;
   const currentLesson =
     getCurrentLessonForCategory(roadmapCategoryIds.miniscript) ??
     getCurrentLessonForCategory(roadmapCategoryIds.complexity) ??
-    learnLessons[learnLessons.length - 1];
-  const percent = Math.round((clearedCount / learnLessons.length) * 100);
-  const xp = useMemo(() => completedCount * 80 + learnLessons.length * 5, [completedCount]);
+    lessons[lessons.length - 1];
+  const percent = lessons.length
+    ? Math.round((clearedCount / lessons.length) * 100)
+    : 0;
+  const xp = useMemo(
+    () => completedCount * 80 + lessons.length * 5,
+    [completedCount, lessons.length]
+  );
   const lessonStreak = useMemo(() => calculateLessonStreak(progress), [progress]);
-  const miniscriptSections = learnSections.filter(
-    (section) => !section.id.startsWith("complexity-")
-  );
-  const complexitySections = learnSections.filter((section) =>
-    section.id.startsWith("complexity-")
-  );
-  const contentGroups = [
-    {
-      id: roadmapCategoryIds.miniscript,
-      label: c.section,
-      title: c.title,
-      sections: miniscriptSections,
-    },
-    {
-      id: roadmapCategoryIds.complexity,
-      label: c.complexityCategory,
-      title: c.complexityTitle,
-      sections: complexitySections,
-    },
-  ];
+  const contentGroups = categories.map((category, index) => ({
+    id: category.id,
+    label:
+      category.id === roadmapCategoryIds.complexity
+        ? c.complexityCategory
+        : `${c.section} ${index + 1}`,
+    title: text(category.title, lessonLocale),
+    description: text(category.description, lessonLocale),
+    sections: category.sectionIds
+      .map((sectionId) => sections.find((section) => section.id === sectionId))
+      .filter((section): section is (typeof sections)[number] => Boolean(section)),
+  }));
 
   return (
     <div className="scroll-smooth bg-white px-4 py-6 md:px-8">
@@ -538,51 +595,66 @@ export default function LearnRoadmapPage() {
             </div>
           </div>
 
-          <div className="space-y-6">
-            {learnSections.map((section) => {
-              const sectionLessons = section.lessonIds
-                .map((id) => learnLessons.find((lesson) => lesson.id === id))
-                .filter((lesson): lesson is (typeof learnLessons)[number] =>
-                  Boolean(lesson)
-                );
-              const isComplexityCategoryStart = section.id === "complexity-basics";
-              const categoryStartLesson = sectionLessons[0] ?? currentLesson;
+          <div className="space-y-8">
+            {contentGroups.map((group, groupIndex) => (
+              <div key={group.id} className="space-y-6">
+                {groupIndex > 0 && (
+                  <div
+                    id={group.id}
+                    className="scroll-mt-24 rounded-[28px] border border-zinc-800 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 p-6 text-white shadow-sm md:p-8"
+                  >
+                    <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-emerald-300">
+                          {group.label}
+                        </p>
+                        <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-5xl">
+                          {group.title}
+                        </h2>
+                        <p className="mt-3 max-w-2xl text-sm text-zinc-300 md:text-base">
+                          {group.description}
+                        </p>
+                      </div>
 
-              return (
-                <div key={section.id} className="space-y-6">
-                  {isComplexityCategoryStart && (
-                    <div
-                      id="complexity-analysis"
-                      className="scroll-mt-24 rounded-[28px] border border-zinc-800 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 p-6 text-white shadow-sm md:p-8"
-                    >
-                      <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-                        <div>
-                          <p className="text-xs font-semibold uppercase text-emerald-300">
-                            {c.complexityCategory}
-                          </p>
-                          <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-5xl">
-                            {c.complexityTitle}
-                          </h2>
-                          <p className="mt-3 max-w-2xl text-sm text-zinc-300 md:text-base">
-                            {c.complexitySubtitle}
-                          </p>
-                        </div>
-
+                      {group.sections.some((section) => section.lessonIds.length > 0) && (
                         <Button
                           asChild
                           className="w-fit rounded-full !bg-white !text-black transition-transform hover:scale-[1.03] hover:!bg-white hover:!text-black focus-visible:!text-black active:scale-[0.98]"
                         >
-                          <Link href={`/learn/lesson/${categoryStartLesson.id}`}>
+                          <Link
+                            href={`/learn/lesson/${
+                              group.sections
+                                .flatMap((section) => section.lessonIds)
+                                .find((lessonId) => configuredLessonById.has(lessonId)) ??
+                              currentLesson.id
+                            }`}
+                          >
                             {c.complexityStart}
                             <ArrowRight className="ml-2 h-4 w-4" />
                           </Link>
                         </Button>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                )}
 
+                {group.sections.length === 0 && (
+                  <Card className="scroll-mt-24 rounded-[24px] border-dashed border-zinc-200">
+                    <CardContent className="p-5">
+                      <p className="text-sm text-muted-foreground">{group.description}</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {group.sections.map((section) => {
+                  const sectionLessons = section.lessonIds
+                    .map((id) => configuredLessonById.get(id))
+                    .filter((lesson): lesson is LearnLesson => Boolean(lesson));
+
+                  return (
                   <Card
                     id={section.id}
+                    key={section.id}
                     className="scroll-mt-24 overflow-hidden rounded-[24px] border-zinc-200"
                   >
                     <CardContent className="p-0">
@@ -613,8 +685,9 @@ export default function LearnRoadmapPage() {
 
                         <div className="space-y-6">
                           {sectionLessons.map((lesson) => {
-                            const index = getLessonCategoryIndex(lesson);
+                            const index = getConfiguredLessonCategoryIndex(lesson);
                             const rule = getLessonRule(lesson);
+                            const lessonKind = getLessonKind(lesson);
                             const done = Boolean(progress[lesson.id]?.completed);
                             const quizPassed = hasPassingQuiz(lesson);
                             const practiced = hasRequiredPractice(lesson);
@@ -622,7 +695,12 @@ export default function LearnRoadmapPage() {
                             const isCurrent = lesson.id === currentLesson.id;
                             const locked = !canOpenLesson(lesson);
                             const isBonus = rule.kind === "bonus";
-                            const isChallenge = rule.kind === "challenge";
+                            const isTheory = lessonKind === "theory";
+                            const isVideo = lessonKind === "video";
+                            const isAssessment = lessonKind === "assessment";
+                            const isChallenge =
+                              lessonKind === "challenge" ||
+                              (!isAssessment && !isTheory && rule.kind === "challenge");
                             const alignment = index % 2 === 0 ? "md:mr-auto" : "md:ml-auto";
 
                             return (
@@ -647,10 +725,22 @@ export default function LearnRoadmapPage() {
                                       !cleared &&
                                       !isCurrent &&
                                       "border-sky-100 bg-sky-50/50",
+                                    isTheory &&
+                                      !cleared &&
+                                      !isCurrent &&
+                                      "border-emerald-100 bg-emerald-50/50",
+                                    isVideo &&
+                                      !cleared &&
+                                      !isCurrent &&
+                                      "border-blue-100 bg-blue-50/50",
                                     isChallenge &&
                                       !cleared &&
                                       !isCurrent &&
                                       "border-amber-100 bg-amber-50/50",
+                                    isAssessment &&
+                                      !cleared &&
+                                      !isCurrent &&
+                                      "border-violet-100 bg-violet-50/50",
                                     locked && "bg-zinc-50"
                                   )}
                                 >
@@ -662,8 +752,14 @@ export default function LearnRoadmapPage() {
                                           ? "bg-emerald-500"
                                           : isCurrent
                                             ? "bg-lime-500"
+                                            : isAssessment
+                                              ? "bg-violet-500"
                                             : isChallenge
                                               ? "bg-amber-400"
+                                              : isTheory
+                                                ? "bg-emerald-500"
+                                                : isVideo
+                                                  ? "bg-blue-500"
                                               : isBonus
                                                 ? "bg-sky-400"
                                                 : "bg-zinc-300"
@@ -673,8 +769,14 @@ export default function LearnRoadmapPage() {
                                         <Check className="h-5 w-5" />
                                       ) : locked ? (
                                         <Lock className="h-5 w-5" />
+                                      ) : isAssessment ? (
+                                        <ListChecks className="h-5 w-5" />
                                       ) : isChallenge ? (
                                         <Trophy className="h-5 w-5" />
+                                      ) : isTheory ? (
+                                        <BookOpen className="h-5 w-5" />
+                                      ) : isVideo ? (
+                                        <Video className="h-5 w-5" />
                                       ) : isBonus ? (
                                         <Sparkles className="h-5 w-5" />
                                       ) : (
@@ -709,6 +811,33 @@ export default function LearnRoadmapPage() {
                                           >
                                             <Trophy className="mr-1 h-3 w-3" />
                                             {c.challenge}
+                                          </Badge>
+                                        )}
+                                        {isTheory && (
+                                          <Badge
+                                            variant="outline"
+                                            className="rounded-full border-emerald-200 bg-emerald-50 text-emerald-700"
+                                          >
+                                            <BookOpen className="mr-1 h-3 w-3" />
+                                            {c.theory}
+                                          </Badge>
+                                        )}
+                                        {isVideo && (
+                                          <Badge
+                                            variant="outline"
+                                            className="rounded-full border-blue-200 bg-blue-50 text-blue-700"
+                                          >
+                                            <Video className="mr-1 h-3 w-3" />
+                                            {c.video}
+                                          </Badge>
+                                        )}
+                                        {isAssessment && (
+                                          <Badge
+                                            variant="outline"
+                                            className="rounded-full border-violet-200 bg-violet-50 text-violet-700"
+                                          >
+                                            <ListChecks className="mr-1 h-3 w-3" />
+                                            {c.assessment}
                                           </Badge>
                                         )}
                                       </div>
@@ -770,9 +899,10 @@ export default function LearnRoadmapPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </section>
 
@@ -801,7 +931,7 @@ export default function LearnRoadmapPage() {
                   </div>
                   <div className="rounded-2xl bg-white/10 p-3">
                     <Sparkles className="mx-auto mb-1 h-4 w-4 text-lime-300" />
-                    <strong className="block text-base text-white">{learnLessons.length}</strong>
+                    <strong className="block text-base text-white">{lessons.length}</strong>
                     {c.stats[2]}
                   </div>
                 </div>
@@ -826,8 +956,8 @@ export default function LearnRoadmapPage() {
                   {contentGroups.map((group) => {
                     const groupLessons = group.sections.flatMap((section) =>
                       section.lessonIds
-                        .map((id) => learnLessons.find((lesson) => lesson.id === id))
-                        .filter((lesson): lesson is (typeof learnLessons)[number] =>
+                        .map((id) => configuredLessonById.get(id))
+                        .filter((lesson): lesson is LearnLesson =>
                           Boolean(lesson)
                         )
                     );
@@ -862,14 +992,14 @@ export default function LearnRoadmapPage() {
                           {group.sections.map((section) => {
                             const sectionLessons = section.lessonIds
                               .map((id) =>
-                                learnLessons.find((lesson) => lesson.id === id)
+                                configuredLessonById.get(id)
                               )
                               .filter(
-                                (lesson): lesson is (typeof learnLessons)[number] =>
+                                (lesson): lesson is LearnLesson =>
                                   Boolean(lesson)
                               );
                             const completedInSection = sectionLessons.filter(
-                              (lesson) => isLessonCleared(lesson)
+                              (lesson) => progress[lesson.id]?.completed
                             ).length;
                             const isCurrentSection = section.lessonIds.includes(
                               currentLesson.id

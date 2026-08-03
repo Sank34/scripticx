@@ -27,12 +27,19 @@ import {
 import { advanceLine, parseLine, reset, setVariable, step } from "@/lib/engine";
 import {
   getLessonById,
-  learnSections,
+  getLessonKind,
   text,
   youtubeEmbedUrl,
   type LessonLocale,
   type LessonQuizQuestion,
 } from "@/lib/learn-lessons";
+import {
+  getRoadmapConfigData,
+  readRoadmapConfig,
+  readRemoteRoadmapConfig,
+  roadmapConfigEvent,
+  writeRoadmapConfig,
+} from "@/lib/roadmap-config";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -46,29 +53,6 @@ type StoredProgress = Record<
 >;
 
 const progressKey = "scripticx.lessonProgress.v1";
-
-const getLessonCategoryId = (lessonId: string) => {
-  const section = learnSections.find((item) =>
-    item.lessonIds.includes(lessonId)
-  );
-
-  return section?.id.startsWith("complexity-")
-    ? "complexity-analysis"
-    : "miniscript-roadmap";
-};
-
-const getLessonIdsForCategory = (lessonId: string) => {
-  const categoryId = getLessonCategoryId(lessonId);
-
-  return learnSections
-    .filter(
-      (section) =>
-        (section.id.startsWith("complexity-")
-          ? "complexity-analysis"
-          : "miniscript-roadmap") === categoryId
-    )
-    .flatMap((section) => section.lessonIds);
-};
 
 type LessonRow = {
   id: string;
@@ -111,6 +95,13 @@ const copy = {
     videoLabel: "Video lesson",
     videoPlaceholder: "YouTube video placeholder",
     videoSoon: "The lesson video will appear here after it is published.",
+    lessonTypes: {
+      theory: "Theory lesson",
+      video: "Video lesson",
+      challenge: "Code challenge",
+      assessment: "Evaluation quiz",
+      interactive: "Interactive lesson",
+    },
   },
   ro: {
     back: "Înapoi la roadmap",
@@ -137,6 +128,13 @@ const copy = {
     videoLabel: "Lecție video",
     videoPlaceholder: "Template video YouTube",
     videoSoon: "Videoul lecției va apărea aici după publicare.",
+    lessonTypes: {
+      theory: "Lecție de teorie",
+      video: "Lecție video",
+      challenge: "Code challenge",
+      assessment: "Quiz de evaluare",
+      interactive: "Lecție interactivă",
+    },
   },
 };
 
@@ -241,18 +239,46 @@ export default function LessonPage() {
   const lessonLocale = locale as LessonLocale;
   const c = copy[lessonLocale] ?? copy.en;
   const lessonId = useLessonId();
-  const lesson = useMemo(() => getLessonById(lessonId), [lessonId]);
-  const categoryLessonIds = lesson ? getLessonIdsForCategory(lesson.id) : [];
+  const [roadmapData, setRoadmapData] = useState(() =>
+    getRoadmapConfigData(null)
+  );
+  const lessons = roadmapData.lessons;
+  const sections = roadmapData.sections;
+  const lesson = useMemo(
+    () => lessons.find((item) => item.id === lessonId) ?? getLessonById(lessonId),
+    [lessonId, lessons]
+  );
+  const categoryLessonIds = useMemo(() => {
+    if (!lesson) return [];
+
+    const section = sections.find((item) => item.lessonIds.includes(lesson.id));
+    const categoryId = section?.id.startsWith("complexity-")
+      ? "complexity-analysis"
+      : "miniscript-roadmap";
+
+    return sections
+      .filter(
+        (item) =>
+          (item.id.startsWith("complexity-")
+            ? "complexity-analysis"
+            : "miniscript-roadmap") === categoryId
+      )
+      .flatMap((item) => item.lessonIds);
+  }, [lesson, sections]);
   const lessonIndex = lesson
     ? categoryLessonIds.indexOf(lesson.id)
     : -1;
   const previousLesson =
     lessonIndex > 0
-      ? getLessonById(categoryLessonIds[lessonIndex - 1]) ?? null
+      ? lessons.find((item) => item.id === categoryLessonIds[lessonIndex - 1]) ??
+        getLessonById(categoryLessonIds[lessonIndex - 1]) ??
+        null
       : null;
   const nextLesson =
     lessonIndex >= 0 && lessonIndex < categoryLessonIds.length - 1
-      ? getLessonById(categoryLessonIds[lessonIndex + 1]) ?? null
+      ? lessons.find((item) => item.id === categoryLessonIds[lessonIndex + 1]) ??
+        getLessonById(categoryLessonIds[lessonIndex + 1]) ??
+        null
       : null;
 
   const [progress, setProgress] = useState<StoredProgress>({});
@@ -265,6 +291,41 @@ export default function LessonPage() {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [lessonDbId, setLessonDbId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncRoadmapConfig = () =>
+      setRoadmapData(getRoadmapConfigData(readRoadmapConfig()));
+    const syncRemoteRoadmapConfig = async () => {
+      try {
+        const remoteConfig = await readRemoteRoadmapConfig();
+        if (!remoteConfig) {
+          syncRoadmapConfig();
+          return;
+        }
+
+        writeRoadmapConfig(remoteConfig);
+        setRoadmapData(getRoadmapConfigData(remoteConfig));
+      } catch {
+        syncRoadmapConfig();
+      }
+    };
+    const syncVisibleRoadmapConfig = () => {
+      if (document.visibilityState === "visible") {
+        void syncRemoteRoadmapConfig();
+      }
+    };
+
+    void syncRemoteRoadmapConfig();
+    window.addEventListener(roadmapConfigEvent, syncRoadmapConfig);
+    window.addEventListener("focus", syncRemoteRoadmapConfig);
+    document.addEventListener("visibilitychange", syncVisibleRoadmapConfig);
+
+    return () => {
+      window.removeEventListener(roadmapConfigEvent, syncRoadmapConfig);
+      window.removeEventListener("focus", syncRemoteRoadmapConfig);
+      document.removeEventListener("visibilitychange", syncVisibleRoadmapConfig);
+    };
+  }, []);
 
   useEffect(() => {
     setProgress(readProgress());
@@ -459,6 +520,28 @@ export default function LessonPage() {
     );
   }
 
+  const lessonKind = getLessonKind(lesson);
+  const isTheoryLesson = lessonKind === "theory";
+  const isVideoLesson = lessonKind === "video";
+  const isAssessmentLesson = lessonKind === "assessment";
+  const hasPlayground =
+    lessonKind === "challenge" || lessonKind === "interactive";
+  const showQuiz = !isTheoryLesson && quizQuestions.length > 0;
+  const showRecommendedProblems =
+    !isTheoryLesson &&
+    !isAssessmentLesson &&
+    lesson.recommendedProblems.length > 0;
+  const theoryBlocks =
+    lesson.theory && lesson.theory.length > 0
+      ? lesson.theory
+      : [
+          {
+            heading: lesson.title,
+            body: lesson.transcript,
+            bullets: lesson.tags.map((tag) => ({ en: tag, ro: tag })),
+          },
+        ];
+
   return (
     <main className="min-h-full overflow-y-auto bg-white px-4 py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -488,7 +571,8 @@ export default function LessonPage() {
 
         <section className="rounded-[28px] border border-zinc-200 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 p-6 text-white shadow-sm md:p-8">
           <p className="text-xs font-semibold uppercase text-emerald-300">
-            {lesson.order.toString().padStart(2, "0")} · MiniScript+
+            {lesson.order.toString().padStart(2, "0")} ·{" "}
+            {c.lessonTypes[lessonKind]}
           </p>
           <h1 className="mt-3 max-w-4xl text-3xl font-bold tracking-tight md:text-5xl">
             {text(lesson.title, lessonLocale)}
@@ -509,8 +593,17 @@ export default function LessonPage() {
           </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div
+          className={cn(
+            "grid gap-6",
+            isAssessmentLesson
+              ? "mx-auto max-w-2xl"
+              : "xl:grid-cols-[minmax(0,1fr)_420px]"
+          )}
+        >
+          {!isAssessmentLesson && (
           <section className="space-y-6">
+            {isVideoLesson && (
             <Card className="overflow-hidden rounded-[24px] border-zinc-200">
               <CardContent className="p-0">
                 <div className="border-b border-zinc-100 px-5 py-4">
@@ -539,18 +632,58 @@ export default function LessonPage() {
                 )}
               </CardContent>
             </Card>
+            )}
 
             <Card className="rounded-[24px] border-zinc-200">
               <CardContent className="space-y-3 p-5">
                 <p className="text-xs font-semibold uppercase text-emerald-700">
                   {c.explanation}
                 </p>
-                <p className="text-base leading-7 text-zinc-700">
-                  {text(lesson.transcript, lessonLocale)}
-                </p>
+                {isTheoryLesson ? (
+                  <div className="space-y-3">
+                    {theoryBlocks.map((block, index) => (
+                      <article
+                        key={`${text(block.heading, lessonLocale)}-${index}`}
+                        className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4"
+                      >
+                        <div className="flex gap-3">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0 space-y-2">
+                            <h2 className="font-semibold">
+                              {text(block.heading, lessonLocale)}
+                            </h2>
+                            <p className="text-base leading-7 text-zinc-700">
+                              {text(block.body, lessonLocale)}
+                            </p>
+                            {block.bullets?.length ? (
+                              <div className="flex flex-wrap gap-2">
+                                {block.bullets.map((bullet) => (
+                                  <Badge
+                                    key={text(bullet, lessonLocale)}
+                                    variant="secondary"
+                                    className="rounded-full"
+                                  >
+                                    {text(bullet, lessonLocale)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-base leading-7 text-zinc-700">
+                    {text(lesson.transcript, lessonLocale)}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
+            {hasPlayground && (
             <Card className="overflow-hidden rounded-[24px] border-zinc-200">
               <CardContent className="p-0">
                 <div className="flex flex-col gap-3 border-b border-zinc-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
@@ -633,9 +766,17 @@ export default function LessonPage() {
                 </div>
               </CardContent>
             </Card>
+            )}
           </section>
+          )}
 
-          <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <aside
+            className={cn(
+              "space-y-6",
+              !isAssessmentLesson && "xl:sticky xl:top-6 xl:self-start"
+            )}
+          >
+            {showQuiz && (
             <Card className="rounded-[24px] border-zinc-200">
               <CardContent className="space-y-4 p-5">
                 <div>
@@ -694,7 +835,9 @@ export default function LessonPage() {
                 </Button>
               </CardContent>
             </Card>
+            )}
 
+            {showRecommendedProblems && (
             <Card className="rounded-[24px] border-zinc-200">
               <CardContent className="space-y-3 p-5">
                 <p className="text-xs font-semibold uppercase text-emerald-700">
@@ -722,6 +865,7 @@ export default function LessonPage() {
                 ))}
               </CardContent>
             </Card>
+            )}
 
             <Card className="rounded-[24px] border-zinc-200 bg-zinc-950 text-white">
               <CardContent className="space-y-4 p-5">

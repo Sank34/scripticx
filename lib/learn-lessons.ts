@@ -11,12 +11,39 @@ export type LessonQuizQuestion = {
   answerIndex: number;
 };
 
+export type LearnLessonKind =
+  | "interactive"
+  | "theory"
+  | "video"
+  | "challenge"
+  | "assessment";
+
+export type LessonRuleKind = "required" | "bonus" | "challenge";
+
+export type LearnLessonUnlockRule = {
+  kind?: LessonRuleKind;
+  locked?: boolean;
+  requiredProblemCodes?: number[];
+  requiresCorrectQuiz?: boolean;
+};
+
+export type LearnTheoryBlock = {
+  heading: LocalizedText;
+  body: LocalizedText;
+  bullets?: LocalizedText[];
+};
+
 export type RecommendedProblem = {
   title: LocalizedText;
   topic: string;
   href: string;
   difficulty?: "easy" | "medium" | "hard";
   code?: number;
+};
+
+export type LearnChallenge = {
+  prompt: LocalizedText;
+  problem?: RecommendedProblem;
 };
 
 export type LearnLesson = {
@@ -34,6 +61,10 @@ export type LearnLesson = {
   code: string;
   quiz: LessonQuizQuestion[];
   recommendedProblems: RecommendedProblem[];
+  kind?: LearnLessonKind;
+  theory?: LearnTheoryBlock[];
+  challenge?: LearnChallenge;
+  unlockRule?: LearnLessonUnlockRule;
 };
 
 export type LearnSection = {
@@ -58,6 +89,12 @@ export function youtubeEmbedUrl(url?: string) {
     url.match(/youtube\.com\/embed\/([^?]+)/);
 
   return match?.[1] ? `https://www.youtube.com/embed/${match[1]}` : null;
+}
+
+export function getLessonKind(lesson: LearnLesson): LearnLessonKind {
+  if (lesson.kind) return lesson.kind;
+
+  return lesson.level === "challenge" ? "challenge" : "video";
 }
 
 const problem = (
@@ -888,8 +925,6 @@ export function getLessonById(id: string) {
   return learnLessons.find((lesson) => lesson.id === id) ?? null;
 }
 
-export type LessonRuleKind = "required" | "bonus" | "challenge";
-
 export type LessonRule = {
   kind: LessonRuleKind;
   requiresCorrectQuiz: boolean;
@@ -905,24 +940,59 @@ const sectionChallengeLessonIds = new Set(
 );
 
 export function getLessonRule(lesson: LearnLesson): LessonRule {
+  const kind = getLessonKind(lesson);
   const firstRecommendedProblemCode = lesson.recommendedProblems[0]?.code;
   const isChallenge =
-    lesson.level === "challenge" || sectionChallengeLessonIds.has(lesson.id);
+    kind === "challenge" ||
+    lesson.level === "challenge" ||
+    sectionChallengeLessonIds.has(lesson.id);
 
-  if (bonusLessonIds.has(lesson.id)) {
-    return {
+  let rule: LessonRule;
+
+  if (kind === "theory") {
+    rule = {
+      kind: "required",
+      requiresCorrectQuiz: false,
+      requiredProblemCodes: [],
+    };
+  } else if (kind === "assessment") {
+    rule = {
+      kind: "challenge",
+      requiresCorrectQuiz: true,
+      requiredProblemCodes: [],
+    };
+  } else if (bonusLessonIds.has(lesson.id)) {
+    rule = {
       kind: "bonus",
+      requiresCorrectQuiz: false,
+      requiredProblemCodes: [],
+    };
+  } else {
+    rule = {
+      kind: isChallenge ? "challenge" : "required",
+      requiresCorrectQuiz: true,
+      requiredProblemCodes:
+        isChallenge && typeof firstRecommendedProblemCode === "number"
+          ? [firstRecommendedProblemCode]
+          : [],
+    };
+  }
+
+  if (!lesson.unlockRule) return rule;
+
+  if (lesson.unlockRule.locked === false) {
+    return {
+      kind: lesson.unlockRule.kind ?? rule.kind,
       requiresCorrectQuiz: false,
       requiredProblemCodes: [],
     };
   }
 
   return {
-    kind: isChallenge ? "challenge" : "required",
-    requiresCorrectQuiz: true,
+    kind: lesson.unlockRule.kind ?? rule.kind,
+    requiresCorrectQuiz:
+      lesson.unlockRule.requiresCorrectQuiz ?? rule.requiresCorrectQuiz,
     requiredProblemCodes:
-      isChallenge && typeof firstRecommendedProblemCode === "number"
-        ? [firstRecommendedProblemCode]
-        : [],
+      lesson.unlockRule.requiredProblemCodes ?? rule.requiredProblemCodes,
   };
 }
