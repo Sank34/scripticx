@@ -311,6 +311,21 @@ function ProblemContent() {
     }
   }
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Enter") return;
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (isSubmitting) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      void runCode();
+    }
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  });
+
   const handleEditorMount: OnMount = (editor) => {
     const syncLine = () => {
       setEditorLine(editor.getPosition()?.lineNumber ?? 1);

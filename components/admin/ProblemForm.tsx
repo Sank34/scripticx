@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,6 +115,26 @@ export function ProblemForm({ initialData, onSuccess }: any) {
     updated[index].output = value;
     setTestCases(updated);
   }
+
+  const canSubmit =
+    !loading &&
+    Object.values(title_i18n || {}).some((v: any) => v?.trim?.()) &&
+    Object.values(description_i18n || {}).some((v: any) => v?.trim?.());
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Enter") return;
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (loading) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      void handleSubmit();
+    }
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  });
 
   async function handleSubmit() {
     const hasTitle = Object.values(title_i18n || {}).some(
@@ -336,11 +356,7 @@ export function ProblemForm({ initialData, onSuccess }: any) {
 
       <Button
         onClick={handleSubmit}
-        disabled={
-          loading ||
-          !Object.values(title_i18n || {}).some((v: any) => v?.trim?.()) ||
-          !Object.values(description_i18n || {}).some((v: any) => v?.trim?.())
-        }
+        disabled={!canSubmit}
         className="w-full"
       >
         {loading
