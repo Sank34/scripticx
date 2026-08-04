@@ -1457,6 +1457,13 @@ export const translations = {
             deleteTitle: "Delete this user?",
             cancel: "Cancel",
             confirm: "Delete",
+            deleting: "Deleting...",
+          },
+
+          toast: {
+            deleted: "User and authentication account deleted",
+            deleteError: "Could not delete user",
+            sessionExpired: "Your admin session has expired",
           },
 
           badges: {
@@ -3182,6 +3189,13 @@ export const translations = {
             deleteTitle: "Ștergi acest utilizator?",
             cancel: "Anulează",
             confirm: "Șterge",
+            deleting: "Se șterge...",
+          },
+
+          toast: {
+            deleted: "Utilizatorul și contul de autentificare au fost șterse",
+            deleteError: "Utilizatorul nu a putut fi șters",
+            sessionExpired: "Sesiunea de administrator a expirat",
           },
 
           badges: {

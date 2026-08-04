@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { api } from "@/lib/api";
+import { onboardingMetadataKeys } from "@/lib/onboarding";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,7 +46,14 @@ export default function AuthCallbackPage() {
       isFinalizing.current = true;
 
       try {
+        const existingProfile = await api.profiles.getProfile(user.id);
         await api.profiles.ensureForUser(user);
+        if (!existingProfile) {
+          const { error: metadataError } = await api.auth.updateUserMetadata({
+            [onboardingMetadataKeys.required]: true,
+          });
+          if (metadataError) throw metadataError;
+        }
         if (active) router.replace("/dashboard");
       } catch (profileError) {
         isFinalizing.current = false;

@@ -10,6 +10,7 @@ import { MobileDrawer } from "@/components/MobileDrawer";
 import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
 import { NetworkStatus } from "@/components/NetworkStatus";
+import { OnboardingManager } from "@/components/onboarding/OnboardingManager";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
@@ -154,6 +155,7 @@ export default function RootLayout({
             </SidebarProvider>
             <MobileDrawer />
             <NetworkStatus />
+            <OnboardingManager />
           </LanguageProvider>
         </Providers>
 

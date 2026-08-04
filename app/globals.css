@@ -206,3 +206,47 @@ nextjs-portal {
   opacity: 1;
   pointer-events: auto;
 }
+
+@keyframes onboarding-blob-drift {
+  0% {
+    border-radius: 46% 54% 58% 42%;
+    transform: translate3d(-5%, -3%, 0) rotate(0deg) scale(0.94);
+  }
+  33% {
+    border-radius: 58% 42% 44% 56%;
+    transform: translate3d(6%, -7%, 0) rotate(9deg) scale(1.05);
+  }
+  66% {
+    border-radius: 42% 58% 55% 45%;
+    transform: translate3d(3%, 7%, 0) rotate(-7deg) scale(0.98);
+  }
+  100% {
+    border-radius: 46% 54% 58% 42%;
+    transform: translate3d(-5%, -3%, 0) rotate(0deg) scale(0.94);
+  }
+}
+
+@keyframes onboarding-preparing-progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+.onboarding-preparing-blob {
+  animation: onboarding-blob-drift 6.5s ease-in-out infinite;
+  will-change: border-radius, transform;
+}
+
+.onboarding-preparing-progress {
+  animation: onboarding-preparing-progress 20s linear both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-preparing-blob {
+    animation: none;
+  }
+
+  .onboarding-preparing-progress {
+    animation: none;
+    width: 100%;
+  }
+}

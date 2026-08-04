@@ -152,6 +152,7 @@ export function MobileDrawer() {
         <DrawerTrigger asChild>
           <button
             aria-label={t("mobileDrawer.open")}
+            data-tour="mobile-menu"
             className="flex h-7 w-28 items-center justify-center rounded-full border border-zinc-200/80 bg-white/80 shadow-[0_10px_30px_rgba(24,24,27,0.14)] backdrop-blur-xl transition-all duration-200 active:scale-95"
           >
             <span className="h-1.5 w-12 rounded-full bg-zinc-400" />

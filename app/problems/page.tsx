@@ -113,9 +113,9 @@ export default function ProblemsPage() {
   });
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
 
-      <h1 className="text-3xl font-bold">{t("problems.title")}</h1>
+      <h1 data-tour="problems-workspace" className="text-3xl font-bold">{t("problems.title")}</h1>
 
       {dailyChallenge?.problems && (
         <Link href={`/problems/${dailyChallenge.problem_id}`} className="block">

@@ -88,7 +88,18 @@ function NavItem({
           : "justify-start px-3"
       }`}
     >
-      <Link href={href}>
+      <Link
+        href={href}
+        data-tour={
+          href === "/editor"
+            ? "nav-editor"
+            : href === "/learn"
+              ? "nav-learn"
+              : href === "/problems"
+                ? "nav-problems"
+                : undefined
+        }
+      >
         <span className="relative inline-flex shrink-0">
           <Icon size={18} />
           {collapsed && hasBadge && (

@@ -568,6 +568,7 @@ export default function LearnRoadmapPage() {
         <section className="space-y-6">
           <div
             id="miniscript-roadmap"
+            data-tour="roadmap-workspace"
             className="scroll-mt-24 rounded-[28px] border border-zinc-200 bg-gradient-to-br from-emerald-500 to-lime-500 p-6 text-white shadow-sm"
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

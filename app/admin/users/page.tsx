@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 import {
   Card,
@@ -32,6 +33,7 @@ import {
   Trash2,
   Search,
   Ban,
+  LoaderCircle,
 } from "lucide-react";
 
 import {
@@ -60,6 +62,7 @@ function AdminUsersContent() {
 
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     if (!user) return;
@@ -107,12 +110,40 @@ function AdminUsersContent() {
   }
 
   async function deleteUser(userId: string) {
-    if (userId === user?.id) return;
+    if (userId === user?.id || deletingId) return;
 
-    await supabase.from("profiles").delete().eq("id", userId);
+    setDeletingId(userId);
 
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
-    setDeleteId(null);
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) {
+        throw sessionError || new Error(t("admin.users.page.toast.sessionExpired"));
+      }
+
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error || t("admin.users.page.toast.deleteError"));
+      }
+
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setDeleteId(null);
+      toast.success(t("admin.users.page.toast.deleted"));
+    } catch (error) {
+      toast.error(t("admin.users.page.toast.deleteError"), {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   useEffect(() => {
@@ -253,9 +284,14 @@ function AdminUsersContent() {
                   size="sm"
                   variant="destructive"
                   onClick={() => setDeleteId(u.id)}
+                  disabled={deletingId === u.id}
                   className="flex items-center gap-1"
                 >
-                  <Trash2 size={14} />
+                  {deletingId === u.id ? (
+                    <LoaderCircle size={14} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
                 </Button>
 
               </div>
@@ -276,10 +312,16 @@ function AdminUsersContent() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("admin.users.page.dialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteUser(deleteId!)}
+              onClick={() => void deleteUser(deleteId!)}
+              disabled={Boolean(deletingId)}
               className="bg-red-500 hover:bg-red-600"
             >
-              {t("admin.users.page.dialog.confirm")}
+              {deletingId ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : null}
+              {deletingId
+                ? t("admin.users.page.dialog.deleting")
+                : t("admin.users.page.dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

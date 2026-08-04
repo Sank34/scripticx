@@ -313,8 +313,20 @@ class AuthApi {
     return this.client.auth.signInWithPassword({ email, password });
   }
 
-  signUp(email: string, password: string) {
-    return this.client.auth.signUp({ email, password });
+  signUp(
+    email: string,
+    password: string,
+    metadata?: Record<string, unknown>
+  ) {
+    return this.client.auth.signUp({
+      email,
+      password,
+      options: metadata ? { data: metadata } : undefined,
+    });
+  }
+
+  updateUserMetadata(metadata: Record<string, unknown>) {
+    return this.client.auth.updateUser({ data: metadata });
   }
 
   signInWithGoogle(redirectTo: string) {

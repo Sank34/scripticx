@@ -953,7 +953,8 @@ END
     icon: React.ReactNode,
     onClick: () => void | Promise<void>,
     variant: "default" | "secondary" | "outline" | "ghost" = "outline",
-    disabled = false
+    disabled = false,
+    tourId?: string
   ) => (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -963,6 +964,7 @@ END
           onClick={onClick}
           disabled={disabled}
           aria-label={label}
+          data-tour={tourId}
         >
           {icon}
         </Button>
@@ -1114,7 +1116,7 @@ END
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+    <div data-tour="editor-workspace" className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
       <TooltipProvider>
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
           <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4">
@@ -1133,7 +1135,7 @@ END
                 compile();
               }, "secondary")}
               {toolbarButton(t("editor.actions.step"), <StepForward size={16} />, handleStep, "outline", stopped)}
-              {toolbarButton(t("editor.actions.run"), <Play size={16} />, handleRun, "default")}
+              {toolbarButton(t("editor.actions.run"), <Play size={16} />, handleRun, "default", false, "editor-run")}
               <div className="hidden items-center gap-1.5 sm:flex">
                 {toolbarButton(
                   t("editor.githubImport.action"),
@@ -1306,7 +1308,7 @@ END
                 onChange={handleCodeChange}
                 onRun={handleRun}
               >
-                <div className="min-h-0 flex-1 overflow-hidden">
+                <div data-tour="editor-code" className="min-h-0 flex-1 overflow-hidden">
                   <MiniScriptMonacoEditor
                     onMount={handleEditorMount}
                     height="100%"
@@ -1376,6 +1378,7 @@ END
                   </TabsTrigger>
                   <TabsTrigger
                     value="visual"
+                    data-tour="editor-visualize"
                     className="gap-1.5 px-2 text-xs"
                     title={t("editor.visualization.title")}
                   >

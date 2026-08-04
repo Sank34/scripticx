@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 import { siGoogle } from "simple-icons";
 import { api } from "@/lib/api";
+import { onboardingMetadataKeys } from "@/lib/onboarding";
 import { AppModal } from "@/components/ui/app-modal";
 
 import {
@@ -99,7 +100,9 @@ export default function LoginPage() {
     if (!email.trim() || !password) return;
 
     setAuthAction("register");
-    const { data, error } = await api.auth.signUp(email.trim(), password);
+    const { data, error } = await api.auth.signUp(email.trim(), password, {
+      [onboardingMetadataKeys.required]: true,
+    });
 
     if (error) {
       setAuthAction(null);
@@ -126,6 +129,11 @@ export default function LoginPage() {
     }
 
     setAuthAction(null);
+    if (data.session) {
+      router.replace("/dashboard");
+      return;
+    }
+
     showModal(
       t("login.modal.accountCreatedTitle"),
       t("login.modal.accountCreatedDescription"),
