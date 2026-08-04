@@ -11,6 +11,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { ShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { TopbarBreadcrumbs } from "@/components/navigation/TopbarBreadcrumbs";
 import { NotificationsPopover } from "@/components/notifications/NotificationsPopover";
+import { AttentionPopover } from "@/components/admin/AttentionPopover";
 
 import { Button } from "@/components/ui/button";
 
@@ -120,6 +121,8 @@ export function Topbar() {
 
         {user ? (
           <>
+            <AttentionPopover isAdmin={profile?.role === "admin"} />
+
             <NotificationsPopover user={user} />
 
             <DropdownMenu>

@@ -35,10 +35,15 @@ export function AdminNavCard({
   return (
     <Link
       href={href}
-      className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Card className={cn("h-full transition hover:shadow-md", ringClassName)}>
-        <CardContent className="space-y-3 p-4">
+      <Card
+        className={cn(
+          "h-full gap-0 py-0 shadow-sm transition hover:shadow-md",
+          ringClassName
+        )}
+      >
+        <CardContent className="flex h-full flex-col gap-3 p-4">
           <div className="flex items-center justify-between gap-2">
             {icon}
 
@@ -67,7 +72,7 @@ export function AdminNavCard({
             <p className="text-sm text-muted-foreground">{description}</p>
           </div>
 
-          <span className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition group-hover:text-foreground">
+          <span className="mt-auto flex items-center gap-1 text-sm font-medium text-muted-foreground transition group-hover:text-foreground">
             {t("admin.overview.actions.open")}
             <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
           </span>

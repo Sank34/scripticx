@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
-  ArrowRight,
+  BarChart3,
   CalendarDays,
   CircleCheck,
   FileText,
@@ -14,39 +14,44 @@ import {
   Mail,
   Megaphone,
   RefreshCw,
+  Send,
   Sparkles,
-  TriangleAlert,
+  TrendingDown,
+  TrendingUp,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import RouteGuard from "@/components/RouteGuard";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/components/LanguageProvider";
+import { ActivityChart } from "@/components/admin/ActivityChart";
+import { AdminHeroBanner } from "@/components/admin/AdminHeroBanner";
 import { AdminNavCard } from "@/components/admin/AdminNavCard";
 import { AdminPanelSection } from "@/components/admin/AdminPanelSection";
+import { AdminStatTile } from "@/components/admin/AdminStatTile";
+import { ProblemPopularityChart } from "@/components/admin/ProblemPopularityChart";
 import { EmptyState } from "@/components/common/EmptyState";
-import { PageHeader } from "@/components/common/PageHeader";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import {
+  ANALYTICS_RANGES,
+  buildActivitySeries,
+  buildPopularityData,
+  formatDay,
+  hasActivity,
+  summarizeActivity,
+  type AnalyticsRange,
+} from "@/lib/adminAnalytics";
+import { fetchAdminAnalytics } from "@/lib/adminAnalyticsData";
+import {
   buildActivityFeed,
-  buildAttentionItems,
   type ActivityItem,
-  type AttentionItem,
-  type AttentionItemId,
   type CountResult,
 } from "@/lib/adminOverview";
 import { fetchAdminCounts, fetchAdminOverview } from "@/lib/adminOverviewData";
 import { cn } from "@/lib/utils";
-
-const ATTENTION_ICON: Record<AttentionItemId, typeof Mail> = {
-  bannedUsers: Users,
-  noDailyToday: CalendarDays,
-  noDailyUpcoming: CalendarDays,
-  noProblems: FileText,
-  staleChangelog: Megaphone,
-  unresolvedMessages: Mail,
-};
 
 const ACTIVITY_ICON = {
   daily: { className: "text-orange-500", Icon: CalendarDays },
@@ -58,38 +63,75 @@ function positive(count: CountResult | undefined): number | null {
   return typeof count === "number" && count > 0 ? count : null;
 }
 
-function AttentionRow({ item }: { item: AttentionItem }) {
-  const { t } = useLanguage();
-  const Icon = ATTENTION_ICON[item.id];
-  const base = `admin.overview.attention.items.${item.id}`;
-  const title =
-    item.count === undefined
-      ? t(`${base}.title`)
-      : t(`${base}.title`).replace("{count}", String(item.count));
-
+function UpToDateToast({
+  description,
+  title,
+}: {
+  description: string;
+  title: string;
+}) {
   return (
-    <Link
-      href={item.href}
-      className="flex items-start gap-3 border-b border-border pb-3 transition last:border-b-0 last:pb-0 hover:opacity-80"
-    >
-      <span
-        className={cn(
-          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-          item.severity === "warn"
-            ? "bg-amber-100 text-amber-700"
-            : "bg-blue-100 text-blue-700"
-        )}
-      >
-        <Icon className="h-3.5 w-3.5" />
+    <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 shadow-2xl shadow-emerald-950/10">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+        <CircleCheck className="h-4 w-4" />
       </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{t(`${base}.description`)}</p>
+      <div className="min-w-0">
+        <p className="font-semibold">{title}</p>
+        <p className="text-xs text-emerald-800">{description}</p>
       </div>
+    </div>
+  );
+}
 
-      <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-    </Link>
+function DashboardSection({
+  action,
+  children,
+  description,
+  title,
+}: {
+  action?: ReactNode;
+  children: ReactNode;
+  description: string;
+  title: string;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <CardTitle>{title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function RangeToggle({
+  onChange,
+  value,
+}: {
+  onChange: (range: AnalyticsRange) => void;
+  value: AnalyticsRange;
+}) {
+  const { t } = useLanguage();
+
+  return (
+    <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+      {ANALYTICS_RANGES.map((range) => (
+        <Button
+          key={range}
+          variant={range === value ? "secondary" : "ghost"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => onChange(range)}
+        >
+          {t(`admin.overview.analytics.ranges.${range}`)}
+        </Button>
+      ))}
+    </div>
   );
 }
 
@@ -128,6 +170,8 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 
 function AdminContent() {
   const { locale, t } = useLanguage();
+  const { profile } = useAuth();
+  const queryClient = useQueryClient();
 
   const countsQuery = useQuery({
     queryKey: ["admin", "counts"],
@@ -139,38 +183,117 @@ function AdminContent() {
     queryFn: fetchAdminOverview,
   });
 
+  const [days, setDays] = useState<AnalyticsRange>(30);
+
+  const analyticsQuery = useQuery({
+    queryKey: ["admin", "analytics", days],
+    queryFn: () => fetchAdminAnalytics(days),
+  });
+
   const counts = countsQuery.data;
   const overview = overviewQuery.data;
-
-  const attentionItems = useMemo(
-    () => buildAttentionItems(counts, overview, new Date()),
-    [counts, overview]
-  );
+  const analytics = analyticsQuery.data;
 
   const activityItems = useMemo(
     () => buildActivityFeed(overview, locale),
     [overview, locale]
   );
 
-  const isFetching = countsQuery.isFetching || overviewQuery.isFetching;
+  const popularity = useMemo(
+    () => buildPopularityData(analytics?.problems, locale),
+    [analytics, locale]
+  );
+
+  const activitySeries = useMemo(
+    () => buildActivitySeries(analytics?.activity, locale),
+    [analytics, locale]
+  );
+
+  const summary = useMemo(
+    () => summarizeActivity(analytics?.activity),
+    [analytics]
+  );
+
+  const percent = useMemo(
+    () => new Intl.NumberFormat(undefined, { maximumFractionDigits: 0, style: "percent" }),
+    []
+  );
+
+  const isFetching =
+    countsQuery.isFetching || overviewQuery.isFetching || analyticsQuery.isFetching;
   const bannedCount = positive(counts?.bannedUsers);
   const newMessageCount = positive(counts?.contactNew);
 
-  function refreshAll() {
-    void countsQuery.refetch();
-    void overviewQuery.refetch();
+  const analyticsPending = analyticsQuery.isPending;
+  const analyticsUnavailable = analytics?.available === false;
+  const TrendIcon =
+    summary.deltaPct !== null && summary.deltaPct < 0 ? TrendingDown : TrendingUp;
+
+  const adminName = profile?.username?.trim();
+  const bannerTitle = adminName
+    ? t("admin.overview.banner.greeting").replace("{name}", adminName)
+    : t("admin.title");
+
+  function snapshot() {
+    return JSON.stringify([
+      queryClient.getQueryData(["admin", "counts"]) ?? null,
+      queryClient.getQueryData(["admin", "overview"]) ?? null,
+      queryClient.getQueryData(["admin", "analytics", days]) ?? null,
+      queryClient.getQueryData(["admin", "tasks"]) ?? null,
+    ]);
+  }
+
+  async function refreshAll() {
+    const before = snapshot();
+
+    try {
+      await Promise.all([
+        countsQuery.refetch({ throwOnError: true }),
+        overviewQuery.refetch({ throwOnError: true }),
+        analyticsQuery.refetch({ throwOnError: true }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] }),
+      ]);
+    } catch {
+      toast.error(t("admin.overview.actions.refreshFailed"));
+      return;
+    }
+
+    if (snapshot() === before) {
+      toast.custom(
+        () => (
+          <UpToDateToast
+            title={t("admin.overview.actions.upToDate")}
+            description={t("admin.overview.actions.upToDateHint")}
+          />
+        ),
+        {
+          position: "bottom-center",
+          unstyled: true,
+          style: {
+            background: "transparent",
+            border: "none",
+            boxShadow: "none",
+            padding: 0,
+            width: "auto",
+          },
+        }
+      );
+      return;
+    }
+
+    toast.success(t("admin.overview.actions.refreshed"));
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t("admin.title")}
-        subtitle={t("admin.overview.subtitle")}
+      <AdminHeroBanner
+        title={bannerTitle}
+        subtitle={t("admin.overview.banner.subtitle")}
         action={
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
-            onClick={refreshAll}
+            onClick={() => void refreshAll()}
             disabled={isFetching}
           >
             <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
@@ -179,127 +302,231 @@ function AdminContent() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <AdminNavCard
-          href="/admin/problems"
-          icon={<FileText className="h-5 w-5 text-blue-500" />}
-          ringClassName="ring-blue-500/30"
-          title={t("admin.problems.title")}
-          description={t("admin.problems.description")}
-          count={counts?.problems}
-        />
-
-        <AdminNavCard
-          href="/admin/users"
-          icon={<Users className="h-5 w-5 text-emerald-500" />}
-          ringClassName="ring-emerald-500/30"
-          title={t("admin.users.title")}
-          description={t("admin.users.description")}
-          count={counts?.users}
-          accentBadge={
-            bannedCount
-              ? {
-                  className: "bg-red-100 text-red-700",
-                  label: t("admin.overview.badges.banned").replace(
-                    "{count}",
-                    String(bannedCount)
-                  ),
-                }
-              : null
-          }
-        />
-
-        <AdminNavCard
-          href="/admin/updates"
-          icon={<Sparkles className="h-5 w-5 text-amber-500" />}
-          ringClassName="ring-amber-500/30"
-          title={t("admin.updates.title")}
-          description={t("admin.updates.description")}
-          count={counts?.updates}
-        />
-
-        <AdminNavCard
-          href="/admin/contact"
-          icon={<Mail className="h-5 w-5 text-rose-500" />}
-          ringClassName="ring-rose-500/30"
-          title={t("admin.contact.cardTitle")}
-          description={t("admin.contact.cardDescription")}
-          count={counts?.contactTotal}
-          accentBadge={
-            newMessageCount
-              ? {
-                  className: "bg-rose-500 text-white",
-                  label: t("admin.overview.badges.new").replace(
-                    "{count}",
-                    String(newMessageCount)
-                  ),
-                }
-              : null
-          }
-        />
-
-        <AdminNavCard
-          href="/admin/lessons"
-          icon={<GitBranch className="h-5 w-5 text-violet-500" />}
-          ringClassName="ring-violet-500/30"
-          title={locale === "ro" ? "Configurator lecții" : "Lesson configurator"}
-          description={
-            locale === "ro"
-              ? "Editează roadmap-ul, nodurile și quiz-urile lecțiilor."
-              : "Edit the roadmap, lesson nodes, and quizzes."
-          }
-          count={null}
-          accentBadge={{
-            className: "bg-violet-100 text-violet-700",
-            label: locale === "ro" ? "Frontend" : "Frontend",
-          }}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AdminPanelSection
-          icon={<TriangleAlert className="h-4 w-4 text-amber-500" />}
-          title={t("admin.overview.attention.title")}
-          isLoading={countsQuery.isPending || overviewQuery.isPending}
-          isError={countsQuery.isError && overviewQuery.isError}
-          onRetry={refreshAll}
-          action={
-            attentionItems.length > 0 ? (
-              <Badge variant="secondary">{attentionItems.length}</Badge>
-            ) : null
-          }
-        >
-          {attentionItems.length === 0 ? (
-            <EmptyState
-              className="py-8"
-              icon={<CircleCheck className="h-8 w-8 text-emerald-500" />}
-              title={t("admin.overview.attention.empty.title")}
-              description={t("admin.overview.attention.empty.description")}
+      <DashboardSection
+        title={t("admin.overview.analytics.title")}
+        description={t("admin.overview.analytics.description")}
+        action={<RangeToggle value={days} onChange={setDays} />}
+      >
+        {analyticsUnavailable ? (
+          <EmptyState
+            className="py-8"
+            icon={<BarChart3 className="h-8 w-8" />}
+            title={t("admin.overview.analytics.unavailable.title")}
+            description={t("admin.overview.analytics.unavailable.description")}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <AdminStatTile
+              pending={analyticsPending}
+              icon={<Send className="h-4 w-4 text-blue-500" />}
+              label={t("admin.overview.analytics.summary.submissions")}
+              value={summary.submissions.toLocaleString()}
+              footer={t("admin.overview.analytics.summary.avgPerDay").replace(
+                "{count}",
+                summary.avgPerDay.toLocaleString()
+              )}
             />
-          ) : (
-            attentionItems.map((item) => <AttentionRow key={item.id} item={item} />)
-          )}
-        </AdminPanelSection>
 
-        <AdminPanelSection
-          icon={<Activity className="h-4 w-4 text-orange-500" />}
-          title={t("admin.overview.activity.title")}
-          isLoading={overviewQuery.isPending}
-          isError={overviewQuery.isError}
-          onRetry={() => void overviewQuery.refetch()}
-        >
-          {activityItems.length === 0 ? (
-            <EmptyState
-              className="py-8"
-              icon={<Inbox className="h-8 w-8" />}
-              title={t("admin.overview.activity.empty.title")}
-              description={t("admin.overview.activity.empty.description")}
+            <AdminStatTile
+              pending={analyticsPending}
+              icon={<Users className="h-4 w-4 text-emerald-500" />}
+              label={t("admin.overview.analytics.summary.peakActiveUsers")}
+              value={summary.activeUsers.toLocaleString()}
+              footer={
+                summary.peakDay
+                  ? t("admin.overview.analytics.summary.peakOn").replace(
+                      "{day}",
+                      formatDay(summary.peakDay, locale)
+                    )
+                  : t("admin.overview.analytics.summary.peakActiveUsersHint")
+              }
             />
-          ) : (
-            activityItems.map((item) => <ActivityRow key={item.id} item={item} />)
-          )}
-        </AdminPanelSection>
-      </div>
+
+            <AdminStatTile
+              pending={analyticsPending}
+              icon={<CircleCheck className="h-4 w-4 text-violet-500" />}
+              label={t("admin.overview.analytics.summary.solves")}
+              value={summary.solves.toLocaleString()}
+              footer={t("admin.overview.analytics.summary.solveShare").replace(
+                "{percent}",
+                percent.format(summary.solveRate)
+              )}
+            />
+
+            <AdminStatTile
+              pending={analyticsPending}
+              icon={<TrendIcon className="h-4 w-4 text-orange-500" />}
+              label={t("admin.overview.analytics.summary.trend")}
+              value={
+                summary.deltaPct === null
+                  ? "—"
+                  : `${summary.deltaPct > 0 ? "+" : ""}${summary.deltaPct}%`
+              }
+              valueClassName={cn(
+                summary.deltaPct !== null &&
+                  (summary.deltaPct < 0 ? "text-rose-500" : "text-emerald-500")
+              )}
+              footer={
+                summary.deltaPct === null
+                  ? t("admin.overview.analytics.summary.trendUnknown")
+                  : t("admin.overview.analytics.summary.trendAgainst").replace(
+                      "{count}",
+                      summary.previousSubmissions.toLocaleString()
+                    )
+              }
+            />
+          </div>
+        )}
+      </DashboardSection>
+
+      <DashboardSection
+        title={t("admin.overview.tools.title")}
+        description={t("admin.overview.tools.description")}
+      >
+        <div className="-m-2 flex snap-x scroll-pl-2 items-stretch gap-4 overflow-x-auto p-2">
+          <div className="w-[17rem] shrink-0 snap-start">
+            <AdminNavCard
+              href="/admin/problems"
+              icon={<FileText className="h-5 w-5 text-blue-500" />}
+              ringClassName="ring-blue-500/50"
+              title={t("admin.problems.title")}
+              description={t("admin.problems.description")}
+              count={counts?.problems}
+            />
+          </div>
+
+          <div className="w-[17rem] shrink-0 snap-start">
+            <AdminNavCard
+              href="/admin/users"
+              icon={<Users className="h-5 w-5 text-emerald-500" />}
+              ringClassName="ring-emerald-500/50"
+              title={t("admin.users.title")}
+              description={t("admin.users.description")}
+              count={counts?.users}
+              accentBadge={
+                bannedCount
+                  ? {
+                      className: "bg-red-100 text-red-700",
+                      label: t("admin.overview.badges.banned").replace(
+                        "{count}",
+                        String(bannedCount)
+                      ),
+                    }
+                  : null
+              }
+            />
+          </div>
+
+          <div className="w-[17rem] shrink-0 snap-start">
+            <AdminNavCard
+              href="/admin/updates"
+              icon={<Sparkles className="h-5 w-5 text-amber-500" />}
+              ringClassName="ring-amber-500/50"
+              title={t("admin.updates.title")}
+              description={t("admin.updates.description")}
+              count={counts?.updates}
+            />
+          </div>
+
+          <div className="w-[17rem] shrink-0 snap-start">
+            <AdminNavCard
+              href="/admin/contact"
+              icon={<Mail className="h-5 w-5 text-rose-500" />}
+              ringClassName="ring-rose-500/50"
+              title={t("admin.contact.cardTitle")}
+              description={t("admin.contact.cardDescription")}
+              count={counts?.contactTotal}
+              accentBadge={
+                newMessageCount
+                  ? {
+                      className: "bg-rose-500 text-white",
+                      label: t("admin.overview.badges.new").replace(
+                        "{count}",
+                        String(newMessageCount)
+                      ),
+                    }
+                  : null
+              }
+            />
+          </div>
+
+          <div className="w-[17rem] shrink-0 snap-start">
+            <AdminNavCard
+              href="/admin/lessons"
+              icon={<GitBranch className="h-5 w-5 text-violet-500" />}
+              ringClassName="ring-violet-500/50"
+              title={t("admin.lessons.title")}
+              description={t("admin.lessons.description")}
+              count={null}
+              accentBadge={{
+                className: "bg-violet-100 text-violet-700",
+                label: t("admin.lessons.badge"),
+              }}
+            />
+          </div>
+        </div>
+      </DashboardSection>
+
+      {!analyticsUnavailable && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <AdminPanelSection
+            icon={<Activity className="h-4 w-4 text-blue-500" />}
+            title={t("admin.overview.analytics.trendTitle")}
+            isLoading={analyticsPending}
+            isError={analyticsQuery.isError}
+            onRetry={() => void analyticsQuery.refetch()}
+          >
+            {hasActivity(activitySeries) ? (
+              <ActivityChart data={activitySeries} />
+            ) : (
+              <EmptyState
+                className="py-10"
+                icon={<Activity className="h-8 w-8" />}
+                title={t("admin.overview.analytics.empty.title")}
+                description={t("admin.overview.analytics.empty.description")}
+              />
+            )}
+          </AdminPanelSection>
+
+          <AdminPanelSection
+            icon={<BarChart3 className="h-4 w-4 text-blue-500" />}
+            title={t("admin.overview.analytics.popularityTitle")}
+            isLoading={analyticsPending}
+            isError={analyticsQuery.isError}
+            onRetry={() => void analyticsQuery.refetch()}
+          >
+            {popularity.length > 0 ? (
+              <ProblemPopularityChart data={popularity} />
+            ) : (
+              <EmptyState
+                className="py-10"
+                icon={<BarChart3 className="h-8 w-8" />}
+                title={t("admin.overview.analytics.empty.title")}
+                description={t("admin.overview.analytics.empty.description")}
+              />
+            )}
+          </AdminPanelSection>
+        </div>
+      )}
+
+      <AdminPanelSection
+        icon={<Activity className="h-4 w-4 text-orange-500" />}
+        title={t("admin.overview.activity.title")}
+        isLoading={overviewQuery.isPending}
+        isError={overviewQuery.isError}
+        onRetry={() => void overviewQuery.refetch()}
+      >
+        {activityItems.length === 0 ? (
+          <EmptyState
+            className="py-8"
+            icon={<Inbox className="h-8 w-8" />}
+            title={t("admin.overview.activity.empty.title")}
+            description={t("admin.overview.activity.empty.description")}
+          />
+        ) : (
+          activityItems.map((item) => <ActivityRow key={item.id} item={item} />)
+        )}
+      </AdminPanelSection>
     </div>
   );
 }
