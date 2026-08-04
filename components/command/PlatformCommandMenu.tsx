@@ -120,12 +120,6 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         keywords: ["ranking", "score"],
       },
       {
-        href: "/learn",
-        icon: Route,
-        label: t("nav.learn"),
-        keywords: ["roadmap", "learning path", "lessons"],
-      },
-      {
         href: "/docs/basics",
         icon: BookOpen,
         label: t("nav.docs"),
@@ -150,6 +144,12 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     if (!user) return commands;
 
     commands.unshift(
+      {
+        href: "/learn",
+        icon: Route,
+        label: t("nav.learn"),
+        keywords: ["roadmap", "learning path", "lessons"],
+      },
       {
         href: "/dashboard",
         icon: LayoutDashboard,

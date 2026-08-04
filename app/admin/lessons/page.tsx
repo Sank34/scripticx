@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   BookOpen,
   Check,
   ClipboardList,
@@ -18,6 +19,7 @@ import {
   MousePointer2,
   Plus,
   Save,
+  Scaling,
   Search,
   Settings2,
   Shuffle,
@@ -32,6 +34,16 @@ import {
 import RouteGuard from "@/components/RouteGuard";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -87,6 +99,7 @@ import {
   type LessonLocale,
 } from "@/lib/learn-lessons";
 import {
+  buildDefaultRoadmapConnections,
   clearRoadmapConfig,
   defaultRoadmapCategories,
   getRoadmapConfigData,
@@ -96,6 +109,9 @@ import {
   writeRemoteRoadmapConfig,
   type RoadmapConfig,
   type RoadmapCategory,
+  type RoadmapConfigConnection,
+  type RoadmapConnectionSide,
+  type RoadmapSectionFrame,
 } from "@/lib/roadmap-config";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -108,6 +124,8 @@ type CanvasNode = {
   y: number;
 };
 
+type ResizableWidgetId = "inspector";
+
 type DragState =
   | {
       type: "nodes";
@@ -118,7 +136,43 @@ type DragState =
     }
   | { type: "canvas"; startX: number; startY: number; originX: number; originY: number }
   | { type: "selection"; startX: number; startY: number; currentX: number; currentY: number }
+  | {
+      type: "connection";
+      sourceId: string;
+      sourceSide: RoadmapConnectionSide;
+      currentX: number;
+      currentY: number;
+      targetId?: string;
+      targetSide?: RoadmapConnectionSide;
+    }
+  | {
+      type: "section-resize";
+      corner: "nw" | "ne" | "sw" | "se";
+      origin: RoadmapSectionFrame;
+      sectionId: string;
+      startX: number;
+      startY: number;
+    }
+  | {
+      type: "section-move";
+      frameOrigin: RoadmapSectionFrame;
+      nodeOrigins: Record<string, { x: number; y: number }>;
+      sectionId: string;
+      startX: number;
+      startY: number;
+    }
+  | {
+      type: "widget-resize";
+      horizontalDirection: -1 | 1;
+      originHeight: number;
+      originWidth: number;
+      startX: number;
+      startY: number;
+      widget: ResizableWidgetId;
+    }
   | null;
+
+type ConnectionDraft = Extract<NonNullable<DragState>, { type: "connection" }>;
 
 type QuizDraft = {
   answerIndex: number;
@@ -159,13 +213,22 @@ type ClipboardNode = {
 
 const NODE_WIDTH = 210;
 const NODE_HEIGHT = 94;
-const NODE_COLUMN_GAP = 340;
-const NODE_ROW_GAP = 150;
+const NODE_COLUMN_GAP = 400;
+const NODE_ROW_GAP = 180;
 const SECTION_COLUMNS = 4;
-const SECTION_GAP = 310;
-const STAGE_SIZE = 2200;
+const SECTION_GAP = 480;
+const SECTION_FRAME_GAP = 260;
 const MIN_ZOOM = 55;
 const MAX_ZOOM = 125;
+const MIN_SECTION_WIDTH = 300;
+const MIN_SECTION_HEIGHT = 170;
+const MIN_INSPECTOR_WIDTH = 320;
+const MIN_INSPECTOR_HEIGHT = 260;
+const WIDGET_LIMITS: Record<ResizableWidgetId, { height: number; width: number }> = {
+  inspector: { height: MIN_INSPECTOR_HEIGHT, width: MIN_INSPECTOR_WIDTH },
+};
+const HANDLE_SIDES: RoadmapConnectionSide[] = ["top", "right", "bottom", "left"];
+const HANDLE_SNAP_DISTANCE = 34;
 
 const ruleStyles = {
   required: {
@@ -227,6 +290,16 @@ const copy = {
     hideWidgets: "Hide widgets",
     showWidgets: "Show widgets",
     keybinds: "Space + drag to pan, Ctrl + wheel to zoom",
+    connectHint: "Drag from a node handle to another node",
+    connectionAdded: "Connection added",
+    connectionDeleted: "Connection deleted",
+    connectionReversed: "Connection direction reversed",
+    connection: "Connection",
+    from: "From",
+    to: "To",
+    reverseDirection: "Reverse direction",
+    startSide: "Start side",
+    endSide: "End side",
     newLesson: "New lesson",
     preview: "Preview",
     nodes: "Nodes",
@@ -282,6 +355,16 @@ const copy = {
     duplicatedLesson: "Lesson duplicated",
     pastedLessons: "Lessons pasted",
     addedSection: "Section added",
+    deleteCategory: "Delete category",
+    deleteCategoryDescription:
+      "The category will be removed. Its sections will be moved to another category.",
+    deleteSection: "Delete section",
+    deleteSectionDescription:
+      "The section, all of its lessons, and their connections will be removed.",
+    deletedCategory: "Category deleted",
+    deletedSection: "Section deleted",
+    keepCategory: "Keep category",
+    keepSection: "Keep section",
     resetDone: "Roadmap reset",
   },
   ro: {
@@ -304,6 +387,16 @@ const copy = {
     hideWidgets: "Ascunde widget-uri",
     showWidgets: "Arată widget-uri",
     keybinds: "Space + drag pentru pan, Ctrl + wheel pentru zoom",
+    connectHint: "Trage dintr-un punct al nodului spre alt nod",
+    connectionAdded: "Conexiune adăugată",
+    connectionDeleted: "Conexiune ștearsă",
+    connectionReversed: "Direcția conexiunii a fost inversată",
+    connection: "Conexiune",
+    from: "Din",
+    to: "Spre",
+    reverseDirection: "Inversează direcția",
+    startSide: "Latura de start",
+    endSide: "Latura finală",
     newLesson: "Lecție nouă",
     preview: "Preview",
     nodes: "Noduri",
@@ -359,6 +452,16 @@ const copy = {
     duplicatedLesson: "Lecție duplicată",
     pastedLessons: "Lecții lipite",
     addedSection: "Secțiune adăugată",
+    deleteCategory: "Șterge categoria",
+    deleteCategoryDescription:
+      "Categoria va fi eliminată. Secțiunile sale vor fi mutate într-o altă categorie.",
+    deleteSection: "Șterge secțiunea",
+    deleteSectionDescription:
+      "Secțiunea, toate lecțiile sale și conexiunile lor vor fi eliminate.",
+    deletedCategory: "Categorie ștearsă",
+    deletedSection: "Secțiune ștearsă",
+    keepCategory: "Păstrează categoria",
+    keepSection: "Păstrează secțiunea",
     resetDone: "Roadmap resetat",
   },
 } as const;
@@ -405,6 +508,54 @@ function buildInitialNodes(
     sectionY += rowCount * NODE_ROW_GAP + SECTION_GAP - NODE_ROW_GAP;
 
     return sectionNodes;
+  });
+}
+
+function buildInitialSectionFrames(
+  nodes: CanvasNode[],
+  sections: LearnSection[],
+  savedFrames: RoadmapSectionFrame[] = []
+) {
+  const savedFrameBySectionId = new Map(
+    savedFrames.map((frame) => [frame.sectionId, frame])
+  );
+
+  let nextFrameY = 54;
+
+  return sections.map((section) => {
+    const savedFrame = savedFrameBySectionId.get(section.id);
+    if (savedFrame) {
+      nextFrameY = Math.max(nextFrameY, savedFrame.y + savedFrame.height + SECTION_FRAME_GAP);
+      return savedFrame;
+    }
+
+    const sectionNodes = nodes.filter((node) => node.sectionId === section.id);
+    if (!sectionNodes.length) {
+      const frame = {
+        sectionId: section.id,
+        x: 80,
+        y: nextFrameY,
+        width: 440,
+        height: 220,
+      };
+      nextFrameY = frame.y + frame.height + SECTION_FRAME_GAP;
+      return frame;
+    }
+
+    const minX = Math.min(...sectionNodes.map((node) => node.x));
+    const maxX = Math.max(...sectionNodes.map((node) => node.x + NODE_WIDTH));
+    const minY = Math.min(...sectionNodes.map((node) => node.y));
+    const maxY = Math.max(...sectionNodes.map((node) => node.y + NODE_HEIGHT));
+
+    const frame = {
+      sectionId: section.id,
+      x: minX - 42,
+      y: minY - 66,
+      width: Math.max(360, maxX - minX + 84),
+      height: Math.max(190, maxY - minY + 108),
+    };
+    nextFrameY = Math.max(nextFrameY, frame.y + frame.height + SECTION_FRAME_GAP);
+    return frame;
   });
 }
 
@@ -469,8 +620,15 @@ function buildAdminState(locale: LessonLocale) {
     categories: config?.categories?.length
       ? config.categories
       : buildInitialCategories(),
+    connections:
+      config?.connections ?? buildDefaultRoadmapConnections(nodes, sections),
     drafts: buildInitialDrafts(locale, lessons),
     nodes,
+    sectionFrames: buildInitialSectionFrames(
+      nodes,
+      sections,
+      config?.sectionFrames
+    ),
     sections,
   };
 }
@@ -642,6 +800,66 @@ function getSelectionBounds(rect: SelectionRect) {
   };
 }
 
+function getHandlePoint(node: CanvasNode, side: RoadmapConnectionSide) {
+  switch (side) {
+    case "top":
+      return { x: node.x + NODE_WIDTH / 2, y: node.y };
+    case "right":
+      return { x: node.x + NODE_WIDTH, y: node.y + NODE_HEIGHT / 2 };
+    case "bottom":
+      return { x: node.x + NODE_WIDTH / 2, y: node.y + NODE_HEIGHT };
+    case "left":
+      return { x: node.x, y: node.y + NODE_HEIGHT / 2 };
+  }
+}
+
+function getSideVector(side: RoadmapConnectionSide) {
+  switch (side) {
+    case "top":
+      return { x: 0, y: -1 };
+    case "right":
+      return { x: 1, y: 0 };
+    case "bottom":
+      return { x: 0, y: 1 };
+    case "left":
+      return { x: -1, y: 0 };
+  }
+}
+
+function getConnectionPath(
+  start: { x: number; y: number },
+  sourceSide: RoadmapConnectionSide,
+  end: { x: number; y: number },
+  targetSide?: RoadmapConnectionSide
+) {
+  const distance = Math.max(64, Math.min(220, Math.hypot(end.x - start.x, end.y - start.y) * 0.45));
+  const sourceVector = getSideVector(sourceSide);
+  const targetVector = targetSide ? getSideVector(targetSide) : { x: 0, y: 0 };
+  const sourceControl = {
+    x: start.x + sourceVector.x * distance,
+    y: start.y + sourceVector.y * distance,
+  };
+  const targetControl = {
+    x: end.x + targetVector.x * distance,
+    y: end.y + targetVector.y * distance,
+  };
+
+  return `M ${start.x} ${start.y} C ${sourceControl.x} ${sourceControl.y}, ${targetControl.x} ${targetControl.y}, ${end.x} ${end.y}`;
+}
+
+function getHandleClass(side: RoadmapConnectionSide) {
+  switch (side) {
+    case "top":
+      return "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2";
+    case "right":
+      return "right-0 top-1/2 -translate-y-1/2 translate-x-1/2";
+    case "bottom":
+      return "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2";
+    case "left":
+      return "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2";
+  }
+}
+
 function LessonsAdminContent() {
   const { locale } = useLanguage();
   const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
@@ -655,6 +873,12 @@ function LessonsAdminContent() {
   const [nodes, setNodes] = useState<CanvasNode[]>(() =>
     buildAdminState(lessonLocale).nodes
   );
+  const [sectionFrames, setSectionFrames] = useState<RoadmapSectionFrame[]>(() =>
+    buildAdminState(lessonLocale).sectionFrames
+  );
+  const [connections, setConnections] = useState<RoadmapConfigConnection[]>(() =>
+    buildAdminState(lessonLocale).connections
+  );
   const [drafts, setDrafts] = useState<Record<string, LessonDraft>>(() =>
     buildAdminState(lessonLocale).drafts
   );
@@ -665,10 +889,14 @@ function LessonsAdminContent() {
   const [selectedSectionId, setSelectedSectionId] = useState(
     nodes[0]?.sectionId ?? sections[0]?.id ?? ""
   );
+  const [selectedSectionFrameId, setSelectedSectionFrameId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     categories[0]?.id ?? ""
   );
   const [createDialogType, setCreateDialogType] = useState<
+    "category" | "section" | null
+  >(null);
+  const [deleteDialogType, setDeleteDialogType] = useState<
     "category" | "section" | null
   >(null);
   const [createName, setCreateName] = useState("");
@@ -679,12 +907,20 @@ function LessonsAdminContent() {
   const [widgetsHidden, setWidgetsHidden] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
+  const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null);
+  const [selectedConnectionId, setSelectedConnectionId] = useState("");
+  const [widgetSizes, setWidgetSizes] = useState<Record<ResizableWidgetId, { height: number; width: number }>>({
+    inspector: { height: 680, width: 460 },
+  });
   const dragRef = useRef<DragState>(null);
   const clipboardRef = useRef<ClipboardNode[]>([]);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
   const selectedNode =
     nodes.find((node) => node.id === selectedId) ?? (selectedId ? nodes[0] : undefined);
+  const selectedConnection = connections.find(
+    (connection) => connection.id === selectedConnectionId
+  );
   const selectedLesson = selectedNode?.lesson;
   const selectedDraft = selectedLesson ? drafts[selectedLesson.id] : null;
   const selectedSection = selectedNode
@@ -714,11 +950,35 @@ function LessonsAdminContent() {
         )
       : null;
   const scale = zoom[0] / 100;
+  const categoryLabelPositions = useMemo(
+    () =>
+      categories.map((category, categoryIndex) => {
+        const frames = sectionFrames.filter((frame) =>
+          category.sectionIds.includes(frame.sectionId)
+        );
 
-  const nodeCount = nodes.length;
-  const quizCount = Object.values(drafts).reduce(
-    (total, draft) => total + draft.quiz.length,
-    0
+        return {
+          category,
+          x: frames.length ? Math.min(...frames.map((frame) => frame.x)) : 80,
+          y: frames.length
+            ? Math.min(...frames.map((frame) => frame.y)) - 46
+            : 44 + categoryIndex * (SECTION_GAP + NODE_ROW_GAP),
+        };
+      }),
+    [categories, sectionFrames]
+  );
+
+  const categoryIsExplicitlySelected = Boolean(
+    !selectedConnection &&
+      !selectedLesson &&
+      !selectedSectionDetails &&
+      selectedCategoryDetails
+  );
+  const hasConfigurableSelection = Boolean(
+    selectedConnection ||
+      selectedLesson ||
+      selectedSectionDetails ||
+      categoryIsExplicitlySelected
   );
 
   useEffect(() => {
@@ -753,6 +1013,10 @@ function LessonsAdminContent() {
         setCategories(categories);
         setSections(sections);
         setNodes(remoteNodes);
+        setSectionFrames(
+          buildInitialSectionFrames(remoteNodes, sections, remoteConfig.sectionFrames)
+        );
+        setConnections(remoteConfig.connections);
         setDrafts(buildInitialDrafts(lessonLocale, lessons));
         setSelectedId(remoteNodes[0]?.id ?? "");
         setSelectedIds(remoteNodes[0]?.id ? [remoteNodes[0].id] : []);
@@ -764,6 +1028,8 @@ function LessonsAdminContent() {
             categories[0]?.id ??
             ""
         );
+        setSelectedConnectionId("");
+        setSelectedSectionFrameId("");
       } catch {
         if (!cancelled && readRoadmapConfig()) {
           toast.warning(c.localFallback);
@@ -820,6 +1086,25 @@ function LessonsAdminContent() {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (
+        event.key === "Escape" &&
+        !isTextEditingTarget(event.target) &&
+        !isCanvasWidgetTarget(event.target)
+      ) {
+        event.preventDefault();
+        dragRef.current = null;
+        setConnectionDraft(null);
+        setSelectedCategoryId("");
+        setSelectedConnectionId("");
+        setSelectedId("");
+        setSelectedIds([]);
+        setSelectedSectionFrameId("");
+        setSelectedSectionId("");
+        setSelectionRect(null);
+        setSpacePressed(false);
+        return;
+      }
+
+      if (
         event.code !== "Space" ||
         isTextEditingTarget(event.target) ||
         isCanvasWidgetTarget(event.target)
@@ -865,9 +1150,13 @@ function LessonsAdminContent() {
     const initialCategories = buildInitialCategories();
     const initialSections = buildInitialSections();
     const initialNodes = buildInitialNodes(initialSections, learnLessons);
+    const initialConnections = buildDefaultRoadmapConnections(initialNodes, initialSections);
+    const initialSectionFrames = buildInitialSectionFrames(initialNodes, initialSections);
     setCategories(initialCategories);
     setSections(initialSections);
     setNodes(initialNodes);
+    setConnections(initialConnections);
+    setSectionFrames(initialSectionFrames);
     setDrafts(buildInitialDrafts(lessonLocale));
     setSelectedId(initialNodes[0]?.id ?? "");
     setSelectedIds(initialNodes[0]?.id ? [initialNodes[0].id] : []);
@@ -876,6 +1165,8 @@ function LessonsAdminContent() {
     setPan({ x: 0, y: 0 });
     setZoom([84]);
     setSelectionRect(null);
+    setSelectedConnectionId("");
+    setSelectedSectionFrameId("");
     toast.success(c.resetDone);
   }
 
@@ -924,6 +1215,7 @@ function LessonsAdminContent() {
 
     const config: RoadmapConfig = {
       categories: nextCategories,
+      connections,
       lessons: nextLessons,
       nodes: orderedNodes.map((node) => ({
         id: node.id,
@@ -931,6 +1223,7 @@ function LessonsAdminContent() {
         x: node.x,
         y: node.y,
       })),
+      sectionFrames,
       sections: nextSections,
       updatedAt: new Date().toISOString(),
       version: 1,
@@ -996,6 +1289,7 @@ function LessonsAdminContent() {
     setSelectedId("");
     setSelectedIds([]);
     setSelectedSectionId("");
+    setSelectedSectionFrameId("");
     setSelectedCategoryId(id);
     toast.success(c.addedSection);
   }
@@ -1003,8 +1297,9 @@ function LessonsAdminContent() {
   function addSection(title: string) {
     const id = `draft-section-${Date.now().toString(36)}`;
     const y =
-      nodes.length > 0
-        ? Math.max(...nodes.map((node) => node.y)) + SECTION_GAP
+      sectionFrames.length > 0
+        ? Math.max(...sectionFrames.map((frame) => frame.y + frame.height)) +
+          SECTION_FRAME_GAP
         : 100;
 
     setSections((current) => [
@@ -1021,6 +1316,16 @@ function LessonsAdminContent() {
         lessonIds: [],
       },
     ]);
+    setSectionFrames((current) => [
+      ...current,
+      {
+        sectionId: id,
+        x: 80,
+        y,
+        width: 440,
+        height: 220,
+      },
+    ]);
     setCategories((current) =>
       current.map((category, index) =>
         category.id === (selectedCategoryId || current[0]?.id) || (!selectedCategoryId && index === 0)
@@ -1034,6 +1339,7 @@ function LessonsAdminContent() {
     setSelectedId("");
     setSelectedIds([]);
     setSelectedSectionId(id);
+    setSelectedSectionFrameId(id);
     setSelectedCategoryId(selectedCategoryId || categories[0]?.id || "");
     setPan((current) => ({ ...current, y: current.y - y * scale + 180 }));
     toast.success(c.addedSection);
@@ -1068,6 +1374,89 @@ function LessonsAdminContent() {
         section.id === id ? { ...section, ...patch } : section
       )
     );
+  }
+
+  function deleteSelectedCategory() {
+    if (!selectedCategoryDetails || categories.length <= 1) return;
+
+    const fallbackCategory = categories.find(
+      (category) => category.id !== selectedCategoryDetails.id
+    );
+    if (!fallbackCategory) return;
+
+    setCategories((current) =>
+      current
+        .filter((category) => category.id !== selectedCategoryDetails.id)
+        .map((category) =>
+          category.id === fallbackCategory.id
+            ? {
+                ...category,
+                sectionIds: Array.from(
+                  new Set([
+                    ...category.sectionIds,
+                    ...selectedCategoryDetails.sectionIds,
+                  ])
+                ),
+              }
+            : category
+        )
+    );
+    setSelectedCategoryId(fallbackCategory.id);
+    setSelectedSectionId("");
+    setSelectedSectionFrameId("");
+    setDeleteDialogType(null);
+    toast.success(c.deletedCategory);
+  }
+
+  function deleteSelectedSection() {
+    if (!selectedSectionDetails || sections.length <= 1) return;
+
+    const lessonIds = new Set(
+      nodes
+        .filter((node) => node.sectionId === selectedSectionDetails.id)
+        .map((node) => node.id)
+    );
+    const remainingSections = sections.filter(
+      (section) => section.id !== selectedSectionDetails.id
+    );
+    const fallbackSection = remainingSections[0];
+    const fallbackCategory = categories.find((category) =>
+      category.sectionIds.includes(fallbackSection.id)
+    );
+
+    setSections(remainingSections);
+    setSectionFrames((current) =>
+      current.filter((frame) => frame.sectionId !== selectedSectionDetails.id)
+    );
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        sectionIds: category.sectionIds.filter(
+          (sectionId) => sectionId !== selectedSectionDetails.id
+        ),
+      }))
+    );
+    setNodes((current) => current.filter((node) => !lessonIds.has(node.id)));
+    setConnections((current) =>
+      current.filter(
+        (connection) =>
+          !lessonIds.has(connection.sourceId) &&
+          !lessonIds.has(connection.targetId)
+      )
+    );
+    setDrafts((current) => {
+      const next = { ...current };
+      lessonIds.forEach((lessonId) => delete next[lessonId]);
+      return next;
+    });
+    setSelectedId("");
+    setSelectedIds([]);
+    setSelectedConnectionId("");
+    setSelectedSectionId(fallbackSection.id);
+    setSelectedSectionFrameId(fallbackSection.id);
+    setSelectedCategoryId(fallbackCategory?.id ?? categories[0]?.id ?? "");
+    setDeleteDialogType(null);
+    toast.success(c.deletedSection);
   }
 
   function updateQuizQuestion(questionIndex: number, patch: Partial<QuizDraft>) {
@@ -1117,8 +1506,8 @@ function LessonsAdminContent() {
     const viewport = viewportRef.current;
     const centerX = viewport ? viewport.clientWidth / 2 : 520;
     const centerY = viewport ? viewport.clientHeight / 2 : 320;
-    const x = Math.max(24, (centerX - pan.x) / scale - NODE_WIDTH / 2);
-    const y = Math.max(24, (centerY - pan.y) / scale - NODE_HEIGHT / 2);
+    const x = (centerX - pan.x) / scale - NODE_WIDTH / 2;
+    const y = (centerY - pan.y) / scale - NODE_HEIGHT / 2;
     const sectionId = selectedNode?.sectionId ?? selectedSectionId ?? sections[0]?.id ?? "draft";
 
     setNodes((current) => [
@@ -1157,6 +1546,7 @@ function LessonsAdminContent() {
     setSelectedId(id);
     setSelectedIds([id]);
     setSelectedSectionId(sectionId);
+    setSelectedSectionFrameId("");
     toast.success(c.addedLesson);
   }
 
@@ -1193,6 +1583,7 @@ function LessonsAdminContent() {
     }));
     setSelectedId(id);
     setSelectedIds([id]);
+    setSelectedSectionFrameId("");
     toast.success(c.duplicatedLesson);
   }
 
@@ -1204,6 +1595,12 @@ function LessonsAdminContent() {
 
     const nextNodes = nodes.filter((node) => !idsToDelete.has(node.id));
     setNodes(nextNodes);
+    setConnections((current) =>
+      current.filter(
+        (connection) =>
+          !idsToDelete.has(connection.sourceId) && !idsToDelete.has(connection.targetId)
+      )
+    );
     setDrafts((current) => {
       const next = { ...current };
       idsToDelete.forEach((id) => delete next[id]);
@@ -1212,7 +1609,61 @@ function LessonsAdminContent() {
     setSelectedId(nextNodes[0]?.id ?? "");
     setSelectedIds(nextNodes[0]?.id ? [nextNodes[0].id] : []);
     setSelectedSectionId(nextNodes[0]?.sectionId ?? sections[0]?.id ?? "");
+    setSelectedSectionFrameId("");
     toast.success(c.deletedLesson);
+  }
+
+  function deleteSelectedConnection() {
+    if (!selectedConnectionId) return;
+
+    setConnections((current) =>
+      current.filter((connection) => connection.id !== selectedConnectionId)
+    );
+    setSelectedConnectionId("");
+    toast.success(c.connectionDeleted);
+  }
+
+  function deleteCurrentSelection() {
+    if (selectedConnectionId) {
+      deleteSelectedConnection();
+      return;
+    }
+
+    if (selectedSectionFrameId) {
+      setDeleteDialogType("section");
+      return;
+    }
+
+    if (categoryIsExplicitlySelected) {
+      setDeleteDialogType("category");
+      return;
+    }
+
+    deleteSelectedLesson();
+  }
+
+  function updateSelectedConnection(patch: Partial<RoadmapConfigConnection>) {
+    if (!selectedConnectionId) return;
+
+    setConnections((current) =>
+      current.map((connection) =>
+        connection.id === selectedConnectionId
+          ? { ...connection, ...patch }
+          : connection
+      )
+    );
+  }
+
+  function reverseSelectedConnection() {
+    if (!selectedConnection) return;
+
+    updateSelectedConnection({
+      sourceId: selectedConnection.targetId,
+      sourceSide: selectedConnection.targetSide,
+      targetId: selectedConnection.sourceId,
+      targetSide: selectedConnection.sourceSide,
+    });
+    toast.success(c.connectionReversed);
   }
 
   function getViewportPoint(event: React.PointerEvent<HTMLDivElement | HTMLButtonElement>) {
@@ -1293,8 +1744,8 @@ function LessonsAdminContent() {
     const viewport = viewportRef.current;
     const centerX = viewport ? viewport.clientWidth / 2 : 520;
     const centerY = viewport ? viewport.clientHeight / 2 : 320;
-    const baseX = Math.max(24, (centerX - pan.x) / scale - NODE_WIDTH / 2);
-    const baseY = Math.max(24, (centerY - pan.y) / scale - NODE_HEIGHT / 2);
+    const baseX = (centerX - pan.x) / scale - NODE_WIDTH / 2;
+    const baseY = (centerY - pan.y) / scale - NODE_HEIGHT / 2;
     const pastedIds: string[] = [];
     const nextDraftEntries: Array<[string, LessonDraft]> = [];
     const nextNodes = copiedNodes.map((item, index) => {
@@ -1323,8 +1774,8 @@ function LessonsAdminContent() {
         ...item.node,
         id,
         lesson,
-        x: Math.max(24, baseX + item.offsetX),
-        y: Math.max(24, baseY + item.offsetY),
+        x: baseX + item.offsetX,
+        y: baseY + item.offsetY,
       };
     });
 
@@ -1335,6 +1786,7 @@ function LessonsAdminContent() {
     }));
     setSelectedIds(pastedIds);
     setSelectedId(pastedIds[0] ?? selectedId);
+    setSelectedSectionFrameId("");
     toast.success(c.pastedLessons);
   }
 
@@ -1347,7 +1799,20 @@ function LessonsAdminContent() {
       const key = event.key.toLowerCase();
       if (key === "backspace" || key === "delete") {
         event.preventDefault();
-        deleteSelectedLesson();
+        if (selectedConnectionId) {
+          deleteSelectedConnection();
+        } else if (selectedSectionFrameId && sections.length > 1) {
+          setDeleteDialogType("section");
+        } else if (
+          !selectedId &&
+          !selectedSectionId &&
+          selectedCategoryDetails &&
+          categories.length > 1
+        ) {
+          setDeleteDialogType("category");
+        } else {
+          deleteSelectedLesson();
+        }
         return;
       }
 
@@ -1371,10 +1836,144 @@ function LessonsAdminContent() {
     return () => window.removeEventListener("keydown", handleClipboardShortcuts);
   });
 
-  function beginNodeDrag(event: React.PointerEvent<HTMLButtonElement>, node: CanvasNode) {
+  function getWorldPoint(clientX: number, clientY: number) {
+    const viewport = viewportRef.current;
+    const rect = viewport?.getBoundingClientRect();
+    const viewportX = rect ? clientX - rect.left : clientX;
+    const viewportY = rect ? clientY - rect.top : clientY;
+
+    return {
+      x: (viewportX - pan.x) / scale,
+      y: (viewportY - pan.y) / scale,
+    };
+  }
+
+  function findClosestHandle(
+    point: { x: number; y: number },
+    excludedNodeId?: string
+  ) {
+    let closest:
+      | { nodeId: string; side: RoadmapConnectionSide; x: number; y: number; distance: number }
+      | undefined;
+
+    nodes.forEach((node) => {
+      if (node.id === excludedNodeId) return;
+
+      HANDLE_SIDES.forEach((side) => {
+        const handle = getHandlePoint(node, side);
+        const distance = Math.hypot(point.x - handle.x, point.y - handle.y);
+        if (distance <= HANDLE_SNAP_DISTANCE && (!closest || distance < closest.distance)) {
+          closest = { nodeId: node.id, side, ...handle, distance };
+        }
+      });
+    });
+
+    return closest;
+  }
+
+  function beginConnection(
+    event: React.PointerEvent<HTMLButtonElement>,
+    node: CanvasNode,
+    side: RoadmapConnectionSide
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    viewportRef.current?.setPointerCapture(event.pointerId);
+    const point = getHandlePoint(node, side);
+    const draft: ConnectionDraft = {
+      type: "connection",
+      sourceId: node.id,
+      sourceSide: side,
+      currentX: point.x,
+      currentY: point.y,
+    };
+
+    dragRef.current = draft;
+    setConnectionDraft(draft);
+    setSelectedConnectionId("");
+    setSelectedId(node.id);
+    setSelectedIds([node.id]);
+    setSelectedSectionId(node.sectionId);
+    setSelectedSectionFrameId("");
+  }
+
+  function beginSectionResize(
+    event: React.PointerEvent<HTMLButtonElement>,
+    frame: RoadmapSectionFrame,
+    corner: "nw" | "ne" | "sw" | "se"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    viewportRef.current?.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      type: "section-resize",
+      corner,
+      origin: frame,
+      sectionId: frame.sectionId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    setSelectedId("");
+    setSelectedIds([]);
+    setSelectedConnectionId("");
+    setSelectedSectionId(frame.sectionId);
+    setSelectedSectionFrameId(frame.sectionId);
+  }
+
+  function beginSectionMove(
+    event: React.PointerEvent<HTMLButtonElement>,
+    frame: RoadmapSectionFrame
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      type: "section-move",
+      frameOrigin: frame,
+      nodeOrigins: Object.fromEntries(
+        nodes
+          .filter((node) => node.sectionId === frame.sectionId)
+          .map((node) => [node.id, { x: node.x, y: node.y }])
+      ),
+      sectionId: frame.sectionId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    setSelectedId("");
+    setSelectedIds([]);
+    setSelectedConnectionId("");
+    setSelectedSectionId(frame.sectionId);
+    setSelectedSectionFrameId(frame.sectionId);
+  }
+
+  function beginWidgetResize(
+    event: React.PointerEvent<HTMLButtonElement>,
+    widget: ResizableWidgetId,
+    horizontalDirection: -1 | 1
+  ) {
+    const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+    if (!bounds) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      type: "widget-resize",
+      horizontalDirection,
+      originHeight: bounds.height,
+      originWidth: bounds.width,
+      startX: event.clientX,
+      startY: event.clientY,
+      widget,
+    };
+  }
+
+  function beginNodeDrag(event: React.PointerEvent<HTMLElement>, node: CanvasNode) {
     if (spacePressed) return;
 
     event.stopPropagation();
+    setSelectedConnectionId("");
+    setSelectedSectionFrameId("");
 
     if (event.shiftKey) {
       setSelectedIds((current) => {
@@ -1427,7 +2026,7 @@ function LessonsAdminContent() {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
 
-    if (!spacePressed) {
+    if (!spacePressed && event.pointerType !== "touch") {
       const point = getViewportPoint(event);
       const rect = {
         startX: point.x,
@@ -1438,7 +2037,13 @@ function LessonsAdminContent() {
 
       dragRef.current = { type: "selection", ...rect };
       setSelectionRect(rect);
+      setConnectionDraft(null);
+      setSelectedCategoryId("");
       setSelectedIds([]);
+      setSelectedId("");
+      setSelectedConnectionId("");
+      setSelectedSectionFrameId("");
+      setSelectedSectionId("");
       return;
     }
 
@@ -1480,19 +2085,124 @@ function LessonsAdminContent() {
       return;
     }
 
+    if (drag.type === "connection") {
+      const pointer = getWorldPoint(event.clientX, event.clientY);
+      const target = findClosestHandle(pointer, drag.sourceId);
+      const nextDraft: ConnectionDraft = {
+        ...drag,
+        currentX: target?.x ?? pointer.x,
+        currentY: target?.y ?? pointer.y,
+        targetId: target?.nodeId,
+        targetSide: target?.side,
+      };
+
+      dragRef.current = nextDraft;
+      setConnectionDraft(nextDraft);
+      return;
+    }
+
+    if (drag.type === "section-resize") {
+      const deltaX = (event.clientX - drag.startX) / scale;
+      const deltaY = (event.clientY - drag.startY) / scale;
+      const resizesFromLeft = drag.corner === "nw" || drag.corner === "sw";
+      const resizesFromTop = drag.corner === "nw" || drag.corner === "ne";
+      const width = Math.max(
+        MIN_SECTION_WIDTH,
+        drag.origin.width + (resizesFromLeft ? -deltaX : deltaX)
+      );
+      const height = Math.max(
+        MIN_SECTION_HEIGHT,
+        drag.origin.height + (resizesFromTop ? -deltaY : deltaY)
+      );
+
+      setSectionFrames((current) =>
+        current.map((frame) =>
+          frame.sectionId === drag.sectionId
+            ? {
+                ...frame,
+                height,
+                width,
+                x: resizesFromLeft
+                  ? drag.origin.x + drag.origin.width - width
+                  : drag.origin.x,
+                y: resizesFromTop
+                  ? drag.origin.y + drag.origin.height - height
+                  : drag.origin.y,
+              }
+            : frame
+        )
+      );
+      return;
+    }
+
+    if (drag.type === "section-move") {
+      const deltaX = (event.clientX - drag.startX) / scale;
+      const deltaY = (event.clientY - drag.startY) / scale;
+      const nextX = drag.frameOrigin.x + deltaX;
+      const nextY = drag.frameOrigin.y + deltaY;
+      const appliedDeltaX = nextX - drag.frameOrigin.x;
+      const appliedDeltaY = nextY - drag.frameOrigin.y;
+
+      setSectionFrames((current) =>
+        current.map((frame) =>
+          frame.sectionId === drag.sectionId
+            ? { ...frame, x: nextX, y: nextY }
+            : frame
+        )
+      );
+      setNodes((current) =>
+        current.map((node) => {
+          const origin = drag.nodeOrigins[node.id];
+          return origin
+            ? {
+                ...node,
+                x: origin.x + appliedDeltaX,
+                y: origin.y + appliedDeltaY,
+              }
+            : node;
+        })
+      );
+      return;
+    }
+
+    if (drag.type === "widget-resize") {
+      const viewport = viewportRef.current;
+      const limits = WIDGET_LIMITS[drag.widget];
+      const maxHeight =
+        drag.widget === "inspector"
+          ? Math.max(limits.height, (viewport?.clientHeight ?? 760) - 96)
+          : 240;
+      const width = Math.min(
+        Math.max(
+          limits.width,
+          drag.originWidth +
+            (event.clientX - drag.startX) * drag.horizontalDirection
+        ),
+        Math.max(limits.width, (viewport?.clientWidth ?? 900) - 32)
+      );
+      const height = Math.min(
+        Math.max(limits.height, drag.originHeight + event.clientY - drag.startY),
+        maxHeight
+      );
+
+      setWidgetSizes((current) => ({
+        ...current,
+        [drag.widget]: { height, width },
+      }));
+      return;
+    }
+
     setNodes((current) =>
       current.map((node) =>
         drag.ids.includes(node.id)
           ? {
               ...node,
-              x: Math.max(
-                24,
-                drag.origins[node.id].x + (event.clientX - drag.startX) / scale
-              ),
-              y: Math.max(
-                24,
-                drag.origins[node.id].y + (event.clientY - drag.startY) / scale
-              ),
+              x:
+                drag.origins[node.id].x +
+                (event.clientX - drag.startX) / scale,
+              y:
+                drag.origins[node.id].y +
+                (event.clientY - drag.startY) / scale,
             }
           : node
       )
@@ -1500,6 +2210,40 @@ function LessonsAdminContent() {
   }
 
   function endDrag() {
+    if (dragRef.current?.type === "connection") {
+      const draft = dragRef.current;
+      if (draft.targetId && draft.targetSide) {
+        const connection: RoadmapConfigConnection = {
+          id: `${draft.sourceId}-${draft.sourceSide}-${draft.targetId}-${draft.targetSide}-${Date.now().toString(36)}`,
+          sourceId: draft.sourceId,
+          sourceSide: draft.sourceSide,
+          targetId: draft.targetId,
+          targetSide: draft.targetSide,
+        };
+        const existing = connections.find(
+          (item) =>
+            item.sourceId === connection.sourceId &&
+            item.sourceSide === connection.sourceSide &&
+            item.targetId === connection.targetId &&
+            item.targetSide === connection.targetSide
+        );
+
+        if (existing) {
+          setSelectedConnectionId(existing.id);
+        } else {
+          setConnections((current) => [...current, connection]);
+          setSelectedConnectionId(connection.id);
+          toast.success(c.connectionAdded);
+        }
+        setSelectedIds([]);
+        setSelectedId("");
+      }
+
+      setConnectionDraft(null);
+      dragRef.current = null;
+      return;
+    }
+
     if (dragRef.current?.type === "selection") {
       const ids = getNodeIdsInRect(dragRef.current);
       setSelectedIds(ids);
@@ -1547,12 +2291,52 @@ function LessonsAdminContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AlertDialog
+        open={Boolean(deleteDialogType)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDialogType(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteDialogType === "category"
+                ? c.deleteCategory
+                : c.deleteSection}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialogType === "category"
+                ? c.deleteCategoryDescription
+                : c.deleteSectionDescription}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {deleteDialogType === "category"
+                ? c.keepCategory
+                : c.keepSection}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={
+                deleteDialogType === "category"
+                  ? deleteSelectedCategory
+                  : deleteSelectedSection
+              }
+            >
+              {deleteDialogType === "category"
+                ? c.deleteCategory
+                : c.deleteSection}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
             ref={viewportRef}
             className={cn(
-              "relative h-full min-h-0 w-full overflow-hidden bg-[radial-gradient(circle_at_1px_1px,hsl(var(--muted-foreground)/0.18)_1px,transparent_0)] bg-[length:22px_22px]",
+              "relative h-full min-h-0 w-full touch-none overflow-hidden bg-[radial-gradient(circle_at_1px_1px,hsl(var(--muted-foreground)/0.18)_1px,transparent_0)] bg-[length:22px_22px]",
               spacePressed ? "cursor-grab active:cursor-grabbing" : "cursor-default"
             )}
             onPointerDown={beginCanvasDrag}
@@ -1560,30 +2344,54 @@ function LessonsAdminContent() {
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
           >
-            {!widgetsHidden && (
-              <div data-canvas-widget className="absolute left-4 top-4 z-20 max-w-[420px] rounded-xl border bg-background/95 p-3 shadow-sm backdrop-blur">
-                <div className="flex items-start gap-3">
-                  <Button asChild variant="outline" size="icon" className="shrink-0">
-                    <Link href="/admin" aria-label={c.back}>
-                      <ArrowLeft className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <div className="min-w-0">
-                    <h1 className="truncate text-lg font-semibold">{c.title}</h1>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{c.keybinds}</p>
-                  </div>
-                </div>
-              </div>
-            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  data-canvas-widget
+                  asChild
+                  variant="outline"
+                  size="icon"
+                  className="absolute left-2 top-2 z-40 bg-background/95 shadow-sm backdrop-blur sm:left-4 sm:top-4"
+                >
+                  <Link href="/admin" aria-label={c.back}>
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{c.back}</TooltipContent>
+            </Tooltip>
 
-            <div data-canvas-widget className="absolute right-4 top-4 z-30 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-2 rounded-xl border bg-background/95 p-2 shadow-sm backdrop-blur">
-              <div className="relative w-52">
+            <div data-canvas-widget className="absolute left-14 right-2 top-2 z-30 flex items-center justify-end gap-1 rounded-lg border bg-background/95 p-1.5 shadow-sm backdrop-blur sm:left-auto sm:right-4 sm:top-4 sm:gap-2 sm:rounded-xl sm:p-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="sm:hidden" aria-label={c.search}>
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  data-canvas-widget
+                  align="start"
+                  className="w-[calc(100vw-1rem)] p-2 sm:hidden"
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder={c.search}
+                      className="h-9 pl-8"
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <div className="relative hidden w-44 shrink-0 sm:block md:w-52">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={c.search}
-                  className="h-8 pl-8"
+                  className="h-8 pl-8 pr-2"
                 />
               </div>
               <Popover>
@@ -1661,7 +2469,7 @@ function LessonsAdminContent() {
                   </div>
                 </PopoverContent>
               </Popover>
-              <Separator orientation="vertical" className="h-6" />
+              <Separator orientation="vertical" className="hidden h-6 md:block" />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -1675,7 +2483,7 @@ function LessonsAdminContent() {
                 </TooltipTrigger>
                 <TooltipContent>Zoom out</TooltipContent>
               </Tooltip>
-              <div className="w-28 px-1">
+              <div className="hidden w-28 px-1 md:block">
                 <Slider value={zoom} min={MIN_ZOOM} max={MAX_ZOOM} step={5} onValueChange={setZoom} />
               </div>
               <Tooltip>
@@ -1691,9 +2499,9 @@ function LessonsAdminContent() {
                 </TooltipTrigger>
                 <TooltipContent>Zoom in</TooltipContent>
               </Tooltip>
-              <Button variant="outline" size="sm" onClick={resetLayout}>
+              <Button variant="outline" size="icon" onClick={resetLayout} className="hidden xl:inline-flex">
                 <Shuffle className="h-3.5 w-3.5" />
-                {c.reset}
+                <span className="sr-only">{c.reset}</span>
               </Button>
               <Button
                 variant="outline"
@@ -1707,127 +2515,237 @@ function LessonsAdminContent() {
                   <EyeOff className="h-4 w-4" />
                 )}
               </Button>
-              <Button size="sm" onClick={saveRoadmapConfig} disabled={isSaving}>
+              <Button size="sm" className="h-9 px-2 sm:px-3" onClick={saveRoadmapConfig} disabled={isSaving} aria-label={isSaving ? c.saving : c.save}>
                 <Save className="h-3.5 w-3.5" />
-                {isSaving ? c.saving : c.save}
+                <span className="hidden sm:inline">{isSaving ? c.saving : c.save}</span>
               </Button>
             </div>
 
-            {!widgetsHidden && (
-              <div data-canvas-widget className="absolute left-4 top-28 z-20 flex gap-2 rounded-xl border bg-background/95 p-2 shadow-sm backdrop-blur">
-                <Badge variant="secondary" className="rounded-full">{nodeCount} {c.nodes.toLowerCase()}</Badge>
-                <Badge variant="secondary" className="rounded-full">{sections.length} {c.sections.toLowerCase()}</Badge>
-                <Badge variant="secondary" className="rounded-full">{quizCount} {c.quizItems.toLowerCase()}</Badge>
-              </div>
-            )}
-
             <div
-              className="absolute left-0 top-0 origin-top-left transition-transform duration-75"
+              className="absolute left-0 top-0 h-px w-px origin-top-left overflow-visible transition-transform duration-75"
               style={{
-                height: STAGE_SIZE,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                width: STAGE_SIZE,
               }}
             >
-              <svg className="pointer-events-none absolute inset-0 h-full w-full">
-                {sections.flatMap((section) => {
-                  const sectionNodes = nodes
-                    .filter((node) => node.sectionId === section.id)
-                    .sort((a, b) => a.y - b.y || a.x - b.x);
-                  return sectionNodes.slice(0, -1).map((node, index) => {
-                    const next = sectionNodes[index + 1];
-                    const startX = node.x + NODE_WIDTH;
-                    const startY = node.y + NODE_HEIGHT / 2;
-                    const endX = next.x;
-                    const endY = next.y + NODE_HEIGHT / 2;
-                    const control = Math.max(56, (endX - startX) / 2);
+              {sectionFrames.map((frame) => {
+                const section = sections.find((item) => item.id === frame.sectionId);
+                if (!section) return null;
+                const active = selectedSectionFrameId === section.id;
+                const isEmpty = !nodes.some((node) => node.sectionId === section.id);
 
-                    return (
-                      <path
-                        key={`${node.id}-${next.id}`}
-                        d={`M ${startX} ${startY} C ${startX + control} ${startY}, ${endX - control} ${endY}, ${endX} ${endY}`}
-                        fill="none"
-                        stroke="#d4d4d8"
-                        strokeLinecap="round"
-                        strokeWidth="3"
+                return (
+                  <div
+                    key={section.id}
+                    className={cn(
+                      "pointer-events-none absolute rounded-lg border bg-background/25 transition-colors",
+                      active
+                        ? "z-[4] border-blue-500 bg-blue-50/35 shadow-[0_0_0_1px_rgba(59,130,246,0.18)]"
+                        : "z-[3] border-dashed border-zinc-300/90"
+                    )}
+                    style={{
+                      left: frame.x,
+                      top: frame.y,
+                      width: frame.width,
+                      height: frame.height,
+                    }}
+                  >
+                    {isEmpty && (
+                      <button
+                        type="button"
+                        aria-label={`Select ${text(section.title, lessonLocale)}`}
+                        className="pointer-events-auto absolute inset-0 z-0 cursor-default rounded-lg"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onContextMenu={() => {
+                          setSelectedId("");
+                          setSelectedIds([]);
+                          setSelectedConnectionId("");
+                          setSelectedSectionId(section.id);
+                          setSelectedSectionFrameId(section.id);
+                          setSelectedCategoryId(
+                            categories.find((category) =>
+                              category.sectionIds.includes(section.id)
+                            )?.id ?? selectedCategoryId
+                          );
+                        }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedId("");
+                          setSelectedIds([]);
+                          setSelectedConnectionId("");
+                          setSelectedSectionId(section.id);
+                          setSelectedSectionFrameId(section.id);
+                          setSelectedCategoryId(
+                            categories.find((category) =>
+                              category.sectionIds.includes(section.id)
+                            )?.id ?? selectedCategoryId
+                          );
+                        }}
                       />
-                    );
-                  });
+                    )}
+                    {active && (
+                      (["nw", "ne", "sw", "se"] as const).map((corner) => (
+                        <button
+                          key={corner}
+                          type="button"
+                          aria-label={`Resize ${text(section.title, lessonLocale)} ${corner}`}
+                          className={cn(
+                            "pointer-events-auto absolute z-20 h-[18px] w-[18px] rounded-[3px] border-2 border-blue-500 bg-white shadow-sm",
+                            corner === "nw" && "-left-[10px] -top-[10px] cursor-nwse-resize",
+                            corner === "ne" && "-right-[10px] -top-[10px] cursor-nesw-resize",
+                            corner === "sw" && "-bottom-[10px] -left-[10px] cursor-nesw-resize",
+                            corner === "se" && "-bottom-[10px] -right-[10px] cursor-nwse-resize"
+                          )}
+                          onPointerDown={(event) => beginSectionResize(event, frame, corner)}
+                        />
+                      ))
+                    )}
+                    <button
+                      type="button"
+                      className={cn(
+                        "pointer-events-auto absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] cursor-move items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-semibold text-zinc-700 shadow-sm transition hover:border-blue-400 active:cursor-grabbing",
+                        active && "border-blue-500 text-blue-700"
+                      )}
+                      onPointerDown={(event) => beginSectionMove(event, frame)}
+                      onContextMenu={() => {
+                        setSelectedId("");
+                        setSelectedIds([]);
+                        setSelectedConnectionId("");
+                        setSelectedSectionId(section.id);
+                        setSelectedSectionFrameId(section.id);
+                        setSelectedCategoryId(
+                          categories.find((category) =>
+                            category.sectionIds.includes(section.id)
+                          )?.id ?? selectedCategoryId
+                        );
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedId("");
+                        setSelectedIds([]);
+                        setSelectedConnectionId("");
+                        setSelectedSectionId(section.id);
+                        setSelectedSectionFrameId(section.id);
+                        setSelectedCategoryId(
+                          categories.find((category) =>
+                            category.sectionIds.includes(section.id)
+                          )?.id ?? selectedCategoryId
+                        );
+                      }}
+                    >
+                      <Grip className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{text(section.title, lessonLocale)}</span>
+                    </button>
+                  </div>
+                );
+              })}
+
+              <svg className="absolute left-0 top-0 z-[1] h-px w-px overflow-visible">
+                <defs>
+                  <marker id="roadmap-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                    <path d="M 0 0 L 7 3.5 L 0 7 z" fill="#a1a1aa" />
+                  </marker>
+                  <marker id="roadmap-arrow-selected" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                    <path d="M 0 0 L 7 3.5 L 0 7 z" fill="#2563eb" />
+                  </marker>
+                </defs>
+                {connections.map((connection) => {
+                  const source = nodes.find((node) => node.id === connection.sourceId);
+                  const target = nodes.find((node) => node.id === connection.targetId);
+                  if (!source || !target) return null;
+                  const start = getHandlePoint(source, connection.sourceSide);
+                  const end = getHandlePoint(target, connection.targetSide);
+                  const path = getConnectionPath(
+                    start,
+                    connection.sourceSide,
+                    end,
+                    connection.targetSide
+                  );
+                  const selected = selectedConnectionId === connection.id;
+
+                  return (
+                    <g key={connection.id}>
+                      <path
+                        d={path}
+                        fill="none"
+                        markerEnd={`url(#${selected ? "roadmap-arrow-selected" : "roadmap-arrow"})`}
+                        pointerEvents="none"
+                        stroke={selected ? "#2563eb" : "#a1a1aa"}
+                        strokeLinecap="round"
+                        strokeWidth={selected ? 3 : 2.5}
+                      />
+                      <path
+                        d={path}
+                        fill="none"
+                        pointerEvents="stroke"
+                        stroke="transparent"
+                        strokeWidth="18"
+                        className="cursor-pointer"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedConnectionId(connection.id);
+                          setSelectedId("");
+                          setSelectedIds([]);
+                          setSelectedSectionFrameId("");
+                        }}
+                      />
+                    </g>
+                  );
                 })}
+                {connectionDraft && (() => {
+                  const source = nodes.find((node) => node.id === connectionDraft.sourceId);
+                  if (!source) return null;
+                  const start = getHandlePoint(source, connectionDraft.sourceSide);
+                  const end = { x: connectionDraft.currentX, y: connectionDraft.currentY };
+
+                  return (
+                    <path
+                      d={getConnectionPath(start, connectionDraft.sourceSide, end, connectionDraft.targetSide)}
+                      fill="none"
+                      markerEnd="url(#roadmap-arrow-selected)"
+                      pointerEvents="none"
+                      stroke="#2563eb"
+                      strokeDasharray="7 5"
+                      strokeLinecap="round"
+                      strokeWidth="3"
+                    />
+                  );
+                })()}
               </svg>
 
-              {categories.map((category, categoryIndex) => {
-                const categorySections = sections.filter((section) =>
-                  category.sectionIds.includes(section.id)
-                );
-                const firstSection = categorySections[0];
-                const firstNode = firstSection
-                  ? nodes.find((node) => node.sectionId === firstSection.id)
-                  : null;
-
+              {categoryLabelPositions.map(({ category, x, y }) => {
                 return (
                   <button
                     key={category.id}
                     type="button"
                     className={cn(
-                      "absolute rounded-full border bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800",
+                      "absolute z-[2] max-w-[320px] truncate rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800",
                       selectedCategoryId === category.id &&
                         !selectedLesson &&
                         !selectedSectionDetails &&
-                        "ring-4 ring-lime-100"
+                        "ring-4 ring-blue-100"
                     )}
-                    style={{
-                      left: firstNode?.x ?? 80,
-                      top:
-                        (firstNode?.y ??
-                          70 + categoryIndex * (SECTION_GAP + NODE_ROW_GAP)) -
-                        88,
-                    }}
+                    style={{ left: x, top: y }}
                     onPointerDown={(event) => event.stopPropagation()}
+                    onContextMenu={() => {
+                      setSelectedId("");
+                      setSelectedIds([]);
+                      setSelectedConnectionId("");
+                      setSelectedSectionId("");
+                      setSelectedSectionFrameId("");
+                      setSelectedCategoryId(category.id);
+                    }}
                     onClick={(event) => {
                       event.stopPropagation();
                       setSelectedId("");
                       setSelectedIds([]);
+                      setSelectedConnectionId("");
                       setSelectedSectionId("");
+                      setSelectedSectionFrameId("");
                       setSelectedCategoryId(category.id);
                     }}
                   >
                     {text(category.title, lessonLocale)}
-                  </button>
-                );
-              })}
-
-              {sections.map((section, sectionIndex) => {
-                const firstNode = nodes.find((node) => node.sectionId === section.id);
-
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    className={cn(
-                      "absolute rounded-full border bg-background/90 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition hover:border-zinc-400 hover:text-foreground",
-                      selectedSectionId === section.id &&
-                        !selectedLesson &&
-                        "border-lime-400 text-foreground ring-4 ring-lime-100"
-                    )}
-                    style={{
-                      left: firstNode?.x ?? 120,
-                      top: (firstNode?.y ?? 120 + sectionIndex * SECTION_GAP) - 48,
-                    }}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedId("");
-                      setSelectedIds([]);
-                      setSelectedSectionId(section.id);
-                      setSelectedCategoryId(
-                        categories.find((category) =>
-                          category.sectionIds.includes(section.id)
-                        )?.id ?? selectedCategoryId
-                      );
-                    }}
-                  >
-                    {text(section.title, lessonLocale)}
                   </button>
                 );
               })}
@@ -1842,20 +2760,31 @@ function LessonsAdminContent() {
                 );
 
                 return (
-                  <button
+                  <div
                     key={node.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className={cn(
-                      "absolute flex h-[94px] w-[210px] cursor-grab flex-col items-start justify-between rounded-[22px] border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
+                      "group absolute z-10 flex h-[94px] w-[210px] cursor-grab flex-col items-start justify-between rounded-lg border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
                       styles.node,
                       styles.border,
-                      isSelected && "ring-4 ring-lime-100",
+                      isSelected && "ring-4 ring-blue-100",
                       isSelected &&
                         selectedIds.length > 1 &&
-                        "outline outline-2 outline-lime-400"
+                        "outline outline-2 outline-blue-500"
                     )}
                     style={{ left: node.x, top: node.y }}
                     onPointerDown={(event) => beginNodeDrag(event, node)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedId(node.id);
+                        setSelectedIds([node.id]);
+                        setSelectedSectionId(node.sectionId);
+                        setSelectedConnectionId("");
+                        setSelectedSectionFrameId("");
+                      }
+                    }}
                   >
                     <span className="flex w-full items-center justify-between gap-2">
                       <span className="flex min-w-0 items-center gap-2">
@@ -1896,7 +2825,29 @@ function LessonsAdminContent() {
                         {nodeRuleKind}
                       </Badge>
                     </span>
-                  </button>
+                    {HANDLE_SIDES.map((side) => {
+                      const isSnapTarget =
+                        connectionDraft?.targetId === node.id &&
+                        connectionDraft.targetSide === side;
+
+                      return (
+                        <button
+                          key={side}
+                          type="button"
+                          aria-label={`${c.connectHint}: ${side}`}
+                          className={cn(
+                            "absolute z-20 h-3.5 w-3.5 rounded-full border-2 border-blue-500 bg-white shadow-sm transition-all hover:scale-125 hover:bg-blue-500",
+                            getHandleClass(side),
+                            isSelected || connectionDraft
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+                            isSnapTarget && "scale-150 bg-blue-500 ring-4 ring-blue-200"
+                          )}
+                          onPointerDown={(event) => beginConnection(event, node, side)}
+                        />
+                      );
+                    })}
+                  </div>
                 );
               })}
             </div>
@@ -1908,23 +2859,119 @@ function LessonsAdminContent() {
               />
             )}
 
-            <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
+            <div className="pointer-events-none absolute bottom-3 left-3 z-20 hidden items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur sm:flex">
               <MousePointer2 className="h-3.5 w-3.5" />
               {Math.round(scale * 100)}%
             </div>
 
-            <div className="pointer-events-none absolute bottom-3 left-32 z-20 flex items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur">
+            <div className="pointer-events-none absolute bottom-3 left-32 z-20 hidden items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur lg:flex">
               <Maximize2 className="h-3.5 w-3.5" />
               {c.keybinds}
             </div>
 
-        {!widgetsHidden && (
-        <aside data-canvas-widget className="absolute bottom-4 right-4 top-20 z-20 w-[min(460px,calc(100%-2rem))] overflow-y-auto rounded-xl border bg-background/95 p-4 shadow-sm backdrop-blur [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {!selectedLesson && !selectedSectionDetails && selectedCategoryDetails && (
+        {!widgetsHidden && hasConfigurableSelection && (
+        <div
+          data-canvas-widget
+          className="absolute bottom-2 left-2 right-2 z-20 max-h-[58dvh] w-auto sm:bottom-auto sm:left-auto sm:right-4 sm:top-20 sm:h-[var(--inspector-height)] sm:max-h-[calc(100%-6rem)] sm:w-[var(--inspector-width)]"
+          style={{
+            "--inspector-height": `${widgetSizes.inspector.height}px`,
+            "--inspector-width": `${widgetSizes.inspector.width}px`,
+          } as React.CSSProperties}
+        >
+        <aside className="h-full overflow-y-auto rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur sm:p-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {selectedConnection && (
+            <Card className="border-blue-200">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>{c.connection}</CardTitle>
+                    <CardDescription>{selectedConnection.id}</CardDescription>
+                  </div>
+                  <Button variant="outline" size="icon" onClick={deleteSelectedConnection} aria-label={c.delete}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="min-w-0 rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">{c.from}</p>
+                    <p className="mt-1 truncate text-sm font-medium">{selectedConnection.sourceId}</p>
+                  </div>
+                  <div className="min-w-0 rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">{c.to}</p>
+                    <p className="mt-1 truncate text-sm font-medium">{selectedConnection.targetId}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-2 text-xs font-medium text-muted-foreground">
+                    {c.startSide}
+                    <Select
+                      value={selectedConnection.sourceSide}
+                      onValueChange={(value) =>
+                        updateSelectedConnection({
+                          sourceSide: value as RoadmapConnectionSide,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-full text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {HANDLE_SIDES.map((side) => (
+                          <SelectItem key={side} value={side}>{side}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <label className="space-y-2 text-xs font-medium text-muted-foreground">
+                    {c.endSide}
+                    <Select
+                      value={selectedConnection.targetSide}
+                      onValueChange={(value) =>
+                        updateSelectedConnection({
+                          targetSide: value as RoadmapConnectionSide,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-full text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {HANDLE_SIDES.map((side) => (
+                          <SelectItem key={side} value={side}>{side}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                </div>
+                <Button variant="outline" className="w-full" onClick={reverseSelectedConnection}>
+                  <ArrowLeftRight className="h-4 w-4" />
+                  {c.reverseDirection}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          {!selectedConnection && !selectedLesson && !selectedSectionDetails && selectedCategoryDetails && (
             <Card className="border-zinc-200">
               <CardHeader>
-                <CardTitle>{c.categoryDetails}</CardTitle>
-                <CardDescription>{selectedCategoryDetails.id}</CardDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle>{c.categoryDetails}</CardTitle>
+                    <CardDescription className="truncate">
+                      {selectedCategoryDetails.id}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    disabled={categories.length <= 1}
+                    onClick={() => setDeleteDialogType("category")}
+                    aria-label={c.deleteCategory}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <label className="space-y-2 text-sm font-medium">
@@ -1973,11 +3020,26 @@ function LessonsAdminContent() {
               </CardContent>
             </Card>
           )}
-          {!selectedLesson && selectedSectionDetails && (
+          {!selectedConnection && !selectedLesson && selectedSectionDetails && (
             <Card className="border-zinc-200">
               <CardHeader>
-                <CardTitle>{c.sectionDetails}</CardTitle>
-                <CardDescription>{selectedSectionDetails.id}</CardDescription>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle>{c.sectionDetails}</CardTitle>
+                    <CardDescription className="truncate">
+                      {selectedSectionDetails.id}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    disabled={sections.length <= 1}
+                    onClick={() => setDeleteDialogType("section")}
+                    aria-label={c.deleteSection}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <label className="space-y-2 text-sm font-medium">
@@ -2063,7 +3125,7 @@ function LessonsAdminContent() {
               </CardContent>
             </Card>
           )}
-          {selectedLesson && selectedDraft && selectedRule && (
+          {!selectedConnection && selectedLesson && selectedDraft && selectedRule && (
             <div className="space-y-4">
               <Card className="border-zinc-200">
                 <CardHeader>
@@ -2492,6 +3554,15 @@ function LessonsAdminContent() {
             </div>
           )}
         </aside>
+        <button
+          type="button"
+          aria-label="Resize inspector"
+          className="absolute -bottom-1.5 -left-1.5 hidden h-5 w-5 cursor-nesw-resize items-center justify-center rounded-md border border-zinc-300 bg-background text-muted-foreground shadow-sm hover:border-blue-400 hover:text-blue-600 sm:flex"
+          onPointerDown={(event) => beginWidgetResize(event, "inspector", -1)}
+        >
+          <Scaling className="h-3 w-3" />
+        </button>
+        </div>
         )}
           </div>
         </ContextMenuTrigger>
@@ -2534,13 +3605,29 @@ function LessonsAdminContent() {
             <Copy className="h-4 w-4" />
             {c.duplicate}
           </ContextMenuItem>
+          {selectedConnectionId && (
+            <ContextMenuItem onSelect={reverseSelectedConnection}>
+              <ArrowLeftRight className="h-4 w-4" />
+              {c.reverseDirection}
+            </ContextMenuItem>
+          )}
           <ContextMenuItem
-            onSelect={deleteSelectedLesson}
-            disabled={!selectedLesson || nodes.length <= 1}
+            onSelect={deleteCurrentSelection}
+            disabled={
+              selectedSectionFrameId
+                ? sections.length <= 1
+                : categoryIsExplicitlySelected
+                  ? categories.length <= 1
+                  : !selectedConnectionId && (!selectedLesson || nodes.length <= 1)
+            }
             variant="destructive"
           >
             <Trash2 className="h-4 w-4" />
-            {c.delete}
+            {selectedSectionFrameId
+              ? c.deleteSection
+              : categoryIsExplicitlySelected
+                ? c.deleteCategory
+                : c.delete}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={resetLayout}>

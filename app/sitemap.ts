@@ -8,7 +8,6 @@ const publicRoutes = [
   "/problems",
   "/leaderboard",
   "/community",
-  "/learn",
   "/docs/basics",
   "/docs/variables",
   "/docs/loops",

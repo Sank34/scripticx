@@ -21,17 +21,17 @@ export default function RouteGuard({
     if (loading) return;
 
     if (isBanned) {
-      router.push("/banned");
+      router.replace("/banned");
       return;
     }
 
     if (requireAuth && !user) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
     if (requireAdmin && !isAdmin) {
-      router.push("/");
+      router.replace("/");
       return;
     }
   }, [user, loading, isAdmin, isBanned, requireAuth, requireAdmin, router]);
@@ -44,6 +44,14 @@ export default function RouteGuard({
         <Skeleton className="h-32 w-full" />
       </div>
     );
+  }
+
+  if (
+    isBanned ||
+    (requireAuth && !user) ||
+    (requireAdmin && !isAdmin)
+  ) {
+    return null;
   }
 
   return children;

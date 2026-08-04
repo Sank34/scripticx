@@ -13,6 +13,24 @@ export type RoadmapConfigNode = {
   y: number;
 };
 
+export type RoadmapConnectionSide = "top" | "right" | "bottom" | "left";
+
+export type RoadmapConfigConnection = {
+  id: string;
+  sourceId: string;
+  sourceSide: RoadmapConnectionSide;
+  targetId: string;
+  targetSide: RoadmapConnectionSide;
+};
+
+export type RoadmapSectionFrame = {
+  height: number;
+  sectionId: string;
+  width: number;
+  x: number;
+  y: number;
+};
+
 export type RoadmapCategory = {
   description: {
     en: string;
@@ -29,8 +47,10 @@ export type RoadmapCategory = {
 
 export type RoadmapConfig = {
   categories: RoadmapCategory[];
+  connections: RoadmapConfigConnection[];
   lessons: LearnLesson[];
   nodes: RoadmapConfigNode[];
+  sectionFrames: RoadmapSectionFrame[];
   sections: LearnSection[];
   updatedAt: string;
   version: 1;
@@ -86,16 +106,36 @@ function categoryIdForStaticSection(sectionId: string) {
     : defaultCategoryIds.miniscript;
 }
 
+type RemoteRoadmapLayout = {
+  connections?: RoadmapConfigConnection[];
+  deletedCategoryIds?: string[];
+  deletedSectionIds?: string[];
+  nodes?: RoadmapConfigNode[];
+  sectionFrames?: RoadmapSectionFrame[];
+};
+
+type RemotePathDescription = Partial<RoadmapCategory["description"]> & {
+  __roadmap?: RemoteRoadmapLayout;
+};
+
 type RemoteLearningPathRow = {
-  description_i18n: Partial<RoadmapCategory["description"]> | null;
+  description_i18n: RemotePathDescription | null;
   id: string;
   order_index: number | null;
   slug: string;
   title_i18n: Partial<RoadmapCategory["title"]> | null;
 };
 
+type RemoteUnitRoadmapMetadata = {
+  frame?: RoadmapSectionFrame;
+};
+
+type RemoteUnitDescription = Partial<LearnSection["description"]> & {
+  __roadmap?: RemoteUnitRoadmapMetadata;
+};
+
 type RemoteUnitRow = {
-  description_i18n: Partial<LearnSection["description"]> | null;
+  description_i18n: RemoteUnitDescription | null;
   id: string;
   order_index: number | null;
   path_id: string | null;
@@ -122,6 +162,7 @@ type RemoteLessonRow = {
 };
 
 type RemoteRoadmapMetadata = {
+  connections?: RoadmapConfigConnection[];
   kind?: LearnLesson["kind"];
   node?: RoadmapConfigNode;
   recommendedProblems?: LearnLesson["recommendedProblems"];
@@ -129,11 +170,61 @@ type RemoteRoadmapMetadata = {
   unlockRule?: LearnLesson["unlockRule"];
 };
 
-function mergeDefaultSections(remoteSections: LearnSection[], remoteLessons: LearnLesson[]) {
+function getConnectionSides(
+  source: RoadmapConfigNode,
+  target: RoadmapConfigNode
+): Pick<RoadmapConfigConnection, "sourceSide" | "targetSide"> {
+  const deltaX = target.x - source.x;
+  const deltaY = target.y - source.y;
+
+  if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+    return deltaX >= 0
+      ? { sourceSide: "right", targetSide: "left" }
+      : { sourceSide: "left", targetSide: "right" };
+  }
+
+  return deltaY >= 0
+    ? { sourceSide: "bottom", targetSide: "top" }
+    : { sourceSide: "top", targetSide: "bottom" };
+}
+
+export function buildDefaultRoadmapConnections(
+  nodes: RoadmapConfigNode[],
+  sections: LearnSection[]
+): RoadmapConfigConnection[] {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+  return sections.flatMap((section) =>
+    section.lessonIds.slice(0, -1).flatMap((sourceId, index) => {
+      const targetId = section.lessonIds[index + 1];
+      const source = nodeById.get(sourceId);
+      const target = nodeById.get(targetId);
+      if (!source || !target) return [];
+
+      return [
+        {
+          id: `${sourceId}--${targetId}`,
+          sourceId,
+          targetId,
+          ...getConnectionSides(source, target),
+        },
+      ];
+    })
+  );
+}
+
+function mergeDefaultSections(
+  remoteSections: LearnSection[],
+  remoteLessons: LearnLesson[],
+  deletedSectionIds: string[] = []
+) {
   const remoteSectionIds = new Set(remoteSections.map((section) => section.id));
   const remoteLessonIds = new Set(remoteLessons.map((lesson) => lesson.id));
+  const deletedSectionIdSet = new Set(deletedSectionIds);
   const missingSections = learnSections.map((section) => {
-    if (remoteSectionIds.has(section.id)) return null;
+    if (remoteSectionIds.has(section.id) || deletedSectionIdSet.has(section.id)) {
+      return null;
+    }
 
     return {
       ...section,
@@ -149,13 +240,16 @@ function mergeDefaultSections(remoteSections: LearnSection[], remoteLessons: Lea
 
 function mergeDefaultCategories(
   remoteCategories: RoadmapCategory[],
-  remoteSections: LearnSection[]
+  remoteSections: LearnSection[],
+  deletedCategoryIds: string[] = []
 ) {
   const remoteCategoryIds = new Set(remoteCategories.map((category) => category.id));
   const remoteSectionIds = new Set(remoteSections.map((section) => section.id));
+  const deletedCategoryIdSet = new Set(deletedCategoryIds);
   const merged = [...remoteCategories];
 
   for (const defaultCategory of defaultRoadmapCategories) {
+    if (deletedCategoryIdSet.has(defaultCategory.id)) continue;
     if (remoteCategoryIds.has(defaultCategory.id)) {
       const category = merged.find((item) => item.id === defaultCategory.id);
       if (category) {
@@ -181,9 +275,15 @@ export function readRoadmapConfig(): RoadmapConfig | null {
   try {
     const parsed = JSON.parse(
       localStorage.getItem(roadmapConfigKey) || "null"
-    ) as (RoadmapConfig & { categories?: RoadmapCategory[] }) | null;
+    ) as (RoadmapConfig & {
+      categories?: RoadmapCategory[];
+      sectionFrames?: RoadmapSectionFrame[];
+    }) | null;
 
     if (!parsed?.lessons?.length || !parsed.sections?.length) return null;
+
+    const connections =
+      parsed.connections ?? buildDefaultRoadmapConnections(parsed.nodes, parsed.sections);
 
     return {
       ...parsed,
@@ -199,6 +299,8 @@ export function readRoadmapConfig(): RoadmapConfig | null {
                 )
                 .map((section) => section.id),
             })),
+      connections,
+      sectionFrames: parsed.sectionFrames ?? [],
     };
   } catch {
     return null;
@@ -257,6 +359,17 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
   const categoryByPathId = new Map(
     pathRows.map((path, index) => [path.id, categories[index]])
   );
+  const savedLayout = pathRows
+    .map((path) => path.description_i18n?.[roadmapMetadataKey])
+    .find(
+      (layout): layout is RemoteRoadmapLayout =>
+        Boolean(
+          layout &&
+            (Array.isArray(layout.nodes) ||
+              Array.isArray(layout.sectionFrames) ||
+              Array.isArray(layout.connections))
+        )
+    );
 
   const units: LearnSection[] = (unitRows ?? []).map((unit, index) => {
     const category = unit.path_id ? categoryByPathId.get(unit.path_id) : undefined;
@@ -283,6 +396,25 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
   const sectionByUnitId = new Map(
     (unitRows ?? []).map((unit, index) => [unit.id, units[index]])
   );
+  const unitSectionFrames = (unitRows ?? []).flatMap((unit) => {
+    const frame = unit.description_i18n?.[roadmapMetadataKey]?.frame;
+    return frame ? [{ ...frame, sectionId: unit.slug }] : [];
+  });
+  const sectionFrames = savedLayout?.sectionFrames ?? unitSectionFrames;
+
+  const hasLessonConnections = (lessonRows ?? []).some((row) => {
+    const metadata = (row.content_i18n?.[roadmapMetadataKey] ??
+      {}) as RemoteRoadmapMetadata;
+    return Array.isArray(metadata.connections);
+  });
+  const lessonConnections = (lessonRows ?? []).flatMap((row) => {
+    const metadata = (row.content_i18n?.[roadmapMetadataKey] ??
+      {}) as RemoteRoadmapMetadata;
+    return metadata.connections ?? [];
+  });
+  const hasExplicitConnections =
+    Array.isArray(savedLayout?.connections) || hasLessonConnections;
+  const remoteConnections = savedLayout?.connections ?? lessonConnections;
 
   const lessons = (lessonRows ?? []).map((row, index) => {
     const metadata = (row.content_i18n?.[roadmapMetadataKey] ??
@@ -321,6 +453,9 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     } satisfies LearnLesson;
   });
 
+  const savedNodeById = new Map(
+    (savedLayout?.nodes ?? []).map((node) => [node.id, node])
+  );
   const remoteNodes = lessons.map((lesson, index) => {
     const row = (lessonRows ?? [])[index];
     const metadata = (row.content_i18n?.[roadmapMetadataKey] ??
@@ -328,7 +463,7 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     const section = row.unit_id ? sectionByUnitId.get(row.unit_id) : undefined;
 
     return (
-      metadata.node ?? {
+      savedNodeById.get(lesson.id) ?? metadata.node ?? {
         id: lesson.id,
         sectionId: section?.id ?? units[0]?.id ?? "roadmap",
         x: 120 + (index % 4) * 340,
@@ -337,7 +472,11 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     );
   });
 
-  const mergedSections = mergeDefaultSections(units, lessons);
+  const mergedSections = mergeDefaultSections(
+    units,
+    lessons,
+    savedLayout?.deletedSectionIds
+  );
   const remoteLessonIds = new Set(lessons.map((lesson) => lesson.id));
   const mergedLessons = [
     ...lessons,
@@ -363,10 +502,24 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
       }
   );
 
+  const connections = hasExplicitConnections
+    ? remoteConnections.filter(
+        (connection) =>
+          nodes.some((node) => node.id === connection.sourceId) &&
+          nodes.some((node) => node.id === connection.targetId)
+      )
+    : buildDefaultRoadmapConnections(nodes, mergedSections);
+
   return {
-    categories: mergeDefaultCategories(categories, units),
+    categories: mergeDefaultCategories(
+      categories,
+      units,
+      savedLayout?.deletedCategoryIds
+    ),
+    connections,
     lessons: mergedLessons,
     nodes,
+    sectionFrames,
     sections: mergedSections,
     updatedAt: new Date().toISOString(),
     version: 1,
@@ -376,8 +529,14 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
 export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
   const { data: existingPaths, error: pathsReadError } = await supabase
     .from("learning_paths")
-    .select("id, slug")
-    .returns<Array<{ id: string; slug: string }>>();
+    .select("id, slug, description_i18n")
+    .returns<
+      Array<{
+        description_i18n: RemotePathDescription | null;
+        id: string;
+        slug: string;
+      }>
+    >();
 
   if (pathsReadError) throw pathsReadError;
 
@@ -387,15 +546,47 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
       path.id,
     ])
   );
+  const existingPathByCategoryId = new Map(
+    (existingPaths ?? []).map((path) => [categoryIdFromPathSlug(path.slug), path])
+  );
   const pathRows = config.categories.map((category, index) => {
-    const id = pathIdByCategoryId.get(category.id) ?? crypto.randomUUID();
+    const existing = existingPathByCategoryId.get(category.id);
+    const id = existing?.id ?? crypto.randomUUID();
     pathIdByCategoryId.set(category.id, id);
 
     return {
       id,
       slug: pathSlugFromCategoryId(category.id),
       title_i18n: category.title,
-      description_i18n: category.description,
+      description_i18n: {
+        ...(existing?.description_i18n ?? {}),
+        ...category.description,
+        ...(index === 0
+          ? {
+              [roadmapMetadataKey]: {
+                connections: config.connections,
+                deletedCategoryIds: defaultRoadmapCategories
+                  .filter(
+                    (defaultCategory) =>
+                      !config.categories.some(
+                        (category) => category.id === defaultCategory.id
+                      )
+                  )
+                  .map((category) => category.id),
+                deletedSectionIds: learnSections
+                  .filter(
+                    (defaultSection) =>
+                      !config.sections.some(
+                        (section) => section.id === defaultSection.id
+                      )
+                  )
+                  .map((section) => section.id),
+                nodes: config.nodes,
+                sectionFrames: config.sectionFrames,
+              },
+            }
+          : {}),
+      },
       language: "msp",
       order_index: category.order ?? index + 1,
       is_published: true,
@@ -410,13 +601,19 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
 
   const { data: existingUnits, error: unitsReadError } = await supabase
     .from("learning_units")
-    .select("id, slug")
-    .returns<Array<{ id: string; slug: string }>>();
+    .select("id, slug, description_i18n")
+    .returns<Array<{ description_i18n: RemoteUnitDescription | null; id: string; slug: string }>>();
 
   if (unitsReadError) throw unitsReadError;
 
+  const existingUnitBySectionId = new Map(
+    (existingUnits ?? []).map((unit) => [unit.slug, unit])
+  );
   const unitIdBySectionId = new Map(
     (existingUnits ?? []).map((unit) => [unit.slug, unit.id])
+  );
+  const frameBySectionId = new Map(
+    config.sectionFrames.map((frame) => [frame.sectionId, frame])
   );
   const categoryBySectionId = new Map<string, RoadmapCategory>();
   config.categories.forEach((category) => {
@@ -425,7 +622,8 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
     );
   });
   const unitRows = config.sections.map((section, index) => {
-    const id = unitIdBySectionId.get(section.id) ?? crypto.randomUUID();
+    const existing = existingUnitBySectionId.get(section.id);
+    const id = existing?.id ?? crypto.randomUUID();
     unitIdBySectionId.set(section.id, id);
     const category =
       categoryBySectionId.get(section.id) ?? config.categories[0];
@@ -435,7 +633,14 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
       path_id: pathIdByCategoryId.get(category.id),
       slug: section.id,
       title_i18n: section.title,
-      description_i18n: section.description,
+      description_i18n: {
+        ...(existing?.description_i18n ?? {}),
+        ...section.description,
+        [roadmapMetadataKey]: {
+          ...(existing?.description_i18n?.[roadmapMetadataKey] ?? {}),
+          frame: frameBySectionId.get(section.id),
+        },
+      },
       order_index: section.order ?? index + 1,
       is_published: true,
     };
@@ -478,6 +683,9 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
       content_i18n: {
         ...existingContent,
         [roadmapMetadataKey]: {
+          connections: config.connections.filter(
+            (connection) => connection.sourceId === lesson.id
+          ),
           kind: lesson.kind,
           node: nodeByLessonId.get(lesson.id),
           recommendedProblems: lesson.recommendedProblems,
@@ -498,11 +706,13 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
     };
   });
 
-  const { error: lessonsError } = await supabase
-    .from("lessons")
-    .upsert(lessonRows, { onConflict: "id" });
+  if (lessonRows.length > 0) {
+    const { error: lessonsError } = await supabase
+      .from("lessons")
+      .upsert(lessonRows, { onConflict: "id" });
 
-  if (lessonsError) throw lessonsError;
+    if (lessonsError) throw lessonsError;
+  }
 
   const savedSlugs = new Set(config.lessons.map((lesson) => lesson.id));
   const localConfig = readRoadmapConfig();
@@ -517,6 +727,53 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
       .from("lessons")
       .delete()
       .in("slug", deletedSlugs);
+
+    if (deleteError) throw deleteError;
+  }
+
+  const savedSectionIds = new Set(config.sections.map((section) => section.id));
+  const removableSectionIds = new Set([
+    ...learnSections.map((section) => section.id),
+    ...(localConfig?.sections ?? []).map((section) => section.id),
+  ]);
+  const deletedUnitIds = (existingUnits ?? [])
+    .filter(
+      (unit) =>
+        removableSectionIds.has(unit.slug) && !savedSectionIds.has(unit.slug)
+    )
+    .map((unit) => unit.id);
+
+  if (deletedUnitIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("learning_units")
+      .delete()
+      .in("id", deletedUnitIds);
+
+    if (deleteError) throw deleteError;
+  }
+
+  const savedCategoryIds = new Set(
+    config.categories.map((category) => category.id)
+  );
+  const removableCategoryIds = new Set([
+    ...defaultRoadmapCategories.map((category) => category.id),
+    ...(localConfig?.categories ?? []).map((category) => category.id),
+  ]);
+  const deletedPathIds = (existingPaths ?? [])
+    .filter((path) => {
+      const categoryId = categoryIdFromPathSlug(path.slug);
+      return (
+        removableCategoryIds.has(categoryId) &&
+        !savedCategoryIds.has(categoryId)
+      );
+    })
+    .map((path) => path.id);
+
+  if (deletedPathIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("learning_paths")
+      .delete()
+      .in("id", deletedPathIds);
 
     if (deleteError) throw deleteError;
   }
@@ -535,6 +792,10 @@ export function getRoadmapConfigData(config?: RoadmapConfig | null) {
       ? config.categories
       : defaultRoadmapCategories,
     lessons: config?.lessons?.length ? config.lessons : learnLessons,
+    connections:
+      config?.connections ??
+      buildDefaultRoadmapConnections(config?.nodes ?? [], config?.sections ?? learnSections),
+    sectionFrames: config?.sectionFrames ?? [],
     sections: config?.sections?.length ? config.sections : learnSections,
   };
 }

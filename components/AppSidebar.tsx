@@ -351,12 +351,16 @@ export function AppSidebar() {
           {!collapsed && <SidebarGroupLabel>{t("sidebar.learn")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
-            <NavItem
+            
+            {user && (
+              <NavItem
               href="/learn"
               icon={Route}
               label={t("nav.learn")}
               active={roadmapActive}
             />
+            )}
+            
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">

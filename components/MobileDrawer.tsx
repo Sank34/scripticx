@@ -96,13 +96,18 @@ export function MobileDrawer() {
     {
       label: t("sidebar.learn"),
       items: [
-        {
-          href: "/learn",
-          icon: Route,
-          label: t("nav.learn"),
-          active: (currentPath: string) =>
-            currentPath === "/learn" || currentPath.startsWith("/learn/lesson"),
-        },
+        ...(isLoggedIn
+          ? [
+              {
+                href: "/learn",
+                icon: Route,
+                label: t("nav.learn"),
+                active: (currentPath: string) =>
+                  currentPath === "/learn" ||
+                  currentPath.startsWith("/learn/lesson"),
+              },
+            ]
+          : []),
         {
           href: "/docs/basics",
           icon: BookOpen,
