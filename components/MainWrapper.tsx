@@ -10,6 +10,7 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
   const isFullWidth =
     pathname === "/editor" ||
     pathname === "/admin/lessons" ||
+    /^\/competitions\/[^/]+$/.test(pathname || "") ||
     (pathname?.startsWith("/problems/") && pathname !== "/problems") ||
     (pathname?.startsWith("/groups/") && pathname !== "/groups") ||
     pathname?.startsWith("/invite/") ||

@@ -8,6 +8,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
+  SidebarResizeHandle,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -183,7 +184,8 @@ export function AppSidebar() {
   const openExamples = examplesOpenOverride ?? pathname.startsWith("/examples");
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [isScrollable, setIsScrollable] = useState(false);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -235,19 +237,52 @@ export function AppSidebar() {
   }, []);
 
   useEffect(() => {
-    function checkScrollable() {
-      if (!scrollRef.current) return;
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) return;
 
-      const { scrollHeight, clientHeight } = scrollRef.current;
-      setIsScrollable(scrollHeight > clientHeight + 4);
+    let frame = 0;
+
+    function updateScrollShadows() {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const element = scrollRef.current;
+        if (!element) return;
+        const { scrollHeight, clientHeight, scrollTop } = element;
+        setCanScrollUp(scrollTop > 2);
+        setCanScrollDown(scrollTop + clientHeight < scrollHeight - 2);
+      });
     }
 
-    checkScrollable();
+    updateScrollShadows();
 
-    window.addEventListener("resize", checkScrollable);
+    const resizeObserver = new ResizeObserver(updateScrollShadows);
+    resizeObserver.observe(scrollElement);
+    Array.from(scrollElement.children).forEach((child) =>
+      resizeObserver.observe(child)
+    );
+
+    const mutationObserver = new MutationObserver(() => {
+      Array.from(scrollElement.children).forEach((child) =>
+        resizeObserver.observe(child)
+      );
+      updateScrollShadows();
+    });
+    mutationObserver.observe(scrollElement, {
+      childList: true,
+      subtree: true,
+    });
+
+    scrollElement.addEventListener("scroll", updateScrollShadows, {
+      passive: true,
+    });
+    window.addEventListener("resize", updateScrollShadows);
 
     return () => {
-      window.removeEventListener("resize", checkScrollable);
+      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      scrollElement.removeEventListener("scroll", updateScrollShadows);
+      window.removeEventListener("resize", updateScrollShadows);
     };
   }, [collapsed, openDocs, openExamples, pathname]);
 
@@ -260,8 +295,8 @@ export function AppSidebar() {
 
         <div
           className={`sticky top-0 z-20 flex items-center justify-between bg-[var(--sidebar)] px-3 py-4 transition-all duration-200 ${
-            isScrollable
-              ? "border-b border-zinc-100/80"
+            canScrollUp
+              ? "border-b border-zinc-200/80 shadow-[0_5px_14px_rgba(0,0,0,0.06)]"
               : "border-transparent"
           }`}
         >
@@ -270,7 +305,11 @@ export function AppSidebar() {
               collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
             }`}
           >
-            <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard"
+              aria-label="ScripticX Dashboard"
+              className="-ml-1 flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-zinc-100"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logoSCX.svg"
@@ -284,10 +323,10 @@ export function AppSidebar() {
                 </span>
 
                 <span className="text-xs text-muted-foreground">
-                  Platform
+                  {t("sidebar.platform")}
                 </span>
               </div>
-            </div>
+            </Link>
           </div>
 
           <Button
@@ -319,10 +358,13 @@ export function AppSidebar() {
             }
           `}</style>
 
-        <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel>{t("sidebar.platform")}</SidebarGroupLabel>}
+        <SidebarGroup className="py-1.5">
+          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">{t("sidebar.platform")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
+            {user && (
+              <NavItem href="/dashboard" icon={LayoutDashboard} label={t("nav.dashboard")} active={pathname.startsWith("/dashboard")} />
+            )}
             { user && (
               <NavItem href="/editor" icon={Code} label={t("nav.editor")} active={pathname.startsWith("/editor")} />
             )}
@@ -330,6 +372,22 @@ export function AppSidebar() {
               <NavItem href="/livecode" icon={SquareTerminal} label={t("nav.livecode")} active={pathname.startsWith("/livecode") || pathname.startsWith("/live") } />
             )}
             <NavItem href="/problems" icon={List} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
+            {user && (
+              <NavItem href="/classes" icon={School} label={t("nav.classes")} active={pathname.startsWith("/classes")} />
+            )}
+            {user && (
+              <NavItem href="/search" icon={Search} label={t("nav.search")} active={pathname.startsWith("/search")} />
+            )}
+            {role === "admin" && (
+              <NavItem href="/admin" icon={Shield} label={t("nav.admin")} active={pathname.startsWith("/admin")} />
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="py-1.5">
+          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">{t("sidebar.community")}</SidebarGroupLabel>}
+
+          <SidebarGroupContent className="space-y-1">
             {user && (
               <NavItem href="/competitions" icon={Medal} label={t("nav.competitions")} active={pathname.startsWith("/competitions")} />
             )}
@@ -350,24 +408,11 @@ export function AppSidebar() {
                 hasActivity={groupActivity.hasActivity}
               />
             )}
-            {user && (
-              <NavItem href="/dashboard" icon={LayoutDashboard} label={t("nav.dashboard")} active={pathname.startsWith("/dashboard")} />
-            )}
-            {user && (
-              <NavItem href="/search" icon={Search} label={t("nav.search")} active={pathname.startsWith("/search")} />
-            )}
-            {role === "admin" && (
-              <NavItem href="/admin" icon={Shield} label={t("nav.admin")} active={pathname.startsWith("/admin")} />
-            )}
-            {user && (
-              <NavItem href="/classes" icon={School} label={t("nav.classes")} active={pathname.startsWith("/classes")} />
-            )}
-
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel>{t("sidebar.learn")}</SidebarGroupLabel>}
+        <SidebarGroup className="py-1.5">
+          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">{t("sidebar.learn")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             
@@ -474,8 +519,8 @@ export function AppSidebar() {
       </SidebarContent>
       <div
         className={`sticky bottom-0 z-20 mt-auto bg-[var(--sidebar)] px-2 py-3 transition-all duration-200 ${
-          isScrollable
-            ? "border-t border-zinc-100/80 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]"
+          canScrollDown
+            ? "border-t border-zinc-200/80 shadow-[0_-6px_16px_rgba(0,0,0,0.07)]"
             : "border-transparent shadow-none"
         }`}
       >
@@ -532,6 +577,10 @@ export function AppSidebar() {
           </Button>
         </div>
       </div>
+      <SidebarResizeHandle
+        aria-label={t("sidebar.resize")}
+        title={`${t("sidebar.resize")}. ${t("sidebar.resetWidth")}`}
+      />
     </Sidebar>
   );
 }

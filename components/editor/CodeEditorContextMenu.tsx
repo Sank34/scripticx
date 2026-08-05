@@ -9,6 +9,7 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
+  ContextMenuShortcut,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -24,6 +25,8 @@ type CodeEditorContextMenuProps = {
   onRun?: () => void;
   onSubmit?: () => void;
   readOnly?: boolean;
+  submitDisabled?: boolean;
+  submitShortcut?: string;
 };
 
 export function CodeEditorContextMenu({
@@ -35,6 +38,8 @@ export function CodeEditorContextMenu({
   onRun,
   onSubmit,
   readOnly = false,
+  submitDisabled = false,
+  submitShortcut,
 }: CodeEditorContextMenuProps) {
   async function copyCode() {
     await navigator.clipboard.writeText(code);
@@ -109,9 +114,12 @@ export function CodeEditorContextMenu({
         )}
 
         {onSubmit && (
-          <ContextMenuItem onSelect={onSubmit}>
+          <ContextMenuItem disabled={submitDisabled} onSelect={onSubmit}>
             <Send size={14} />
             Submit
+            {submitShortcut && (
+              <ContextMenuShortcut>{submitShortcut}</ContextMenuShortcut>
+            )}
           </ContextMenuItem>
         )}
 

@@ -68,6 +68,7 @@ export function MobileDrawer() {
       items: [
         ...(isLoggedIn
           ? [
+              { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
               { href: "/editor", icon: Code, label: t("nav.editor") },
               {
                 href: "/livecode",
@@ -81,6 +82,20 @@ export function MobileDrawer() {
           : []),
         { href: "/problems", icon: List, label: t("nav.problems") },
         ...(isLoggedIn
+          ? [
+              { href: "/classes", icon: School, label: t("nav.classes") },
+              { href: "/search", icon: Search, label: t("nav.search") },
+              ...(isAdmin
+                ? [{ href: "/admin", icon: Shield, label: t("nav.admin") }]
+                : []),
+            ]
+          : []),
+      ],
+    },
+    {
+      label: t("sidebar.community"),
+      items: [
+        ...(isLoggedIn
           ? [{ href: "/competitions", icon: Medal, label: t("nav.competitions") }]
           : []),
         { href: "/leaderboard", icon: Trophy, label: t("nav.leaderboard") },
@@ -89,12 +104,6 @@ export function MobileDrawer() {
               { href: "/shop", icon: ShoppingBag, label: t("nav.shop") },
               { href: "/feed", icon: MessageSquare, label: t("nav.feed") },
               { href: "/groups", icon: UsersRound, label: t("nav.groups") },
-              { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
-              { href: "/search", icon: Search, label: t("nav.search") },
-              ...(isAdmin
-                ? [{ href: "/admin", icon: Shield, label: t("nav.admin") }]
-                : []),
-              { href: "/classes", icon: School, label: t("nav.classes") },
             ]
           : []),
       ],
@@ -170,24 +179,31 @@ export function MobileDrawer() {
             {t("mobileDrawer.title")}
           </DrawerTitle>
 
-          <div className="flex h-full flex-col overflow-hidden px-8 pb-10 pt-8">
-            <div className="mb-10 flex flex-col items-center justify-center text-center">
-              <Image
-                src="/logoSCX.svg"
-                alt="ScripticX"
-                width={56}
-                height={56}
-                className="mb-3 h-14 w-14 object-contain"
-              />
+          <div className="flex h-full flex-col overflow-hidden px-5 pb-6 pt-5">
+            <DrawerClose asChild>
+              <Link
+                href="/dashboard"
+                aria-label="ScripticX Dashboard"
+                className="mb-5 flex items-center gap-3 rounded-2xl p-2 transition-colors active:bg-zinc-100"
+              >
+                <Image
+                  src="/logoSCX.svg"
+                  alt="ScripticX"
+                  width={44}
+                  height={44}
+                  className="h-11 w-11 object-contain"
+                />
 
-              <h2 className="text-3xl font-semibold tracking-tight text-black">
-                ScripticX
-              </h2>
-
-              <p className="mt-1 text-sm text-zinc-500">
-                {t("mobileDrawer.subtitle")}
-              </p>
-            </div>
+                <div className="min-w-0 text-left">
+                  <h2 className="text-xl font-semibold tracking-tight text-black">
+                    ScripticX
+                  </h2>
+                  <p className="text-xs text-zinc-500">
+                    {t("mobileDrawer.subtitle")}
+                  </p>
+                </div>
+              </Link>
+            </DrawerClose>
 
             <div
               className="flex-1 overflow-y-auto"
@@ -202,17 +218,17 @@ export function MobileDrawer() {
                 }
               `}</style>
 
-              <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-10 pb-12">
+              <div className="mx-auto flex w-full max-w-sm flex-col gap-6 pb-8">
                 {navItems.map((section) => (
                   <div
                     key={section.label}
-                    className="flex w-full flex-col items-center"
+                    className="flex w-full flex-col"
                   >
-                    <h3 className="mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-zinc-400">
+                    <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
                       {section.label}
                     </h3>
 
-                    <div className="flex w-full flex-col items-center gap-2">
+                    <div className="flex w-full flex-col gap-1">
                       {section.items.map((item) => {
                         const active = item.active
                           ? item.active(pathname)
@@ -224,7 +240,7 @@ export function MobileDrawer() {
                             <DrawerClose asChild>
                               <Link
                                 href={item.href}
-                                className={`flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-medium transition-all duration-200 active:scale-[0.98] ${
+                                className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all duration-200 active:scale-[0.98] ${
                                   active
                                     ? "bg-zinc-100 text-black shadow-sm"
                                     : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
@@ -236,7 +252,7 @@ export function MobileDrawer() {
                             </DrawerClose>
 
                             {item.children && active && (
-                              <div className="mt-2 flex flex-col items-center gap-1">
+                              <div className="mt-1 flex flex-col gap-1 pl-11">
                                 {item.children.map((child) => {
                                   const childActive = pathname === child.href;
 
@@ -244,7 +260,7 @@ export function MobileDrawer() {
                                     <DrawerClose asChild key={child.href}>
                                       <Link
                                         href={child.href}
-                                        className={`w-full rounded-xl px-4 py-2 text-center text-sm font-medium transition ${
+                                        className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                                           childActive
                                             ? "bg-zinc-100 text-black"
                                             : "text-zinc-500 hover:bg-zinc-50 hover:text-black"
@@ -264,9 +280,9 @@ export function MobileDrawer() {
                   </div>
                 ))}
 
-                <div className="h-px w-24 bg-zinc-200" />
+                <div className="h-px w-full bg-zinc-100" />
 
-                <div className="flex w-full flex-col items-center gap-2">
+                <div className="flex w-full flex-col gap-1">
                   {footerItems.map((item) => {
                     const active = pathname.startsWith(item.href);
                     const Icon = item.icon;
@@ -275,7 +291,7 @@ export function MobileDrawer() {
                       <DrawerClose asChild key={item.href}>
                         <Link
                           href={item.href}
-                          className={`flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-medium transition-all duration-200 active:scale-[0.98] ${
+                          className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all duration-200 active:scale-[0.98] ${
                             active
                               ? "bg-zinc-100 text-black shadow-sm"
                               : "text-zinc-600 hover:bg-zinc-50 hover:text-black"

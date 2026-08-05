@@ -2,7 +2,10 @@ export const translations = {
   en: {
     sidebar: {
       platform: "Platform",
+      community: "Community",
       learn: "Learn",
+      resize: "Resize sidebar",
+      resetWidth: "Double-click to reset",
     },
 
     nav: {
@@ -1739,7 +1742,10 @@ export const translations = {
   ro: {
     sidebar: {
       platform: "Platformă",
+      community: "Comunitate",
       learn: "Învățare",
+      resize: "Redimensionează bara laterală",
+      resetWidth: "Dublu-click pentru resetare",
     },
 
     nav: {

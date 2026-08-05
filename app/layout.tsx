@@ -11,6 +11,7 @@ import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
 import { NetworkStatus } from "@/components/NetworkStatus";
 import { OnboardingManager } from "@/components/onboarding/OnboardingManager";
+import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
@@ -136,26 +137,27 @@ export default function RootLayout({
         />
         <Providers>
           <LanguageProvider>
-            <SidebarProvider>
-              <div className="h-screen w-full overflow-hidden p-2">
-                <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-zinc-100">
+            <GlobalContextMenu>
+              <SidebarProvider>
+                <div className="h-screen w-full overflow-hidden p-2">
+                  <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-zinc-100">
 
-                  <AppSidebar />
+                    <AppSidebar />
 
-                  <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-zinc-200/70 bg-white shadow-sm">
+                    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-zinc-200/70 bg-white shadow-sm">
 
-                    <Topbar />
+                      <Topbar />
 
-                    <MainWrapper>{children}</MainWrapper>
+                      <MainWrapper>{children}</MainWrapper>
 
+                    </div>
                   </div>
-
                 </div>
-              </div>
-            </SidebarProvider>
-            <MobileDrawer />
-            <NetworkStatus />
-            <OnboardingManager />
+              </SidebarProvider>
+              <MobileDrawer />
+              <NetworkStatus />
+              <OnboardingManager />
+            </GlobalContextMenu>
           </LanguageProvider>
         </Providers>
 
