@@ -8,12 +8,15 @@ import { useParams } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
 import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
+import { SubmissionHistory } from "@/components/problems/SubmissionHistory";
 import {
   TestResultCard,
   type ProblemTestResult,
 } from "@/components/problems/TestResultCard";
 import { useAuth } from "@/hooks/useAuth";
 import { api, type DailyChallenge } from "@/lib/api";
+import { competitionApiFetch } from "@/lib/competitionClient";
+import type { StandardSubmission } from "@/lib/competitionTypes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -69,7 +72,9 @@ function ProblemContent() {
   const [evaluationStatuses, setEvaluationStatuses] = useState<EvaluationStatus[]>([]);
   const [editorLine, setEditorLine] = useState(1);
   const [tabSize, setTabSize] = useState(2);
-  const [activeTab, setActiveTab] = useState<"description" | "solution">("description");
+  const [activeTab, setActiveTab] = useState<
+    "description" | "solution" | "submissions"
+  >("description");
   const problemQueryKey = ["problems", "detail", id, user?.id] as const;
   const { data: problemPage, isPending: loading } = useQuery({
     queryKey: problemQueryKey,
@@ -102,6 +107,14 @@ function ProblemContent() {
   const problem = problemPage?.problem || null;
   const dailyChallenge = problemPage?.dailyChallenge || null;
   const dailyCompleted = problemPage?.dailyCompleted || false;
+  const submissionsQueryKey = ["problems", "submissions", id, user?.id] as const;
+  const submissionsQuery = useQuery<{ submissions: StandardSubmission[] }>({
+    queryKey: submissionsQueryKey,
+    queryFn: () =>
+      competitionApiFetch(`/api/submissions?problemId=${encodeURIComponent(id)}`),
+    enabled: Boolean(id && user?.id),
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     if (!problem || hydratedProblemId.current === id) return;
@@ -172,6 +185,7 @@ function ProblemContent() {
       void queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
       void queryClient.invalidateQueries({ queryKey: ["profile"] });
       void queryClient.invalidateQueries({ queryKey: ["rewards-shop"] });
+      void queryClient.invalidateQueries({ queryKey: submissionsQueryKey });
       window.dispatchEvent(new Event("profile-updated"));
       window.dispatchEvent(new Event("rewards-updated"));
 
@@ -358,10 +372,12 @@ function ProblemContent() {
         <aside className="min-h-0 overflow-hidden border-t border-zinc-200 bg-white md:border-t-0">
           <Tabs
             value={activeTab}
-            onValueChange={(v) => setActiveTab(v as "description" | "solution")}
+            onValueChange={(v) =>
+              setActiveTab(v as "description" | "solution" | "submissions")
+            }
             className="flex h-full min-h-0 flex-col gap-0"
           >
-            <TabsList className="grid h-11 w-full grid-cols-2 rounded-none border-b bg-zinc-50 px-3">
+            <TabsList className="grid h-11 w-full grid-cols-3 rounded-none border-b bg-zinc-50 px-3">
               <TabsTrigger value="description" className="text-sm">
                 {t("problemPage.tabs.description") || "Cerință"}
               </TabsTrigger>
@@ -370,6 +386,14 @@ function ProblemContent() {
                 {testResults.length > 0 && (
                   <span className={`ml-2 text-xs font-semibold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
                     {score}%
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="submissions" className="text-sm">
+                {locale === "ro" ? "Submisii" : "Submissions"}
+                {(submissionsQuery.data?.submissions.length || 0) > 0 && (
+                  <span className="ml-2 text-xs text-zinc-500">
+                    {submissionsQuery.data?.submissions.length}
                   </span>
                 )}
               </TabsTrigger>
@@ -497,6 +521,43 @@ function ProblemContent() {
                       ))}
                     </div>
                   </>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="submissions" className="mt-0 min-h-0 flex-1 overflow-y-auto">
+              <div className="space-y-4 px-5 py-5">
+                <div>
+                  <h2 className="text-lg font-semibold text-zinc-950">
+                    {locale === "ro" ? "Istoricul submisiilor" : "Submission history"}
+                  </h2>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    {locale === "ro"
+                      ? "Poți deschide orice încercare pentru a vedea și copia codul trimis."
+                      : "Open any attempt to inspect and copy the submitted code."}
+                  </p>
+                </div>
+                {submissionsQuery.isPending ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : submissionsQuery.isError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {locale === "ro"
+                      ? "Nu am putut încărca submisiile."
+                      : "Could not load submissions."}
+                  </div>
+                ) : (
+                  <SubmissionHistory
+                    locale={locale}
+                    items={(submissionsQuery.data?.submissions || []).map((submission) => ({
+                      code: submission.code,
+                      id: submission.id,
+                      score: submission.score,
+                      submittedAt: submission.created_at,
+                    }))}
+                  />
                 )}
               </div>
             </TabsContent>

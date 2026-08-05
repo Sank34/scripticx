@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, UserCheck, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -38,6 +38,7 @@ export function BadgeRecipientsDialog({
 }) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [pendingUsers, setPendingUsers] = useState<Set<string>>(new Set());
 
   const copy = locale === "ro"
@@ -73,13 +74,13 @@ export function BadgeRecipientsDialog({
   });
 
   const visibleRecipients = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase(locale);
+    const normalized = deferredQuery.trim().toLocaleLowerCase(locale);
     const recipients = recipientsQuery.data || [];
     if (!normalized) return recipients;
     return recipients.filter((recipient) =>
       recipient.username.toLocaleLowerCase(locale).includes(normalized)
     );
-  }, [locale, query, recipientsQuery.data]);
+  }, [deferredQuery, locale, recipientsQuery.data]);
 
   async function toggle(recipient: BadgeRecipient) {
     if (!badge || pendingUsers.has(recipient.id)) return;
@@ -115,7 +116,7 @@ export function BadgeRecipientsDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="max-h-[88vh] overflow-hidden sm:max-w-xl">
+      <DialogContent className="grid h-[min(560px,calc(100dvh-3rem))] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden sm:max-w-xl">
         <DialogHeader>
           <div className="flex items-center gap-3 pr-8">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
@@ -152,7 +153,7 @@ export function BadgeRecipientsDialog({
           </span>
         </div>
 
-        <div className="min-h-52 flex-1 space-y-1 overflow-y-auto pr-1">
+        <div className="min-h-0 space-y-1 overflow-y-auto pr-1">
           {recipientsQuery.isPending ? (
             Array.from({ length: 5 }).map((_, index) => (
               <Skeleton key={index} className="h-14 w-full" />

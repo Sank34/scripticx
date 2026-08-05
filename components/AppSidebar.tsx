@@ -27,6 +27,7 @@ import {
   MessageSquare,
   Search,
   Trophy,
+  Medal,
   Code,
   List,
   LayoutDashboard,
@@ -329,6 +330,9 @@ export function AppSidebar() {
               <NavItem href="/livecode" icon={SquareTerminal} label={t("nav.livecode")} active={pathname.startsWith("/livecode") || pathname.startsWith("/live") } />
             )}
             <NavItem href="/problems" icon={List} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
+            {user && (
+              <NavItem href="/competitions" icon={Medal} label={t("nav.competitions")} active={pathname.startsWith("/competitions")} />
+            )}
             <NavItem href="/leaderboard" icon={Trophy} label={t("nav.leaderboard")} active={pathname.startsWith("/leaderboard")} />
             {user && (
               <NavItem href="/shop" icon={ShoppingBag} label={t("nav.shop")} active={pathname.startsWith("/shop")} />

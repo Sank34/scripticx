@@ -83,5 +83,11 @@ describe("badge prototypes", () => {
     for (const key of ["first_solve", "five_solves", "ten_solves", "perfect"]) {
       expect(keys.has(key)).toBe(true);
     }
+
+    for (const badge of DEFAULT_BADGES.filter((entry) => entry.trigger === "automatic")) {
+      expect(badge.automaticRule).toBeDefined();
+      expect(Number.isInteger(badge.automaticRule?.threshold)).toBe(true);
+      expect(badge.automaticRule?.threshold).toBeGreaterThan(0);
+    }
   });
 });

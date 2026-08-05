@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   BADGE_ICON_NAMES,
   RARITY_STYLES,
+  type BadgeRuleMetric,
   type BadgeDefinition,
   type BadgeTrigger,
   type RewardRarity,
@@ -84,6 +85,10 @@ export function BadgeEditorDialog({
         trigger: "Mod de acordare",
         event: "Nume eveniment",
         eventPlaceholder: "Ex: CodeCamp 2026",
+        ruleTitle: "Regulă automată",
+        ruleMetric: "Se acordă în funcție de",
+        ruleThreshold: "Prag",
+        ruleHint: "Badge-ul se acordă o singură dată, imediat după o acțiune verificată de server.",
         status: "Badge activ",
         statusHint: "Badge-urile inactive rămân în sistem, dar nu mai pot fi acordate.",
         preset: "Alege un icon",
@@ -97,6 +102,7 @@ export function BadgeEditorDialog({
         save: "Salvează badge-ul",
         required: "Numele și cheia unică sunt obligatorii.",
         invalidKey: "Cheia poate conține doar litere mici, cifre și underscore.",
+        invalidRule: "Alege o regulă și un prag întreg între 1 și 1.000.000.",
         badFile: "Alege o imagine PNG, JPG, WebP sau SVG de maximum 1 MB.",
         uploadFailed: "Iconul nu a putut fi încărcat.",
         uploaded: "Icon încărcat.",
@@ -106,6 +112,15 @@ export function BadgeEditorDialog({
           event: "Eveniment",
           manual: "Manual",
         },
+        ruleMetrics: {
+          problems_solved: "Probleme rezolvate cu 100%",
+          perfect_submissions: "Submisii cu punctaj 100%",
+          submissions_sent: "Submisii verificate trimise",
+          total_score: "Puncte totale pe platformă",
+          daily_challenges: "Daily challenges finalizate",
+          competition_participations: "Competiții la care a participat",
+          competition_problems_solved: "Probleme de concurs rezolvate",
+        } as Record<BadgeRuleMetric, string>,
       }
     : {
         create: "Create badge",
@@ -122,6 +137,10 @@ export function BadgeEditorDialog({
         trigger: "Award method",
         event: "Event name",
         eventPlaceholder: "Example: CodeCamp 2026",
+        ruleTitle: "Automatic rule",
+        ruleMetric: "Award based on",
+        ruleThreshold: "Threshold",
+        ruleHint: "The badge is awarded once, immediately after a server-verified action.",
         status: "Active badge",
         statusHint: "Inactive badges stay in the system but can no longer be awarded.",
         preset: "Choose an icon",
@@ -135,6 +154,7 @@ export function BadgeEditorDialog({
         save: "Save badge",
         required: "Badge name and unique key are required.",
         invalidKey: "The key can only contain lowercase letters, numbers, and underscores.",
+        invalidRule: "Choose a rule and an integer threshold between 1 and 1,000,000.",
         badFile: "Choose a PNG, JPG, WebP or SVG image up to 1 MB.",
         uploadFailed: "The icon could not be uploaded.",
         uploaded: "Icon uploaded.",
@@ -144,6 +164,15 @@ export function BadgeEditorDialog({
           event: "Event",
           manual: "Manual",
         },
+        ruleMetrics: {
+          problems_solved: "Problems solved with 100%",
+          perfect_submissions: "Submissions scoring 100%",
+          submissions_sent: "Verified submissions sent",
+          total_score: "Total platform points",
+          daily_challenges: "Daily challenges completed",
+          competition_participations: "Competitions joined",
+          competition_problems_solved: "Competition problems solved",
+        } as Record<BadgeRuleMetric, string>,
       };
 
   useEffect(() => {
@@ -156,6 +185,17 @@ export function BadgeEditorDialog({
 
   function update<K extends keyof BadgeDefinition>(key: K, value: BadgeDefinition[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+    setError("");
+  }
+
+  function updateTrigger(trigger: BadgeTrigger) {
+    setDraft((current) => ({
+      ...current,
+      trigger,
+      automaticRule: trigger === "automatic"
+        ? current.automaticRule || { metric: "problems_solved", threshold: 1 }
+        : current.automaticRule,
+    }));
     setError("");
   }
 
@@ -194,6 +234,16 @@ export function BadgeEditorDialog({
       setError(copy.invalidKey);
       return;
     }
+    if (
+      draft.trigger === "automatic" &&
+      (!draft.automaticRule ||
+        !Number.isInteger(draft.automaticRule.threshold) ||
+        draft.automaticRule.threshold < 1 ||
+        draft.automaticRule.threshold > 1_000_000)
+    ) {
+      setError(copy.invalidRule);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -203,6 +253,7 @@ export function BadgeEditorDialog({
         key,
         description: draft.description.trim(),
         eventName: draft.trigger === "event" ? draft.eventName?.trim() : undefined,
+        automaticRule: draft.trigger === "automatic" ? draft.automaticRule : undefined,
       });
     } catch {
       setError(copy.saveFailed);
@@ -276,7 +327,7 @@ export function BadgeEditorDialog({
                 <span className="text-sm font-medium">{copy.trigger}</span>
                 <Select
                   value={draft.trigger}
-                  onValueChange={(value) => update("trigger", value as BadgeTrigger)}
+                  onValueChange={(value) => updateTrigger(value as BadgeTrigger)}
                 >
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -297,6 +348,52 @@ export function BadgeEditorDialog({
                   placeholder={copy.eventPlaceholder}
                 />
               </label>
+            )}
+
+            {draft.trigger === "automatic" && (
+              <div className="space-y-3 rounded-xl border bg-zinc-50/70 p-3">
+                <div>
+                  <p className="text-sm font-medium">{copy.ruleTitle}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    {copy.ruleHint}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium text-zinc-700">{copy.ruleMetric}</span>
+                    <Select
+                      value={draft.automaticRule?.metric || "problems_solved"}
+                      onValueChange={(value) => update("automaticRule", {
+                        metric: value as BadgeRuleMetric,
+                        threshold: draft.automaticRule?.threshold || 1,
+                      })}
+                    >
+                      <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(copy.ruleMetrics) as BadgeRuleMetric[]).map((metric) => (
+                          <SelectItem key={metric} value={metric}>{copy.ruleMetrics[metric]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium text-zinc-700">{copy.ruleThreshold}</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={1_000_000}
+                      step={1}
+                      inputMode="numeric"
+                      value={draft.automaticRule?.threshold || 1}
+                      onChange={(event) => update("automaticRule", {
+                        metric: draft.automaticRule?.metric || "problems_solved",
+                        threshold: Number(event.target.value),
+                      })}
+                      className="bg-white"
+                    />
+                  </label>
+                </div>
+              </div>
             )}
 
             <button

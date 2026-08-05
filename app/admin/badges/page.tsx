@@ -46,6 +46,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   RARITY_STYLES,
   type BadgeDefinition,
+  type BadgeRuleMetric,
   type BadgeTrigger,
 } from "@/lib/rewards";
 import {
@@ -91,6 +92,15 @@ function AdminBadgesContent() {
           event: "Eveniment",
           manual: "Manual",
         } as Record<BadgeTrigger, string>,
+        ruleMetrics: {
+          problems_solved: "probleme rezolvate",
+          perfect_submissions: "submisii perfecte",
+          submissions_sent: "submisii verificate",
+          total_score: "puncte totale",
+          daily_challenges: "daily challenges",
+          competition_participations: "participări la competiții",
+          competition_problems_solved: "probleme de concurs",
+        } as Record<BadgeRuleMetric, string>,
         empty: "Nu există badge-uri care corespund filtrelor.",
         loadError: "Badge-urile nu au putut fi încărcate. Verifică dacă migrarea Supabase a fost aplicată.",
         retry: "Reîncearcă",
@@ -126,6 +136,15 @@ function AdminBadgesContent() {
           event: "Event",
           manual: "Manual",
         } as Record<BadgeTrigger, string>,
+        ruleMetrics: {
+          problems_solved: "problems solved",
+          perfect_submissions: "perfect submissions",
+          submissions_sent: "verified submissions",
+          total_score: "total points",
+          daily_challenges: "daily challenges",
+          competition_participations: "competition entries",
+          competition_problems_solved: "competition problems",
+        } as Record<BadgeRuleMetric, string>,
         empty: "No badges match these filters.",
         loadError: "Badges could not be loaded. Check that the Supabase migration was applied.",
         retry: "Try again",
@@ -323,6 +342,11 @@ function AdminBadgesContent() {
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1"><Users className="size-3.5" />{badge.recipients} {copy.people}</span>
                         <Badge variant="secondary">{copy.types[badge.trigger]}</Badge>
+                        {badge.trigger === "automatic" && badge.automaticRule && (
+                          <span>
+                            {badge.automaticRule.threshold} {copy.ruleMetrics[badge.automaticRule.metric]}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="outline" size="sm" onClick={() => setRecipientsBadge(badge)}>

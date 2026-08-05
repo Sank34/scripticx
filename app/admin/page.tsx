@@ -20,6 +20,7 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
+  Trophy,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -386,6 +387,19 @@ function AdminContent() {
         description={t("admin.overview.tools.description")}
       >
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] items-stretch gap-4">
+          <div className="min-w-0">
+            <AdminNavCard
+              href="/admin/competitions"
+              icon={<Trophy className="h-5 w-5 text-zinc-700" />}
+              ringClassName="ring-zinc-500/50"
+              title={locale === "ro" ? "Competiții" : "Competitions"}
+              description={locale === "ro"
+                ? "Configurează concursuri, probleme, invitații și maintenance."
+                : "Configure competitions, problems, invites, and maintenance."}
+              count={null}
+            />
+          </div>
+
           <div className="min-w-0">
             <AdminNavCard
               href="/admin/problems"

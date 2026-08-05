@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "prepare:monaco": "node scripts/copy-monaco-assets.mjs",
+    "generate:secrets": "node scripts/generate-platform-secrets.mjs",
     "prebuild": "npm run prepare:monaco",
     "dev": "npm run check && npm run prepare:monaco && next dev",
     "dev:turbo": "npm run check && npm run prepare:monaco && next dev --turbopack",

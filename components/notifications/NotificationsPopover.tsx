@@ -133,6 +133,31 @@ function getLocalizedNotification(
     };
   }
 
+  if (notification.type === "competition_time") {
+    const competitionName =
+      getStringMetadata(notification.metadata, "competitionName") ||
+      (ro ? "Competiție" : "Competition");
+    const remainingValue = notification.metadata?.remainingMinutes;
+    const remainingMinutes =
+      typeof remainingValue === "number" ? remainingValue : null;
+    const remainingLabel = remainingMinutes == null
+      ? null
+      : remainingMinutes >= 60
+        ? `${Math.floor(remainingMinutes / 60)}h${remainingMinutes % 60 ? ` ${remainingMinutes % 60}m` : ""}`
+        : `${remainingMinutes}m`;
+
+    return {
+      title: ro
+        ? `${competitionName}: timp rămas`
+        : `${competitionName}: time remaining`,
+      body: remainingLabel
+        ? ro
+          ? `Mai sunt ${remainingLabel} din competiție.`
+          : `${remainingLabel} remain in the competition.`
+        : notification.body,
+    };
+  }
+
   if (notification.type === "live_invite") {
     const roomName =
       getStringMetadata(notification.metadata, "roomName") ||

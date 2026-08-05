@@ -183,8 +183,23 @@ export function resolveEquippedReward(
 
 export type BadgeTrigger = "automatic" | "event" | "manual";
 
+export type BadgeRuleMetric =
+  | "problems_solved"
+  | "perfect_submissions"
+  | "submissions_sent"
+  | "total_score"
+  | "daily_challenges"
+  | "competition_participations"
+  | "competition_problems_solved";
+
+export type BadgeAutomaticRule = {
+  metric: BadgeRuleMetric;
+  threshold: number;
+};
+
 export type BadgeDefinition = {
   active: boolean;
+  automaticRule?: BadgeAutomaticRule;
   createdAt?: string;
   description: string;
   eventName?: string;
@@ -214,6 +229,7 @@ export const DEFAULT_BADGES: BadgeDefinition[] = [
     iconName: "rocket",
     rarity: "common",
     trigger: "automatic",
+    automaticRule: { metric: "problems_solved", threshold: 1 },
     active: true,
     recipients: 128,
   },
@@ -225,6 +241,7 @@ export const DEFAULT_BADGES: BadgeDefinition[] = [
     iconName: "flame",
     rarity: "rare",
     trigger: "automatic",
+    automaticRule: { metric: "problems_solved", threshold: 5 },
     active: true,
     recipients: 74,
   },
@@ -236,6 +253,7 @@ export const DEFAULT_BADGES: BadgeDefinition[] = [
     iconName: "brain",
     rarity: "epic",
     trigger: "automatic",
+    automaticRule: { metric: "problems_solved", threshold: 10 },
     active: true,
     recipients: 31,
   },
@@ -247,6 +265,7 @@ export const DEFAULT_BADGES: BadgeDefinition[] = [
     iconName: "trophy",
     rarity: "rare",
     trigger: "automatic",
+    automaticRule: { metric: "perfect_submissions", threshold: 1 },
     active: true,
     recipients: 96,
   },

@@ -41,12 +41,23 @@ export async function POST(request: Request) {
     const admin = createAdminSupabase();
     const { data: problem, error: problemError } = await admin
       .from("problems")
-      .select("id, test_cases")
+      .select("id, test_cases, visibility, publish_at")
       .eq("id", problemId)
-      .maybeSingle<{ id: string; test_cases: unknown }>();
+      .maybeSingle<{
+        id: string;
+        publish_at: string | null;
+        test_cases: unknown;
+        visibility: string | null;
+      }>();
 
     if (problemError) throw problemError;
-    if (!problem) throw new HttpError(404, "Problem not found");
+    if (
+      !problem ||
+      (problem.visibility && problem.visibility !== "public") ||
+      (problem.publish_at && Date.parse(problem.publish_at) > Date.now())
+    ) {
+      throw new HttpError(404, "Problem not found");
+    }
 
     let evaluation;
     try {

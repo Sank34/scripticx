@@ -52,6 +52,7 @@ export function TopbarBreadcrumbs() {
   const labelBySegment: Record<string, string> = {
     admin: t("nav.admin"),
     classes: t("nav.classes"),
+    competitions: t("nav.competitions"),
     contact: t("nav.contact"),
     dashboard: t("nav.dashboard"),
     editor: t("nav.editor"),
@@ -67,6 +68,7 @@ export function TopbarBreadcrumbs() {
     live: t("nav.livecode"),
     livecode: t("nav.livecode"),
     login: "Login",
+    lockdown: "Maintenance",
     post: t("nav.feed"),
     problems: t("nav.problems"),
     profile: t("user.profile"),

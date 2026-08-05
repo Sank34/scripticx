@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
   List,
   Mail,
+  Medal,
   MessageSquare,
   Route,
   School,
@@ -79,6 +80,9 @@ export function MobileDrawer() {
             ]
           : []),
         { href: "/problems", icon: List, label: t("nav.problems") },
+        ...(isLoggedIn
+          ? [{ href: "/competitions", icon: Medal, label: t("nav.competitions") }]
+          : []),
         { href: "/leaderboard", icon: Trophy, label: t("nav.leaderboard") },
         ...(isLoggedIn
           ? [

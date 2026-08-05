@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   List,
   MessageSquare,
+  Medal,
   Route,
   Search,
   Settings,
@@ -158,6 +159,12 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         shortcut: "⌘ H",
         shortcutKey: "h",
         keywords: ["home", "overview"],
+      },
+      {
+        href: "/competitions",
+        icon: Medal,
+        label: t("nav.competitions"),
+        keywords: ["contest", "competition", "arena", "ranking"],
       },
       {
         href: "/shop",

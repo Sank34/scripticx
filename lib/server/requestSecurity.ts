@@ -22,6 +22,7 @@ export function getBearerToken(request: Request) {
 export async function requireUser(request: Request): Promise<{
   user: User;
   accessToken: string;
+  role: string;
 }> {
   const accessToken = getBearerToken(request);
   if (!accessToken) throw new HttpError(401, "Authentication required");
@@ -33,7 +34,47 @@ export async function requireUser(request: Request): Promise<{
   } = await client.auth.getUser(accessToken);
 
   if (error || !user) throw new HttpError(401, "Invalid session");
-  return { user, accessToken };
+
+  const admin = createAdminSupabase();
+  const [{ data: profile, error: profileError }, { data: settings, error: settingsError }] =
+    await Promise.all([
+      admin
+        .from("profiles")
+        .select("role, banned")
+        .eq("id", user.id)
+        .maybeSingle<{ role: string | null; banned: boolean | null }>(),
+      admin
+        .from("platform_settings")
+        .select("lockdown_enabled")
+        .eq("id", "global")
+        .maybeSingle<{ lockdown_enabled: boolean }>(),
+    ]);
+
+  if (profileError || !profile) {
+    console.error("Could not verify authenticated profile:", profileError);
+    throw new HttpError(403, "Profile access denied");
+  }
+  if (profile.banned) throw new HttpError(403, "Account is banned");
+
+  const settingsUnavailable =
+    settingsError?.code === "42P01" || settingsError?.code === "PGRST205";
+  if (settingsError && !settingsUnavailable) {
+    console.error("Could not verify platform status:", settingsError);
+    throw new HttpError(503, "Platform access service unavailable");
+  }
+
+  const role = profile.role || "user";
+  if (settings?.lockdown_enabled && role !== "admin") {
+    throw new HttpError(423, "Platform is currently locked");
+  }
+
+  return { user, accessToken, role };
+}
+
+export async function requireAdmin(request: Request) {
+  const session = await requireUser(request);
+  if (session.role !== "admin") throw new HttpError(403, "Admin access required");
+  return session;
 }
 
 export function requestIpKey(request: Request) {

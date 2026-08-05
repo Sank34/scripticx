@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api";
 import {
@@ -65,7 +66,63 @@ const realtimeScopesByTable: Record<string, string[]> = {
   learning_units: ["roadmap", "admin"],
   lessons: ["roadmap", "admin"],
   lesson_progress: ["roadmap", "dashboard", "profile"],
+  competitions: ["competitions", "admin"],
+  competition_breaks: ["competitions", "admin"],
+  competition_problems: ["competitions", "admin"],
+  competition_participants: ["competitions", "admin"],
+  competition_submissions: ["competitions", "admin"],
+  platform_settings: ["platform-status", "admin"],
 };
+
+function PlatformAccessSync() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    let active = true;
+
+    async function synchronize() {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        await fetch("/api/auth/access", { method: "DELETE" });
+        return;
+      }
+
+      const response = await fetch("/api/auth/access", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!active || !response.ok) return;
+
+      const status = (await response.json()) as {
+        lockdownEnabled?: boolean;
+        role?: string;
+      };
+      if (
+        status.lockdownEnabled &&
+        status.role !== "admin" &&
+        pathname !== "/lockdown"
+      ) {
+        router.replace(`/lockdown?next=${encodeURIComponent(pathname)}`);
+      }
+    }
+
+    void synchronize();
+    const interval = window.setInterval(synchronize, 4 * 60 * 1000);
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      window.setTimeout(() => void synchronize(), 0);
+    });
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      data.subscription.unsubscribe();
+    };
+  }, [pathname, router]);
+
+  return null;
+}
 
 function AuthCacheSync({ queryClient }: { queryClient: QueryClient }) {
   useEffect(() => {
@@ -242,6 +299,7 @@ export default function Providers({
   return (
     <QueryClientProvider client={queryClient}>
       <AuthCacheSync queryClient={queryClient} />
+      <PlatformAccessSync />
       {children}
     </QueryClientProvider>
   );

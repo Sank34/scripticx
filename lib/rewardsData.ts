@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type {
+  BadgeAutomaticRule,
   BadgeDefinition,
   EquippedRewards,
   RewardInventoryItem,
@@ -8,6 +9,7 @@ import type {
 
 type BadgeRow = {
   active: boolean | null;
+  automatic_rule?: BadgeAutomaticRule | null;
   created_at?: string | null;
   description?: string | null;
   event_name?: string | null;
@@ -87,6 +89,13 @@ function normalizeProduct(row: RewardProductRow): RewardProduct {
 }
 
 function normalizeBadge(row: BadgeRow, recipients = 0): BadgeDefinition {
+  const legacyRules: Record<string, BadgeAutomaticRule> = {
+    first_solve: { metric: "problems_solved", threshold: 1 },
+    five_solves: { metric: "problems_solved", threshold: 5 },
+    ten_solves: { metric: "problems_solved", threshold: 10 },
+    perfect: { metric: "perfect_submissions", threshold: 1 },
+  };
+
   return {
     id: String(row.id),
     key: row.key,
@@ -96,6 +105,7 @@ function normalizeBadge(row: BadgeRow, recipients = 0): BadgeDefinition {
     iconUrl: row.icon_url || undefined,
     rarity: row.rarity || "common",
     trigger: row.trigger_type || "manual",
+    automaticRule: row.automatic_rule || legacyRules[row.key],
     eventName: row.event_name || undefined,
     active: row.active ?? true,
     recipients,
@@ -134,6 +144,7 @@ export async function saveAdminBadge(badge: BadgeDefinition): Promise<BadgeDefin
     icon_url: badge.iconUrl || null,
     rarity: badge.rarity,
     trigger_type: badge.trigger,
+    automatic_rule: badge.trigger === "automatic" ? badge.automaticRule || null : null,
     event_name: badge.trigger === "event" ? badge.eventName || null : null,
     active: badge.active,
   };
