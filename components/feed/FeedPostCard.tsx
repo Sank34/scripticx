@@ -72,6 +72,7 @@ export function FeedPostCard({
           <UserAvatar
             avatarUrl={post.profiles?.avatar_url}
             username={username}
+            equippedRewards={post.profiles?.equipped_rewards}
           />
 
           <div>

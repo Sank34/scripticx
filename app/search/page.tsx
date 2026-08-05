@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
@@ -23,54 +24,62 @@ function SearchContent() {
   const initialQuery = searchParams.get("q") || "";
 
   const [query, setQuery] = useState(initialQuery);
-  const [results, setResults] = useState<any[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery.trim());
   const [recent, setRecent] = useState<string[]>([]);
-  const [topUsers, setTopUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("recent_searches");
-    if (stored) setRecent(JSON.parse(stored));
-  }, []);
-
-  useEffect(() => {
-    fetchTopUsers();
+    try {
+      const stored = localStorage.getItem("recent_searches");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setRecent(parsed.filter((item): item is string => typeof item === "string"));
+        }
+      }
+    } catch {
+      localStorage.removeItem("recent_searches");
+    }
   }, []);
 
   useEffect(() => {
     const delay = setTimeout(() => {
-      if (query.trim()) {
-        fetchUsers(query);
-      } else {
-        setResults([]);
-      }
+      setDebouncedQuery(query.trim());
     }, 300);
 
     return () => clearTimeout(delay);
   }, [query]);
 
-  async function fetchTopUsers() {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url, total_score")
-      .order("total_score", { ascending: false })
-      .limit(5);
+  const { data: topUsers = [] } = useQuery({
+    queryKey: ["search", "top-users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, total_score, equipped_rewards")
+        .order("total_score", { ascending: false })
+        .limit(5);
 
-    if (data) setTopUsers(data);
-  }
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-  async function fetchUsers(q: string) {
-    setLoading(true);
+  const { data: results = [], isFetching: loading } = useQuery({
+    queryKey: ["search", "profiles", debouncedQuery.toLowerCase()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, bio, total_score, equipped_rewards")
+        .ilike("username", `%${debouncedQuery}%`)
+        .limit(10);
 
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url, bio, total_score")
-      .ilike("username", `%${q}%`)
-      .limit(10);
-
-    setResults(data || []);
-    setLoading(false);
-  }
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: Boolean(debouncedQuery),
+    staleTime: 2 * 60 * 1000,
+    placeholderData: (previous) => previous ?? [],
+  });
 
   function handleSearch(value: string) {
     setQuery(value);
@@ -80,11 +89,12 @@ function SearchContent() {
     e.preventDefault();
     if (!query.trim()) return;
 
-    const updated = [query, ...recent.filter((r) => r !== query)].slice(0, 5);
+    const normalizedQuery = query.trim();
+    const updated = [normalizedQuery, ...recent.filter((r) => r !== normalizedQuery)].slice(0, 5);
     setRecent(updated);
     localStorage.setItem("recent_searches", JSON.stringify(updated));
 
-    router.push(`/search?q=${query}`);
+    router.push(`/search?q=${encodeURIComponent(normalizedQuery)}`);
   }
 
   return (
@@ -112,6 +122,7 @@ function SearchContent() {
               <UserListItem
                 key={u.id}
                 avatarUrl={u.avatar_url}
+                equippedRewards={u.equipped_rewards}
                 href={`/u/${u.username}`}
                 meta={`${u.total_score || 0} ${t("search.points")}`}
                 rank={i + 1}
@@ -161,6 +172,7 @@ function SearchContent() {
             <UserListItem
               key={u.id}
               avatarUrl={u.avatar_url}
+              equippedRewards={u.equipped_rewards}
               description={u.bio}
               href={`/u/${u.username}`}
               meta={`${u.total_score || 0} ${t("search.points")}`}

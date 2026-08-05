@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api";
@@ -19,20 +20,22 @@ import { Users, Plus, Link as LinkIcon } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
+
+type ClassPageData = {
+  cls: any;
+  members: any[];
+  assignments: any[];
+  authorized: boolean;
+};
 
 export default function ClassPage() {
   const router = useRouter();
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-
-  const [cls, setCls] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const [open, setOpen] = useState(false);
-  const [sessionName, setSessionName] = useState("");
+  const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
 
   const [openAssignment, setOpenAssignment] = useState(false);
   const [assignmentTitle, setAssignmentTitle] = useState("");
@@ -40,11 +43,9 @@ export default function ClassPage() {
   const [assignmentDeadline, setAssignmentDeadline] = useState("");
   const [selectedProblems, setSelectedProblems] = useState<any[]>([]);
   const [problemQuery, setProblemQuery] = useState("");
-  const [problems, setProblems] = useState<any[]>([]);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [problemOpen, setProblemOpen] = useState(false);
-
-  const [userId, setUserId] = useState<string | null>(null);
+  const userId = user?.id || null;
 
   const { locale } = useLanguage();
 
@@ -55,129 +56,115 @@ export default function ClassPage() {
     return value || key;
   };
 
-  useEffect(() => {
-    load();
-  }, [id]);
+  const classQueryKey = ["classes", "detail", id, userId] as const;
+  const { data: classPage, isPending: loading } = useQuery({
+    queryKey: classQueryKey,
+    queryFn: async (): Promise<ClassPageData> => {
+      if (!id || !userId) {
+        return { cls: null, members: [], assignments: [], authorized: false };
+      }
 
-  async function load() {
-    if (!id) return;
-
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (user) setUserId(user.id);
-
-    let classData = null;
-    let classError = null;
-
-    const isUUID = /^[0-9a-fA-F-]{36}$/.test(id || "");
-
-    if (isUUID) {
-      const res = await supabase
+      const lookupColumn = /^[0-9a-fA-F-]{36}$/.test(id) ? "id" : "invite_code";
+      const { data: classData, error: classError } = await supabase
         .from("classes")
         .select("*")
-        .eq("id", id)
+        .eq(lookupColumn, id)
         .maybeSingle();
+      if (classError) throw classError;
+      if (!classData) {
+        return { cls: null, members: [], assignments: [], authorized: true };
+      }
 
-      classData = res.data;
-      classError = res.error;
-    } else {
-      const res = await supabase
-        .from("classes")
-        .select("*")
-        .eq("invite_code", id)
-        .maybeSingle();
+      const isTeacher = userId === classData.teacher_id;
+      if (!isTeacher) {
+        const { data: memberCheck, error: memberError } = await supabase
+          .from("class_members")
+          .select("user_id")
+          .eq("class_id", classData.id)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (memberError) throw memberError;
+        if (!memberCheck) {
+          return { cls: classData, members: [], assignments: [], authorized: false };
+        }
+      }
 
-      classData = res.data;
-      classError = res.error;
-    }
+      const [memberResult, assignmentResult] = await Promise.all([
+        supabase
+          .from("class_members")
+          .select("user_id, role")
+          .eq("class_id", classData.id),
+        supabase
+          .from("assignments")
+          .select("*")
+          .eq("class_id", classData.id)
+          .order("created_at", { ascending: false }),
+      ]);
+      if (memberResult.error) throw memberResult.error;
+      if (assignmentResult.error) throw assignmentResult.error;
 
-    if (classData) setCls(classData);
+      const memberRows = memberResult.data || [];
+      const userIds = memberRows.map((member) => member.user_id);
+      const { data: profiles, error: profileError } = userIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, username, avatar_url, equipped_rewards")
+            .in("id", userIds)
+        : { data: [], error: null };
+      if (profileError) throw profileError;
 
-    const isTeacher = user?.id === classData?.teacher_id;
-
-    const { data: memberCheck } = await supabase
-      .from("class_members")
-      .select("user_id")
-      .eq("class_id", classData?.id)
-      .eq("user_id", user?.id)
-      .maybeSingle();
-
-    const isMember = !!memberCheck;
-
-    if (!isTeacher && !isMember) {
-      router.push("/classes");
-      return;
-    }
-
-    const { data: memberRows } = await supabase
-      .from("class_members")
-      .select("user_id, role")
-      .eq("class_id", classData?.id);
-
-    if (!memberRows || memberRows.length === 0) {
-      setMembers([]);
-    } else {
-      const userIds = memberRows.map((m) => m.user_id);
-
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url")
-        .in("id", userIds);
-
-      const profileMap: any = {};
-      (profiles || []).forEach((p) => {
-        profileMap[p.id] = p;
-      });
-
-      const merged = memberRows.map((m) => ({
-        ...(profileMap[m.user_id] || {
-          id: m.user_id,
+      const profileMap = new Map(
+        (profiles || []).map((profile) => [profile.id, profile])
+      );
+      const members = memberRows.map((member) => ({
+        ...(profileMap.get(member.user_id) || {
+          id: member.user_id,
           username: "User",
           avatar_url: null,
         }),
-        role: m.role,
+        role: member.role,
       }));
 
-      setMembers(merged);
-    }
+      return {
+        cls: classData,
+        members,
+        assignments: assignmentResult.data || [],
+        authorized: true,
+      };
+    },
+    enabled: Boolean(id) && !authLoading,
+    staleTime: 2 * 60 * 1000,
+  });
+  const cls = classPage?.cls || null;
+  const members = classPage?.members || [];
+  const assignments = classPage?.assignments || [];
 
-    const { data: sessionData } = await supabase
-      .from("class_sessions")
-      .select("*")
-      .eq("class_id", classData?.id)
-      .order("created_at", { ascending: false });
+  useEffect(() => {
+    if (classPage && !classPage.authorized) router.replace("/classes");
+  }, [classPage, router]);
 
-    setSessions(sessionData || []);
-
-    const { data: assignmentData } = await supabase
-      .from("assignments")
-      .select("*")
-      .eq("class_id", classData?.id)
-      .order("created_at", { ascending: false });
-
-    setAssignments(assignmentData || []);
-    setLoading(false);
-  }
-
-  async function createSession() {
-    if (!sessionName.trim()) return;
-
-    const { data } = await supabase
-      .from("class_sessions")
-      .insert({
-        class_id: cls?.id,
-        title: sessionName,
-        status: "active",
-      })
-      .select()
-      .single();
-
-    if (data) {
-      setSessions((prev) => [data, ...prev]);
-      setSessionName("");
-      setOpen(false);
-    }
-  }
+  const { data: problemCatalog = [] } = useQuery({
+    queryKey: ["problems", "assignment-picker"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("problems")
+        .select("id, title_i18n");
+      if (error) throw error;
+      return (data || []).map((problem) => ({
+        ...problem,
+        title: problem.title_i18n?.en || "Untitled",
+      }));
+    },
+    enabled: problemOpen,
+    staleTime: 5 * 60 * 1000,
+  });
+  const problems = useMemo(() => {
+    const query = problemQuery.trim().toLowerCase();
+    if (!query) return [];
+    return problemCatalog
+      .filter((problem) => problem.title.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [problemCatalog, problemQuery]);
 
   async function createAssignment() {
     if (!assignmentTitle.trim() || selectedProblems.length === 0) return;
@@ -224,7 +211,11 @@ export default function ClassPage() {
     }
 
     if (data) {
-      setAssignments((prev) => [data, ...prev]);
+      queryClient.setQueryData<ClassPageData>(classQueryKey, (current) =>
+        current
+          ? { ...current, assignments: [data, ...current.assignments] }
+          : current
+      );
 
       if (userId && cls?.id) {
         try {
@@ -251,38 +242,10 @@ export default function ClassPage() {
     }
   }
 
-  async function fetchProblems(query: string) {
-    if (!query.trim()) {
-      setProblems([]);
-      return;
-    }
-
-    const { data } = await supabase
-      .from("problems")
-      .select("*");
-
-    if (!data) {
-      setProblems([]);
-      return;
-    }
-
-    const filtered = data
-      .map((p: any) => ({
-        ...p,
-        title: p.title_i18n?.en || "Untitled",
-      }))
-      .filter((p: any) =>
-        p.title.toLowerCase().includes(query.toLowerCase())
-      )
-      .slice(0, 5);
-
-    setProblems(filtered);
-  }
-
   const teacherName =
     members.find((m) => m.role === "teacher")?.username || t("classes.roles.teacher");
 
-  if (loading) {
+  if (loading || (classPage && !classPage.authorized)) {
     return (
       <div className="p-6 max-w-6xl mx-auto space-y-6">
         <Skeleton className="h-40 w-full rounded-2xl" />
@@ -424,13 +387,12 @@ export default function ClassPage() {
               {members.map((m) => (
                 <div key={m.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    {m.avatar_url ? (
-                      <img src={m.avatar_url} className="w-6 h-6 rounded-full" />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs">
-                        {m.username?.[0]?.toUpperCase()}
-                      </div>
-                    )}
+                    <UserAvatar
+                      avatarUrl={m.avatar_url}
+                      username={m.username}
+                      equippedRewards={m.equipped_rewards}
+                      className="w-6 h-6"
+                    />
                     <span>{m.username}</span>
                   </div>
 
@@ -495,7 +457,6 @@ export default function ClassPage() {
                     className="h-10 text-sm"
                     onValueChange={(value) => {
                       setProblemQuery(value);
-                      fetchProblems(value);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && problems.length > 0) {
@@ -505,7 +466,6 @@ export default function ClassPage() {
                           return [...prev, p];
                         });
                         setProblemQuery("");
-                        setProblems([]);
                         setProblemOpen(false);
                         setAssignmentTitle(p.title);
                       }
@@ -526,7 +486,6 @@ export default function ClassPage() {
                             return [...prev, p];
                           });
                           setProblemQuery("");
-                          setProblems([]);
                           setProblemOpen(false);
                           setAssignmentTitle(p.title);
                         }}

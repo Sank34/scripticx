@@ -15,18 +15,20 @@ import {
 import { Crown, Medal, Trophy } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
+import type { EquippedRewards } from "@/lib/rewards";
 
 type LeaderboardUser = {
   id: string;
   username: string;
   avatar_url: string | null;
+  equipped_rewards?: EquippedRewards | null;
   total_score: number;
 };
 
 async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, username, avatar_url, total_score")
+    .select("id, username, avatar_url, total_score, equipped_rewards")
     .order("total_score", { ascending: false })
     .limit(50);
 

@@ -1,30 +1,23 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
-export function useUserRole(user: any) {
-  const [role, setRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) {
-      setRole(null);
-      setLoading(false);
-      return;
-    }
-
-    async function fetchRole() {
-      const { data } = await supabase
+export function useUserRole(user: User | null) {
+  const { data: role = null, isPending: loading } = useQuery({
+    queryKey: ["profile", user?.id, "role"],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", user.id)
-        .single();
-
-      setRole(data?.role || "user");
-      setLoading(false);
-    }
-
-    fetchRole();
-  }, [user]);
+        .maybeSingle();
+      if (error) throw error;
+      return data?.role || "user";
+    },
+    enabled: Boolean(user),
+    staleTime: 5 * 60 * 1000,
+  });
 
   return { role, loading };
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useRouter } from "next/navigation";
@@ -70,11 +71,9 @@ function parseDateKey(dateKey: string) {
 function AdminProblemsContent() {
   const router = useRouter();
   const { locale, t } = useLanguage();
+  const queryClient = useQueryClient();
   const todayKey = api.dailyChallenges.getTodayKey();
 
-  const [problems, setProblems] = useState<any[]>([]);
-  const [dailyChallenges, setDailyChallenges] = useState<DailyChallenge[]>([]);
-  const [loading, setLoading] = useState(true);
   const [schedulingDaily, setSchedulingDaily] = useState(false);
   const [dailyDate, setDailyDate] = useState(() => todayKey);
   const [dailyProblemId, setDailyProblemId] = useState("");
@@ -82,15 +81,11 @@ function AdminProblemsContent() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [openCreate, setOpenCreate] = useState(false);
-  const scheduledDateKeys = new Set(
-    dailyChallenges
-      .filter((challenge) => challenge.is_active)
-      .map((challenge) => challenge.challenge_date)
-  );
-
-  useEffect(() => {
-    async function fetchProblems() {
-      const [{ data }, scheduled] = await Promise.all([
+  const adminProblemsQueryKey = ["admin", "problems"] as const;
+  const { data, isPending: loading } = useQuery({
+    queryKey: adminProblemsQueryKey,
+    queryFn: async () => {
+      const [{ data: problemRows, error }, scheduled] = await Promise.all([
         supabase
           .from("problems")
           .select("*")
@@ -98,13 +93,21 @@ function AdminProblemsContent() {
         api.dailyChallenges.list(90),
       ]);
 
-      setProblems(data || []);
-      setDailyChallenges(scheduled);
-      setLoading(false);
-    }
-
-    fetchProblems();
-  }, []);
+      if (error) throw error;
+      return {
+        problems: problemRows || [],
+        dailyChallenges: scheduled,
+      };
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+  const problems = data?.problems || [];
+  const dailyChallenges: DailyChallenge[] = data?.dailyChallenges || [];
+  const scheduledDateKeys = new Set(
+    dailyChallenges
+      .filter((challenge) => challenge.is_active)
+      .map((challenge) => challenge.challenge_date)
+  );
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -119,7 +122,15 @@ function AdminProblemsContent() {
       return;
     }
 
-    setProblems((prev) => prev.filter((p) => p.id !== deleteId));
+    queryClient.setQueryData<typeof data>(adminProblemsQueryKey, (current) =>
+      current
+        ? {
+            ...current,
+            problems: current.problems.filter((problem) => problem.id !== deleteId),
+          }
+        : current
+    );
+    void queryClient.invalidateQueries({ queryKey: ["problems"] });
     setDeleteId(null);
 
     toast.success(t("admin.problems.toast.deleted"));
@@ -153,7 +164,8 @@ function AdminProblemsContent() {
         createdBy: user.id,
       });
 
-      setDailyChallenges(await api.dailyChallenges.list(90));
+      await queryClient.invalidateQueries({ queryKey: adminProblemsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: ["daily-challenge"] });
       toast.success("Daily challenge scheduled");
     } catch {
       toast.error("Could not schedule daily challenge");
@@ -347,7 +359,8 @@ function AdminProblemsContent() {
           <ProblemForm
             onSuccess={() => {
               setOpenCreate(false);
-              window.location.reload();
+              void queryClient.invalidateQueries({ queryKey: adminProblemsQueryKey });
+              void queryClient.invalidateQueries({ queryKey: ["problems"] });
             }}
           />
         </DialogContent>

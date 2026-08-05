@@ -75,7 +75,11 @@ function DashboardContent() {
       supabase
         .from("submissions")
         .select(`
-          *,
+          id,
+          user_id,
+          problem_id,
+          score,
+          created_at,
           problems (
             title_i18n
           )
@@ -128,7 +132,7 @@ function DashboardContent() {
 
     const { data: users } = await supabase
       .from("profiles")
-      .select("id, username, avatar_url, total_score")
+      .select("id, username, avatar_url, total_score, equipped_rewards")
       .order("total_score", { ascending: false })
       .limit(5);
 
@@ -162,7 +166,7 @@ function DashboardContent() {
 
         const { data: usersData } = await supabase
           .from("profiles")
-          .select("id, username, avatar_url")
+          .select("id, username, avatar_url, equipped_rewards")
           .in("id", userIds);
 
         const userMap = Object.fromEntries(
@@ -485,6 +489,7 @@ function DashboardContent() {
               <div className="flex items-center gap-3">
                 <UserAvatar
                   avatarUrl={topUser.avatar_url}
+                  equippedRewards={topUser.equipped_rewards}
                   className="size-10"
                   username={topUser.username}
                 />
@@ -506,6 +511,7 @@ function DashboardContent() {
                 </span>
                 <UserAvatar
                   avatarUrl={u.avatar_url}
+                  equippedRewards={u.equipped_rewards}
                   className="size-7"
                   username={u.username}
                 />
@@ -577,6 +583,7 @@ function DashboardContent() {
               >
                 <UserAvatar
                   avatarUrl={item.profile?.avatar_url}
+                  equippedRewards={item.profile?.equipped_rewards}
                   className="size-8"
                   username={item.profile?.username}
                 />

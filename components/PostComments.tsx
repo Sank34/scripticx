@@ -1,21 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user/UserAvatar";
 import Link from "next/link";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
 
 export default function PostComments({ postId }: { postId: string }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const [comments, setComments] = useState<any[]>([]);
   const [content, setContent] = useState("");
 
   const { locale } = useLanguage();
@@ -33,45 +34,50 @@ export default function PostComments({ postId }: { postId: string }) {
     return fallback || key;
   };
 
-  async function fetchComments() {
-    const { data } = await supabase
-      .from("comments")
-      .select("*")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: false });
+  const commentsQueryKey = ["post", postId, "comments"] as const;
+  const { data: comments = [] } = useQuery({
+    queryKey: commentsQueryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("comments")
+        .select("*")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
 
-    const withProfiles = await Promise.all(
-      (data || []).map(async (c) => {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("username, avatar_url")
-          .eq("id", c.user_id)
-          .maybeSingle();
+      const userIds = [...new Set((data || []).map((comment) => comment.user_id))];
+      const { data: profiles, error: profilesError } = userIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, username, avatar_url, equipped_rewards")
+            .in("id", userIds)
+        : { data: [], error: null };
+      if (profilesError) throw profilesError;
 
-        return {
-          ...c,
-          profiles: profile,
-        };
-      })
-    );
-
-    setComments(withProfiles);
-  }
-
-  useEffect(() => {
-    fetchComments();
-  }, []);
+      const profileById = new Map(
+        (profiles || []).map((profile) => [profile.id, profile])
+      );
+      return (data || []).map((comment) => ({
+        ...comment,
+        profiles: profileById.get(comment.user_id) || null,
+      }));
+    },
+    enabled: Boolean(postId),
+    staleTime: 60 * 1000,
+  });
 
   async function addComment() {
     if (!content.trim() || !user) return;
 
-    const { error } = await supabase.from("comments").insert([
-      {
-        post_id: postId,
-        user_id: user.id,
-        content,
-      },
-    ]);
+    const { data: comment, error } = await supabase
+      .from("comments")
+      .insert({
+          post_id: postId,
+          user_id: user.id,
+          content,
+      })
+      .select("id")
+      .single<{ id: string }>();
 
     if (error) {
       console.error(error);
@@ -97,13 +103,14 @@ export default function PostComments({ postId }: { postId: string }) {
         href: `/post/${postId}`,
         metadata: {
           postId,
+          commentId: comment.id,
           username: actor?.username || null,
         },
       });
     }
 
     setContent("");
-    fetchComments();
+    await queryClient.invalidateQueries({ queryKey: ["post", postId] });
   }
 
   return (
@@ -124,14 +131,12 @@ export default function PostComments({ postId }: { postId: string }) {
         {comments.map((c) => (
           <div key={c.id} className="flex items-start gap-3">
             <Link href={`/u/${c.profiles?.username}`}>
-              <Avatar className="w-8 h-8 cursor-pointer">
-                {c.profiles?.avatar_url && (
-                  <AvatarImage src={c.profiles.avatar_url} />
-                )}
-                <AvatarFallback>
-                  {(c.profiles?.username || "U")[0]}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                avatarUrl={c.profiles?.avatar_url}
+                username={c.profiles?.username}
+                equippedRewards={c.profiles?.equipped_rewards}
+                className="w-8 h-8 cursor-pointer"
+              />
             </Link>
             <div className="bg-muted rounded-lg px-3 py-2 text-sm max-w-full">
               <Link href={`/u/${c.profiles?.username}`}>

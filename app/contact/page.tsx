@@ -121,21 +121,30 @@ export default function ContactPage() {
 
     setSubmitting(true);
 
-    const { error: insertError } = await supabase
-      .from("contact_messages")
-      .insert({
-        user_id: user?.id ?? null,
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const response = await fetch("/api/contact", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {}),
+      },
+      body: JSON.stringify({
         name: finalName,
         email: finalEmail,
         topic,
         description,
-      });
+      }),
+    });
+    const result = (await response.json()) as { error?: string };
 
     setSubmitting(false);
 
-    if (insertError) {
-      console.error("contact insert failed:", insertError);
-      setError(`${copy.errorGeneric} (${insertError.message})`);
+    if (!response.ok) {
+      setError(result.error || copy.errorGeneric);
       return;
     }
 

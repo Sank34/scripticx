@@ -4,7 +4,7 @@ import {
   createNotFoundMetadata,
   createPageMetadata,
 } from "@/lib/metadata";
-import { createServerSupabase } from "@/lib/supabaseServer";
+import { createAdminSupabase } from "@/lib/supabaseServer";
 
 export async function generateMetadata({
   params,
@@ -12,7 +12,7 @@ export async function generateMetadata({
   params: Promise<{ roomId: string }>;
 }): Promise<Metadata> {
   const { roomId } = await params;
-  const supabase = createServerSupabase();
+  const supabase = createAdminSupabase();
   const { data: room } = await supabase
     .from("live_rooms")
     .select("name, status")

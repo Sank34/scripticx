@@ -1,69 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
 import { api, type ProfileSummary } from "@/lib/api";
 
 const AUTH_TIMEOUT_MS = 6000;
 
+export const authQueryKey = ["auth", "current"] as const;
+
+export type AuthState = {
+  profile: ProfileSummary | null;
+  user: User | null;
+};
+
+export async function fetchAuthState(): Promise<AuthState> {
+  const { data } = await api.auth.getSessionWithTimeout(AUTH_TIMEOUT_MS);
+  const user = data.session?.user ?? null;
+
+  if (!user) return { profile: null, user: null };
+
+  const profile = await api.profiles.getProfile(user.id);
+  return { profile: profile || null, user };
+}
+
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<ProfileSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const hasLoaded = useRef(false);
+  const queryClient = useQueryClient();
+  const authQuery = useQuery<AuthState>({
+    queryKey: authQueryKey,
+    queryFn: fetchAuthState,
+    staleTime: 1000 * 60 * 5,
+  });
+  const user = authQuery.data?.user ?? null;
+  const profile = authQuery.data?.profile ?? null;
 
-  const load = useCallback(async (showLoading = false) => {
-    if (showLoading || !hasLoaded.current) {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const { data } = await api.auth.getSessionWithTimeout(AUTH_TIMEOUT_MS);
-
-      const currentUser = data.session?.user ?? null;
-
-      setUser(currentUser);
-
-      if (!currentUser) {
-        setProfile(null);
-        return;
-      }
-
-      const profileData = await api.profiles.getProfile(currentUser.id);
-      setProfile(profileData || null);
-    } catch (err) {
-      console.error("Auth load failed:", err);
-      setUser(null);
-      setProfile(null);
-      setError(err instanceof Error ? err.message : "Auth load failed");
-    } finally {
-      hasLoaded.current = true;
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load(true);
-
-    const subscription = api.auth.onAuthStateChange(() => {
-      window.setTimeout(() => {
-        void load(false);
-      }, 0);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [load]);
+  const reload = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: authQueryKey });
+  }, [queryClient]);
 
   return {
     user,
     profile,
-    loading,
-    error,
-    reload: load,
+    loading: authQuery.isPending,
+    error: authQuery.error instanceof Error ? authQuery.error.message : null,
+    reload,
     isAdmin: profile?.role === "admin",
     isBanned: profile?.banned === true,
   };

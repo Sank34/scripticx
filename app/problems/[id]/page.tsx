@@ -1,9 +1,9 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { OnMount } from "@monaco-editor/react";
-import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
 import { useParams } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
 import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
@@ -16,7 +16,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { api, type DailyChallenge } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { checkAchievements } from "@/lib/achievements";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
 import { Markdown } from "@/components/Markdown";
@@ -36,13 +35,11 @@ type EvaluationStatus = {
   status: "pending" | "evaluating" | "passed" | "failed";
 };
 
-function waitForPaint() {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      window.setTimeout(resolve, 120);
-    });
-  });
-}
+type ProblemPageData = {
+  problem: any;
+  dailyChallenge: DailyChallenge | null;
+  dailyCompleted: boolean;
+};
 
 function slugify(text: string): string {
   if (!text) return "problem";
@@ -57,66 +54,60 @@ function slugify(text: string): string {
 }
 
 function ProblemContent() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
 
   const params = useParams();
-  const id = params?.id;
+  const id = typeof params?.id === "string" ? params.id : "";
 
-  const [problem, setProblem] = useState<any>(null);
   const [code, setCode] = useState("");
+  const hydratedProblemId = useRef<string | null>(null);
   const [, setResult] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<ProblemTestResult[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [evaluationStatuses, setEvaluationStatuses] = useState<EvaluationStatus[]>([]);
   const [editorLine, setEditorLine] = useState(1);
   const [tabSize, setTabSize] = useState(2);
   const [activeTab, setActiveTab] = useState<"description" | "solution">("description");
-  const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
-  const [dailyCompleted, setDailyCompleted] = useState(false);
-
-  useEffect(() => {
-    if (!id || typeof id !== "string") return;
-
-    async function fetchProblem() {
-      const [{ data }, todayChallenge] = await Promise.all([
+  const problemQueryKey = ["problems", "detail", id, user?.id] as const;
+  const { data: problemPage, isPending: loading } = useQuery({
+    queryKey: problemQueryKey,
+    queryFn: async (): Promise<ProblemPageData> => {
+      const [{ data, error }, todayChallenge] = await Promise.all([
         supabase
           .from("problems")
           .select("*")
           .eq("id", id)
-          .single(),
+          .maybeSingle(),
         api.dailyChallenges.getForDate(),
       ]);
+      if (error) throw error;
 
-      if (data) {
-        setProblem(data);
-        setCode(data.starter_code);
-      }
-
-      const matchingDailyChallenge =
+      const dailyChallenge =
         todayChallenge?.problem_id === id ? todayChallenge : null;
+      const completion = dailyChallenge && user?.id
+        ? await api.dailyChallenges.getCompletion(dailyChallenge.id, user.id)
+        : null;
 
-      if (matchingDailyChallenge) {
-        setDailyChallenge(matchingDailyChallenge);
+      return {
+        problem: data,
+        dailyChallenge,
+        dailyCompleted: Boolean(completion),
+      };
+    },
+    enabled: Boolean(id) && !authLoading,
+    staleTime: 2 * 60 * 1000,
+  });
+  const problem = problemPage?.problem || null;
+  const dailyChallenge = problemPage?.dailyChallenge || null;
+  const dailyCompleted = problemPage?.dailyCompleted || false;
 
-        if (user?.id) {
-          const completion = await api.dailyChallenges.getCompletion(
-            matchingDailyChallenge.id,
-            user.id
-          );
-          setDailyCompleted(Boolean(completion));
-        }
-      } else {
-        setDailyChallenge(null);
-        setDailyCompleted(false);
-      }
-
-      setLoading(false);
-    }
-
-    fetchProblem();
-  }, [id, user?.id]);
+  useEffect(() => {
+    if (!problem || hydratedProblemId.current === id) return;
+    setCode(problem.starter_code || "");
+    hydratedProblemId.current = id;
+  }, [id, problem]);
 
   async function runCode() {
     if (!problem || !user) return;
@@ -127,153 +118,77 @@ function ProblemContent() {
     setEvaluationStatuses(
       problem.test_cases.map(() => ({ status: "pending" }))
     );
-    const results: ProblemTestResult[] = [];
 
     try {
-      for (const [index, test] of problem.test_cases.entries()) {
-        setEvaluationStatuses((current) =>
-          current.map((item, itemIndex) =>
-            itemIndex === index ? { status: "evaluating" } : item
-          )
-        );
-        await waitForPaint();
+      setEvaluationStatuses(
+        problem.test_cases.map(() => ({ status: "evaluating" }))
+      );
 
-        let program;
-
-        try {
-          program = code.split("\n").map(parseLine);
-        } catch (e: any) {
-          setResult(`${t("problemPage.result.error")}: ${e.message}`);
-          setEvaluationStatuses((current) =>
-            current.map((item, itemIndex) =>
-              itemIndex === index ? { status: "failed" } : item
-            )
-          );
-          return;
-        }
-
-        reset();
-
-        let res;
-        const out: string[] = [];
-        let inputIndex = 0;
-
-        try {
-          while (true) {
-            res = step(program);
-            if (!res) break;
-
-            if ((res as any).inputRequest) {
-              const varName = (res as any).inputRequest;
-              const value = test.input[inputIndex++];
-              setVariable(varName, value);
-              advanceLine();
-              continue;
-            }
-
-            if (res.output !== null) {
-              out.push(String(res.output));
-            }
-          }
-        } catch (e: any) {
-          out.push(`${t("problemPage.result.error")}: ${e.message}`);
-        }
-
-        const normalize = (str: string) =>
-          str.trim().replace(/\r\n/g, "\n");
-
-        const got = normalize(out.join("\n"));
-        const expected = normalize(test.output);
-        const passed = got === expected;
-
-        results.push({
-          passed,
-          expected,
-          got,
-          input: test.input,
-        });
-
-        setEvaluationStatuses((current) =>
-          current.map((item, itemIndex) =>
-            itemIndex === index
-              ? { status: passed ? "passed" : "failed" }
-              : item
-          )
-        );
-        await waitForPaint();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) {
+        throw sessionError || new Error("Authentication required");
       }
 
-      const score = Math.round(
-        (results.filter(r => r.passed).length / results.length) * 100
-      );
+      const response = await fetch("/api/submissions/evaluate", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ problemId: id, code }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        score?: number;
+        results?: ProblemTestResult[];
+        bonusAwarded?: boolean;
+        bonusPoints?: number;
+      };
+      if (!response.ok || typeof payload.score !== "number" || !payload.results) {
+        throw new Error(payload.error || "Could not evaluate submission");
+      }
+
+      const { score, results } = payload;
 
       setResult(`${t("problemPage.result.score")}: ${score}%`);
       setTestResults(results);
+      setEvaluationStatuses(
+        results.map((result) => ({
+          status: result.passed ? "passed" : "failed",
+        }))
+      );
       setActiveTab("solution");
 
-      const { data: previous } = await supabase
-        .from("submissions")
-        .select("score")
-        .eq("user_id", user.id)
-        .eq("problem_id", id);
-
-      const bestPrevious =
-        previous?.length
-          ? Math.max(...previous.map((s) => s.score))
-          : 0;
-
-      await supabase.from("submissions").insert([
-        {
-          user_id: user.id,
-          problem_id: id,
-          code,
-          score,
-        },
-      ]);
-
-      let bonusAwarded = false;
-
-      if (score === 100 && dailyChallenge && !dailyCompleted) {
-        bonusAwarded = await api.dailyChallenges.complete({
-          challengeId: dailyChallenge.id,
-          userId: user.id,
-          problemId: String(id),
-          bonusPoints: dailyChallenge.bonus_points || 0,
-        });
-
-        if (bonusAwarded) {
-          setDailyCompleted(true);
-        }
-      }
-
-      const scoreIncrement = score > bestPrevious ? score - bestPrevious : 0;
-      const bonusIncrement = bonusAwarded ? dailyChallenge?.bonus_points || 0 : 0;
-      const totalIncrement = dailyChallenge ? bonusIncrement : scoreIncrement;
-
-      if (totalIncrement > 0) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("total_score")
-          .eq("id", user.id)
-          .single();
-
-        await supabase
-          .from("profiles")
-          .update({
-            total_score: (profile?.total_score || 0) + totalIncrement,
-          })
-          .eq("id", user.id);
-      }
-
-      await checkAchievements(user.id, score);
-
-      if (bonusAwarded && bonusIncrement > 0) {
-        toast.success(
-          locale === "ro"
-            ? `Daily challenge rezolvat! Ai primit ${bonusIncrement} puncte bonus.`
-            : `Daily challenge solved! You received ${bonusIncrement} bonus points.`
+      if (payload.bonusAwarded) {
+        queryClient.setQueryData<ProblemPageData>(problemQueryKey, (current) =>
+          current ? { ...current, dailyCompleted: true } : current
         );
       }
+
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+      void queryClient.invalidateQueries({ queryKey: ["rewards-shop"] });
+      window.dispatchEvent(new Event("profile-updated"));
+      window.dispatchEvent(new Event("rewards-updated"));
+
+      if (payload.bonusAwarded && (payload.bonusPoints || 0) > 0) {
+        toast.success(
+          locale === "ro"
+            ? `Daily challenge rezolvat! Ai primit ${payload.bonusPoints} puncte bonus.`
+            : `Daily challenge solved! You received ${payload.bonusPoints} bonus points.`
+        );
+      }
+    } catch (error) {
+      setEvaluationStatuses(
+        problem.test_cases.map(() => ({ status: "failed" }))
+      );
+      const message = error instanceof Error ? error.message : "Submission failed";
+      setResult(`${t("problemPage.result.error")}: ${message}`);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -290,7 +205,7 @@ function ProblemContent() {
     editor.onDidChangeModelContent(syncLine);
   };
 
-  if (!id || typeof id !== "string" || loading) {
+  if (!id || loading) {
     return (
       <div className="flex h-full">
         <Skeleton className="w-1/2 h-full" />

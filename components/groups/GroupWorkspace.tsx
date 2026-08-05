@@ -459,6 +459,7 @@ function StudyGroupMemberPreview({
           <UserAvatar
             avatarUrl={profile?.avatar_url}
             username={username}
+            equippedRewards={profile?.equipped_rewards}
             className="size-8"
           />
           <div className="min-w-0">
@@ -490,6 +491,7 @@ function StudyGroupMemberPreview({
             <UserAvatar
               avatarUrl={profile?.avatar_url}
               username={username}
+              equippedRewards={profile?.equipped_rewards}
               className="size-20 border-4 border-white shadow-sm"
             />
             <span className="rounded-full border bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm">
@@ -2007,6 +2009,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             <UserAvatar
                               avatarUrl={profile?.avatar_url}
                               username={username}
+                              equippedRewards={profile?.equipped_rewards}
                               className="size-8 transition hover:ring-2 hover:ring-zinc-300"
                             />
                           </Link>
@@ -2014,6 +2017,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           <UserAvatar
                             avatarUrl={profile?.avatar_url}
                             username={username}
+                            equippedRewards={profile?.equipped_rewards}
                             className="size-8"
                           />
                         )}
@@ -2457,6 +2461,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                         <UserAvatar
                           avatarUrl={candidate.avatar_url}
                           username={candidate.username}
+                          equippedRewards={candidate.equipped_rewards}
                           className="size-8"
                         />
                         <span className="min-w-0">
@@ -2739,6 +2744,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                       <UserAvatar
                         avatarUrl={candidate.avatar_url}
                         username={candidate.username}
+                        equippedRewards={candidate.equipped_rewards}
                         className="size-8"
                       />
                       <div className="min-w-0">
@@ -3227,6 +3233,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             <UserAvatar
                               avatarUrl={profile?.avatar_url}
                               username={username}
+                              equippedRewards={profile?.equipped_rewards}
                               className="size-11"
                             />
                             <div className="min-w-0">

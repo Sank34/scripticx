@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import PublicProfileHeader from "@/components/PublicProfileHeader";
 import { StatCard } from "@/components/common/StatCard";
+import { AchievementBadgeCard } from "@/components/achievements/AchievementBadgeCard";
 
 import {
   Card,
@@ -14,12 +15,19 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 
-import { Flame, Globe, Trophy, Check, Rocket, Brain } from "lucide-react";
+import { Award, Flame, Globe } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 
 import { getLocalized } from "@/lib/getLocalized";
 import { translations } from "@/lib/i18n";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
+import { ProfileBackground } from "@/components/user/ProfileBackground";
+import {
+  getLegacyBadgeRarity,
+  resolveEquippedReward,
+  type EquippedRewards,
+  type RewardRarity,
+} from "@/lib/rewards";
 import {
   absoluteUrl,
   createNotFoundMetadata,
@@ -109,7 +117,11 @@ export default async function PublicProfile({
   const { data: submissions } = await supabase
     .from("submissions")
     .select(`
-      *,
+      id,
+      user_id,
+      problem_id,
+      score,
+      created_at,
       problems (
         title_i18n,
         difficulty
@@ -122,8 +134,7 @@ export default async function PublicProfile({
     .from("user_achievements")
     .select(`
       achievement:achievements (
-        title,
-        icon
+        *
       )
     `)
     .eq("user_id", profile.id);
@@ -134,14 +145,6 @@ export default async function PublicProfile({
     .eq("user_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(3);
-
-  const iconMap: any = {
-    trophy: Trophy,
-    flame: Flame,
-    check: Check,
-    rocket: Rocket,
-    brain: Brain,
-  };
 
   const best: Record<string, any> = {};
   const days = new Set<string>();
@@ -179,6 +182,11 @@ export default async function PublicProfile({
   }
 
   const initial = (profile.username || "U")[0]?.toUpperCase();
+  const equippedRewards = (profile.equipped_rewards || {}) as EquippedRewards;
+  const backgroundReward =
+    equippedRewards["profile-background"] || equippedRewards["profile-banner"];
+  const titleReward = resolveEquippedReward(equippedRewards["profile-title"]);
+  const equippedTitle = titleReward?.name?.[locale];
   const profileUrl = absoluteUrl(
     `/u/${encodeURIComponent(profile.username)}`
   );
@@ -220,7 +228,9 @@ export default async function PublicProfile({
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="relative isolate min-h-full w-full overflow-hidden pb-16 md:pb-0">
+      {backgroundReward && <ProfileBackground reward={backgroundReward} />}
+      <div className="relative z-[1] mx-auto max-w-5xl space-y-6 p-6">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -230,7 +240,7 @@ export default async function PublicProfile({
 
       <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
         <div
-          className="relative h-44 bg-gradient-to-br from-zinc-950 via-zinc-800 to-emerald-400 bg-cover bg-center sm:h-52"
+          className="relative h-44 bg-zinc-100 bg-cover bg-center sm:h-52"
           style={
             profile.banner_url
               ? {
@@ -248,6 +258,7 @@ export default async function PublicProfile({
               <ProfileImagePreview
                 alt={`${profile.username} profile picture`}
                 avatarUrl={profile.avatar_url}
+                equippedRewards={equippedRewards}
                 className="h-20 w-20 border border-zinc-200 shadow-sm sm:h-24 sm:w-24"
                 fallback={initial}
               />
@@ -256,6 +267,11 @@ export default async function PublicProfile({
                 <h1 className="truncate text-3xl font-bold">
                   {profile.username}
                 </h1>
+                {equippedTitle && (
+                  <Badge variant="outline" className="mt-1.5 bg-white">
+                    {equippedTitle}
+                  </Badge>
+                )}
                 <PublicProfileHeader
                   profileId={profile.id}
                   profileUsername={profile.username}
@@ -322,19 +338,40 @@ export default async function PublicProfile({
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between">
           <CardTitle>{t("publicProfile.achievements")}</CardTitle>
+          <Badge variant="secondary">{achievements?.length || 0}</Badge>
         </CardHeader>
-        <CardContent className="flex gap-2 flex-wrap">
-          {achievements?.map((a: any, i: number) => {
-            const Icon = iconMap[a.achievement.icon];
-            return (
-              <div key={i} className="flex items-center gap-2 px-3 py-1 rounded bg-muted text-sm">
-                {Icon && <Icon size={14} />}
-                {a.achievement.title}
-              </div>
-            );
-          })}
+        <CardContent>
+          {achievements?.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {achievements.map((item: any, index: number) => {
+                const achievement = item.achievement;
+                if (!achievement) return null;
+
+                return (
+                  <AchievementBadgeCard
+                    key={`${achievement.title}-${index}`}
+                    compact
+                    title={achievement.title}
+                    iconName={achievement.icon}
+                    iconUrl={achievement.icon_url}
+                    rarity={(achievement.rarity || getLegacyBadgeRarity(achievement.icon)) as RewardRarity}
+                    description={achievement.description || (
+                      locale === "ro" ? "Badge obținut pe ScripticX." : "Badge earned on ScripticX."
+                    )}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-50 px-4 py-10 text-center">
+              <Award className="size-8 text-zinc-300" />
+              <p className="mt-2 text-sm font-medium">
+                {locale === "ro" ? "Nu există badge-uri încă." : "No badges yet."}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -397,6 +434,7 @@ export default async function PublicProfile({
         </CardContent>
       </Card>
 
+    </div>
     </div>
   );
 }

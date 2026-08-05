@@ -6,10 +6,12 @@ import type { UpdateEntry } from "@/lib/updates";
 export type CountResult = number | null;
 
 export type AdminCounts = {
+  achievements?: CountResult;
   bannedUsers: CountResult;
   contactNew: CountResult;
   contactTotal: CountResult;
   problems: CountResult;
+  rewardProducts?: CountResult;
   updates: CountResult;
   users: CountResult;
 };

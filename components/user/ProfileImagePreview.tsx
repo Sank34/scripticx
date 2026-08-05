@@ -3,14 +3,16 @@
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { X } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
+import type { EquippedRewards } from "@/lib/rewards";
 import { cn } from "@/lib/utils";
 
 type ProfileImagePreviewProps = {
   alt: string;
   avatarUrl?: string | null;
   className?: string;
+  equippedRewards?: EquippedRewards | null;
   fallback: string;
 };
 
@@ -18,13 +20,16 @@ export function ProfileImagePreview({
   alt,
   avatarUrl,
   className,
+  equippedRewards,
   fallback,
 }: ProfileImagePreviewProps) {
   const avatar = (
-    <Avatar className={className}>
-      {avatarUrl ? <AvatarImage src={avatarUrl} alt={alt} /> : null}
-      <AvatarFallback>{fallback}</AvatarFallback>
-    </Avatar>
+    <UserAvatar
+      avatarUrl={avatarUrl}
+      equippedRewards={equippedRewards}
+      username={fallback}
+      className={className}
+    />
   );
 
   if (!avatarUrl) {

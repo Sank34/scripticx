@@ -2,7 +2,8 @@
 
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { use } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 import {
@@ -11,11 +12,7 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user/UserAvatar";
 import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import { MentionText } from "@/components/feed/MentionText";
 import PostComments from "@/components/PostComments";
@@ -26,20 +23,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
+
+type PostDetailData = {
+  post: any;
+  profile: any;
+  likes: number;
+  liked: boolean;
+  commentsCount: number;
+};
 
 function ClientPost({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const [post, setPost] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [likes, setLikes] = useState(0);
-  const [liked, setLiked] = useState(false);
-  const [commentsCount, setCommentsCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-
+  const { id } = use(params);
+  const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const { locale } = useLanguage();
+  const postQueryKey = ["post", id, user?.id || "anonymous"] as const;
 
   const t = (key: string) => {
     const keys = key.split(".");
@@ -54,71 +57,74 @@ function ClientPost({
     return fallback || key;
   };
 
-  useEffect(() => {
-    async function load() {
-      const { id } = await params;
-
-      const { data: postData } = await supabase
+  const { data: postDetail, isPending: loading } = useQuery({
+    queryKey: postQueryKey,
+    queryFn: async (): Promise<PostDetailData | null> => {
+      const { data: postData, error: postError } = await supabase
         .from("posts")
         .select("*")
         .eq("id", id)
         .maybeSingle();
+      if (postError) throw postError;
 
-      if (!postData) {
-        setLoading(false);
-        return;
-      }
+      if (!postData) return null;
 
-      setPost(postData);
+      const [profileResult, likesResult, commentsResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("username, avatar_url, equipped_rewards")
+          .eq("id", postData.user_id)
+          .maybeSingle(),
+        supabase
+          .from("post_likes")
+          .select("user_id")
+          .eq("post_id", id),
+        supabase
+          .from("comments")
+          .select("id", { count: "exact", head: true })
+          .eq("post_id", id),
+      ]);
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("username, avatar_url")
-        .eq("id", postData.user_id)
-        .maybeSingle();
+      if (profileResult.error) throw profileResult.error;
+      if (likesResult.error) throw likesResult.error;
+      if (commentsResult.error) throw commentsResult.error;
 
-      setProfile(profileData);
-
-      const { data: likesData } = await supabase
-        .from("post_likes")
-        .select("user_id")
-        .eq("post_id", id);
-
-      setLikes(likesData?.length || 0);
-
-      const user = (await supabase.auth.getUser()).data.user;
-      if (user) {
-        setLiked(
-          likesData?.some((l: any) => l.user_id === user.id) || false
-        );
-      }
-
-      const { data: commentsData } = await supabase
-        .from("comments")
-        .select("id")
-        .eq("post_id", id);
-
-      setCommentsCount(commentsData?.length || 0);
-      setLoading(false);
-    }
-
-    void load();
-  }, [params]);
+      return {
+        post: postData,
+        profile: profileResult.data,
+        likes: likesResult.data?.length || 0,
+        liked: Boolean(
+          user && likesResult.data?.some((like) => like.user_id === user.id)
+        ),
+        commentsCount: commentsResult.count || 0,
+      };
+    },
+    enabled: Boolean(id) && !authLoading,
+    staleTime: 2 * 60 * 1000,
+  });
+  const post = postDetail?.post || null;
+  const profile = postDetail?.profile || null;
+  const likes = postDetail?.likes || 0;
+  const liked = postDetail?.liked || false;
+  const commentsCount = postDetail?.commentsCount || 0;
 
   async function toggleLike() {
-    const user = (await supabase.auth.getUser()).data.user;
     if (!user || !post) return;
 
-    if (liked) {
-      await api.feed.toggleLike(post.id, user.id, true);
-
-      setLikes((l) => l - 1);
-      setLiked(false);
-    } else {
-      await api.feed.toggleLike(post.id, user.id, false);
-
-      setLikes((l) => l + 1);
-      setLiked(true);
+    try {
+      await api.feed.toggleLike(post.id, user.id, liked);
+      queryClient.setQueryData<PostDetailData | null>(postQueryKey, (current) =>
+        current
+          ? {
+              ...current,
+              liked: !liked,
+              likes: Math.max(0, current.likes + (liked ? -1 : 1)),
+            }
+          : current
+      );
+      void queryClient.invalidateQueries({ queryKey: ["feed"] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("post.likeError"));
     }
   }
 
@@ -149,14 +155,11 @@ function ClientPost({
       <Card>
         <CardHeader className="flex flex-row items-center gap-3">
 
-          <Avatar>
-            {profile?.avatar_url && (
-              <AvatarImage src={profile.avatar_url} />
-            )}
-            <AvatarFallback>
-              {(profile?.username || "U")[0]}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            avatarUrl={profile?.avatar_url}
+            username={profile?.username}
+            equippedRewards={profile?.equipped_rewards}
+          />
 
           <div>
             <Link href={`/u/${profile?.username}`}>

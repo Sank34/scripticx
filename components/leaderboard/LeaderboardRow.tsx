@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import { UserAvatar } from "@/components/user/UserAvatar";
+import type { EquippedRewards } from "@/lib/rewards";
 
 type LeaderboardRowProps = {
   pointsLabel: string;
   rank: number;
   user: {
     avatar_url: string | null;
+    equipped_rewards?: EquippedRewards | null;
     username: string;
     total_score: number;
   };
@@ -24,6 +26,7 @@ export function LeaderboardRow({ pointsLabel, rank, user }: LeaderboardRowProps)
           avatarUrl={user.avatar_url}
           className="w-8 h-8"
           username={user.username}
+          equippedRewards={user.equipped_rewards}
         />
         <span className="font-medium">{user.username}</span>
       </div>

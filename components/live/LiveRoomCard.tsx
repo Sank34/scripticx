@@ -60,6 +60,7 @@ export function LiveRoomCard({
                 avatarUrl={participant.avatar_url}
                 className="w-6 h-6 border"
                 username={participant.username}
+                equippedRewards={participant.equipped_rewards}
               />
             ))}
 

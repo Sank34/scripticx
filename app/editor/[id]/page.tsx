@@ -11,11 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user/UserAvatar";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +21,10 @@ import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 
 import { Copy, ExternalLink, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/components/LanguageProvider";
+import type { EquippedRewards } from "@/lib/rewards";
 
 type ProjectFile = {
   id: string;
@@ -48,6 +46,7 @@ type SnippetData = {
 type ProfileData = {
   username: string | null;
   avatar_url: string | null;
+  equipped_rewards?: EquippedRewards | null;
 };
 
 function createFileId() {
@@ -105,24 +104,19 @@ function normalizeProjectFiles(
 
 export default function EditorSnippetPage() {
   const { t } = useLanguage();
-  const [data, setData] = useState<SnippetData | null>(null);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [files, setFiles] = useState<ProjectFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const params = useParams();
-  const id = params?.id as string;
-
-  useEffect(() => {
-    async function fetchData() {
-      if (!id) return;
-
-      const { data: snippet } = await supabase
+  const id = typeof params?.id === "string" ? params.id : "";
+  const { data: snippetResult, isPending: loading } = useQuery({
+    queryKey: ["editor-snippets", "detail", id],
+    queryFn: async () => {
+      const { data: snippet, error: snippetError } = await supabase
         .from("snippets")
         .select("*")
         .eq("id", id)
         .maybeSingle();
+      if (snippetError) throw snippetError;
 
       const snippetData = snippet as SnippetData | null;
       const projectFiles = normalizeProjectFiles(
@@ -130,25 +124,25 @@ export default function EditorSnippetPage() {
         snippetData?.code || ""
       );
 
-      setData(snippetData);
-      setFiles(projectFiles);
-      setActiveFileId(projectFiles[0]?.id ?? null);
-
+      let profileData: ProfileData | null = null;
       if (snippetData?.user_id) {
-        const { data: prof } = await supabase
+        const { data: prof, error: profileError } = await supabase
           .from("profiles")
-          .select("username, avatar_url")
+          .select("username, avatar_url, equipped_rewards")
           .eq("id", snippetData.user_id)
           .maybeSingle();
-
-        setProfile(prof as ProfileData | null);
+        if (profileError) throw profileError;
+        profileData = prof as ProfileData | null;
       }
 
-      setLoading(false);
-    }
-
-    fetchData();
-  }, [id]);
+      return { snippet: snippetData, profile: profileData, files: projectFiles };
+    },
+    enabled: Boolean(id),
+    staleTime: 5 * 60 * 1000,
+  });
+  const data = snippetResult?.snippet || null;
+  const profile = snippetResult?.profile || null;
+  const files = snippetResult?.files || [];
 
   if (loading) {
     return (
@@ -237,12 +231,12 @@ export default function EditorSnippetPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
 
         <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10">
-            {profile?.avatar_url && (
-              <AvatarImage src={profile.avatar_url} />
-            )}
-            <AvatarFallback>{initial}</AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            avatarUrl={profile?.avatar_url}
+            username={profile?.username || initial}
+            equippedRewards={profile?.equipped_rewards}
+            className="w-10 h-10"
+          />
 
           <div>
             <Link

@@ -10,6 +10,7 @@ export const translations = {
       livecode: "Live Code",
       problems: "Problems",
       leaderboard: "Leaderboard",
+      shop: "Rewards Shop",
       feed: "Feed",
       groups: "Groups",
       dashboard: "Dashboard",
@@ -1475,7 +1476,14 @@ export const translations = {
       lessons: {
         title: "Lesson configurator",
         description: "Edit the roadmap, lesson nodes, and quizzes.",
-        badge: "Frontend",
+      },
+      badgeManager: {
+        title: "Badges",
+        description: "Create achievement and event badges with custom icons.",
+      },
+      shopManager: {
+        title: "Shop items",
+        description: "Create cosmetics, upload assets, and design profile backgrounds.",
       },
       updates: {
         title: "Updates",
@@ -1738,6 +1746,7 @@ export const translations = {
       livecode: "Programare live",
       problems: "Probleme",
       leaderboard: "Clasament",
+      shop: "Magazin de recompense",
       feed: "Feed",
       groups: "Grupuri",
       dashboard: "Panou",
@@ -3207,7 +3216,14 @@ export const translations = {
       lessons: {
         title: "Configurator lecții",
         description: "Editează roadmap-ul, nodurile și quiz-urile lecțiilor.",
-        badge: "Frontend",
+      },
+      badgeManager: {
+        title: "Badge-uri",
+        description: "Creează badge-uri pentru realizări și evenimente, cu iconuri custom.",
+      },
+      shopManager: {
+        title: "Shop items",
+        description: "Creează cosmetice, încarcă asset-uri și construiește background-uri de profil.",
       },
       updates: {
         title: "Noutăți",

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -13,6 +14,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useLanguage } from "@/components/LanguageProvider";
 import { Markdown } from "@/components/Markdown";
 import { translations } from "@/lib/i18n";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
+
+type AssignmentPageData = {
+  assignment: any;
+  problems: any[];
+  isTeacher: boolean;
+  members: any[];
+  submissions: any[];
+};
 
 export default function AssignmentPage() {
   const router = useRouter();
@@ -22,15 +33,8 @@ export default function AssignmentPage() {
   const assignmentId = Array.isArray(params.assignmentId)
     ? params.assignmentId[0]
     : params.assignmentId;
-
-  const [assignment, setAssignment] = useState<any>(null);
-  const [problems, setProblems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  // removed submitted state (derived from problems)
-  const [isTeacher, setIsTeacher] = useState(false);
-  const [members, setMembers] = useState<any[]>([]);
-  const [submissions, setSubmissions] = useState<any[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id || null;
 
   const [viewOpen, setViewOpen] = useState(false);
   const [activeSubmission, setActiveSubmission] = useState<any>(null);
@@ -45,128 +49,83 @@ export default function AssignmentPage() {
     return value || key;
   };
 
-  useEffect(() => {
-    load();
-  }, [assignmentId]);
+  const { data: assignmentPage, isPending: loading } = useQuery({
+    queryKey: ["classes", classId, "assignments", assignmentId, userId, locale],
+    queryFn: async (): Promise<AssignmentPageData> => {
+      if (!assignmentId || !classId) {
+        return { assignment: null, problems: [], isTeacher: false, members: [], submissions: [] };
+      }
 
-  async function load() {
-    if (!assignmentId) return;
+      const [assignmentResult, classResult, memberResult, submissionResult] =
+        await Promise.all([
+          supabase.from("assignments").select("*").eq("id", assignmentId).maybeSingle(),
+          supabase.from("classes").select("teacher_id").eq("id", classId).maybeSingle(),
+          supabase.from("class_members").select("user_id").eq("class_id", classId),
+          supabase
+            .from("assignment_problem_submissions")
+            .select("*")
+            .eq("assignment_id", assignmentId),
+        ]);
+      if (assignmentResult.error) throw assignmentResult.error;
+      if (classResult.error) throw classResult.error;
+      if (memberResult.error) throw memberResult.error;
+      if (submissionResult.error) throw submissionResult.error;
 
-    // 1. Assignment
-    const { data: assignmentData } = await supabase
-      .from("assignments")
-      .select("*")
-      .eq("id", assignmentId)
-      .single();
+      const assignmentData = assignmentResult.data;
+      const memberIds = (memberResult.data || []).map((member) => member.user_id);
+      const { data: profiles, error: profileError } = memberIds.length
+        ? await supabase
+            .from("profiles")
+            .select("id, username, avatar_url, equipped_rewards")
+            .in("id", memberIds)
+        : { data: [], error: null };
+      if (profileError) throw profileError;
 
-    console.log("ASSIGNMENT DATA:", assignmentData);
-
-    setAssignment(assignmentData);
-
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (user) setUserId(user.id);
-
-    // detect teacher from class
-    const { data: classData } = await supabase
-      .from("classes")
-      .select("teacher_id")
-      .eq("id", classId)
-      .single();
-
-    if (user && classData?.teacher_id === user.id) {
-      setIsTeacher(true);
-    }
-
-    // removed old assignment_submissions logic
-
-    // fetch members
-    const { data: memberRows } = await supabase
-      .from("class_members")
-      .select("user_id")
-      .eq("class_id", classId);
-
-    const userIds = memberRows?.map((m: any) => m.user_id) || [];
-
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url")
-      .in("id", userIds);
-
-    // fetch submissions (per problem)
-    const { data: subs } = await supabase
-      .from("assignment_problem_submissions")
-      .select("*")
-      .eq("assignment_id", assignmentId);
-
-    setMembers(profiles || []);
-    setSubmissions(subs || []);
-
-    // 2. Problems (support multiple)
-    let problemIds = assignmentData?.problem_ids;
-    // handle stringified arrays and Postgres array format
-    if (typeof problemIds === "string") {
-      try {
-        // try JSON first
-        problemIds = JSON.parse(problemIds);
-      } catch {
-        // fallback for Postgres array format: "{uuid1,uuid2}"
-        if (problemIds.startsWith("{") && problemIds.endsWith("}")) {
-          problemIds = problemIds
-            .slice(1, -1)
-            .split(",")
-            .map((id: string) => id.trim())
-            .filter(Boolean);
+      let problemIds: unknown = assignmentData?.problem_ids;
+      if (typeof problemIds === "string") {
+        const serializedProblemIds = problemIds;
+        try {
+          problemIds = JSON.parse(serializedProblemIds);
+        } catch {
+          if (serializedProblemIds.startsWith("{") && serializedProblemIds.endsWith("}")) {
+            problemIds = serializedProblemIds
+              .slice(1, -1)
+              .split(",")
+              .map((value: string) => value.trim());
+          }
         }
       }
-    }
+      const normalizedProblemIds = Array.isArray(problemIds)
+        ? problemIds.filter((value): value is string => typeof value === "string" && Boolean(value))
+        : assignmentData?.problem_id
+          ? [assignmentData.problem_id]
+          : [];
+      const { data: problemRows, error: problemError } = normalizedProblemIds.length
+        ? await supabase.from("problems").select("*").in("id", normalizedProblemIds)
+        : { data: [], error: null };
+      if (problemError) throw problemError;
 
-    console.log("PARSED problemIds:", problemIds, typeof problemIds);
-
-    if (problemIds && problemIds.length) {
-      const { data: problemsData } = await supabase
-        .from("problems")
-        .select("*")
-        .in("id", problemIds);
-
-      console.log("PROBLEMS DATA:", problemsData);
-
-      if (problemsData) {
-        setProblems(
-          problemsData.map((p: any) => ({
-            ...p,
-            title: p.title_i18n?.[locale] || p.title_i18n?.en || "Untitled",
-            description: p.description_i18n?.[locale] || p.description_i18n?.en || "",
-          }))
-        );
-      }
-    } else if (assignmentData?.problem_id) {
-      // fallback old single problem
-      const { data: problemData } = await supabase
-        .from("problems")
-        .select("*")
-        .eq("id", assignmentData.problem_id)
-        .single();
-
-      if (problemData) {
-        setProblems([
-          {
-            ...problemData,
-            title:
-              problemData.title_i18n?.[locale] ||
-              problemData.title_i18n?.en ||
-              "Untitled",
-            description:
-              problemData.description_i18n?.[locale] ||
-              problemData.description_i18n?.en ||
-              "",
-          },
-        ]);
-      }
-    }
-
-    setLoading(false);
-  }
+      return {
+        assignment: assignmentData,
+        problems: (problemRows || []).map((problem) => ({
+          ...problem,
+          title: problem.title_i18n?.[locale] || problem.title_i18n?.en || "Untitled",
+          description:
+            problem.description_i18n?.[locale] || problem.description_i18n?.en || "",
+        })),
+        isTeacher: Boolean(userId && classResult.data?.teacher_id === userId),
+        members: profiles || [],
+        submissions: submissionResult.data || [],
+      };
+    },
+    enabled: Boolean(assignmentId && classId) && !authLoading,
+    staleTime: 90 * 1000,
+  });
+  const assignment = assignmentPage?.assignment || null;
+  const problems = assignmentPage?.problems || [];
+  const isTeacher = assignmentPage?.isTeacher || false;
+  const members = assignmentPage?.members || [];
+  const submissions = assignmentPage?.submissions || [];
 
   if (loading) {
     return (
@@ -354,16 +313,12 @@ export default function AssignmentPage() {
                 className="flex items-center justify-between border rounded p-2"
               >
                 <div className="flex items-center gap-2">
-                  {m.avatar_url ? (
-                    <img
-                      src={m.avatar_url}
-                      className="w-6 h-6 rounded-full"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs">
-                      {m.username?.[0]}
-                    </div>
-                  )}
+                  <UserAvatar
+                    avatarUrl={m.avatar_url}
+                    username={m.username}
+                    equippedRewards={m.equipped_rewards}
+                    className="w-6 h-6"
+                  />
 
                   <span className="text-sm font-medium">{m.username}</span>
                 </div>

@@ -37,6 +37,7 @@ import {
   HelpCircle,
   Route,
   Sparkles,
+  ShoppingBag,
   Mail,
   type LucideIcon,
 } from "lucide-react";
@@ -329,6 +330,9 @@ export function AppSidebar() {
             )}
             <NavItem href="/problems" icon={List} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
             <NavItem href="/leaderboard" icon={Trophy} label={t("nav.leaderboard")} active={pathname.startsWith("/leaderboard")} />
+            {user && (
+              <NavItem href="/shop" icon={ShoppingBag} label={t("nav.shop")} active={pathname.startsWith("/shop")} />
+            )}
             {user && (
               <NavItem href="/feed" icon={MessageSquare} label={t("nav.feed")} active={pathname.startsWith("/feed")} />
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useParams, useRouter } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
@@ -12,26 +12,24 @@ function EditProblemContent() {
   const params = useParams();
   const router = useRouter();
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
 
-  const id = params?.id;
-
-  const [problem, setProblem] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchProblem() {
-      const { data } = await supabase
+  const id = typeof params?.id === "string" ? params.id : "";
+  const { data: problem, isPending: loading } = useQuery({
+    queryKey: ["admin", "problems", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from("problems")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
-      setProblem(data);
-      setLoading(false);
-    }
-
-    if (id) fetchProblem();
-  }, [id]);
+      if (error) throw error;
+      return data;
+    },
+    enabled: Boolean(id),
+    staleTime: 2 * 60 * 1000,
+  });
 
   if (loading) {
     return (
@@ -55,7 +53,11 @@ function EditProblemContent() {
 
       <ProblemForm
         initialData={problem}
-        onSuccess={() => router.push("/admin/problems")}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: ["admin", "problems"] });
+          void queryClient.invalidateQueries({ queryKey: ["problems"] });
+          router.push("/admin/problems");
+        }}
       />
 
     </div>

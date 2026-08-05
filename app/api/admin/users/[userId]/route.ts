@@ -73,8 +73,9 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     admin = createAdminSupabase();
   } catch (error) {
+    console.error("Admin client configuration error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Server configuration error" },
+      { error: "Server configuration error" },
       { status: 503 }
     );
   }
@@ -86,7 +87,8 @@ export async function DELETE(request: Request, context: RouteContext) {
     .maybeSingle<{ role: string | null }>();
 
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 });
+    console.error("Could not verify administrator role:", profileError);
+    return NextResponse.json({ error: "Could not verify administrator role" }, { status: 500 });
   }
   if (actorProfile?.role !== "admin") {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 });
@@ -111,8 +113,9 @@ export async function DELETE(request: Request, context: RouteContext) {
       profileCleanupPending: Boolean(profileDeleteError),
     });
   } catch (error) {
+    console.error("Could not delete user:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not delete user" },
+      { error: "Could not delete user" },
       { status: 500 }
     );
   }

@@ -4,7 +4,7 @@ import {
   createNotFoundMetadata,
   createPageMetadata,
 } from "@/lib/metadata";
-import { createServerSupabase } from "@/lib/supabaseServer";
+import { createAdminSupabase } from "@/lib/supabaseServer";
 
 export async function generateMetadata({
   params,
@@ -12,7 +12,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const supabase = createServerSupabase();
+  const supabase = createAdminSupabase();
   const { data: classData } = await supabase
     .from("classes")
     .select("name")

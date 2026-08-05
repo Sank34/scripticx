@@ -7,56 +7,110 @@ import {
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
+import {
+  authQueryKey,
+  type AuthState,
+} from "@/hooks/useAuth";
 
-const realtimeInvalidationTargets = [
-  "admin",
-  "livecode",
-  "command-menu",
-  "dashboard",
-  "profile",
-  "feed",
-  "leaderboard",
-  "problems",
-  "classes",
-  "updates",
-  "community",
-  "contact_messages",
-  "editor-snippets",
-  "notifications",
-  "groups",
-  "daily-challenge",
-  "daily-challenge-completions",
-];
+const realtimeScopesByTable: Record<string, string[]> = {
+  live_rooms: ["livecode", "command-menu", "groups"],
+  room_participants: ["livecode"],
+  live_participants: ["livecode"],
+  live_messages: ["livecode"],
+  profiles: [
+    "auth",
+    "admin",
+    "profile",
+    "feed",
+    "leaderboard",
+    "community",
+    "search",
+    "classes",
+    "post",
+    "command-menu",
+  ],
+  posts: ["feed", "post", "profile", "community"],
+  comments: ["feed", "post", "profile", "community"],
+  post_likes: ["feed", "post", "profile", "community"],
+  follows: ["profile", "feed", "community", "search"],
+  snippets: ["editor-snippets", "profile", "community"],
+  submissions: ["dashboard", "profile", "leaderboard", "problems", "roadmap"],
+  problems: ["problems", "admin", "classes", "dashboard", "daily-challenge"],
+  classes: ["classes", "admin", "dashboard"],
+  class_members: ["classes", "admin", "dashboard"],
+  assignments: ["classes", "dashboard", "notifications"],
+  assignment_submissions: ["classes", "dashboard"],
+  assignment_problem_submissions: ["classes", "dashboard"],
+  user_achievements: ["profile", "admin", "community"],
+  achievements: ["profile", "admin", "community"],
+  updates: ["updates", "dashboard", "admin"],
+  contact_messages: ["contact_messages", "admin"],
+  notifications: ["notifications"],
+  study_groups: ["groups", "community", "command-menu"],
+  study_group_members: ["groups", "community"],
+  study_group_channels: ["groups"],
+  study_group_messages: ["groups"],
+  daily_challenges: ["daily-challenge", "problems", "dashboard", "admin"],
+  daily_challenge_completions: [
+    "daily-challenge-completions",
+    "daily-challenge",
+    "problems",
+    "dashboard",
+  ],
+  reward_products: ["rewards-shop", "admin", "profile"],
+  user_reward_inventory: ["rewards-shop", "profile", "auth"],
+  reward_transactions: ["rewards-shop", "profile", "admin"],
+  learning_paths: ["roadmap", "admin"],
+  learning_units: ["roadmap", "admin"],
+  lessons: ["roadmap", "admin"],
+  lesson_progress: ["roadmap", "dashboard", "profile"],
+};
 
-const realtimeTables = [
-  "live_rooms",
-  "room_participants",
-  "live_participants",
-  "live_messages",
-  "profiles",
-  "posts",
-  "comments",
-  "post_likes",
-  "follows",
-  "snippets",
-  "submissions",
-  "problems",
-  "classes",
-  "class_members",
-  "assignments",
-  "assignment_submissions",
-  "assignment_problem_submissions",
-  "user_achievements",
-  "updates",
-  "contact_messages",
-  "notifications",
-  "study_groups",
-  "study_group_members",
-  "study_group_channels",
-  "study_group_messages",
-  "daily_challenges",
-  "daily_challenge_completions",
-];
+function AuthCacheSync({ queryClient }: { queryClient: QueryClient }) {
+  useEffect(() => {
+    const subscription = api.auth.onAuthStateChange((session) => {
+      const user = session?.user ?? null;
+
+      if (!user) {
+        queryClient.setQueryData<AuthState>(authQueryKey, {
+          profile: null,
+          user: null,
+        });
+        return;
+      }
+
+      const current = queryClient.getQueryData<AuthState>(authQueryKey);
+      queryClient.setQueryData<AuthState>(authQueryKey, {
+        profile: current?.user?.id === user.id ? current.profile : null,
+        user,
+      });
+
+      window.setTimeout(async () => {
+        const profile = await api.profiles.getProfile(user.id);
+        queryClient.setQueryData<AuthState>(authQueryKey, {
+          profile: profile || null,
+          user,
+        });
+      }, 0);
+    });
+
+    function refreshProfile() {
+      void queryClient.invalidateQueries({ queryKey: authQueryKey });
+    }
+
+    window.addEventListener("profile-updated", refreshProfile);
+    window.addEventListener("rewards-updated", refreshProfile);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("profile-updated", refreshProfile);
+      window.removeEventListener("rewards-updated", refreshProfile);
+    };
+  }, [queryClient]);
+
+  return null;
+}
 
 export default function Providers({
   children,
@@ -70,9 +124,9 @@ export default function Providers({
           queries: {
             staleTime: 1000 * 60 * 3,
             gcTime: 1000 * 60 * 30,
-            refetchOnReconnect: "always",
-            refetchOnWindowFocus: "always",
-            refetchOnMount: "always",
+            refetchOnReconnect: true,
+            refetchOnWindowFocus: true,
+            refetchOnMount: true,
             retry: 2,
           },
         },
@@ -82,20 +136,21 @@ export default function Providers({
 
   useEffect(() => {
     let invalidationTimeout: number | null = null;
+    const pendingScopes = new Set<string>();
 
-    function invalidateRealtimeQueries() {
+    function invalidateRealtimeQueries(scopes: string[]) {
+      scopes.forEach((scope) => pendingScopes.add(scope));
       if (invalidationTimeout) return;
 
       invalidationTimeout = window.setTimeout(() => {
         invalidationTimeout = null;
+        const invalidatedScopes = new Set(pendingScopes);
+        pendingScopes.clear();
 
         void queryClient.invalidateQueries({
           predicate: (query) => {
             const scope = query.queryKey[0];
-            return (
-              typeof scope === "string" &&
-              realtimeInvalidationTargets.includes(scope)
-            );
+            return typeof scope === "string" && invalidatedScopes.has(scope);
           },
         });
       }, 250);
@@ -103,7 +158,7 @@ export default function Providers({
 
     const channel = supabase.channel("global-realtime-invalidations");
 
-    realtimeTables.forEach((table) => {
+    Object.entries(realtimeScopesByTable).forEach(([table, scopes]) => {
       channel.on(
         "postgres_changes",
         {
@@ -111,7 +166,23 @@ export default function Providers({
           schema: "public",
           table,
         },
-        invalidateRealtimeQueries
+        (payload) => {
+          if (table !== "profiles") {
+            invalidateRealtimeQueries(scopes);
+            return;
+          }
+
+          const changedId =
+            (payload.new as Record<string, unknown> | null)?.id ??
+            (payload.old as Record<string, unknown> | null)?.id;
+          const currentUserId = queryClient.getQueryData<AuthState>(authQueryKey)
+            ?.user?.id;
+          invalidateRealtimeQueries(
+            changedId && changedId !== currentUserId
+              ? scopes.filter((scope) => scope !== "auth")
+              : scopes
+          );
+        }
       );
     });
 
@@ -147,6 +218,7 @@ export default function Providers({
 
       await queryClient.refetchQueries({
         type: "active",
+        stale: true,
       });
     }
 
@@ -169,6 +241,7 @@ export default function Providers({
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthCacheSync queryClient={queryClient} />
       {children}
     </QueryClientProvider>
   );

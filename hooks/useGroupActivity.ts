@@ -167,6 +167,7 @@ export function useGroupActivity(userId?: string | null) {
   }, []);
 
   return useMemo(() => {
+    void seenVersion;
     const mentionCountsByGroup = new Map<string, number>();
     const mentionCountsByChannel = new Map<string, number>();
     const activityGroupIds = new Set<string>();

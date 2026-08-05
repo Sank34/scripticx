@@ -1,6 +1,7 @@
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { extractMentionUsernames } from "@/lib/mentions";
+import type { EquippedRewards } from "@/lib/rewards";
 
 export type ProfileSummary = {
   id: string;
@@ -10,6 +11,8 @@ export type ProfileSummary = {
   role?: string | null;
   banned?: boolean | null;
   total_score?: number | null;
+  reward_points?: number | null;
+  equipped_rewards?: EquippedRewards | null;
   [key: string]: unknown;
 };
 
@@ -17,6 +20,7 @@ export type MentionCandidate = {
   id: string;
   username: string;
   avatar_url: string | null;
+  equipped_rewards?: EquippedRewards | null;
   isFollowing: boolean;
 };
 
@@ -264,6 +268,7 @@ type CreateNotificationInput = {
   body?: string | null;
   href?: string | null;
   metadata?: Record<string, unknown>;
+  locale?: "en" | "ro";
 };
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -401,7 +406,6 @@ class ProfilesApi {
           id: user.id,
           username,
           avatar_url: avatarUrl,
-          role: "user",
         },
         { onConflict: "id" }
       )
@@ -417,7 +421,6 @@ class ProfilesApi {
     const { error } = await this.client.from("profiles").upsert({
       id: userId,
       username: username.trim().toLowerCase(),
-      role: "user",
     });
 
     if (error) throw error;
@@ -519,6 +522,7 @@ class ProfilesApi {
         id: profile.id,
         username: profile.username,
         avatar_url: profile.avatar_url || null,
+        equipped_rewards: profile.equipped_rewards || {},
         isFollowing: followingIds.has(profile.id),
       }))
       .sort(
@@ -666,8 +670,14 @@ class FeedApi {
     let imageUrl: string | null = null;
 
     if (image) {
-      const ext = image.name.split(".").pop();
-      const fileName = `${userId}-${Date.now()}.${ext}`;
+      if (!["image/png", "image/jpeg", "image/webp"].includes(image.type)) {
+        throw new Error("Unsupported post image type");
+      }
+      if (image.size > 8 * 1024 * 1024) {
+        throw new Error("Post image is too large");
+      }
+      const ext = image.type === "image/jpeg" ? "jpg" : image.type.split("/")[1];
+      const fileName = `${userId}/${crypto.randomUUID()}.${ext}`;
 
       const { error: uploadError } = await this.client.storage
         .from("posts")
@@ -698,13 +708,12 @@ class FeedApi {
     const mentionedUsernames = extractMentionUsernames(content);
 
     if (mentionedUsernames.length > 0) {
-      const [{ data: mentionedProfiles, error: profilesError }, actor] =
+      const [{ data: mentionedProfiles, error: profilesError }] =
         await Promise.all([
           this.client
             .from("profiles")
             .select("id, username")
             .in("username", mentionedUsernames),
-          this.profiles.getSummary(userId),
         ]);
 
       if (profilesError) {
@@ -715,30 +724,20 @@ class FeedApi {
         );
 
         if (recipients.length > 0) {
-          const { error: notificationError } = await this.client
-            .from("notifications")
-            .insert(
-              recipients.map((profile) => ({
-                user_id: profile.id,
-                actor_id: userId,
+          await Promise.all(
+            recipients.map((profile) =>
+              NotificationsApi.createWithClient(this.client, {
+                userId: profile.id,
+                actorId: userId,
                 type: "post_mention",
-                title: `${actor?.username || "Someone"} mentioned you in a post`,
-                body: content.slice(0, 160),
-                href: `/post/${post.id}`,
+                title: "Mention",
                 metadata: {
                   postId: post.id,
-                  username: actor?.username || null,
                   mentionedUsername: profile.username,
                 },
-              }))
-            );
-
-          if (notificationError) {
-            console.warn(
-              "Could not create mention notifications.",
-              notificationError
-            );
-          }
+              })
+            )
+          );
         }
       }
     }
@@ -804,18 +803,35 @@ class NotificationsApi {
     client: SupabaseClient,
     input: CreateNotificationInput
   ) {
-    const { error } = await client.from("notifications").insert({
-      user_id: input.userId,
-      actor_id: input.actorId || null,
-      type: input.type,
-      title: input.title,
-      body: input.body || null,
-      href: input.href || null,
-      metadata: input.metadata || {},
+    const {
+      data: { session },
+      error: sessionError,
+    } = await client.auth.getSession();
+    if (sessionError || !session?.access_token) {
+      console.warn("Could not create notification without a valid session.");
+      return;
+    }
+
+    const response = await fetch("/api/notifications", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: input.userId,
+        type: input.type,
+        metadata: input.metadata || {},
+        locale:
+          input.locale ||
+          (typeof document !== "undefined" && document.documentElement.lang === "ro"
+            ? "ro"
+            : "en"),
+      }),
     });
 
-    if (error) {
-      console.warn("Could not create notification.", error);
+    if (!response.ok) {
+      console.warn("Could not create verified notification.", response.status);
     }
   }
 
@@ -851,26 +867,23 @@ class NotificationsApi {
 
     if (recipientIds.length === 0) return 0;
 
-    const href = `/classes/${input.classId}/assignments/${input.assignmentId}`;
     const metadata = {
       assignmentId: input.assignmentId,
       classId: input.classId,
       className: input.className || null,
     };
 
-    const { error } = await this.client.from("notifications").insert(
-      recipientIds.map((userId) => ({
-        user_id: userId,
-        actor_id: input.actorId,
-        type: "new_assignment",
-        title: `New assignment in ${input.className || "your class"}`,
-        body: input.assignmentTitle,
-        href,
-        metadata,
-      }))
+    await Promise.all(
+      recipientIds.map((userId) =>
+        NotificationsApi.createWithClient(this.client, {
+          userId,
+          actorId: input.actorId,
+          type: "new_assignment",
+          title: input.assignmentTitle,
+          metadata,
+        })
+      )
     );
-
-    if (error) throw error;
 
     return recipientIds.length;
   }
@@ -1440,18 +1453,22 @@ class DailyChallengesApi {
     problemId: string;
     bonusPoints: number;
   }) {
-    const { error } = await this.client.from("daily_challenge_completions").insert({
-      challenge_id: input.challengeId,
-      user_id: input.userId,
-      problem_id: input.problemId,
-      bonus_points: input.bonusPoints,
-    });
+    const { data, error } = await this.client
+      .from("daily_challenge_completions")
+      .insert({
+        challenge_id: input.challengeId,
+        user_id: input.userId,
+        problem_id: input.problemId,
+        bonus_points: input.bonusPoints,
+      })
+      .select("id")
+      .single<{ id: string }>();
 
-    if (error?.code === "23505") return false;
+    if (error?.code === "23505") return null;
 
     if (error) throw error;
 
-    return true;
+    return data.id;
   }
 
   async schedule(input: {
@@ -1523,6 +1540,7 @@ class DailyChallengesApi {
         challengeDate: today,
         problemId: challenge.problem_id,
       },
+      locale: locale === "ro" ? "ro" : "en",
     });
 
     return challenge;
@@ -1572,6 +1590,12 @@ class StudyGroupsApi {
     file: File;
     kind: "avatar" | "banner";
   }) {
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(input.file.type)) {
+      throw new Error("Unsupported group image type");
+    }
+    if (input.file.size > 5 * 1024 * 1024) {
+      throw new Error("Group image is too large");
+    }
     const extension = input.file.name.split(".").pop()?.toLowerCase() || "png";
     const safeExtension = ["png", "jpg", "jpeg", "webp", "gif"].includes(
       extension
@@ -1665,7 +1689,7 @@ class StudyGroupsApi {
     if (!mentionedUsernames.length) return;
 
     const mentionedSet = new Set(mentionedUsernames);
-    const [{ data: members, error: membersError }, group, sender] =
+    const [{ data: members, error: membersError }, group] =
       await Promise.all([
         this.client
           .from("study_group_members")
@@ -1673,7 +1697,6 @@ class StudyGroupsApi {
           .eq("group_id", input.groupId)
           .eq("status", "active"),
         this.getGroupIdentity(input.groupId),
-        new ProfilesApi(this.client).getSummary(input.senderId),
       ]);
 
     if (membersError) throw membersError;
@@ -1711,35 +1734,23 @@ class StudyGroupsApi {
 
     if (!recipientIds.length) return;
 
-    const actorName = sender?.username || "Someone";
-    const preview =
-      input.content.length > 120
-        ? `${input.content.slice(0, 117).trim()}...`
-        : input.content;
-    const isRo = input.locale === "ro";
-
-    const { error } = await this.client.from("notifications").insert(
-      recipientIds.map((userId) => ({
-        user_id: userId,
-        actor_id: input.senderId,
-        type: "group_message",
-        title: isRo
-          ? `${actorName} te-a menționat în ${group.name}`
-          : `${actorName} mentioned you in ${group.name}`,
-        body: preview,
-        href: `/groups/${group.slug}`,
-        metadata: {
-          groupId: input.groupId,
-          channelId: input.channelId,
-          messageId: input.messageId || null,
-          mentionedUsernames,
-        },
-      }))
+    await Promise.all(
+      recipientIds.map((userId) =>
+        NotificationsApi.createWithClient(this.client, {
+          userId,
+          actorId: input.senderId,
+          type: "group_message",
+          title: group.name,
+          locale: input.locale === "ro" ? "ro" : "en",
+          metadata: {
+            groupId: input.groupId,
+            channelId: input.channelId,
+            messageId: input.messageId,
+            mentionedUsernames,
+          },
+        })
+      )
     );
-
-    if (error) {
-      console.warn("Could not create group message notifications.", error);
-    }
   }
 
   private async enrichGroups(
@@ -2418,6 +2429,12 @@ class StudyGroupsApi {
   }): Promise<StudyGroupSticker> {
     const name = input.name.trim().slice(0, 32);
     if (!name) throw new Error("Sticker name is required");
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(input.file.type)) {
+      throw new Error("Unsupported sticker image type");
+    }
+    if (input.file.size > 5 * 1024 * 1024) {
+      throw new Error("Sticker image is too large");
+    }
 
     const extension = input.file.name.split(".").pop()?.toLowerCase() || "png";
     const safeExtension = ["png", "jpg", "jpeg", "webp", "gif"].includes(extension)

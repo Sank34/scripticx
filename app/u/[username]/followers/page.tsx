@@ -51,7 +51,8 @@ export default async function FollowersPage({
       profiles!follows_follower_id_fkey (
         id,
         username,
-        avatar_url
+        avatar_url,
+        equipped_rewards
       )
     `)
     .eq("following_id", profile.id);
@@ -87,6 +88,7 @@ export default async function FollowersPage({
                 key={u.id}
                 href={`/u/${u.username}`}
                 avatarUrl={u.avatar_url}
+                equippedRewards={u.equipped_rewards}
                 showArrow={false}
                 username={u.username}
                 variant="row"

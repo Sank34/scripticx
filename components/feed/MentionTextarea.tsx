@@ -211,6 +211,7 @@ export function MentionTextarea({
                   <UserAvatar
                     avatarUrl={candidate.avatar_url}
                     username={candidate.username}
+                    equippedRewards={candidate.equipped_rewards}
                     className="size-8"
                   />
                   <span className="min-w-0">

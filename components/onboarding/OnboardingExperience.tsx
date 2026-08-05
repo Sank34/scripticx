@@ -179,7 +179,7 @@ export function OnboardingExperience({
 
   function chooseAvatar(file: File | undefined) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
       toast.error(language === "ro" ? "Alege o imagine validă." : "Choose a valid image.");
       return;
     }
@@ -343,7 +343,7 @@ export function OnboardingExperience({
                       {c.uploadAvatar}
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/png,image/jpeg,image/webp"
                         className="sr-only"
                         onChange={(event) => chooseAvatar(event.target.files?.[0])}
                       />

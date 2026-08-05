@@ -38,7 +38,8 @@ import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEdit
 import { DebuggerStateCard } from "@/components/live/DebuggerStateCard";
 import { LiveConsolePanel } from "@/components/live/LiveConsolePanel";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import type { EquippedRewards } from "@/lib/rewards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -74,6 +75,7 @@ type LiveParticipant = {
   user_id: string;
   username?: string | null;
   avatar_url?: string | null;
+  equipped_rewards?: EquippedRewards | null;
 };
 
 type ParticipantProfile = ProfileSummary & {
@@ -471,6 +473,7 @@ export default function LiveRoomPage() {
       id: participant.user_id,
       username: participant.username || profilesMap[participant.user_id]?.username,
       avatar_url: participant.avatar_url || profilesMap[participant.user_id]?.avatar_url,
+      equipped_rewards: profilesMap[participant.user_id]?.equipped_rewards,
       online: true,
     }));
 
@@ -481,6 +484,7 @@ export default function LiveRoomPage() {
         id: profile.id,
         username: profile.username,
         avatar_url: profile.avatar_url,
+        equipped_rewards: profile.equipped_rewards,
         online: false,
       }));
 
@@ -1477,10 +1481,12 @@ export default function LiveRoomPage() {
               disabled={!profile.username}
               className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left transition hover:opacity-80 disabled:cursor-default disabled:hover:opacity-100"
             >
-              <Avatar className="h-8 w-8">
-                {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
-                <AvatarFallback>{getInitial(profile)}</AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                avatarUrl={profile.avatar_url}
+                username={profile.username || getInitial(profile)}
+                equippedRewards={profile.equipped_rewards}
+                className="h-8 w-8"
+              />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{profile.username || "User"}</div>
                 <div className="text-xs text-zinc-500">
@@ -1533,10 +1539,12 @@ export default function LiveRoomPage() {
                     className="rounded-full disabled:cursor-default"
                     aria-label={profile?.username ? `Open ${profile.username}` : "User"}
                   >
-                  <Avatar className="h-7 w-7">
-                    {profile?.avatar_url && <AvatarImage src={profile.avatar_url} />}
-                    <AvatarFallback>{getInitial(profile)}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    avatarUrl={profile?.avatar_url}
+                    username={profile?.username || getInitial(profile)}
+                    equippedRewards={profile?.equipped_rewards || profilesMap[messageUserId]?.equipped_rewards}
+                    className="h-7 w-7"
+                  />
                   </button>
                 )}
                 <div
@@ -1669,10 +1677,12 @@ export default function LiveRoomPage() {
                   className="rounded-full transition hover:-translate-y-0.5 disabled:cursor-default disabled:hover:translate-y-0"
                   aria-label={participant.username ? `Open ${participant.username}` : "User"}
                 >
-                <Avatar className="h-7 w-7 border-2 border-white">
-                  {participant.avatar_url && <AvatarImage src={participant.avatar_url} />}
-                  <AvatarFallback>{getInitial(participant)}</AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={participant.avatar_url}
+                  username={participant.username || getInitial(participant)}
+                  equippedRewards={profilesMap[participant.user_id]?.equipped_rewards}
+                  className="h-7 w-7 border-2 border-white"
+                />
                 </button>
               ))}
             </div>
@@ -1862,10 +1872,12 @@ export default function LiveRoomPage() {
                     className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {profile.avatar_url && <AvatarImage src={profile.avatar_url} />}
-                        <AvatarFallback>{getInitial(profile)}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        avatarUrl={profile.avatar_url}
+                        username={profile.username || getInitial(profile)}
+                        equippedRewards={profile.equipped_rewards}
+                        className="h-8 w-8"
+                      />
                       <span className="text-sm font-medium">{profile.username}</span>
                     </div>
                     <Button

@@ -15,6 +15,7 @@ import { Plus, Users, Link as LinkIcon } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -90,29 +91,13 @@ export default function ClassesPage() {
   async function createClass() {
     if (!name.trim()) return;
 
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (!user) return;
-
-    const inviteCode = Math.random().toString(36).substring(2, 8);
-
-    const { data, error } = await supabase
-      .from("classes")
-      .insert({
-        name,
-        teacher_id: user.id,
-        invite_code: inviteCode,
-      })
-      .select()
-      .single();
-
-    if (error || !data) return;
-
-    await supabase.from("class_members").insert({
-      class_id: data.id,
-      user_id: user.id,
-      role: "teacher",
+    const { error } = await supabase.rpc("create_class_secure", {
+      p_name: name.trim(),
     });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
 
     await queryClient.invalidateQueries({
       queryKey: ["classes"],
@@ -124,23 +109,13 @@ export default function ClassesPage() {
   async function joinClass() {
     if (!joinCode.trim()) return;
 
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (!user) return;
-
-    const { data: cls } = await supabase
-      .from("classes")
-      .select("*")
-      .eq("invite_code", joinCode)
-      .maybeSingle();
-
-    if (!cls) return;
-
-    await supabase.from("class_members").insert({
-      class_id: cls.id,
-      user_id: user.id,
-      role: "student",
+    const { error } = await supabase.rpc("join_class_secure", {
+      p_invite_code: joinCode.trim(),
     });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
 
     await queryClient.invalidateQueries({
       queryKey: ["classes"],

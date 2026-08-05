@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   BookOpen,
@@ -29,15 +30,10 @@ import {
   type LearnLesson,
   type LessonLocale,
 } from "@/lib/learn-lessons";
-import {
-  getRoadmapConfigData,
-  readRoadmapConfig,
-  readRemoteRoadmapConfig,
-  roadmapConfigEvent,
-  writeRoadmapConfig,
-} from "@/lib/roadmap-config";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { useRoadmapConfig } from "@/hooks/useRoadmapConfig";
+import { useAuth } from "@/hooks/useAuth";
 
 type StoredProgress = Record<
   string,
@@ -253,71 +249,40 @@ function calculateLessonStreak(progress: StoredProgress) {
 
 export default function LearnRoadmapPage() {
   const { locale } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const lessonLocale = locale as LessonLocale;
   const c = copy[lessonLocale] ?? copy.en;
   const [progress, setProgress] = useState<StoredProgress>({});
   const [solvedProblemCodes, setSolvedProblemCodes] = useState<number[]>([]);
-  const [roadmapData, setRoadmapData] = useState(() =>
-    getRoadmapConfigData(null)
-  );
+  const roadmapData = useRoadmapConfig();
   const lessons = roadmapData.lessons;
   const sections = roadmapData.sections;
   const categories = roadmapData.categories;
 
-  useEffect(() => {
-    const syncRoadmapConfig = () =>
-      setRoadmapData(getRoadmapConfigData(readRoadmapConfig()));
-    const syncRemoteRoadmapConfig = async () => {
-      try {
-        const remoteConfig = await readRemoteRoadmapConfig();
-        if (!remoteConfig) {
-          syncRoadmapConfig();
-          return;
-        }
-
-        writeRoadmapConfig(remoteConfig);
-        setRoadmapData(getRoadmapConfigData(remoteConfig));
-      } catch {
-        syncRoadmapConfig();
-      }
-    };
-    const syncVisibleRoadmapConfig = () => {
-      if (document.visibilityState === "visible") {
-        void syncRemoteRoadmapConfig();
-      }
-    };
-
-    void syncRemoteRoadmapConfig();
-    window.addEventListener(roadmapConfigEvent, syncRoadmapConfig);
-    window.addEventListener("focus", syncRemoteRoadmapConfig);
-    document.addEventListener("visibilitychange", syncVisibleRoadmapConfig);
-
-    return () => {
-      window.removeEventListener(roadmapConfigEvent, syncRoadmapConfig);
-      window.removeEventListener("focus", syncRemoteRoadmapConfig);
-      document.removeEventListener("visibilitychange", syncVisibleRoadmapConfig);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadProgress() {
+  const { data: progressData } = useQuery({
+    queryKey: ["roadmap", "progress", user?.id || "anonymous"],
+    queryFn: async () => {
       const localProgress = readProgress();
-      setProgress(localProgress);
+      if (!user) {
+        return { progress: localProgress, solvedProblemCodes: [] as number[] };
+      }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      const { data: submissionRows } = await supabase
-        .from("submissions")
-        .select("problem_id, score")
-        .eq("user_id", user.id)
-        .gte("score", 100)
-        .returns<SubmissionRow[]>();
+      const [submissionResult, lessonResult] = await Promise.all([
+        supabase
+          .from("submissions")
+          .select("problem_id, score")
+          .eq("user_id", user.id)
+          .gte("score", 100)
+          .returns<SubmissionRow[]>(),
+        supabase
+          .from("lessons")
+          .select("id, slug")
+          .in("slug", learnLessons.map((lesson) => lesson.id))
+          .returns<LessonRow[]>(),
+      ]);
+      if (submissionResult.error) throw submissionResult.error;
+      if (lessonResult.error) throw lessonResult.error;
+      const submissionRows = submissionResult.data;
 
       const solvedProblemIds = Array.from(
         new Set(
@@ -327,38 +292,27 @@ export default function LearnRoadmapPage() {
         )
       );
 
+      let solvedCodes: number[] = [];
       if (solvedProblemIds.length > 0) {
-        const { data: problemRows } = await supabase
+        const { data: problemRows, error: problemError } = await supabase
           .from("problems")
           .select("id, code")
           .in("id", solvedProblemIds)
           .returns<ProblemCodeRow[]>();
-
-        if (!cancelled) {
-          setSolvedProblemCodes(
-            (problemRows ?? [])
-              .map((row) => row.code)
-              .filter((code): code is number => typeof code === "number")
-          );
-        }
-      } else if (!cancelled) {
-        setSolvedProblemCodes([]);
+        if (problemError) throw problemError;
+        solvedCodes = (problemRows ?? [])
+          .map((row) => row.code)
+          .filter((code): code is number => typeof code === "number");
       }
 
-      const { data: lessonRows } = await supabase
-        .from("lessons")
-        .select("id, slug")
-        .in(
-          "slug",
-          learnLessons.map((lesson) => lesson.id)
-        )
-        .returns<LessonRow[]>();
-
-      if (!lessonRows?.length) return;
+      const lessonRows = lessonResult.data;
+      if (!lessonRows?.length) {
+        return { progress: localProgress, solvedProblemCodes: solvedCodes };
+      }
 
       const slugById = new Map(lessonRows.map((lesson) => [lesson.id, lesson.slug]));
 
-      const { data: rows } = await supabase
+      const { data: rows, error: progressError } = await supabase
         .from("lesson_progress")
         .select("lesson_id, completed, last_watched_seconds, quiz_score, updated_at")
         .eq("user_id", user.id)
@@ -367,8 +321,11 @@ export default function LearnRoadmapPage() {
           lessonRows.map((lesson) => lesson.id)
         )
         .returns<LessonProgressRow[]>();
+      if (progressError) throw progressError;
 
-      if (cancelled || !rows?.length) return;
+      if (!rows?.length) {
+        return { progress: localProgress, solvedProblemCodes: solvedCodes };
+      }
 
       const remoteProgress = rows.reduce<StoredProgress>((acc, row) => {
         const slug = slugById.get(row.lesson_id);
@@ -384,17 +341,18 @@ export default function LearnRoadmapPage() {
       }, {});
 
       const syncedProgress = mergeRemoteProgress(localProgress, remoteProgress);
+      return { progress: syncedProgress, solvedProblemCodes: solvedCodes };
+    },
+    enabled: !authLoading,
+    staleTime: 2 * 60 * 1000,
+  });
 
-      setProgress(syncedProgress);
-      writeProgress(syncedProgress);
-    }
-
-    void loadProgress();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEffect(() => {
+    if (!progressData) return;
+    setProgress(progressData.progress);
+    setSolvedProblemCodes(progressData.solvedProblemCodes);
+    writeProgress(progressData.progress);
+  }, [progressData]);
 
   useEffect(() => {
     const syncProgress = () => setProgress(readProgress());

@@ -20,6 +20,7 @@ import {
   School,
   Search,
   Shield,
+  ShoppingBag,
   Sparkles,
   SquareTerminal,
   Trophy,
@@ -81,6 +82,7 @@ export function MobileDrawer() {
         { href: "/leaderboard", icon: Trophy, label: t("nav.leaderboard") },
         ...(isLoggedIn
           ? [
+              { href: "/shop", icon: ShoppingBag, label: t("nav.shop") },
               { href: "/feed", icon: MessageSquare, label: t("nav.feed") },
               { href: "/groups", icon: UsersRound, label: t("nav.groups") },
               { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },

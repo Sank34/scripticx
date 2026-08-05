@@ -7,6 +7,7 @@ import { Users } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { CommunityProfile } from "@/lib/community";
 import { fetchCommunityProfiles } from "@/lib/community";
+import { UserAvatar } from "@/components/user/UserAvatar";
 
 type CommunityDirectoryProps = {
   initialProfiles: CommunityProfile[];
@@ -47,29 +48,18 @@ export function CommunityDirectory({
         >
           {profiles.map((profile) => {
             const profileHref = `/u/${encodeURIComponent(profile.username)}`;
-            const initial = profile.username.charAt(0).toUpperCase();
-
             return (
               <Link
                 key={profile.username}
                 href={profileHref}
                 className="flex min-w-0 items-center gap-3 rounded-lg border bg-background p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {profile.avatar_url ? (
-                  <span
-                    aria-label={t("community.avatarLabel").replace(
-                      "{username}",
-                      profile.username
-                    )}
-                    role="img"
-                    className="size-11 shrink-0 rounded-full border bg-cover bg-center"
-                    style={{ backgroundImage: `url("${profile.avatar_url}")` }}
-                  />
-                ) : (
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full border bg-muted font-medium">
-                    {initial}
-                  </span>
-                )}
+                <UserAvatar
+                  avatarUrl={profile.avatar_url}
+                  username={profile.username}
+                  equippedRewards={profile.equipped_rewards}
+                  className="size-11 border"
+                />
 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">

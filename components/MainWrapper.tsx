@@ -5,6 +5,8 @@ import { useEffect } from "react";
 
 export function MainWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isProfileSurface =
+    pathname === "/profile" || /^\/u\/[^/]+$/.test(pathname || "");
   const isFullWidth =
     pathname === "/editor" ||
     pathname === "/admin/lessons" ||
@@ -28,6 +30,14 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
   if (isFullWidth) {
     return (
       <main className="min-h-0 flex-1 overflow-hidden bg-white">
+        {children}
+      </main>
+    );
+  }
+
+  if (isProfileSurface) {
+    return (
+      <main className="min-h-0 flex-1 overflow-y-auto bg-white [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {children}
       </main>
     );

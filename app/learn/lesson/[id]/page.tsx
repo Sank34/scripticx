@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,15 +34,10 @@ import {
   type LessonLocale,
   type LessonQuizQuestion,
 } from "@/lib/learn-lessons";
-import {
-  getRoadmapConfigData,
-  readRoadmapConfig,
-  readRemoteRoadmapConfig,
-  roadmapConfigEvent,
-  writeRoadmapConfig,
-} from "@/lib/roadmap-config";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { useRoadmapConfig } from "@/hooks/useRoadmapConfig";
+import { useAuth } from "@/hooks/useAuth";
 
 type StoredProgress = Record<
   string,
@@ -236,12 +232,11 @@ async function persistLessonProgress(
 
 export default function LessonPage() {
   const { locale } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const lessonLocale = locale as LessonLocale;
   const c = copy[lessonLocale] ?? copy.en;
   const lessonId = useLessonId();
-  const [roadmapData, setRoadmapData] = useState(() =>
-    getRoadmapConfigData(null)
-  );
+  const roadmapData = useRoadmapConfig();
   const lessons = roadmapData.lessons;
   const sections = roadmapData.sections;
   const lesson = useMemo(
@@ -289,88 +284,47 @@ export default function LessonPage() {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizQuestions, setQuizQuestions] = useState<DisplayQuizQuestion[]>([]);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [lessonDbId, setLessonDbId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const syncRoadmapConfig = () =>
-      setRoadmapData(getRoadmapConfigData(readRoadmapConfig()));
-    const syncRemoteRoadmapConfig = async () => {
-      try {
-        const remoteConfig = await readRemoteRoadmapConfig();
-        if (!remoteConfig) {
-          syncRoadmapConfig();
-          return;
-        }
-
-        writeRoadmapConfig(remoteConfig);
-        setRoadmapData(getRoadmapConfigData(remoteConfig));
-      } catch {
-        syncRoadmapConfig();
-      }
-    };
-    const syncVisibleRoadmapConfig = () => {
-      if (document.visibilityState === "visible") {
-        void syncRemoteRoadmapConfig();
-      }
-    };
-
-    void syncRemoteRoadmapConfig();
-    window.addEventListener(roadmapConfigEvent, syncRoadmapConfig);
-    window.addEventListener("focus", syncRemoteRoadmapConfig);
-    document.addEventListener("visibilitychange", syncVisibleRoadmapConfig);
-
-    return () => {
-      window.removeEventListener(roadmapConfigEvent, syncRoadmapConfig);
-      window.removeEventListener("focus", syncRemoteRoadmapConfig);
-      document.removeEventListener("visibilitychange", syncVisibleRoadmapConfig);
-    };
-  }, []);
+  const userId = user?.id || null;
 
   useEffect(() => {
     setProgress(readProgress());
   }, []);
 
-  useEffect(() => {
-    if (!lesson) return;
-
-    let cancelled = false;
-    const currentLesson = lesson;
-
-    async function loadLessonProgress() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user || cancelled) return;
-
-      setUserId(user.id);
-
-      const { data: lessonRow } = await supabase
+  const { data: remoteLessonProgress } = useQuery({
+    queryKey: ["roadmap", "lesson-progress", lesson?.id, userId],
+    queryFn: async () => {
+      if (!lesson || !userId) return null;
+      const { data: lessonRow, error: lessonError } = await supabase
         .from("lessons")
         .select("id")
-        .eq("slug", currentLesson.id)
+        .eq("slug", lesson.id)
         .maybeSingle()
         .returns<LessonRow | null>();
+      if (lessonError) throw lessonError;
+      if (!lessonRow) return null;
 
-      if (!lessonRow || cancelled) return;
-
-      setLessonDbId(lessonRow.id);
-
-      const { data: row } = await supabase
+      const { data: row, error: progressError } = await supabase
         .from("lesson_progress")
         .select("completed, last_watched_seconds, quiz_score, updated_at")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("lesson_id", lessonRow.id)
         .maybeSingle()
         .returns<LessonProgressRow | null>();
+      if (progressError) throw progressError;
+      return { lessonDbId: lessonRow.id, row };
+    },
+    enabled: Boolean(lesson && userId) && !authLoading,
+    staleTime: 2 * 60 * 1000,
+  });
+  const lessonDbId = remoteLessonProgress?.lessonDbId || null;
 
-      if (!row || cancelled) return;
-
+  useEffect(() => {
+      const row = remoteLessonProgress?.row;
+      if (!row || !lesson) return;
       setProgress((current) => {
         const nextProgress = {
           ...current,
-          [currentLesson.id]: {
+          [lesson.id]: {
             completed: row.completed,
             lastWatched: row.updated_at ?? undefined,
             quizScore: row.quiz_score ?? undefined,
@@ -381,14 +335,7 @@ export default function LessonPage() {
 
         return nextProgress;
       });
-    }
-
-    void loadLessonProgress();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [lesson]);
+  }, [lesson, remoteLessonProgress]);
 
   useEffect(() => {
     if (!lesson) return;
@@ -615,6 +562,9 @@ export default function LessonPage() {
                     src={embedUrl}
                     title={text(lesson.title, lessonLocale)}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    sandbox="allow-scripts allow-same-origin allow-presentation"
                     allowFullScreen
                   />
                 ) : (

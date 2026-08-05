@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -862,6 +863,7 @@ function getHandleClass(side: RoadmapConnectionSide) {
 
 function LessonsAdminContent() {
   const { locale } = useLanguage();
+  const queryClient = useQueryClient();
   const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
   const c = copy[lessonLocale];
   const [categories, setCategories] = useState<RoadmapCategory[]>(() =>
@@ -915,6 +917,11 @@ function LessonsAdminContent() {
   const dragRef = useRef<DragState>(null);
   const clipboardRef = useRef<ClipboardNode[]>([]);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const { data: remoteConfig, isError: remoteConfigFailed } = useQuery({
+    queryKey: ["roadmap", "config-raw"],
+    queryFn: () => readRemoteRoadmapConfig(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   const selectedNode =
     nodes.find((node) => node.id === selectedId) ?? (selectedId ? nodes[0] : undefined);
@@ -982,67 +989,53 @@ function LessonsAdminContent() {
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadRemoteConfig() {
-      try {
-        const remoteConfig = await readRemoteRoadmapConfig();
-        if (cancelled || !remoteConfig) return;
-
-        writeRoadmapConfig(remoteConfig);
-        const { categories, lessons, sections } = getRoadmapConfigData(remoteConfig);
-        const remoteNodes = buildInitialNodes(
-          sections,
-          lessons,
-          remoteConfig.nodes
-            .map((node) => {
-              const lesson = lessons.find((item) => item.id === node.id);
-              if (!lesson) return null;
-
-              return {
-                id: node.id,
-                lesson,
-                sectionId: node.sectionId,
-                x: node.x,
-                y: node.y,
-              };
-            })
-            .filter((node): node is CanvasNode => Boolean(node))
-        );
-
-        setCategories(categories);
-        setSections(sections);
-        setNodes(remoteNodes);
-        setSectionFrames(
-          buildInitialSectionFrames(remoteNodes, sections, remoteConfig.sectionFrames)
-        );
-        setConnections(remoteConfig.connections);
-        setDrafts(buildInitialDrafts(lessonLocale, lessons));
-        setSelectedId(remoteNodes[0]?.id ?? "");
-        setSelectedIds(remoteNodes[0]?.id ? [remoteNodes[0].id] : []);
-        setSelectedSectionId(remoteNodes[0]?.sectionId ?? sections[0]?.id ?? "");
-        setSelectedCategoryId(
-          categories.find((category) =>
-            category.sectionIds.includes(remoteNodes[0]?.sectionId ?? sections[0]?.id ?? "")
-          )?.id ??
-            categories[0]?.id ??
-            ""
-        );
-        setSelectedConnectionId("");
-        setSelectedSectionFrameId("");
-      } catch {
-        if (!cancelled && readRoadmapConfig()) {
-          toast.warning(c.localFallback);
-        }
+    if (!remoteConfig) {
+      if (remoteConfigFailed && readRoadmapConfig()) {
+        toast.warning(c.localFallback);
       }
+      return;
     }
 
-    void loadRemoteConfig();
+    writeRoadmapConfig(remoteConfig);
+    const { categories, lessons, sections } = getRoadmapConfigData(remoteConfig);
+    const remoteNodes = buildInitialNodes(
+      sections,
+      lessons,
+      remoteConfig.nodes
+        .map((node) => {
+          const lesson = lessons.find((item) => item.id === node.id);
+          if (!lesson) return null;
 
-    return () => {
-      cancelled = true;
-    };
-  }, [c.localFallback, lessonLocale]);
+          return {
+            id: node.id,
+            lesson,
+            sectionId: node.sectionId,
+            x: node.x,
+            y: node.y,
+          };
+        })
+        .filter((node): node is CanvasNode => Boolean(node))
+    );
+
+    setCategories(categories);
+    setSections(sections);
+    setNodes(remoteNodes);
+    setSectionFrames(
+      buildInitialSectionFrames(remoteNodes, sections, remoteConfig.sectionFrames)
+    );
+    setConnections(remoteConfig.connections);
+    setDrafts(buildInitialDrafts(lessonLocale, lessons));
+    setSelectedId(remoteNodes[0]?.id ?? "");
+    setSelectedIds(remoteNodes[0]?.id ? [remoteNodes[0].id] : []);
+    setSelectedSectionId(remoteNodes[0]?.sectionId ?? sections[0]?.id ?? "");
+    setSelectedCategoryId(
+      categories.find((category) =>
+        category.sectionIds.includes(remoteNodes[0]?.sectionId ?? sections[0]?.id ?? "")
+      )?.id ?? categories[0]?.id ?? ""
+    );
+    setSelectedConnectionId("");
+    setSelectedSectionFrameId("");
+  }, [c.localFallback, lessonLocale, remoteConfig, remoteConfigFailed]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -1232,6 +1225,8 @@ function LessonsAdminContent() {
     try {
       await writeRemoteRoadmapConfig(config);
       writeRoadmapConfig(config);
+      queryClient.setQueryData(["roadmap", "config-raw"], config);
+      queryClient.setQueryData(["roadmap", "config"], getRoadmapConfigData(config));
 
       setNodes((current) =>
         current.map((node) => {

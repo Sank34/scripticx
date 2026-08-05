@@ -32,6 +32,18 @@ type NotificationsData = {
 
 let hasNotificationSoundGesture = false;
 
+function getSafeNotificationHref(href: string | null | undefined) {
+  if (!href?.startsWith("/") || href.startsWith("//")) return null;
+
+  try {
+    const parsed = new URL(href, window.location.origin);
+    if (parsed.origin !== window.location.origin) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 function getNotificationGroupKey(notification: AppNotification) {
   if (notification.type !== "daily_challenge") {
     return notification.id;
@@ -467,9 +479,10 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   async function openNotification(notification: AppNotification) {
     await markAsRead(notification);
 
-    if (notification.href) {
+    const safeHref = getSafeNotificationHref(notification.href);
+    if (safeHref) {
       setOpen(false);
-      router.push(notification.href);
+      router.push(safeHref);
     }
   }
 
@@ -571,6 +584,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                     <UserAvatar
                       avatarUrl={notification.actor?.avatar_url}
                       username={notification.actor?.username || "S"}
+                      equippedRewards={notification.actor?.equipped_rewards}
                       className="h-9 w-9"
                     />
 

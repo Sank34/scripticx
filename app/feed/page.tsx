@@ -45,7 +45,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 function FeedContent() {
-  const { user, isAdmin } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -240,8 +240,9 @@ function FeedContent() {
 
                   <div className="flex items-center gap-3">
                     <UserAvatar
-                      avatarUrl={user?.user_metadata?.avatar_url}
+                      avatarUrl={profile?.avatar_url || user?.user_metadata?.avatar_url}
                       email={user?.email}
+                      equippedRewards={profile?.equipped_rewards}
                     />
 
                     <div className="text-sm text-muted-foreground">
@@ -307,7 +308,7 @@ function FeedContent() {
                     <input
                       id="image-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/webp"
                       className="hidden"
                       onChange={(e) => setImage(e.target.files?.[0] || null)}
                     />
@@ -345,7 +346,11 @@ function FeedContent() {
                 className="flex items-center gap-3 cursor-pointer"
                 onClick={() => router.push(`/u/${u.username}`)}
               >
-                <UserAvatar avatarUrl={u.avatar_url} username={u.username} />
+                <UserAvatar
+                  avatarUrl={u.avatar_url}
+                  username={u.username}
+                  equippedRewards={u.equipped_rewards}
+                />
 
                 <p className="text-sm font-medium">{u.username}</p>
               </div>

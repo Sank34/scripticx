@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,11 +9,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { ImagePlus } from "lucide-react";
 
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import type { EquippedRewards } from "@/lib/rewards";
 
 import {
   Card,
@@ -43,7 +40,8 @@ function normalizeUrl(url: string) {
 }
 
 function SettingsContent() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const hydratedUserId = useRef<string | null>(null);
 
   const { locale } = useLanguage();
 
@@ -64,6 +62,7 @@ function SettingsContent() {
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [equippedRewards, setEquippedRewards] = useState<EquippedRewards>({});
 
   const [bio, setBio] = useState("");
   const [github, setGithub] = useState("");
@@ -85,33 +84,30 @@ function SettingsContent() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
   useEffect(() => {
-    if (!user) return;
-    const userId = user.id;
+    if (!user || !profile || hydratedUserId.current === user.id) return;
+    const data = profile as typeof profile & {
+      bio?: string | null;
+      github?: string | null;
+      twitter?: string | null;
+      website?: string | null;
+    };
 
-    async function loadProfile() {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (data?.username) setUsername(data.username);
-      if (data?.bio) setBio(data.bio);
-      if (data?.github) setGithub(data.github);
-      if (data?.twitter) setTwitter(data.twitter);
-      if (data?.website) setWebsite(data.website);
+      if (data.username) setUsername(data.username);
+      if (data.bio) setBio(data.bio);
+      if (data.github) setGithub(data.github);
+      if (data.twitter) setTwitter(data.twitter);
+      if (data.website) setWebsite(data.website);
 
       const validAvatar =
-        data?.avatar_url && data.avatar_url.startsWith("http");
+        data.avatar_url && data.avatar_url.startsWith("http");
       const validBanner =
-        data?.banner_url && data.banner_url.startsWith("http");
+        data.banner_url && data.banner_url.startsWith("http");
 
-      setAvatar(validAvatar ? data.avatar_url : null);
-      setBanner(validBanner ? data.banner_url : null);
-    }
-
-    loadProfile();
-  }, [user]);
+      setAvatar(validAvatar ? data.avatar_url ?? null : null);
+      setBanner(validBanner ? data.banner_url ?? null : null);
+      setEquippedRewards((data.equipped_rewards || {}) as EquippedRewards);
+      hydratedUserId.current = user.id;
+  }, [profile, user]);
 
   const onCropComplete = useCallback((_: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels);
@@ -159,6 +155,10 @@ function SettingsContent() {
   function handleSelectImage(e: any) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      toast.error(t("settings.banner.invalid"));
+      return;
+    }
 
     setFileName(file.name);
     const url = URL.createObjectURL(file);
@@ -174,7 +174,7 @@ function SettingsContent() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    if (!file.type.startsWith("image/")) {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
       toast.error(t("settings.banner.invalid"));
       return;
     }
@@ -413,7 +413,7 @@ function SettingsContent() {
                     : t("settings.banner.upload")}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp"
                     onChange={handleSelectBanner}
                     className="hidden"
                     disabled={uploadingBanner}
@@ -435,20 +435,22 @@ function SettingsContent() {
           </div>
 
           <div className="flex items-center gap-6">
-            <Avatar className="w-16 h-16">
-              {avatar && <AvatarImage src={avatar} />}
-              <AvatarFallback>{initial}</AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              avatarUrl={avatar}
+              username={username || initial}
+              equippedRewards={equippedRewards}
+              className="w-16 h-16"
+            />
 
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <label className="px-3 py-2 bg-muted rounded-md cursor-pointer text-sm">
-                  {t("settings.upload")}
-                  <input type="file" accept="image/*" onChange={handleSelectImage} className="hidden" />
+                <label className="px-3 py-2 bg-muted rounded-md cursor-pointer text-sm has-[:disabled]:pointer-events-none has-[:disabled]:opacity-60">
+                  {uploading ? "..." : t("settings.upload")}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleSelectImage} className="hidden" disabled={uploading} />
                 </label>
 
                 {avatar && (
-                  <Button size="sm" variant="destructive" onClick={removeAvatar}>
+                  <Button size="sm" variant="destructive" onClick={removeAvatar} disabled={uploading}>
                     {t("settings.remove")}
                   </Button>
                 )}

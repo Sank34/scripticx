@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  Award,
   BarChart3,
   CalendarDays,
   CircleCheck,
@@ -15,6 +16,7 @@ import {
   Megaphone,
   RefreshCw,
   Send,
+  ShoppingBag,
   Sparkles,
   TrendingDown,
   TrendingUp,
@@ -383,8 +385,8 @@ function AdminContent() {
         title={t("admin.overview.tools.title")}
         description={t("admin.overview.tools.description")}
       >
-        <div className="-m-2 flex snap-x scroll-pl-2 items-stretch gap-4 overflow-x-auto p-2">
-          <div className="w-[17rem] shrink-0 snap-start">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] items-stretch gap-4">
+          <div className="min-w-0">
             <AdminNavCard
               href="/admin/problems"
               icon={<FileText className="h-5 w-5 text-blue-500" />}
@@ -395,7 +397,7 @@ function AdminContent() {
             />
           </div>
 
-          <div className="w-[17rem] shrink-0 snap-start">
+          <div className="min-w-0">
             <AdminNavCard
               href="/admin/users"
               icon={<Users className="h-5 w-5 text-emerald-500" />}
@@ -417,7 +419,7 @@ function AdminContent() {
             />
           </div>
 
-          <div className="w-[17rem] shrink-0 snap-start">
+          <div className="min-w-0">
             <AdminNavCard
               href="/admin/updates"
               icon={<Sparkles className="h-5 w-5 text-amber-500" />}
@@ -428,7 +430,29 @@ function AdminContent() {
             />
           </div>
 
-          <div className="w-[17rem] shrink-0 snap-start">
+          <div className="min-w-0">
+            <AdminNavCard
+              href="/admin/badges"
+              icon={<Award className="h-5 w-5 text-rose-500" />}
+              ringClassName="ring-rose-500/50"
+              title={t("admin.badgeManager.title")}
+              description={t("admin.badgeManager.description")}
+              count={counts?.achievements}
+            />
+          </div>
+
+          <div className="min-w-0">
+            <AdminNavCard
+              href="/admin/shop"
+              icon={<ShoppingBag className="h-5 w-5 text-zinc-700" />}
+              ringClassName="ring-zinc-500/50"
+              title={t("admin.shopManager.title")}
+              description={t("admin.shopManager.description")}
+              count={counts?.rewardProducts}
+            />
+          </div>
+
+          <div className="min-w-0">
             <AdminNavCard
               href="/admin/contact"
               icon={<Mail className="h-5 w-5 text-rose-500" />}
@@ -450,7 +474,7 @@ function AdminContent() {
             />
           </div>
 
-          <div className="w-[17rem] shrink-0 snap-start">
+          <div className="min-w-0">
             <AdminNavCard
               href="/admin/lessons"
               icon={<GitBranch className="h-5 w-5 text-violet-500" />}
@@ -458,10 +482,6 @@ function AdminContent() {
               title={t("admin.lessons.title")}
               description={t("admin.lessons.description")}
               count={null}
-              accentBadge={{
-                className: "bg-violet-100 text-violet-700",
-                label: t("admin.lessons.badge"),
-              }}
             />
           </div>
         </div>

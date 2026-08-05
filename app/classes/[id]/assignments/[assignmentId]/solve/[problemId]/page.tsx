@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -10,6 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Markdown } from "@/components/Markdown";
 import { useLanguage } from "@/components/LanguageProvider";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+type SolvePageData = {
+  assignment: any;
+  problem: any;
+  submission: any;
+};
 
 export default function SolvePage() {
   const params = useParams();
@@ -23,88 +32,70 @@ export default function SolvePage() {
     ? params.problemId[0]
     : params.problemId;
 
-  const [assignment, setAssignment] = useState<any>(null);
-  const [problem, setProblem] = useState<any>(null);
+  const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
   const [code, setCode] = useState("");
-  const [userId, setUserId] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  const hydratedRoute = useRef<string | null>(null);
+  const userId = user?.id || null;
+  const solveQueryKey = [
+    "classes",
+    "assignment-solve",
+    assignmentId,
+    problemIdParam,
+    userId,
+    locale,
+  ] as const;
+
+  const { data: solvePage, isPending: loading } = useQuery({
+    queryKey: solveQueryKey,
+    queryFn: async (): Promise<SolvePageData> => {
+      if (!assignmentId || !problemIdParam) {
+        return { assignment: null, problem: null, submission: null };
+      }
+      const [assignmentResult, problemResult, submissionResult] = await Promise.all([
+        supabase.from("assignments").select("*").eq("id", assignmentId).maybeSingle(),
+        supabase.from("problems").select("*").eq("id", problemIdParam).maybeSingle(),
+        userId
+          ? supabase
+              .from("assignment_problem_submissions")
+              .select("*")
+              .eq("assignment_id", assignmentId)
+              .eq("user_id", userId)
+              .eq("problem_id", problemIdParam)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+      if (assignmentResult.error) throw assignmentResult.error;
+      if (problemResult.error) throw problemResult.error;
+      if (submissionResult.error) throw submissionResult.error;
+
+      const problemData = problemResult.data;
+      return {
+        assignment: assignmentResult.data,
+        problem: problemData
+          ? {
+              ...problemData,
+              title: problemData.title_i18n?.[locale] || problemData.title_i18n?.en || "Untitled",
+              description:
+                problemData.description_i18n?.[locale] || problemData.description_i18n?.en || "",
+            }
+          : null,
+        submission: submissionResult.data,
+      };
+    },
+    enabled: Boolean(assignmentId && problemIdParam) && !authLoading,
+    staleTime: 90 * 1000,
+  });
+  const assignment = solvePage?.assignment || null;
+  const problem = solvePage?.problem || null;
+  const submitted = Boolean(solvePage?.submission);
 
   useEffect(() => {
-    load();
-  }, [assignmentId, problemIdParam]);
-
-  async function load() {
-    if (!assignmentId) return;
-
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (user) setUserId(user.id);
-
-    setSubmitted(false);
-    setCode("");
-
-    // assignment
-    const { data: assignmentData } = await supabase
-      .from("assignments")
-      .select("*")
-      .eq("id", assignmentId)
-      .single();
-
-    setAssignment(assignmentData);
-    if (!assignmentData) return;
-
-    if (!problemIdParam) {
-      console.error("Missing problemId in route");
-      return;
-    }
-
-    const finalProblemId = problemIdParam;
-
-    setProblem(null);
-
-    if (finalProblemId) {
-      const { data: problemData } = await supabase
-        .from("problems")
-        .select("*")
-        .eq("id", finalProblemId)
-        .single();
-
-      if (problemData) {
-        setProblem({
-          ...problemData,
-          title:
-            problemData.title_i18n?.[locale] ||
-            problemData.title_i18n?.en ||
-            "Untitled",
-          description:
-            problemData.description_i18n?.[locale] ||
-            problemData.description_i18n?.en ||
-            "",
-        });
-      }
-    }
-
-    // existing submission (optional)
-    if (user && assignmentData) {
-      console.log("FETCH SUBMISSION:", {
-        assignmentId: assignmentData.id,
-        userId: user?.id,
-        problemId: finalProblemId,
-      });
-      const { data: submission } = await supabase
-        .from("assignment_problem_submissions")
-        .select("*")
-        .eq("assignment_id", assignmentData.id)
-        .eq("user_id", user.id)
-        .eq("problem_id", finalProblemId)
-        .maybeSingle();
-
-      if (submission?.code) {
-        setCode(submission.code);
-        setSubmitted(true);
-      }
-    }
-  }
+    const routeKey = `${assignmentId}:${problemIdParam}:${userId || "anonymous"}`;
+    if (!solvePage || hydratedRoute.current === routeKey) return;
+    setCode(solvePage.submission?.code || "");
+    hydratedRoute.current = routeKey;
+  }, [assignmentId, problemIdParam, solvePage, userId]);
 
   async function handleSubmit() {
     if (!code.trim() || !userId) return;
@@ -124,19 +115,28 @@ export default function SolvePage() {
       );
 
     if (error) {
-      console.error("SUBMIT ERROR:", error);
+      toast.error(error.message);
     } else {
-      console.log("SUBMIT OK", {
-        assignmentId: assignment.id,
-        problemId: problem?.id,
-        userId,
+      queryClient.setQueryData<SolvePageData>(solveQueryKey, (current) =>
+        current
+          ? {
+              ...current,
+              submission: {
+                assignment_id: assignment.id,
+                problem_id: problem?.id,
+                user_id: userId,
+                code,
+              },
+            }
+          : current
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["classes", params.id, "assignments", assignmentId],
       });
     }
-
-    setSubmitted(true);
   }
 
-  if (!assignment) {
+  if (loading || !assignment) {
     return (
       <div className="p-6 max-w-6xl mx-auto space-y-6">
         <div className="space-y-2">

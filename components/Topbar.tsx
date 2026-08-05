@@ -2,24 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import { api, type ProfileSummary } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 import { ShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { TopbarBreadcrumbs } from "@/components/navigation/TopbarBreadcrumbs";
 import { NotificationsPopover } from "@/components/notifications/NotificationsPopover";
 import { AttentionPopover } from "@/components/admin/AttentionPopover";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
 
 import { Button } from "@/components/ui/button";
-
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
 
 import {
   DropdownMenu,
@@ -40,66 +34,12 @@ import {
 export function Topbar() {
   const router = useRouter();
   const { t, locale, setLocale } = useLanguage();
-
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [profile, setProfile] = useState<ProfileSummary | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadProfile(currentUser: SupabaseUser) {
-      const profileData = await api.profiles.getSummary(currentUser.id);
-
-      if (!active) return;
-
-      setProfile(profileData);
-    }
-
-    async function load() {
-      const { data } = await api.auth.getSession();
-
-      const currentUser = data.session?.user ?? null;
-
-      if (!active) return;
-
-      setUser(currentUser);
-
-      if (!currentUser) return;
-
-      await loadProfile(currentUser);
-    }
-
-    void load();
-
-    const subscription = api.auth.onAuthStateChange((session) => {
-      const currentUser = session?.user ?? null;
-
-      setUser(currentUser);
-
-      if (!currentUser) {
-        setProfile(null);
-        return;
-      }
-
-      window.setTimeout(() => {
-        void loadProfile(currentUser);
-      }, 0);
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+  const { profile, user } = useAuth();
 
   async function logout() {
     await api.auth.signOut();
     router.replace("/login");
   }
-
-  const initial = (
-    profile?.username || user?.email || "U"
-  )[0]?.toUpperCase();
 
   return (
     <header className="relative grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-zinc-200/70 bg-white px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
@@ -129,15 +69,13 @@ export function Topbar() {
 
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-zinc-100">
-                <Avatar className="h-8 w-8">
-                  {profile?.avatar_url && (
-                    <AvatarImage src={profile.avatar_url} />
-                  )}
-
-                  <AvatarFallback>
-                    {initial}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={profile?.avatar_url}
+                  username={profile?.username}
+                  email={user.email}
+                  equippedRewards={profile?.equipped_rewards}
+                  className="h-8 w-8"
+                />
               </button>
             </DropdownMenuTrigger>
 
@@ -148,15 +86,13 @@ export function Topbar() {
             >
               <DropdownMenuLabel className="flex items-center gap-3 py-3">
 
-                <Avatar className="h-10 w-10">
-                  {profile?.avatar_url && (
-                    <AvatarImage src={profile.avatar_url} />
-                  )}
-
-                  <AvatarFallback>
-                    {initial}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={profile?.avatar_url}
+                  username={profile?.username}
+                  email={user.email}
+                  equippedRewards={profile?.equipped_rewards}
+                  className="h-10 w-10"
+                />
 
                 <div className="flex flex-col leading-tight">
                   <span className="font-medium">

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Ban } from "lucide-react";
 
 export default function BannedPage() {
-  const [loading, setLoading] = useState(true);
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
 
   const { locale } = useLanguage();
@@ -30,38 +31,17 @@ export default function BannedPage() {
   };
 
   useEffect(() => {
-    async function check() {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
-
-      if (!user) {
-        router.replace("/login");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("banned")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile?.banned) {
-        router.replace("/");
-        return;
-      }
-
-      setLoading(false);
-    }
-
-    check();
-  }, [router]);
+    if (loading) return;
+    if (!user) router.replace("/login");
+    else if (!profile?.banned) router.replace("/");
+  }, [loading, profile?.banned, router, user]);
 
   async function logout() {
     await supabase.auth.signOut();
     router.replace("/login");
   }
 
-  if (loading) return null;
+  if (loading || !user || !profile?.banned) return null;
 
   return (
     <div className="flex min-h-[calc(100vh-140px)] items-center justify-center rounded-[20px] bg-white p-6">

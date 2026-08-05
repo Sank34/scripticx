@@ -30,7 +30,7 @@ async function countRows(
 }
 
 export async function fetchAdminCounts(): Promise<AdminCounts> {
-  const [problems, users, bannedUsers, updates, contactTotal, contactNew] =
+  const [problems, users, bannedUsers, updates, contactTotal, contactNew, achievements, rewardProducts] =
     await Promise.all([
       countRows("problems"),
       countRows("profiles"),
@@ -38,9 +38,20 @@ export async function fetchAdminCounts(): Promise<AdminCounts> {
       countRows("updates"),
       countRows("contact_messages"),
       countRows("contact_messages", (query) => query.eq("status", "new")),
+      countRows("achievements"),
+      countRows("reward_products"),
     ]);
 
-  return { bannedUsers, contactNew, contactTotal, problems, updates, users };
+  return {
+    achievements,
+    bannedUsers,
+    contactNew,
+    contactTotal,
+    problems,
+    rewardProducts,
+    updates,
+    users,
+  };
 }
 
 function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {

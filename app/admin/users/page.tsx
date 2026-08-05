@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import Link from "next/link";
@@ -16,11 +17,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import type { EquippedRewards } from "@/lib/rewards";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +48,7 @@ type AdminUser = {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  equipped_rewards?: EquippedRewards | null;
   role: string;
   banned: boolean;
 };
@@ -57,52 +56,68 @@ type AdminUser = {
 function AdminUsersContent() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    if (!user) return;
+  const usersQueryKey = ["admin", "users", user?.id] as const;
+  const { data: users = [], isPending: loading } = useQuery({
+    queryKey: usersQueryKey,
+    queryFn: async () => {
+      if (!user) return [];
 
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url, role, banned")
-      .neq("id", user.id)
-      .order("username", { ascending: true });
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, equipped_rewards, role, banned")
+        .neq("id", user.id)
+        .order("username", { ascending: true });
 
-    setUsers((data || []) as AdminUser[]);
-    setLoading(false);
-  }, [user]);
+      if (error) throw error;
+      return (data || []) as AdminUser[];
+    },
+    enabled: Boolean(user),
+    staleTime: 2 * 60 * 1000,
+  });
 
   async function toggleAdmin(userId: string, currentRole: string) {
     if (userId === user?.id) return;
 
     const newRole = currentRole === "admin" ? "user" : "admin";
 
-    await supabase
-      .from("profiles")
-      .update({ role: newRole })
-      .eq("id", userId);
+    const { error } = await supabase.rpc("admin_update_user_access", {
+      p_user_id: userId,
+      p_role: newRole,
+      p_banned: null,
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
 
-    setUsers((prev) =>
+    queryClient.setQueryData<AdminUser[]>(usersQueryKey, (prev = []) =>
       prev.map((u) =>
         u.id === userId ? { ...u, role: newRole } : u
       )
     );
+    void queryClient.invalidateQueries({ queryKey: ["admin", "overview"] });
   }
 
   async function toggleBan(userId: string, banned: boolean) {
     if (userId === user?.id) return;
 
-    await supabase
-      .from("profiles")
-      .update({ banned: !banned })
-      .eq("id", userId);
+    const { error } = await supabase.rpc("admin_update_user_access", {
+      p_user_id: userId,
+      p_role: null,
+      p_banned: !banned,
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
 
-    setUsers((prev) =>
+    queryClient.setQueryData<AdminUser[]>(usersQueryKey, (prev = []) =>
       prev.map((u) =>
         u.id === userId ? { ...u, banned: !banned } : u
       )
@@ -134,7 +149,10 @@ function AdminUsersContent() {
         throw new Error(result.error || t("admin.users.page.toast.deleteError"));
       }
 
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      queryClient.setQueryData<AdminUser[]>(usersQueryKey, (prev = []) =>
+        prev.filter((listedUser) => listedUser.id !== userId)
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin", "overview"] });
       setDeleteId(null);
       toast.success(t("admin.users.page.toast.deleted"));
     } catch (error) {
@@ -145,10 +163,6 @@ function AdminUsersContent() {
       setDeletingId(null);
     }
   }
-
-  useEffect(() => {
-    void fetchUsers();
-  }, [fetchUsers]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -228,14 +242,12 @@ function AdminUsersContent() {
                 href={`/u/${u.username}`}
                 className="flex items-center gap-3 hover:opacity-80"
               >
-                <Avatar className="w-9 h-9">
-                  {u.avatar_url && (
-                    <AvatarImage src={u.avatar_url} />
-                  )}
-                  <AvatarFallback>
-                    {u.username?.[0]?.toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={u.avatar_url}
+                  username={u.username}
+                  equippedRewards={u.equipped_rewards}
+                  className="w-9 h-9"
+                />
 
                 <div className="flex flex-col">
                   <p className="font-medium">

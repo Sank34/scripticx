@@ -14,6 +14,7 @@ import {
   Search,
   Settings,
   Shield,
+  ShoppingBag,
   Sparkles,
   SquareTerminal,
   Trophy,
@@ -157,6 +158,12 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         shortcut: "⌘ H",
         shortcutKey: "h",
         keywords: ["home", "overview"],
+      },
+      {
+        href: "/shop",
+        icon: ShoppingBag,
+        label: t("nav.shop"),
+        keywords: ["rewards", "points", "avatar", "badges"],
       },
       {
         href: "/editor",

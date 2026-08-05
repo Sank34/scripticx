@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import Editor, { type OnMount, useMonaco } from "@monaco-editor/react";
+import Editor, {
+  loader,
+  type OnMount,
+  useMonaco,
+} from "@monaco-editor/react";
+
+// @monaco-editor/react defaults to jsDelivr. Keep the editor same-origin so
+// Content Security Policy can remain strict and the IDE also works offline.
+loader.config({ paths: { vs: "/monaco/vs" } });
 
 type MiniScriptMonacoEditorProps = {
   height?: string;
@@ -88,6 +96,11 @@ export function MiniScriptMonacoEditor({
       theme={theme === "dark" ? "miniscriptplusDarkTheme" : "miniscriptplusTheme"}
       value={value}
       onChange={(nextValue) => onChange(nextValue || "")}
+      loading={
+        <div className="flex h-full items-center justify-center bg-white text-sm text-zinc-500">
+          Loading editor…
+        </div>
+      }
       options={{
         fontSize: 14,
         fontFamily: "JetBrains Mono, monospace",
