@@ -52,6 +52,7 @@ nextjs-portal {
 }
 
 :root {
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -87,6 +88,7 @@ nextjs-portal {
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -118,6 +120,99 @@ nextjs-portal {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Keep theme changes calm and readable without animating regular navigation. */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
+  transition-duration: 320ms !important;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/*
+ * Older screens still contain neutral Tailwind colors from before themes were
+ * introduced. These aliases keep those surfaces legible in dark mode while
+ * newer components use the semantic design tokens directly.
+ */
+:where(.dark) [class~="bg-white"] {
+  background-color: var(--card);
+}
+
+:where(.dark) [class~="bg-white/95"],
+:where(.dark) [class~="bg-white/90"],
+:where(.dark) [class~="bg-white/85"],
+:where(.dark) [class~="bg-white/80"],
+:where(.dark) [class~="bg-white/70"],
+:where(.dark) [class~="bg-white/65"] {
+  background-color: color-mix(in oklab, var(--card) 92%, transparent);
+}
+
+:where(.dark) [class~="bg-zinc-50"],
+:where(.dark) [class~="bg-zinc-50/80"],
+:where(.dark) [class~="bg-zinc-50/70"],
+:where(.dark) [class~="bg-zinc-50/50"] {
+  background-color: color-mix(in oklab, var(--muted) 72%, var(--background));
+}
+
+:where(.dark) [class~="bg-zinc-100"],
+:where(.dark) [class~="bg-zinc-100/80"] {
+  background-color: var(--muted);
+}
+
+:where(.dark) [class~="bg-zinc-200"],
+:where(.dark) [class~="bg-zinc-200/90"],
+:where(.dark) [class~="bg-zinc-200/60"] {
+  background-color: var(--accent);
+}
+
+:where(.dark) [class~="text-zinc-950"],
+:where(.dark) [class~="text-zinc-900"],
+:where(.dark) [class~="text-zinc-800"] {
+  color: var(--foreground);
+}
+
+:where(.dark) [class~="text-zinc-700"] {
+  color: color-mix(in oklab, var(--foreground) 84%, var(--muted-foreground));
+}
+
+:where(.dark) [class~="text-zinc-600"],
+:where(.dark) [class~="text-zinc-500"],
+:where(.dark) [class~="text-zinc-400"],
+:where(.dark) [class~="text-zinc-300"] {
+  color: var(--muted-foreground);
+}
+
+:where(.dark) [class~="border-zinc-100"],
+:where(.dark) [class~="border-zinc-200"],
+:where(.dark) [class~="border-zinc-200/80"],
+:where(.dark) [class~="border-zinc-200/70"],
+:where(.dark) [class~="border-zinc-300"],
+:where(.dark) [class~="border-zinc-300/90"] {
+  border-color: var(--border);
+}
+
+:where(.dark) [class~="divide-zinc-100"] > :not(:last-child),
+:where(.dark) [class~="divide-zinc-200"] > :not(:last-child) {
+  border-color: var(--border);
+}
+
+:where(.dark) [class~="hover:bg-zinc-50"]:hover,
+:where(.dark) [class~="hover:bg-zinc-100"]:hover,
+:where(.dark) [class~="hover:bg-zinc-200"]:hover {
+  background-color: var(--accent);
+}
+
+:where(.dark) [class~="hover:bg-white/70"]:hover,
+:where(.dark) [class~="hover:bg-white/80"]:hover,
+:where(.dark) [class~="hover:bg-white/90"]:hover {
+  background-color: color-mix(in oklab, var(--accent) 76%, transparent);
+}
+
+:where(.dark) [class~="placeholder:text-zinc-500"]::placeholder {
+  color: var(--muted-foreground);
 }
 @keyframes fade-in {
   from { opacity: 0 }
@@ -241,6 +336,13 @@ nextjs-portal {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition-duration: 0.01ms !important;
+  }
+
   .onboarding-preparing-blob {
     animation: none;
   }

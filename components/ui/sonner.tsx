@@ -2,6 +2,7 @@
 
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
 
@@ -11,10 +12,12 @@ const Toaster = ({
   toastOptions,
   ...props
 }: ToasterProps) => {
+  const { resolvedTheme } = useTheme()
+
   return (
     <Sonner
       {...props}
-      theme="light"
+      theme={resolvedTheme === "dark" ? "dark" : "light"}
       className={cn("toaster group", className)}
       icons={{
         success: (
@@ -35,9 +38,9 @@ const Toaster = ({
       }}
       style={
         {
-          "--normal-bg": "#ffffff",
-          "--normal-text": "#18181b",
-          "--normal-border": "#e4e4e7",
+          "--normal-bg": "var(--popover)",
+          "--normal-text": "var(--popover-foreground)",
+          "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
           "--toast-close-button-start": "unset",
           "--toast-close-button-end": "0",

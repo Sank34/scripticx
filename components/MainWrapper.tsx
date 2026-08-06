@@ -30,7 +30,7 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
 
   if (isFullWidth) {
     return (
-      <main className="min-h-0 flex-1 overflow-hidden bg-white">
+      <main className="min-h-0 flex-1 overflow-hidden bg-background">
         {children}
       </main>
     );
@@ -38,14 +38,14 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
 
   if (isProfileSurface) {
     return (
-      <main className="min-h-0 flex-1 overflow-y-auto bg-white [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-background [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {children}
       </main>
     );
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-white pb-16 md:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <main className="min-h-0 flex-1 overflow-y-auto bg-background pb-16 md:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
         {children}
       </div>

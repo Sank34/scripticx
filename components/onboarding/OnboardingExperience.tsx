@@ -270,7 +270,7 @@ export function OnboardingExperience({
         <header className="flex shrink-0 items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logoSCX.svg" alt="ScripticX" className="h-9 w-9" />
+            <img src="/logoSCX.svg" alt="ScripticX" className="h-9 w-9 dark:invert" />
             <span className="text-lg font-semibold">ScripticX</span>
           </div>
           <div className="flex items-center rounded-lg border bg-white p-1 shadow-sm">

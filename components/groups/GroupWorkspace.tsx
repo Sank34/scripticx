@@ -1780,8 +1780,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   key={channel.id}
                   className={`group/channel flex w-full items-center rounded-xl text-sm transition ${
                     active
-                      ? "bg-white text-black shadow-sm"
-                      : "text-zinc-600 hover:bg-white/70 hover:text-black"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
                   }`}
                 >
                   <button

@@ -9,12 +9,15 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { MentionText } from "@/components/feed/MentionText";
 
 type FeedPostCardLabels = {
+  comment: string;
   deletePost: string;
+  like: string;
   share: string;
 };
 
 type FeedPostCardProps = {
   commentCount: number;
+  dateLocale: "en" | "ro";
   isLiked: boolean;
   isAdmin: boolean;
   labels: FeedPostCardLabels;
@@ -29,6 +32,7 @@ type FeedPostCardProps = {
 
 export function FeedPostCard({
   commentCount,
+  dateLocale,
   isLiked,
   isAdmin,
   labels,
@@ -41,16 +45,24 @@ export function FeedPostCard({
   post,
 }: FeedPostCardProps) {
   const username = post.profiles?.username || "User";
+  const createdAt = post.created_at ? new Date(post.created_at) : null;
+  const formattedDate =
+    createdAt && !Number.isNaN(createdAt.getTime())
+      ? new Intl.DateTimeFormat(dateLocale === "ro" ? "ro-RO" : "en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(createdAt)
+      : "";
 
   return (
-    <Card className="relative transition hover:shadow-sm">
+    <Card className="relative gap-0 overflow-hidden rounded-2xl py-0 shadow-none ring-border/80 transition-shadow hover:shadow-sm">
       {isAdmin && (
         <button
           type="button"
           title={labels.deletePost}
           aria-label={labels.deletePost}
           onClick={() => onDelete(post)}
-          className="absolute right-4 top-4 z-10 inline-flex size-8 items-center justify-center rounded-md text-red-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+          className="absolute right-4 top-4 z-10 inline-flex size-8 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
         >
           <Trash2 className="size-4" />
         </button>
@@ -68,34 +80,34 @@ export function FeedPostCard({
         }}
         className="cursor-pointer"
       >
-        <CardHeader className="flex flex-row items-center gap-3 pr-14">
+        <CardHeader className="flex flex-row items-center gap-3 px-5 pb-0 pt-5 pr-14">
           <UserAvatar
             avatarUrl={post.profiles?.avatar_url}
             username={username}
             equippedRewards={post.profiles?.equipped_rewards}
           />
 
-          <div>
+          <div className="min-w-0">
             <p
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 onAuthorOpen(username);
               }}
-              className="font-medium hover:underline cursor-pointer"
+              className="w-fit cursor-pointer truncate font-semibold hover:underline"
             >
               {username}
             </p>
             <p className="text-xs text-muted-foreground">
-              {post.created_at ? new Date(post.created_at).toLocaleString() : ""}
+              {formattedDate}
             </p>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3 pt-4">
+        <CardContent className="space-y-4 px-5 py-4">
           <MentionText
             content={post.content}
-            className="whitespace-pre-wrap"
+            className="whitespace-pre-wrap text-[15px] leading-6"
             onMentionOpen={onAuthorOpen}
           />
 
@@ -105,7 +117,7 @@ export function FeedPostCard({
             <img
               src={post.image_url}
               alt=""
-              className="rounded-lg max-h-[400px] object-cover w-full mt-2"
+              className="mt-2 max-h-[460px] w-full rounded-xl border border-border object-cover"
             />
           )}
 
@@ -115,13 +127,16 @@ export function FeedPostCard({
         </CardContent>
       </div>
 
-      <div className="px-6 pb-5 pt-1 flex items-center gap-4 text-sm">
+      <div className="grid grid-cols-3 border-t border-border/70 px-3 py-2 text-sm">
         <button
           onClick={(event) => {
             event.stopPropagation();
             onToggleLike(post.id);
           }}
-          className="flex items-center gap-1 hover:opacity-80"
+          aria-label={`${labels.like}: ${likeCount}`}
+          className={`flex h-9 items-center justify-center gap-2 rounded-lg transition-colors hover:bg-accent ${
+            isLiked ? "text-red-500" : "text-muted-foreground hover:text-foreground"
+          }`}
         >
           <Heart
             size={16}
@@ -131,7 +146,7 @@ export function FeedPostCard({
                 : "scale-100"
             } active:scale-125`}
           />
-          <span>{likeCount}</span>
+          <span className="font-medium">{likeCount}</span>
         </button>
 
         <button
@@ -139,10 +154,11 @@ export function FeedPostCard({
             event.stopPropagation();
             onCommentsOpen(post.id);
           }}
-          className="flex items-center gap-1 hover:opacity-80"
+          aria-label={`${labels.comment}: ${commentCount}`}
+          className="flex h-9 items-center justify-center gap-2 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <MessageCircle size={16} />
-          <span>{commentCount}</span>
+          <span className="font-medium">{commentCount}</span>
         </button>
 
         <button
@@ -150,7 +166,8 @@ export function FeedPostCard({
             event.stopPropagation();
             onShare(post.id);
           }}
-          className="flex items-center gap-1 hover:opacity-80"
+          aria-label={labels.share}
+          className="flex h-9 items-center justify-center gap-2 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Share2 size={16} />
           <span>{labels.share}</span>

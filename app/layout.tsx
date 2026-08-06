@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { Topbar } from "@/components/Topbar";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -98,10 +99,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body
-        className={`${geistSans.className} h-screen overflow-hidden bg-zinc-100 antialiased`}
+        className={`${geistSans.className} h-screen overflow-hidden bg-background text-foreground antialiased`}
       >
         <script
           type="application/ld+json"
@@ -135,48 +137,49 @@ export default function RootLayout({
             }).replace(/</g, "\\u003c"),
           }}
         />
-        <Providers>
-          <LanguageProvider>
-            <GlobalContextMenu>
-              <SidebarProvider>
-                <div className="h-screen w-full overflow-hidden p-2">
-                  <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-zinc-100">
+        <ThemeProvider>
+          <Providers>
+            <LanguageProvider>
+              <GlobalContextMenu>
+                <SidebarProvider>
+                  <div className="h-screen w-full overflow-hidden bg-muted/50 p-2">
+                    <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-muted/50">
 
-                    <AppSidebar />
+                      <AppSidebar />
 
-                    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-zinc-200/70 bg-white shadow-sm">
+                      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background shadow-sm">
 
-                      <Topbar />
+                        <Topbar />
 
-                      <MainWrapper>{children}</MainWrapper>
+                        <MainWrapper>{children}</MainWrapper>
 
+                      </div>
                     </div>
                   </div>
-                </div>
-              </SidebarProvider>
-              <MobileDrawer />
-              <NetworkStatus />
-              <OnboardingManager />
-            </GlobalContextMenu>
-          </LanguageProvider>
-        </Providers>
+                </SidebarProvider>
+                <MobileDrawer />
+                <NetworkStatus />
+                <OnboardingManager />
+              </GlobalContextMenu>
+            </LanguageProvider>
+          </Providers>
 
-        <Toaster
-          position="top-center"
-          richColors={false}
-          closeButton
-          toastOptions={{
-            classNames: {
-              toast:
-                "border-zinc-200 bg-white text-zinc-900 shadow-lg",
-              description: "text-zinc-500",
-              actionButton: "bg-zinc-950 text-white",
-              cancelButton: "bg-zinc-100 text-zinc-700",
-              closeButton:
-                "border-zinc-200 bg-white text-zinc-500 hover:text-zinc-950",
-            },
-          }}
-        />
+          <Toaster
+            position="top-center"
+            richColors={false}
+            closeButton
+            toastOptions={{
+              classNames: {
+                toast: "border-border bg-popover text-popover-foreground shadow-lg",
+                description: "text-muted-foreground",
+                actionButton: "bg-primary text-primary-foreground",
+                cancelButton: "bg-muted text-muted-foreground",
+                closeButton:
+                  "border-border bg-popover text-muted-foreground hover:text-foreground",
+              },
+            }}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -81,10 +81,10 @@ function NavItem({
     <Button
       asChild
       variant={active ? "secondary" : "ghost"}
-      className={`h-10 w-full gap-2 rounded-xl text-[13px] font-medium transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+      className={`h-10 w-full gap-2 rounded-xl text-[13px] font-medium transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
         active
-          ? "bg-zinc-100 text-black shadow-sm"
-          : "text-zinc-600"
+          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+          : "text-muted-foreground"
       } ${
         collapsed
           ? "justify-center px-2"
@@ -148,10 +148,10 @@ function SubItem({ href, label }: SubItemProps) {
       asChild
       variant={active ? "secondary" : "ghost"}
       size="sm"
-      className={`h-9 w-full justify-start rounded-lg pl-8 text-sm transition-all duration-200 hover:bg-zinc-100 hover:text-black active:scale-[0.98] ${
+      className={`h-9 w-full justify-start rounded-lg pl-8 text-sm transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-[0.98] ${
         active
-          ? "bg-zinc-100 text-black shadow-sm"
-          : "text-zinc-600"
+          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+          : "text-muted-foreground"
       }`}
     >
       <Link href={href}>
@@ -296,7 +296,7 @@ export function AppSidebar() {
         <div
           className={`sticky top-0 z-20 flex items-center justify-between bg-[var(--sidebar)] px-3 py-4 transition-all duration-200 ${
             canScrollUp
-              ? "border-b border-zinc-200/80 shadow-[0_5px_14px_rgba(0,0,0,0.06)]"
+              ? "border-b border-sidebar-border shadow-[0_5px_14px_rgba(0,0,0,0.06)]"
               : "border-transparent"
           }`}
         >
@@ -308,13 +308,13 @@ export function AppSidebar() {
             <Link
               href="/dashboard"
               aria-label="ScripticX Dashboard"
-              className="-ml-1 flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-zinc-100"
+              className="-ml-1 flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-sidebar-accent"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logoSCX.svg"
                 alt="ScripticX"
-                className="h-9 w-9 object-contain"
+                className="h-9 w-9 object-contain dark:invert"
               />
 
               <div className="flex flex-col leading-none">
@@ -359,7 +359,7 @@ export function AppSidebar() {
           `}</style>
 
         <SidebarGroup className="py-1.5">
-          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">{t("sidebar.platform")}</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.platform")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             {user && (
@@ -385,7 +385,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="py-1.5">
-          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">{t("sidebar.community")}</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.community")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             {user && (
@@ -412,7 +412,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="py-1.5">
-          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400">{t("sidebar.learn")}</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.learn")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             
@@ -520,7 +520,7 @@ export function AppSidebar() {
       <div
         className={`sticky bottom-0 z-20 mt-auto bg-[var(--sidebar)] px-2 py-3 transition-all duration-200 ${
           canScrollDown
-            ? "border-t border-zinc-200/80 shadow-[0_-6px_16px_rgba(0,0,0,0.07)]"
+            ? "border-t border-sidebar-border shadow-[0_-6px_16px_rgba(0,0,0,0.07)]"
             : "border-transparent shadow-none"
         }`}
       >
@@ -529,9 +529,9 @@ export function AppSidebar() {
           <Button
             asChild
             variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
               collapsed ? "justify-center px-2" : "justify-start px-3"
-            } ${pathname.startsWith("/updates") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+            } ${pathname.startsWith("/updates") ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : ""}`}
           >
             <Link
               href={latestUpdateSlug ? `/updates/${latestUpdateSlug}` : "/updates"}
@@ -553,9 +553,9 @@ export function AppSidebar() {
           <Button
             asChild
             variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
               collapsed ? "justify-center px-2" : "justify-start px-3"
-            } ${pathname.startsWith("/help") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+            } ${pathname.startsWith("/help") ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : ""}`}
           >
             <Link href="/help">
               <HelpCircle size={17} />
@@ -566,9 +566,9 @@ export function AppSidebar() {
           <Button
             asChild
             variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-black hover:shadow-sm active:scale-[0.98] ${
+            className={`h-10 w-full rounded-xl text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
               collapsed ? "justify-center px-2" : "justify-start px-3"
-            } ${pathname.startsWith("/contact") ? "bg-zinc-100 text-black shadow-sm" : ""}`}
+            } ${pathname.startsWith("/contact") ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : ""}`}
           >
             <Link href="/contact">
               <Mail size={17} />

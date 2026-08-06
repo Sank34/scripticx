@@ -439,7 +439,7 @@ function SidebarResizeHandle({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       className={cn(
-        "absolute inset-y-0 right-0 z-50 hidden w-2 touch-none cursor-col-resize outline-none after:absolute after:inset-y-3 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-zinc-200/70 after:transition-[width,background-color] hover:after:w-0.5 hover:after:bg-zinc-400 focus-visible:after:w-0.5 focus-visible:after:bg-zinc-500 data-[resizing=true]:after:w-0.5 data-[resizing=true]:after:bg-zinc-600 md:block",
+        "absolute inset-y-0 right-0 z-50 hidden w-2 touch-none cursor-col-resize outline-none after:absolute after:inset-y-3 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-sidebar-border after:transition-[width,background-color] hover:after:w-0.5 hover:after:bg-muted-foreground/60 focus-visible:after:w-0.5 focus-visible:after:bg-muted-foreground data-[resizing=true]:after:w-0.5 data-[resizing=true]:after:bg-foreground/70 md:block",
         state === "collapsed" && "pointer-events-none opacity-0",
         className
       )}

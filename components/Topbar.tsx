@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 
 import { api } from "@/lib/api";
 import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
@@ -27,14 +29,48 @@ import {
 import {
   Globe,
   LogOut,
+  Monitor,
+  Moon,
   Settings,
+  Sun,
   User,
 } from "lucide-react";
 
 export function Topbar() {
   const router = useRouter();
   const { t, locale, setLocale } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const { profile, user } = useAuth();
+  const [themeMounted, setThemeMounted] = useState(false);
+  const themeTransitionTimeout = useRef<number | null>(null);
+
+  useEffect(() => {
+    setThemeMounted(true);
+
+    return () => {
+      if (themeTransitionTimeout.current) {
+        window.clearTimeout(themeTransitionTimeout.current);
+      }
+      document.documentElement.classList.remove("theme-transition");
+    };
+  }, []);
+
+  function changeTheme(nextTheme: "light" | "dark" | "system") {
+    if (theme === nextTheme) return;
+
+    const root = document.documentElement;
+    root.classList.add("theme-transition");
+    void root.offsetWidth;
+    setTheme(nextTheme);
+
+    if (themeTransitionTimeout.current) {
+      window.clearTimeout(themeTransitionTimeout.current);
+    }
+    themeTransitionTimeout.current = window.setTimeout(() => {
+      root.classList.remove("theme-transition");
+      themeTransitionTimeout.current = null;
+    }, 360);
+  }
 
   async function logout() {
     await api.auth.signOut();
@@ -42,7 +78,7 @@ export function Topbar() {
   }
 
   return (
-    <header className="relative grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-zinc-200/70 bg-white px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
+    <header className="relative grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-border/70 bg-background px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
 
       <div className="flex min-w-0 items-center overflow-hidden pr-3">
         <TopbarBreadcrumbs />
@@ -68,7 +104,7 @@ export function Topbar() {
             <DropdownMenu>
 
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-zinc-100">
+              <button className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-accent">
                 <UserAvatar
                   avatarUrl={profile?.avatar_url}
                   username={profile?.username}
@@ -114,7 +150,7 @@ export function Topbar() {
                   className="flex items-center gap-2"
                 >
                   <User size={16} />
-                  Profile
+                  {t("user.profile")}
                 </Link>
               </DropdownMenuItem>
 
@@ -124,8 +160,52 @@ export function Topbar() {
                   className="flex items-center gap-2"
                 >
                   <Settings size={16} />
-                  Settings
+                  {t("user.settings")}
                 </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onSelect={(event) => event.preventDefault()}
+                className="flex flex-col items-stretch gap-2 p-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Sun size={16} />
+                  {t("user.appearance")}
+                </div>
+
+                <div
+                  role="group"
+                  aria-label={t("user.appearance")}
+                  className="grid grid-cols-3 items-center rounded-lg bg-muted p-0.5"
+                >
+                  {([
+                    { value: "light", label: t("user.light"), icon: Sun },
+                    { value: "dark", label: t("user.dark"), icon: Moon },
+                    { value: "system", label: t("user.auto"), icon: Monitor },
+                  ] as const).map((option) => {
+                    const Icon = option.icon;
+                    const active = themeMounted && theme === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        title={option.label}
+                        aria-label={option.label}
+                        aria-pressed={active}
+                        onClick={() => changeTheme(option.value)}
+                        className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-[11px] font-medium transition-colors ${
+                          active
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="size-3.5" />
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
@@ -168,7 +248,7 @@ export function Topbar() {
                 className="flex items-center gap-2 text-red-500"
               >
                 <LogOut size={16} />
-                Logout
+                {t("user.logout")}
               </DropdownMenuItem>
 
             </DropdownMenuContent>

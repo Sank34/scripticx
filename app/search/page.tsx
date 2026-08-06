@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-import { Search, Trophy, UserX } from "lucide-react";
+import { Loader2, Search, Trophy, UserX } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
 function SearchContent() {
@@ -64,7 +64,11 @@ function SearchContent() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: results = [], isFetching: loading } = useQuery({
+  const {
+    data: results = [],
+    isFetching,
+    isPending: loading,
+  } = useQuery({
     queryKey: ["search", "profiles", debouncedQuery.toLowerCase()],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -153,6 +157,13 @@ function SearchContent() {
 
       {query && (
         <div className="space-y-2">
+
+          {isFetching && !loading && (
+            <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground" role="status">
+              <Loader2 className="size-3 animate-spin" />
+              {t("post.refreshing")}
+            </div>
+          )}
 
           {loading && (
             <>

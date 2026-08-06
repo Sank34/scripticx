@@ -168,13 +168,13 @@ export function MobileDrawer() {
           <button
             aria-label={t("mobileDrawer.open")}
             data-tour="mobile-menu"
-            className="flex h-7 w-28 items-center justify-center rounded-full border border-zinc-200/80 bg-white/80 shadow-[0_10px_30px_rgba(24,24,27,0.14)] backdrop-blur-xl transition-all duration-200 active:scale-95"
+            className="flex h-7 w-28 items-center justify-center rounded-full border border-border/80 bg-background/80 shadow-[0_10px_30px_rgba(24,24,27,0.14)] backdrop-blur-xl transition-all duration-200 active:scale-95"
           >
-            <span className="h-1.5 w-12 rounded-full bg-zinc-400" />
+            <span className="h-1.5 w-12 rounded-full bg-muted-foreground/60" />
           </button>
         </DrawerTrigger>
 
-        <DrawerContent className="h-[82vh] rounded-t-[32px] border-zinc-200 bg-white/95 backdrop-blur-xl">
+        <DrawerContent className="h-[82vh] rounded-t-[32px] border-border bg-background/95 backdrop-blur-xl">
           <DrawerTitle className="sr-only">
             {t("mobileDrawer.title")}
           </DrawerTitle>
@@ -184,21 +184,21 @@ export function MobileDrawer() {
               <Link
                 href="/dashboard"
                 aria-label="ScripticX Dashboard"
-                className="mb-5 flex items-center gap-3 rounded-2xl p-2 transition-colors active:bg-zinc-100"
+                className="mb-5 flex items-center gap-3 rounded-2xl p-2 transition-colors active:bg-accent"
               >
                 <Image
                   src="/logoSCX.svg"
                   alt="ScripticX"
                   width={44}
                   height={44}
-                  className="h-11 w-11 object-contain"
+                  className="h-11 w-11 object-contain dark:invert"
                 />
 
                 <div className="min-w-0 text-left">
-                  <h2 className="text-xl font-semibold tracking-tight text-black">
+                  <h2 className="text-xl font-semibold tracking-tight text-foreground">
                     ScripticX
                   </h2>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-muted-foreground">
                     {t("mobileDrawer.subtitle")}
                   </p>
                 </div>
@@ -224,7 +224,7 @@ export function MobileDrawer() {
                     key={section.label}
                     className="flex w-full flex-col"
                   >
-                    <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                    <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
                       {section.label}
                     </h3>
 
@@ -242,8 +242,8 @@ export function MobileDrawer() {
                                 href={item.href}
                                 className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all duration-200 active:scale-[0.98] ${
                                   active
-                                    ? "bg-zinc-100 text-black shadow-sm"
-                                    : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
+                                    ? "bg-accent text-accent-foreground shadow-sm"
+                                    : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                                 }`}
                               >
                                 <Icon size={22} />
@@ -262,8 +262,8 @@ export function MobileDrawer() {
                                         href={child.href}
                                         className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                                           childActive
-                                            ? "bg-zinc-100 text-black"
-                                            : "text-zinc-500 hover:bg-zinc-50 hover:text-black"
+                                            ? "bg-accent text-accent-foreground"
+                                            : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                                         }`}
                                       >
                                         {child.label}
@@ -280,7 +280,7 @@ export function MobileDrawer() {
                   </div>
                 ))}
 
-                <div className="h-px w-full bg-zinc-100" />
+                <div className="h-px w-full bg-border" />
 
                 <div className="flex w-full flex-col gap-1">
                   {footerItems.map((item) => {
@@ -293,8 +293,8 @@ export function MobileDrawer() {
                           href={item.href}
                           className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all duration-200 active:scale-[0.98] ${
                             active
-                              ? "bg-zinc-100 text-black shadow-sm"
-                              : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
+                              ? "bg-accent text-accent-foreground shadow-sm"
+                              : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                           }`}
                         >
                           <span className="relative inline-flex">
@@ -302,7 +302,7 @@ export function MobileDrawer() {
                             {item.unread && (
                               <span className="absolute -right-1 -top-1 flex h-2 w-2">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
                               </span>
                             )}
                           </span>

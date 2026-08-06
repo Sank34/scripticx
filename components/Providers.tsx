@@ -2,8 +2,13 @@
 
 import {
   QueryClient,
-  QueryClientProvider,
 } from "@tanstack/react-query";
+import {
+  PersistQueryClientProvider,
+  removeOldestQuery,
+  type PersistedClient,
+} from "@tanstack/react-query-persist-client";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -74,6 +79,82 @@ const realtimeScopesByTable: Record<string, string[]> = {
   platform_settings: ["platform-status", "admin"],
 };
 
+const PERSISTED_QUERY_SCOPES = new Set([
+  "community",
+  "dashboard",
+  "feed",
+  "leaderboard",
+  "post",
+  "problems",
+  "profile",
+  "rewards-shop",
+  "roadmap",
+  "search",
+  "update",
+  "updates",
+]);
+
+const QUERY_CACHE_KEY = "scripticx-query-cache-v2";
+const QUERY_CACHE_OWNER_KEY = "scripticx-query-cache-owner-v1";
+const QUERY_CACHE_MAX_AGE = 1000 * 60 * 60 * 12;
+
+function synchronizeQueryCacheOwner(
+  queryClient: QueryClient,
+  nextUserId: string | null
+) {
+  const previousUserId = window.localStorage.getItem(QUERY_CACHE_OWNER_KEY);
+  const changedUser = Boolean(
+    previousUserId && previousUserId !== nextUserId
+  );
+
+  if (changedUser) {
+    window.localStorage.removeItem(QUERY_CACHE_KEY);
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] !== "auth",
+    });
+  }
+
+  if (nextUserId) {
+    window.localStorage.setItem(QUERY_CACHE_OWNER_KEY, nextUserId);
+  } else {
+    window.localStorage.removeItem(QUERY_CACHE_OWNER_KEY);
+  }
+}
+
+function serializeQueryCache(value: PersistedClient): string {
+  return JSON.stringify(value, (_key, current) => {
+    if (current instanceof Set) {
+      return { __scripticxCacheType: "Set", values: Array.from(current) };
+    }
+    if (current instanceof Map) {
+      return { __scripticxCacheType: "Map", values: Array.from(current.entries()) };
+    }
+    return current;
+  });
+}
+
+function deserializeQueryCache(value: string): PersistedClient {
+  return JSON.parse(value, (_key, current) => {
+    if (
+      current &&
+      typeof current === "object" &&
+      current.__scripticxCacheType === "Set" &&
+      Array.isArray(current.values)
+    ) {
+      return new Set(current.values);
+    }
+    if (
+      current &&
+      typeof current === "object" &&
+      current.__scripticxCacheType === "Map" &&
+      Array.isArray(current.values)
+    ) {
+      return new Map(current.values);
+    }
+    return current;
+  }) as PersistedClient;
+}
+
 function PlatformAccessSync() {
   const pathname = usePathname();
   const router = useRouter();
@@ -129,6 +210,8 @@ function AuthCacheSync({ queryClient }: { queryClient: QueryClient }) {
     const subscription = api.auth.onAuthStateChange((session) => {
       const user = session?.user ?? null;
 
+      synchronizeQueryCacheOwner(queryClient, user?.id || null);
+
       if (!user) {
         queryClient.setQueryData<AuthState>(authQueryKey, {
           profile: null,
@@ -180,7 +263,8 @@ export default function Providers({
         defaultOptions: {
           queries: {
             staleTime: 1000 * 60 * 3,
-            gcTime: 1000 * 60 * 30,
+            gcTime: QUERY_CACHE_MAX_AGE,
+            networkMode: "offlineFirst",
             refetchOnReconnect: true,
             refetchOnWindowFocus: true,
             refetchOnMount: true,
@@ -188,6 +272,16 @@ export default function Providers({
           },
         },
       })
+  );
+  const [queryPersister] = useState(() =>
+    createAsyncStoragePersister({
+      storage: typeof window === "undefined" ? undefined : window.localStorage,
+      key: QUERY_CACHE_KEY,
+      throttleTime: 1_000,
+      serialize: serializeQueryCache,
+      deserialize: deserializeQueryCache,
+      retry: removeOldestQuery,
+    })
   );
   const lastResumeAt = useRef(0);
 
@@ -297,10 +391,33 @@ export default function Providers({
   }, [queryClient]);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: queryPersister,
+        maxAge: QUERY_CACHE_MAX_AGE,
+        buster: "scripticx-query-cache-v2",
+        dehydrateOptions: {
+          shouldDehydrateMutation: () => false,
+          shouldDehydrateQuery: (query) => {
+            const scope = query.queryKey[0];
+            const keyParts = query.queryKey.filter(
+              (part): part is string => typeof part === "string"
+            );
+            return (
+              query.state.status === "success" &&
+              typeof scope === "string" &&
+              PERSISTED_QUERY_SCOPES.has(scope) &&
+              !keyParts.includes("role") &&
+              !keyParts.includes("config-raw")
+            );
+          },
+        },
+      }}
+    >
       <AuthCacheSync queryClient={queryClient} />
       <PlatformAccessSync />
       {children}
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

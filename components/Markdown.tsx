@@ -7,49 +7,49 @@ import { Separator } from "@/components/ui/separator";
 
 export function Markdown({ children }: { children: string }) {
   return (
-    <div className="space-y-4 text-[15px] leading-7 text-zinc-700">
+    <div className="space-y-4 text-[15px] leading-7 text-foreground/80">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => (
-            <h1 className="mt-6 text-3xl font-bold tracking-tight text-zinc-900 first:mt-0">
+            <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground first:mt-0">
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mt-8 text-2xl font-semibold tracking-tight text-zinc-900">
+            <h2 className="mt-8 text-2xl font-semibold tracking-tight text-foreground">
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="mt-6 text-lg font-semibold text-zinc-900">
+            <h3 className="mt-6 text-lg font-semibold text-foreground">
               {children}
             </h3>
           ),
-          p: ({ children }) => <p className="text-zinc-700">{children}</p>,
+          p: ({ children }) => <p className="text-foreground/80">{children}</p>,
           a: ({ href, children }) => (
             <a
               href={href}
               target={href?.startsWith("http") ? "_blank" : undefined}
               rel={href?.startsWith("http") ? "noreferrer" : undefined}
-              className="text-zinc-900 underline underline-offset-2 hover:text-black"
+              className="text-foreground underline underline-offset-2 hover:text-foreground/75"
             >
               {children}
             </a>
           ),
           ul: ({ children }) => (
-            <ul className="ml-6 list-disc space-y-1.5 text-zinc-700">
+            <ul className="ml-6 list-disc space-y-1.5 text-foreground/80">
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className="ml-6 list-decimal space-y-1.5 text-zinc-700">
+            <ol className="ml-6 list-decimal space-y-1.5 text-foreground/80">
               {children}
             </ol>
           ),
           li: ({ children }) => <li>{children}</li>,
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-zinc-300 pl-4 italic text-zinc-600">
+            <blockquote className="border-l-2 border-border pl-4 italic text-muted-foreground">
               {children}
             </blockquote>
           ),

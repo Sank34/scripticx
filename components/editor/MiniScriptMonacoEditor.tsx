@@ -6,6 +6,7 @@ import Editor, {
   type OnMount,
   useMonaco,
 } from "@monaco-editor/react";
+import { useTheme } from "next-themes";
 
 // @monaco-editor/react defaults to jsDelivr. Keep the editor same-origin so
 // Content Security Policy can remain strict and the IDE also works offline.
@@ -27,10 +28,12 @@ export function MiniScriptMonacoEditor({
   onMount,
   options,
   readOnly = false,
-  theme = "light",
+  theme: themeOverride,
   value,
 }: MiniScriptMonacoEditorProps) {
   const monaco = useMonaco();
+  const { resolvedTheme } = useTheme();
+  const editorTheme = themeOverride || (resolvedTheme === "dark" ? "dark" : "light");
 
   useEffect(() => {
     if (!monaco) return;
@@ -93,11 +96,11 @@ export function MiniScriptMonacoEditor({
       onMount={onMount}
       height={height}
       defaultLanguage="miniscriptplus"
-      theme={theme === "dark" ? "miniscriptplusDarkTheme" : "miniscriptplusTheme"}
+      theme={editorTheme === "dark" ? "miniscriptplusDarkTheme" : "miniscriptplusTheme"}
       value={value}
       onChange={(nextValue) => onChange(nextValue || "")}
       loading={
-        <div className="flex h-full items-center justify-center bg-white text-sm text-zinc-500">
+        <div className="flex h-full items-center justify-center bg-background text-sm text-muted-foreground">
           Loading editor…
         </div>
       }

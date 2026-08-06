@@ -80,7 +80,7 @@ export function Footer() {
                 aria-hidden="true"
                 width={48}
                 height={34}
-                className="h-6 w-auto shrink-0 object-contain"
+                className="h-6 w-auto shrink-0 object-contain dark:invert"
               />
             </Link>
             <p className="text-sm text-muted-foreground max-w-[220px]">
@@ -113,13 +113,13 @@ function FooterColumn({
 }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <ul className="space-y-2">
         {links.map((l) => (
           <li key={l.href}>
             <Link
               href={l.href}
-              className="text-sm text-muted-foreground transition hover:text-black"
+              className="text-sm text-muted-foreground transition hover:text-foreground"
             >
               {l.label}
             </Link>

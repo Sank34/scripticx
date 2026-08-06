@@ -831,7 +831,7 @@ export default function LessonPage() {
                   </div>
                 </div>
                 <Button
-                  className="w-full rounded-full bg-white text-black hover:bg-white/90"
+                  className="w-full rounded-full bg-white text-black hover:bg-white/90 dark:!bg-white dark:!text-black dark:hover:!bg-white/90"
                   onClick={markCompleted}
                   disabled={completed}
                 >

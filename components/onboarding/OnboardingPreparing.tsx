@@ -101,7 +101,7 @@ export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
       <div className="relative flex min-h-[100dvh] flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)] sm:px-8">
         <header className="flex items-center justify-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logoSCX.svg" alt="ScripticX" className="h-9 w-9" />
+          <img src="/logoSCX.svg" alt="ScripticX" className="h-9 w-9 dark:invert" />
           <span className="text-lg font-semibold">ScripticX</span>
         </header>
 

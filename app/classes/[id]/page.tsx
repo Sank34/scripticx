@@ -322,7 +322,7 @@ export default function ClassPage() {
           {userId && cls?.teacher_id === userId && (
             <Button
               onClick={() => setOpenAssignment(true)}
-              className="bg-white text-black hover:bg-white/90"
+              className="bg-white text-black hover:bg-white/90 dark:!bg-white dark:!text-black dark:hover:!bg-white/90"
             >
               <Plus size={16} />
               {t("classes.detail.newAssignment")}
