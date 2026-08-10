@@ -92,14 +92,14 @@ export default function AuthCallbackPage() {
         <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
           {error ? (
             <>
-              <div className="flex size-11 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <div className="flex size-11 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400">
                 <CircleAlert className="size-5" />
               </div>
               <div className="space-y-1">
                 <h1 className="text-xl font-semibold">
                   {t("authCallback.errorTitle")}
                 </h1>
-                <p className="text-sm text-zinc-600">{error}</p>
+                <p className="text-sm text-muted-foreground">{error}</p>
               </div>
               <Button asChild>
                 <Link href="/login">{t("authCallback.backToLogin")}</Link>
@@ -107,12 +107,12 @@ export default function AuthCallbackPage() {
             </>
           ) : (
             <>
-              <LoaderCircle className="size-7 animate-spin text-zinc-700" />
+              <LoaderCircle className="size-7 animate-spin text-foreground" />
               <div className="space-y-1">
                 <h1 className="text-xl font-semibold">
                   {t("authCallback.title")}
                 </h1>
-                <p className="text-sm text-zinc-600">
+                <p className="text-sm text-muted-foreground">
                   {t("authCallback.description")}
                 </p>
               </div>

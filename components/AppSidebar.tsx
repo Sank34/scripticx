@@ -289,14 +289,14 @@ export function AppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
-      className="h-full bg-transparent overflow-hidden"
+      className="h-full overflow-hidden bg-transparent"
     >
       <SidebarContent className="flex h-full flex-col overflow-hidden">
 
         <div
-          className={`sticky top-0 z-20 flex items-center justify-between bg-[var(--sidebar)] px-3 py-4 transition-all duration-200 ${
+          className={`sticky top-0 z-20 flex items-center justify-between bg-sidebar px-3 py-3 transition-all duration-200 ${
             canScrollUp
-              ? "border-b border-sidebar-border shadow-[0_5px_14px_rgba(0,0,0,0.06)]"
+              ? "border-b border-sidebar-border shadow-[0_5px_14px_rgba(0,0,0,0.06)] dark:shadow-[0_6px_18px_rgba(0,0,0,0.32)]"
               : "border-transparent"
           }`}
         >
@@ -308,7 +308,7 @@ export function AppSidebar() {
             <Link
               href="/dashboard"
               aria-label="ScripticX Dashboard"
-              className="-ml-1 flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-sidebar-accent"
+              className="flex min-w-0 items-center gap-2 rounded-2xl px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -518,9 +518,9 @@ export function AppSidebar() {
 
       </SidebarContent>
       <div
-        className={`sticky bottom-0 z-20 mt-auto bg-[var(--sidebar)] px-2 py-3 transition-all duration-200 ${
+        className={`sticky bottom-0 z-20 mt-auto bg-sidebar px-2 py-3 transition-all duration-200 ${
           canScrollDown
-            ? "border-t border-sidebar-border shadow-[0_-6px_16px_rgba(0,0,0,0.07)]"
+            ? "border-t border-sidebar-border shadow-[0_-6px_16px_rgba(0,0,0,0.07)] dark:shadow-[0_-7px_20px_rgba(0,0,0,0.34)]"
             : "border-transparent shadow-none"
         }`}
       >

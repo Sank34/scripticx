@@ -214,7 +214,7 @@ function AdminProblemsContent() {
                   }}
                   modifiersClassNames={{
                     scheduled:
-                      "bg-emerald-500/15 text-emerald-900 font-semibold hover:bg-emerald-500/25",
+                      "bg-emerald-500/15 text-emerald-900 font-semibold hover:bg-emerald-500/25 dark:text-emerald-200",
                   }}
                   disabled={(date) => formatDateKey(date) < todayKey}
                   onSelect={(date) => {

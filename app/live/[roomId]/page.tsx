@@ -154,16 +154,16 @@ const MSP_TOKEN_PATTERN =
   /(#.*$|"(?:[^"\\]|\\.)*"|\b(?:IF|THEN|ELSE|END|WHILE|PRINT|INPUT|DIV|MOD|TRUE|FALSE|INT|TRUNC|FLOOR|ROUND|ABS|AND|OR|NOT)\b|\b\d+(?:\.\d+)?\b|<=|>=|==|!=|[+\-*/%<>=(),]|\b[a-zA-Z_][a-zA-Z0-9_]*\b|\s+|.)/g;
 
 function getTokenClass(token: string) {
-  if (/^#/.test(token)) return "text-emerald-700 italic";
-  if (/^"/.test(token)) return "text-amber-700";
+  if (/^#/.test(token)) return "text-emerald-700 italic dark:text-emerald-400";
+  if (/^"/.test(token)) return "text-amber-700 dark:text-amber-400";
   if (/^\d/.test(token)) return "text-teal-700";
-  if (/^(TRUE|FALSE)$/i.test(token)) return "text-blue-700";
+  if (/^(TRUE|FALSE)$/i.test(token)) return "text-blue-700 dark:text-blue-400";
   if (/^(IF|THEN|ELSE|END|WHILE|PRINT|INPUT|DIV|MOD|AND|OR|NOT)$/i.test(token)) {
-    return "font-semibold text-violet-700";
+    return "font-semibold text-violet-700 dark:text-violet-400";
   }
-  if (/^(INT|TRUNC|FLOOR|ROUND|ABS)$/i.test(token)) return "font-semibold text-sky-700";
-  if (/^(<=|>=|==|!=|[+\-*/%<>=(),])$/.test(token)) return "text-zinc-700";
-  return "text-zinc-900";
+  if (/^(INT|TRUNC|FLOOR|ROUND|ABS)$/i.test(token)) return "font-semibold text-sky-700 dark:text-sky-400";
+  if (/^(<=|>=|==|!=|[+\-*/%<>=(),])$/.test(token)) return "text-zinc-700 dark:text-zinc-300";
+  return "text-zinc-900 dark:text-zinc-100";
 }
 
 function renderHighlightedMiniScriptLine(line: string, lineIndex: number) {
@@ -258,7 +258,7 @@ export default function LiveRoomPage() {
     >
       <SelectTrigger
         size="sm"
-        className="h-7 border-zinc-200 bg-white px-2 text-xs text-zinc-600"
+        className="h-7 border-border bg-background px-2 text-xs text-muted-foreground"
         aria-label={t("live.tabSize")}
       >
         <SelectValue />
@@ -1287,17 +1287,17 @@ export default function LiveRoomPage() {
   }
 
   const editorPanel = (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-y border-zinc-200 bg-white md:border">
-      <div className="flex h-10 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-y border-border bg-background md:border">
+      <div className="flex h-10 items-center justify-between border-b border-border bg-muted/60 px-3">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400" />
           <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-yellow-400" />
           <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" />
-          <span className="ml-2 truncate text-xs font-medium text-zinc-700">main.msp</span>
+          <span className="ml-2 truncate text-xs font-medium text-foreground">main.msp</span>
         </div>
         <div className="flex min-w-0 shrink-0 items-center gap-2">
-          <Play size={13} className="shrink-0 text-zinc-500" />
-          <span className="max-w-[7rem] truncate text-xs text-zinc-500 sm:max-w-none">
+          <Play size={13} className="shrink-0 text-muted-foreground" />
+          <span className="max-w-[7rem] truncate text-xs text-muted-foreground sm:max-w-none">
             {isClosed && isMobileEditor ? t("livecode.status.closed") : isClosed ? t("live.sessionEnded") : "MiniScript+"}
           </span>
           <div className="md:hidden">{tabSizeControl}</div>
@@ -1317,14 +1317,14 @@ export default function LiveRoomPage() {
             onRun={runCode}
             readOnly={isClosed}
           >
-            <div className="relative h-full min-h-[520px] overflow-hidden bg-white font-mono text-[15px] leading-6 md:min-h-0">
+            <div className="relative h-full min-h-[520px] overflow-hidden bg-background font-mono text-[15px] leading-6 md:min-h-0">
               <div
                 ref={mobileHighlightRef}
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 overflow-hidden"
               >
                 <div className="grid min-h-full min-w-max grid-cols-[3.25rem_1fr]">
-                  <div className="select-none border-r border-zinc-100 bg-zinc-50/80 py-4 text-right text-xs leading-6 text-zinc-400">
+                  <div className="select-none border-r border-border bg-muted/50 py-4 text-right text-xs leading-6 text-muted-foreground">
                     {mobileEditorLines.map((_, index) => (
                       <div key={index} className="h-6 pr-3">
                         {index + 1}
@@ -1345,7 +1345,7 @@ export default function LiveRoomPage() {
                         {code.length > 0 ? (
                           renderHighlightedMiniScriptLine(line, index)
                         ) : (
-                          <span className="text-zinc-400">{line}</span>
+                          <span className="text-muted-foreground">{line}</span>
                         )}
                       </div>
                     ))}
@@ -1473,7 +1473,7 @@ export default function LiveRoomPage() {
         {participantProfiles.map((profile) => (
           <div
             key={profile.id}
-            className="flex w-full items-center gap-3 rounded-lg border border-zinc-200 p-2 text-left"
+            className="flex w-full items-center gap-3 rounded-lg border border-border p-2 text-left"
           >
             <button
               type="button"
@@ -1489,18 +1489,18 @@ export default function LiveRoomPage() {
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{profile.username || "User"}</div>
-                <div className="text-xs text-zinc-500">
+                <div className="text-xs text-muted-foreground">
                   {profile.id === room?.owner_id ? t("live.owner") : profile.online ? "Online" : "Offline"}
                 </div>
               </div>
             </button>
-            <span className={`h-2 w-2 rounded-full ${profile.online ? "bg-emerald-500" : "bg-zinc-300"}`} />
+            <span className={`h-2 w-2 rounded-full ${profile.online ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
             {isOwner && profile.id !== room?.owner_id && (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="h-8 w-8 shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
                 onClick={() => removeParticipant(profile.id)}
                 aria-label={t("live.removeParticipant")}
                 title={t("live.removeParticipant")}
@@ -1551,7 +1551,7 @@ export default function LiveRoomPage() {
                   className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm ${
                     isMe
                       ? "rounded-br-sm bg-zinc-900 text-white"
-                      : "rounded-bl-sm bg-zinc-100 text-zinc-900"
+                      : "rounded-bl-sm bg-muted text-foreground"
                   }`}
                 >
                   {!isMe && (
@@ -1577,7 +1577,7 @@ export default function LiveRoomPage() {
       </div>
 
       {!isClosed && (
-        <div className="border-t border-zinc-200 bg-white p-3">
+        <div className="border-t border-border bg-background p-3">
           <div className="flex gap-2">
             <Input
               value={message}
@@ -1598,7 +1598,7 @@ export default function LiveRoomPage() {
 
   const sidePanel = (
     <Tabs value={rightTab} onValueChange={setRightTab} className="flex h-full min-h-0 flex-col gap-0">
-      <div className="border-b border-zinc-200 bg-white px-2 py-2">
+      <div className="border-b border-border bg-background px-2 py-2">
         <TabsList className="grid h-9 w-full grid-cols-4">
           <TabsTrigger value="console" aria-label={t("live.console")}>
             <Terminal size={15} />
@@ -1626,9 +1626,9 @@ export default function LiveRoomPage() {
 
   if (loading) {
     return (
-      <div className="h-full bg-white">
+      <div className="h-full bg-background">
         <div className="flex h-full flex-col">
-          <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-4">
+          <div className="flex h-14 items-center justify-between border-b border-border px-4">
             <Skeleton className="h-6 w-44" />
             <Skeleton className="h-9 w-28" />
           </div>
@@ -1644,9 +1644,9 @@ export default function LiveRoomPage() {
   if (!room) return null;
 
   return (
-    <div className="h-full overflow-hidden bg-white">
+    <div className="h-full overflow-hidden bg-background">
       <div className="flex h-full min-h-0 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-zinc-200 bg-white px-3 md:px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3 md:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.push("/livecode")} aria-label="Back" className="shrink-0">
               <LogOut size={17} />
@@ -1660,7 +1660,7 @@ export default function LiveRoomPage() {
                   {isClosed ? t("livecode.status.closed") : t("livecode.status.active")}
                 </Badge>
               </div>
-              <div className="hidden text-xs text-zinc-500 md:block">
+              <div className="hidden text-xs text-muted-foreground md:block">
                 {participants.length} {t("live.online")} · {room.id}
               </div>
             </div>
@@ -1717,9 +1717,9 @@ export default function LiveRoomPage() {
 
         {isMobileEditor === false && (
           <div className="hidden min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px] md:grid">
-            <main className="flex min-h-0 min-w-0 flex-col bg-white">
+            <main className="flex min-h-0 min-w-0 flex-col bg-background">
               {editorPanel}
-              <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">
+              <div className="flex h-8 shrink-0 items-center justify-between border-t border-border bg-muted/60 px-3 text-xs text-muted-foreground">
                 <span>Ln {editorCursorLine}</span>
                 <div className="flex items-center gap-2">
                   <span>{t("live.tabSize")}</span>
@@ -1728,7 +1728,7 @@ export default function LiveRoomPage() {
                 </div>
               </div>
             </main>
-            <aside className="min-h-0 border-l border-zinc-200 bg-white">
+            <aside className="min-h-0 border-l border-border bg-background">
               {sidePanel}
             </aside>
           </div>
@@ -1752,8 +1752,8 @@ export default function LiveRoomPage() {
               {peoplePanel}
             </TabsContent>
 
-            <div className="fixed bottom-20 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-zinc-200 bg-white/95 p-1 shadow-lg backdrop-blur">
-              <TabsList className="grid h-10 w-full grid-cols-5 bg-zinc-100">
+            <div className="fixed bottom-20 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-border bg-background/95 p-1 shadow-lg backdrop-blur">
+              <TabsList className="grid h-10 w-full grid-cols-5 bg-muted">
                 <TabsTrigger value="code">Code</TabsTrigger>
                 <TabsTrigger value="run">Console</TabsTrigger>
                 <TabsTrigger value="debugger">Debug</TabsTrigger>
@@ -1822,7 +1822,7 @@ export default function LiveRoomPage() {
       })}
 
       {cursorDebugEnabled && (
-        <div className="fixed bottom-4 left-4 z-[10000] rounded-lg border border-amber-300 bg-amber-50 p-3 font-mono text-[11px] text-amber-950 shadow-xl">
+        <div className="fixed bottom-4 left-4 z-[10000] rounded-lg border border-amber-300 bg-amber-50 p-3 font-mono text-[11px] text-amber-950 shadow-xl dark:border-amber-800 dark:bg-amber-950/90 dark:text-amber-100">
           <div>status: {editorCursorLine}</div>
           <div>sync: {cursorDebugInfo.statusLine}</div>
           <div>pos: {cursorDebugInfo.positionLine ?? "-"}</div>
@@ -1856,7 +1856,7 @@ export default function LiveRoomPage() {
           <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
             <div className="space-y-2">
               {inviteCandidates.length === 0 && (
-                <div className="rounded-lg border border-dashed border-zinc-200 px-3 py-8 text-center text-sm text-zinc-500">
+                <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
                   {t("live.noInviteUsers")}
                 </div>
               )}
@@ -1869,7 +1869,7 @@ export default function LiveRoomPage() {
                 return (
                   <div
                     key={profile.id}
-                    className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
                       <UserAvatar

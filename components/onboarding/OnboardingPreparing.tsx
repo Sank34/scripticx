@@ -87,11 +87,11 @@ export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-[120] overflow-y-auto bg-white text-zinc-950 transition-opacity duration-700 ease-out ${
+      className={`fixed inset-0 z-[120] overflow-y-auto bg-background text-foreground transition-opacity duration-700 ease-out ${
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_58%,#f0fdf4_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_58%,#f0fdf4_100%)] dark:bg-[linear-gradient(180deg,#171717_0%,#18181b_58%,#052e16_100%)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-sky-500 to-violet-500" />
 
       <div className="absolute left-1/2 top-[45%] h-64 w-[min(78vw,680px)] -translate-x-1/2 -translate-y-1/2 sm:h-80">
@@ -107,7 +107,7 @@ export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
 
         <main className="relative z-[1] flex min-h-80 flex-1 items-center justify-center py-10 sm:py-12">
           <div className="w-full max-w-3xl text-center" role="status" aria-live="polite" aria-label={c.status}>
-            <div className="mx-auto mb-7 flex h-11 w-11 items-center justify-center rounded-lg border border-white/80 bg-white/70 text-sky-700 shadow-[0_12px_40px_rgba(14,165,233,0.2)] backdrop-blur-md">
+            <div className="mx-auto mb-7 flex h-11 w-11 items-center justify-center rounded-lg border bg-card/70 text-sky-700 shadow-[0_12px_40px_rgba(14,165,233,0.2)] backdrop-blur-md dark:text-sky-300">
               <Sparkles className="h-5 w-5 animate-pulse" />
             </div>
             <div className="flex min-h-28 items-center justify-center sm:min-h-32">
@@ -118,7 +118,7 @@ export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
                 {c.messages[messageIndex]}
               </h1>
             </div>
-            <div className="mx-auto mt-8 h-1 w-full max-w-sm overflow-hidden rounded-full bg-white/65 shadow-inner backdrop-blur-sm">
+            <div className="mx-auto mt-8 h-1 w-full max-w-sm overflow-hidden rounded-full bg-muted shadow-inner backdrop-blur-sm">
               <div className="onboarding-preparing-progress h-full rounded-full bg-gradient-to-r from-emerald-500 via-sky-500 to-violet-500" />
             </div>
           </div>
@@ -132,7 +132,7 @@ export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
             </p>
             <p
               key={`${language}-${factIndex}`}
-              className="mt-3 animate-in fade-in slide-in-from-bottom-3 text-sm leading-6 text-zinc-600 duration-700 sm:text-base"
+              className="mt-3 animate-in fade-in slide-in-from-bottom-3 text-sm leading-6 text-muted-foreground duration-700 sm:text-base"
             >
               {c.facts[factIndex]}
             </p>

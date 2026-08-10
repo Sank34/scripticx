@@ -933,7 +933,7 @@ END
     >
       <SelectTrigger
         size="sm"
-        className="h-7 border-zinc-200 bg-white px-2 text-xs text-zinc-600"
+        className="h-7 border-border bg-background px-2 text-xs text-muted-foreground"
         aria-label={t("live.tabSize")}
       >
         <SelectValue />
@@ -1027,13 +1027,13 @@ END
 
   const visualizationPanel = (
     <div className="h-full overflow-y-auto p-4">
-      <section className="rounded-xl border border-zinc-200 bg-white">
-        <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <section className="rounded-xl border border-border bg-card">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Workflow size={14} />
           {t("editor.visualization.title")}
         </div>
         <Tabs defaultValue="ast" className="gap-0">
-          <TabsList className="grid h-10 w-full grid-cols-2 rounded-none border-b bg-zinc-50 px-3">
+          <TabsList className="grid h-10 w-full grid-cols-2 rounded-none border-b bg-muted/60 px-3">
             <TabsTrigger value="ast" className="text-xs">
               {t("editor.visualization.tabs.ast")}
             </TabsTrigger>
@@ -1060,7 +1060,7 @@ END
     <div className="h-full overflow-y-auto p-4">
       <div className="space-y-2">
         {snippets.length === 0 && (
-          <div className="rounded-xl border border-dashed border-zinc-200 p-4 text-sm text-zinc-500">
+          <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
             {t("editor.snippets.empty")}
           </div>
         )}
@@ -1070,8 +1070,8 @@ END
             key={snippet.id}
             className={`group flex items-center gap-2 rounded-xl border p-3 transition ${
               savedId === snippet.id
-                ? "border-zinc-900 bg-zinc-50"
-                : "border-zinc-200 hover:bg-zinc-50"
+                ? "border-foreground bg-muted/60"
+                : "border-border hover:bg-muted/60"
             }`}
           >
             <button
@@ -1082,11 +1082,11 @@ END
               <div className="truncate text-sm font-semibold">
                 {snippet.title || t("editor.snippets.untitled")}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="truncate">
                   {new Date(snippet.created_at).toLocaleString()}
                 </span>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                   <ListTree size={12} />
                   {formatSnippetFileCount(getSnippetFileCount(snippet))}
                 </span>
@@ -1103,7 +1103,7 @@ END
             <Button
               size="icon"
               variant="ghost"
-              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
               onClick={() => deleteSnippet(snippet.id)}
               aria-label={t("editor.snippets.delete")}
             >
@@ -1116,15 +1116,15 @@ END
   );
 
   return (
-    <div data-tour="editor-workspace" className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+    <div data-tour="editor-workspace" className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <TooltipProvider>
-        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-          <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-4">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+          <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4">
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold md:text-base">
                 {t("editor.title")}
               </h1>
-              <p className="hidden truncate text-xs text-zinc-500 sm:block">
+              <p className="hidden truncate text-xs text-muted-foreground sm:block">
                 {title || fileName}
               </p>
             </div>
@@ -1165,7 +1165,7 @@ END
             </div>
           </header>
 
-          <div className="flex h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-zinc-200 bg-zinc-50 px-3 sm:hidden">
+          <div className="flex h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-muted/60 px-3 sm:hidden">
             {toolbarButton(
               t("editor.githubImport.action"),
               <GitHubIcon size={16} />,
@@ -1193,23 +1193,23 @@ END
           </div>
 
           <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px]">
-            <main className="flex min-h-0 min-w-0 flex-col border-b border-zinc-200 bg-white xl:border-r xl:border-b-0">
-              <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
+            <main className="flex min-h-0 min-w-0 flex-col border-b border-border bg-background xl:border-r xl:border-b-0">
+              <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-muted/60 px-3">
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400" />
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-yellow-400" />
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500" />
-                  <span className="ml-2 truncate text-xs font-medium text-zinc-700">
+                  <span className="ml-2 truncate text-xs font-medium text-foreground">
                     {fileName}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Play size={13} />
                   <span>MiniScript+</span>
                 </div>
               </div>
 
-              <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-zinc-200 bg-white px-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-background px-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 {files.map((file) => {
                   const isActive = file.id === activeFile?.id;
 
@@ -1219,8 +1219,8 @@ END
                         <div
                           className={`flex h-7 min-w-0 shrink-0 items-center rounded-md border text-xs transition ${
                             isActive
-                              ? "border-zinc-300 bg-zinc-100 text-zinc-950"
-                              : "border-transparent bg-white text-zinc-500 hover:bg-zinc-50"
+                              ? "border-border bg-muted text-foreground"
+                              : "border-transparent bg-background text-muted-foreground hover:bg-muted/60"
                           }`}
                         >
                           <button
@@ -1235,7 +1235,7 @@ END
                           <button
                             type="button"
                             onClick={() => deleteEditorFile(file.id)}
-                            className="flex h-6 w-6 items-center justify-center rounded-sm text-zinc-400 hover:bg-zinc-200 hover:text-zinc-900"
+                            className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                             aria-label={`Delete ${file.name}`}
                           >
                             <X size={12} />
@@ -1335,7 +1335,7 @@ END
                 </div>
               </CodeEditorContextMenu>
 
-              <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">
+              <div className="flex h-8 shrink-0 items-center justify-between border-t border-border bg-muted/60 px-3 text-xs text-muted-foreground">
                 <span>Ln {editorLine}</span>
                 <div className="flex items-center gap-2">
                   <span>{t("live.tabSize")}</span>
@@ -1345,13 +1345,13 @@ END
               </div>
             </main>
 
-            <aside className="min-h-0 overflow-hidden bg-white">
+            <aside className="min-h-0 overflow-hidden bg-background">
               <Tabs
                 value={activePanel}
                 onValueChange={setActivePanel}
                 className="flex h-full min-h-[420px] flex-col gap-0 xl:min-h-0"
               >
-                <TabsList className="grid h-11 w-full grid-cols-5 rounded-none border-b bg-zinc-50 px-3">
+                <TabsList className="grid h-11 w-full grid-cols-5 rounded-none border-b bg-muted/60 px-3">
                   <TabsTrigger
                     value="console"
                     className="gap-1.5 px-2 text-xs"
@@ -1395,7 +1395,7 @@ END
                   </TabsTrigger>
                 </TabsList>
 
-                <div className="min-h-0 border-b border-zinc-200">
+                <div className="min-h-0 border-b border-border">
                   {metadataPanel}
                 </div>
 
@@ -1438,7 +1438,7 @@ END
           >
             <label
               htmlFor="editor-github-url"
-              className="flex items-center gap-2 text-sm font-medium text-zinc-700"
+              className="flex items-center gap-2 text-sm font-medium text-foreground"
             >
               <GitHubIcon size={16} />
               {t("editor.githubImport.label")}
@@ -1451,7 +1451,7 @@ END
               placeholder={t("editor.githubImport.placeholder")}
               disabled={githubImporting}
             />
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-muted-foreground">
               {t("editor.githubImport.hint")}
             </p>
           </form>
@@ -1498,7 +1498,7 @@ END
           >
             <label
               htmlFor="editor-new-file-name"
-              className="text-sm font-medium text-zinc-700"
+              className="text-sm font-medium text-foreground"
             >
               File name
             </label>
@@ -1513,7 +1513,7 @@ END
               placeholder="main.msp"
             />
             {newFileError && (
-              <p className="text-xs text-red-600">{newFileError}</p>
+              <p className="text-xs text-red-600 dark:text-red-400">{newFileError}</p>
             )}
           </form>
 

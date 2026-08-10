@@ -142,8 +142,8 @@ export default function RootLayout({
             <LanguageProvider>
               <GlobalContextMenu>
                 <SidebarProvider>
-                  <div className="h-screen w-full overflow-hidden bg-muted/50 p-2">
-                    <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-muted/50">
+                  <div className="h-screen w-full overflow-hidden bg-sidebar p-2">
+                    <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-sidebar">
 
                       <AppSidebar />
 

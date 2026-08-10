@@ -141,7 +141,7 @@ export async function enforceRateLimit(input: {
   });
 
   if (error) {
-    // Failing closed is important for endpoints that mint points or messages.
+    // Failing closed is important for endpoints that mint points or messages
     console.error("Security rate limiter failed:", error);
     throw new HttpError(503, "Security service unavailable");
   }

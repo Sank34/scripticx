@@ -74,14 +74,14 @@ function UpToDateToast({
   title: string;
 }) {
   return (
-    <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 shadow-2xl shadow-emerald-950/10">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+    <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 shadow-2xl shadow-emerald-950/10 dark:border-emerald-800/70 dark:bg-emerald-950 dark:text-emerald-50">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
         <CircleCheck className="h-4 w-4" />
       </span>
 
       <div className="min-w-0">
         <p className="font-semibold">{title}</p>
-        <p className="text-xs text-emerald-800">{description}</p>
+        <p className="text-xs text-emerald-800 dark:text-emerald-300">{description}</p>
       </div>
     </div>
   );
@@ -390,7 +390,7 @@ function AdminContent() {
           <div className="min-w-0">
             <AdminNavCard
               href="/admin/competitions"
-              icon={<Trophy className="h-5 w-5 text-zinc-700" />}
+              icon={<Trophy className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />}
               ringClassName="ring-zinc-500/50"
               title={locale === "ro" ? "Competiții" : "Competitions"}
               description={locale === "ro"
@@ -422,7 +422,7 @@ function AdminContent() {
               accentBadge={
                 bannedCount
                   ? {
-                      className: "bg-red-100 text-red-700",
+                      className: "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300",
                       label: t("admin.overview.badges.banned").replace(
                         "{count}",
                         String(bannedCount)
@@ -458,7 +458,7 @@ function AdminContent() {
           <div className="min-w-0">
             <AdminNavCard
               href="/admin/shop"
-              icon={<ShoppingBag className="h-5 w-5 text-zinc-700" />}
+              icon={<ShoppingBag className="h-5 w-5 text-zinc-700 dark:text-zinc-300" />}
               ringClassName="ring-zinc-500/50"
               title={t("admin.shopManager.title")}
               description={t("admin.shopManager.description")}

@@ -247,7 +247,7 @@ function ProblemContent() {
     >
       <SelectTrigger
         size="sm"
-        className="h-7 border-zinc-200 bg-white px-2 text-xs text-zinc-600"
+        className="h-7 border-border bg-background px-2 text-xs text-muted-foreground"
         aria-label={t("live.tabSize")}
       >
         <SelectValue />
@@ -263,13 +263,13 @@ function ProblemContent() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="truncate text-sm font-semibold md:text-base">
               {problem.code != null && (
-                <span className="mr-1 text-zinc-500">#{problem.code}</span>
+                <span className="mr-1 text-muted-foreground">#{problem.code}</span>
               )}
               {localizedTitle}
             </h1>
@@ -292,7 +292,7 @@ function ProblemContent() {
               </Badge>
             )}
           </div>
-          <div className="hidden text-xs text-zinc-500 md:block">
+          <div className="hidden text-xs text-muted-foreground md:block">
             {fileName}
           </div>
         </div>
@@ -309,18 +309,18 @@ function ProblemContent() {
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(320px,46vh)_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_390px] md:grid-rows-1">
-        <main className="flex min-h-0 min-w-0 flex-col bg-white">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-zinc-200 bg-white md:border-b-0 md:border-r">
-            <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
+        <main className="flex min-h-0 min-w-0 flex-col bg-background">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-border bg-background md:border-b-0 md:border-r">
+            <div className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-muted/60 px-3">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
                 <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
                 <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                <span className="ml-2 truncate text-xs font-medium text-zinc-700">
+                <span className="ml-2 truncate text-xs font-medium text-foreground">
                   {fileName}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Play size={13} />
                 <span>MiniScript+</span>
               </div>
@@ -359,7 +359,7 @@ function ProblemContent() {
             </CodeEditorContextMenu>
           </div>
 
-          <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">
+          <div className="flex h-8 shrink-0 items-center justify-between border-t border-border bg-muted/60 px-3 text-xs text-muted-foreground">
             <span>Ln {editorLine}</span>
             <div className="flex items-center gap-2">
               <span>{t("live.tabSize")}</span>
@@ -369,7 +369,7 @@ function ProblemContent() {
           </div>
         </main>
 
-        <aside className="min-h-0 overflow-hidden border-t border-zinc-200 bg-white md:border-t-0">
+        <aside className="min-h-0 overflow-hidden border-t border-border bg-background md:border-t-0">
           <Tabs
             value={activeTab}
             onValueChange={(v) =>
@@ -377,14 +377,14 @@ function ProblemContent() {
             }
             className="flex h-full min-h-0 flex-col gap-0"
           >
-            <TabsList className="grid h-11 w-full grid-cols-3 rounded-none border-b bg-zinc-50 px-3">
+            <TabsList className="grid h-11 w-full grid-cols-3 rounded-none border-b bg-muted/60 px-3">
               <TabsTrigger value="description" className="text-sm">
                 {t("problemPage.tabs.description") || "Cerință"}
               </TabsTrigger>
               <TabsTrigger value="solution" className="text-sm" disabled={!isSubmitting && testResults.length === 0}>
                 {t("problemPage.tabs.solution") || "Soluția mea"}
                 {testResults.length > 0 && (
-                  <span className={`ml-2 text-xs font-semibold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
+                  <span className={`ml-2 text-xs font-semibold ${passedCount === testResults.length ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                     {score}%
                   </span>
                 )}
@@ -392,7 +392,7 @@ function ProblemContent() {
               <TabsTrigger value="submissions" className="text-sm">
                 {locale === "ro" ? "Submisii" : "Submissions"}
                 {(submissionsQuery.data?.submissions.length || 0) > 0 && (
-                  <span className="ml-2 text-xs text-zinc-500">
+                  <span className="ml-2 text-xs text-muted-foreground">
                     {submissionsQuery.data?.submissions.length}
                   </span>
                 )}
@@ -419,7 +419,7 @@ function ProblemContent() {
                     )}
                   </div>
                 )}
-                <div className="text-sm leading-relaxed text-zinc-700">
+                <div className="text-sm leading-relaxed text-foreground/90">
                   <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
                 </div>
               </div>
@@ -430,11 +430,11 @@ function ProblemContent() {
                 {isSubmitting && (
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         {t("problemPage.evaluation.title") || "Se evaluează soluția..."}
                       </div>
-                      <p className="text-xs text-zinc-500">
+                      <p className="text-xs text-muted-foreground">
                         {t("problemPage.evaluation.subtitle") || "Rulăm soluția pe fiecare test case."}
                       </p>
                     </div>
@@ -443,7 +443,7 @@ function ProblemContent() {
                       {evaluationStatuses.map((item, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                          className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm"
                         >
                           <span className="font-medium">
                             {t("problemPage.evaluation.testCase") || "Test case"} {index + 1}/{evaluationStatuses.length}
@@ -451,12 +451,12 @@ function ProblemContent() {
                           <span
                             className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
                               item.status === "passed"
-                                ? "text-emerald-600"
+                                ? "text-emerald-600 dark:text-emerald-400"
                                 : item.status === "failed"
-                                  ? "text-red-600"
+                                  ? "text-red-600 dark:text-red-400"
                                   : item.status === "evaluating"
-                                    ? "text-amber-600"
-                                    : "text-zinc-400"
+                                    ? "text-amber-600 dark:text-amber-400"
+                                    : "text-muted-foreground"
                             }`}
                           >
                             {item.status === "evaluating" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -493,10 +493,10 @@ function ProblemContent() {
                           </Badge>
                         </div>
                       )}
-                      <h2 className={`text-3xl font-bold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
+                      <h2 className={`text-3xl font-bold ${passedCount === testResults.length ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {score} {t("problemPage.solution.points") || "puncte"}
                       </h2>
-                      <p className="mt-2 text-sm text-zinc-600">
+                      <p className="mt-2 text-sm text-muted-foreground">
                         {passedCount === testResults.length
                           ? (t("problemPage.solution.successMessage") || "Felicitări! Codul tău a trecut toate testele.")
                           : (t("problemPage.solution.encouragement") || "Codul tău a obținut un punctaj parțial. Analizează exemplele, încearcă să îți corectezi soluția și trimite o nouă soluție.")}
@@ -528,10 +528,10 @@ function ProblemContent() {
             <TabsContent value="submissions" className="mt-0 min-h-0 flex-1 overflow-y-auto">
               <div className="space-y-4 px-5 py-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-zinc-950">
+                  <h2 className="text-lg font-semibold text-foreground">
                     {locale === "ro" ? "Istoricul submisiilor" : "Submission history"}
                   </h2>
-                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     {locale === "ro"
                       ? "Poți deschide orice încercare pentru a vedea și copia codul trimis."
                       : "Open any attempt to inspect and copy the submitted code."}
@@ -543,7 +543,7 @@ function ProblemContent() {
                     <Skeleton className="h-16 w-full" />
                   </div>
                 ) : submissionsQuery.isError ? (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
                     {locale === "ro"
                       ? "Nu am putut încărca submisiile."
                       : "Could not load submissions."}

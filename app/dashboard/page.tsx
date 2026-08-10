@@ -314,10 +314,10 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-50 via-white to-blue-50">
+        <Card className="bg-gradient-to-br from-emerald-50 via-card to-sky-50 ring-emerald-500/20 dark:from-emerald-950/35 dark:via-card dark:to-sky-950/25 dark:ring-emerald-400/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-orange-500" />
+              <CalendarDays className="size-4 text-orange-500 dark:text-orange-400" />
               {locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
             </CardTitle>
           </CardHeader>
@@ -325,7 +325,7 @@ function DashboardContent() {
             {dailyChallenge?.problems ? (
               <>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-700">
+                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400">
                     {dailySolved
                       ? t("problems.status.solved")
                       : locale === "ro"
@@ -377,7 +377,7 @@ function DashboardContent() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Activity className="size-4 text-emerald-600" />
+              <Activity className="size-4 text-emerald-600 dark:text-emerald-400" />
               {locale === "ro" ? "Evoluția scorurilor" : "Score trend"}
             </CardTitle>
             <Badge variant="secondary">
@@ -417,7 +417,7 @@ function DashboardContent() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Target className="size-4 text-blue-600" />
+              <Target className="size-4 text-blue-600 dark:text-blue-400" />
               {locale === "ro" ? "Distribuția rezultatelor" : "Result mix"}
             </CardTitle>
           </CardHeader>
@@ -517,7 +517,7 @@ function DashboardContent() {
                 />
                 <span className="text-sm font-medium">{u.username}</span>
               </div>
-              <span className="text-sm font-semibold text-yellow-600">
+              <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
                 {u.total_score || 0}
               </span>
             </div>

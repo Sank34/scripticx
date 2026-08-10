@@ -56,6 +56,97 @@ type SubmissionResponse = {
   results: Array<{ passed: boolean }>;
 };
 
+function CompetitionDetailSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading competition"
+      className="flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto p-3 md:p-4 xl:overflow-hidden"
+    >
+      <header className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Skeleton className="h-5 w-14 rounded-full bg-zinc-800" />
+            <Skeleton className="h-5 w-20 rounded-full bg-zinc-800" />
+            <div className="ml-1 min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-5 w-full max-w-64 bg-zinc-700" />
+              <Skeleton className="h-3 w-full max-w-80 bg-zinc-800" />
+            </div>
+          </div>
+          <div className="flex min-w-0 shrink-0 items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 lg:min-w-[310px]">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-center justify-between gap-4">
+                <Skeleton className="h-3 w-20 bg-zinc-700" />
+                <Skeleton className="h-3 w-14 bg-zinc-700" />
+              </div>
+              <Skeleton className="h-1 w-full bg-zinc-700" />
+            </div>
+            <Skeleton className="h-6 w-20 shrink-0 bg-zinc-700" />
+          </div>
+        </div>
+      </header>
+
+      <div className="grid h-9 shrink-0 grid-cols-4 gap-1 rounded-lg bg-muted p-1">
+        {[0, 1, 2, 3].map((item) => (
+          <Skeleton
+            key={item}
+            className={item === 0 ? "h-full rounded-md bg-background shadow-sm" : "h-full rounded-md bg-muted-foreground/10"}
+          />
+        ))}
+      </div>
+
+      <div className="grid min-h-[920px] flex-1 grid-rows-[160px_460px_280px] overflow-hidden rounded-xl border border-border bg-background xl:min-h-0 xl:grid-cols-[minmax(180px,18%)_minmax(420px,54%)_minmax(280px,28%)] xl:grid-rows-1">
+        <section className="min-h-0 bg-muted/30">
+          <div className="flex h-11 items-center justify-between border-b px-3">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-5 w-7 rounded-full" />
+          </div>
+          <div className="space-y-1.5 p-2">
+            <Skeleton className="h-16 w-full rounded-lg bg-foreground/10" />
+            <Skeleton className="h-14 w-full rounded-lg" />
+          </div>
+        </section>
+
+        <section className="flex min-h-0 flex-col border-y border-border bg-background xl:border-x xl:border-y-0">
+          <div className="flex h-11 shrink-0 items-center justify-between border-b bg-muted/60 px-4">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+          <div className="min-h-0 flex-1 space-y-3 p-4">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-3 w-56 max-w-full" />
+          </div>
+          <div className="flex h-14 shrink-0 items-center justify-between border-t bg-muted/40 px-3">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-8 w-24 rounded-md" />
+          </div>
+        </section>
+
+        <section className="min-h-0 bg-background">
+          <div className="flex min-h-11 items-center justify-between gap-3 border-b bg-muted/60 px-4 py-2">
+            <div className="space-y-1.5">
+              <Skeleton className="h-2.5 w-12" />
+              <Skeleton className="h-3.5 w-28" />
+            </div>
+            <Skeleton className="h-5 w-14 rounded-full" />
+          </div>
+          <div className="space-y-3 p-5">
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-11/12" />
+            <Skeleton className="h-3 w-4/5" />
+            <Skeleton className="mt-6 h-5 w-24" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function CompetitionDetailContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -339,10 +430,10 @@ function CompetitionDetailContent() {
   );
 
   if (detailQuery.isPending) {
-    return <div className="space-y-4"><Skeleton className="h-40 rounded-2xl" /><Skeleton className="h-[500px] rounded-2xl" /></div>;
+    return <CompetitionDetailSkeleton />;
   }
   if (detailQuery.isError || !competition) {
-    return <Card><CardContent className="p-10 text-center text-sm text-red-600">{copy.loadFailed}</CardContent></Card>;
+    return <Card><CardContent className="p-10 text-center text-sm text-red-600 dark:text-red-400">{copy.loadFailed}</CardContent></Card>;
   }
 
   if (competition.access === "invite_required") {
@@ -350,10 +441,10 @@ function CompetitionDetailContent() {
       <div className="mx-auto flex min-h-[65vh] max-w-xl items-center">
         <Card className="w-full">
           <CardContent className="space-y-5 p-7 text-center">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-zinc-100"><LockKeyhole className="size-5" /></div>
+            <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-muted"><LockKeyhole className="size-5" /></div>
             <div>
               <h1 className="text-2xl font-semibold">{competition.name}</h1>
-              <p className="mt-2 text-sm text-zinc-500">{copy.privateDescription}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{copy.privateDescription}</p>
             </div>
             <Input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder={copy.inviteCode} />
             <Button className="w-full" onClick={() => joinMutation.mutate()} disabled={!inviteCode.trim() || joinMutation.isPending}>
@@ -391,14 +482,14 @@ function CompetitionDetailContent() {
       </header>
 
       {competition.phase === "break" && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <PauseCircle className="mt-0.5 size-5 shrink-0" />
           <div><p className="text-sm font-semibold">{copy.breakTitle}</p><p className="mt-1 text-xs">{copy.breakDescription}</p></div>
         </div>
       )}
 
       {!competition.isParticipant && competition.phase !== "finished" && (
-        <Card><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{copy.joinTitle}</p><p className="mt-1 text-sm text-zinc-500">{copy.joinDescription}</p></div><Button onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>{joinMutation.isPending ? copy.joining : copy.join}</Button></CardContent></Card>
+        <Card><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{copy.joinTitle}</p><p className="mt-1 text-sm text-muted-foreground">{copy.joinDescription}</p></div><Button onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>{joinMutation.isPending ? copy.joining : copy.join}</Button></CardContent></Card>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 gap-3">
@@ -411,11 +502,11 @@ function CompetitionDetailContent() {
 
         <TabsContent value="arena" className="mt-0 min-h-[960px] overflow-hidden p-1 xl:min-h-0">
           {competition.problems.length === 0 ? (
-            <Card className="h-full"><CardContent className="flex h-full items-center justify-center p-10 text-center text-sm text-zinc-500">{copy.hiddenProblems}</CardContent></Card>
+            <Card className="h-full"><CardContent className="flex h-full items-center justify-center p-10 text-center text-sm text-muted-foreground">{copy.hiddenProblems}</CardContent></Card>
           ) : (
             <ResizablePanelGroup
               orientation={isNarrowArena ? "vertical" : "horizontal"}
-              className="overflow-hidden rounded-xl border border-zinc-200 bg-white"
+              className="overflow-hidden rounded-xl border border-border bg-background"
             >
               <ResizablePanel
                 id="competition-problems"
@@ -423,9 +514,9 @@ function CompetitionDetailContent() {
                 minSize={isNarrowArena ? "150px" : "180px"}
                 maxSize={isNarrowArena ? "28%" : "28%"}
               >
-                <div className="flex h-full min-h-0 flex-col bg-zinc-50/50">
+                <div className="flex h-full min-h-0 flex-col bg-muted/30">
                   <div className="flex h-11 shrink-0 items-center justify-between border-b px-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">{copy.problems}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{copy.problems}</p>
                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{competition.problems.length}</Badge>
                   </div>
                   <ScrollArea className="min-h-0 flex-1">
@@ -448,18 +539,18 @@ function CompetitionDetailContent() {
                             className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
                               isSelected
                                 ? "border-zinc-950 bg-zinc-950 text-white"
-                                : "border-transparent bg-white hover:border-zinc-200 hover:bg-zinc-100"
+                                : "border-transparent bg-background hover:border-border hover:bg-muted"
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-xs font-semibold">{copy.problem} {index + 1}</span>
                               <span className="text-[11px] tabular-nums">{problem.max_points}p</span>
                             </div>
-                            <p className={`mt-1 truncate text-xs ${isSelected ? "text-zinc-300" : "text-zinc-500"}`}>
+                            <p className={`mt-1 truncate text-xs ${isSelected ? "text-zinc-300" : "text-muted-foreground"}`}>
                               {getLocalized(problem.problem.title_i18n, locale)}
                             </p>
                             {attempts.length > 0 && (
-                              <p className={`mt-1.5 text-[10px] font-medium ${isSelected ? "text-zinc-300" : "text-emerald-700"}`}>
+                              <p className={`mt-1.5 text-[10px] font-medium ${isSelected ? "text-zinc-300" : "text-emerald-700 dark:text-emerald-400"}`}>
                                 Best: {best}/{problem.max_points}
                               </p>
                             )}
@@ -478,13 +569,13 @@ function CompetitionDetailContent() {
                 defaultSize="54%"
                 minSize={isNarrowArena ? "360px" : "420px"}
               >
-                <div className="flex h-full min-h-0 flex-col bg-white">
-                  <div className="flex h-11 shrink-0 items-center justify-between border-b bg-zinc-50 px-4">
+                <div className="flex h-full min-h-0 flex-col bg-background">
+                  <div className="flex h-11 shrink-0 items-center justify-between border-b bg-muted/60 px-4">
                     <div className="flex min-w-0 items-center gap-2">
-                      <Code2 className="size-3.5 shrink-0 text-zinc-500" />
+                      <Code2 className="size-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate text-xs font-semibold">solution.msp</span>
                     </div>
-                    <span className="text-[11px] text-zinc-500">MiniScript+</span>
+                    <span className="text-[11px] text-muted-foreground">MiniScript+</span>
                   </div>
                   <CodeEditorContextMenu
                     code={selectedProblem ? codeByProblem[selectedProblem.id] ?? selectedProblem.problem.starter_code : ""}
@@ -504,7 +595,7 @@ function CompetitionDetailContent() {
                       />
                     </div>
                   </CodeEditorContextMenu>
-                  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-t bg-zinc-50/70 px-3">
+                  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-t bg-muted/40 px-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <div className="flex gap-1">
                         {selectedProblem && (lastResults[selectedProblem.id] || []).map((result, index) => (
@@ -512,7 +603,7 @@ function CompetitionDetailContent() {
                         ))}
                       </div>
                       {selectedProblem && (
-                        <span className="truncate text-[11px] text-zinc-500">
+                        <span className="truncate text-[11px] text-muted-foreground">
                           {getLocalized(selectedProblem.problem.title_i18n, locale)}
                         </span>
                       )}
@@ -538,10 +629,10 @@ function CompetitionDetailContent() {
                 defaultSize="28%"
                 minSize={isNarrowArena ? "260px" : "280px"}
               >
-                <div className="flex h-full min-h-0 flex-col bg-white">
-                  <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-zinc-50 px-4 py-2">
+                <div className="flex h-full min-h-0 flex-col bg-background">
+                  <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-muted/60 px-4 py-2">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{copy.prompt}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{copy.prompt}</p>
                       <h2 className="truncate text-sm font-semibold">
                         {selectedProblem ? getLocalized(selectedProblem.problem.title_i18n, locale) : "—"}
                       </h2>
@@ -551,7 +642,7 @@ function CompetitionDetailContent() {
                   <ScrollArea className="min-h-0 flex-1">
                     <div className="p-5">
                       {selectedProblem && (
-                        <div className="text-sm leading-6 text-zinc-700">
+                        <div className="text-sm leading-6 text-foreground/90">
                           <Markdown>{getLocalized(selectedProblem.problem.description_i18n, locale)}</Markdown>
                         </div>
                       )}
@@ -565,21 +656,21 @@ function CompetitionDetailContent() {
 
         <TabsContent value="overview" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">
           <div className="grid gap-4 md:grid-cols-3">
-            {[{ icon: Users, label: copy.participants, value: competition.participantCount }, { icon: Medal, label: copy.maximumScore, value: competition.maximumPoints }, { icon: Code2, label: copy.problems, value: competition.problemCount }].map((item) => <Card key={item.label}><CardContent className="p-5"><item.icon className="size-5 text-zinc-500" /><p className="mt-4 text-2xl font-semibold">{item.value}</p><p className="mt-1 text-sm text-zinc-500">{item.label}</p></CardContent></Card>)}
+            {[{ icon: Users, label: copy.participants, value: competition.participantCount }, { icon: Medal, label: copy.maximumScore, value: competition.maximumPoints }, { icon: Code2, label: copy.problems, value: competition.problemCount }].map((item) => <Card key={item.label}><CardContent className="p-5"><item.icon className="size-5 text-muted-foreground" /><p className="mt-4 text-2xl font-semibold">{item.value}</p><p className="mt-1 text-sm text-muted-foreground">{item.label}</p></CardContent></Card>)}
           </div>
-          <Card className="mt-4"><CardContent className="space-y-4 p-5"><h2 className="font-semibold">{copy.schedule}</h2><div className="grid gap-3 text-sm md:grid-cols-2"><div className="rounded-xl bg-zinc-50 p-4"><p className="text-xs text-zinc-500">{copy.starts}</p><p className="mt-1 font-medium">{new Date(competition.starts_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p></div><div className="rounded-xl bg-zinc-50 p-4"><p className="text-xs text-zinc-500">{copy.ends}</p><p className="mt-1 font-medium">{new Date(competition.ends_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p></div></div>{competition.breaks.length > 0 && <div className="space-y-2"><p className="text-sm font-semibold">{copy.breaks}</p>{competition.breaks.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm"><span>{item.title}</span><span className="text-zinc-500">{new Date(item.starts_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}–{new Date(item.ends_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span></div>)}</div>}</CardContent></Card>
+          <Card className="mt-4"><CardContent className="space-y-4 p-5"><h2 className="font-semibold">{copy.schedule}</h2><div className="grid gap-3 text-sm md:grid-cols-2"><div className="rounded-xl bg-muted/60 p-4"><p className="text-xs text-muted-foreground">{copy.starts}</p><p className="mt-1 font-medium">{new Date(competition.starts_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p></div><div className="rounded-xl bg-muted/60 p-4"><p className="text-xs text-muted-foreground">{copy.ends}</p><p className="mt-1 font-medium">{new Date(competition.ends_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p></div></div>{competition.breaks.length > 0 && <div className="space-y-2"><p className="text-sm font-semibold">{copy.breaks}</p>{competition.breaks.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm"><span>{item.title}</span><span className="text-muted-foreground">{new Date(item.starts_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}–{new Date(item.ends_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span></div>)}</div>}</CardContent></Card>
         </TabsContent>
 
         <TabsContent value="ranking" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">
           <Card className="my-1 gap-0 py-0">
-            <div className="flex flex-col gap-3 border-b border-zinc-100 bg-zinc-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-b border-border bg-muted/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white">
                   <Trophy className="size-5" />
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold">{copy.leaderboardTitle}</h2>
-                  <p className="mt-0.5 text-xs text-zinc-500">{copy.leaderboardDescription}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{copy.leaderboardDescription}</p>
                 </div>
               </div>
               {!leaderboardQuery.isPending && !leaderboardQuery.isError && (
@@ -597,13 +688,13 @@ function CompetitionDetailContent() {
                   <Skeleton className="h-16" />
                 </div>
               ) : leaderboardQuery.isError ? (
-                <div className="py-10 text-center text-sm text-zinc-500">{copy.leaderboardHidden}</div>
+                <div className="py-10 text-center text-sm text-muted-foreground">{copy.leaderboardHidden}</div>
               ) : (leaderboardQuery.data?.leaderboard || []).length === 0 ? (
                 <div className="flex flex-col items-center py-12 text-center">
-                  <div className="flex size-11 items-center justify-center rounded-full bg-zinc-100 text-zinc-400">
+                  <div className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     <Trophy className="size-5" />
                   </div>
-                  <p className="mt-3 text-sm text-zinc-500">{copy.leaderboardEmpty}</p>
+                  <p className="mt-3 text-sm text-muted-foreground">{copy.leaderboardEmpty}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -615,25 +706,25 @@ function CompetitionDetailContent() {
                         ? copy.silver
                         : copy.bronze;
                     const rowStyle = entry.position === 1
-                      ? "border-amber-200 bg-amber-50/70"
+                      ? "border-amber-200 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-950/30"
                       : entry.position === 2
-                        ? "border-zinc-300 bg-zinc-100/80"
+                        ? "border-border bg-muted"
                         : entry.position === 3
-                          ? "border-orange-200 bg-orange-50/70"
-                          : "border-zinc-100 bg-white hover:bg-zinc-50";
+                          ? "border-orange-200 bg-orange-50/70 dark:border-orange-800 dark:bg-orange-950/30"
+                          : "border-border bg-card hover:bg-muted/50";
                     const rankStyle = entry.position === 1
                       ? "bg-amber-400 text-amber-950 ring-amber-500/20"
                       : entry.position === 2
                         ? "bg-zinc-300 text-zinc-800 ring-zinc-400/20"
                         : entry.position === 3
                           ? "bg-orange-300 text-orange-950 ring-orange-400/20"
-                          : "bg-zinc-100 text-zinc-600 ring-zinc-200";
+                          : "bg-muted text-muted-foreground ring-border";
                     const avatarStyle = entry.position === 1
-                      ? "ring-2 ring-amber-400 ring-offset-2"
+                      ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-background"
                       : entry.position === 2
-                        ? "ring-2 ring-zinc-300 ring-offset-2"
+                        ? "ring-2 ring-zinc-300 ring-offset-2 ring-offset-background"
                         : entry.position === 3
-                          ? "ring-2 ring-orange-300 ring-offset-2"
+                          ? "ring-2 ring-orange-300 ring-offset-2 ring-offset-background"
                           : "";
 
                     return (
@@ -660,18 +751,18 @@ function CompetitionDetailContent() {
                             <div className="flex min-w-0 items-center gap-2">
                               <p className="truncate text-sm font-semibold">{entry.username}</p>
                               {podium && (
-                                <span className="hidden rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-600 sm:inline-flex">
+                                <span className="hidden rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline-flex">
                                   {rankLabel}
                                 </span>
                               )}
                             </div>
-                            <p className="mt-0.5 text-xs text-zinc-500">{entry.solved_count} {copy.solved}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{entry.solved_count} {copy.solved}</p>
                           </div>
                         </div>
 
                         <div className="text-right">
                           <p className="font-mono text-sm font-semibold tabular-nums sm:text-base">{entry.total_points}</p>
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">{copy.points}</p>
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{copy.points}</p>
                         </div>
                       </div>
                     );
@@ -683,7 +774,7 @@ function CompetitionDetailContent() {
         </TabsContent>
 
         <TabsContent value="submissions" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">
-          <Card><CardContent className="p-5"><div className="mb-5"><h2 className="font-semibold">{copy.mySubmissions}</h2><p className="mt-1 text-sm text-zinc-500">{copy.submissionDescription}</p></div>{submissionsQuery.isPending ? <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div> : <SubmissionHistory locale={locale} items={(submissionsQuery.data?.submissions || []).map((submission) => { const problem = problemMap.get(submission.competition_problem_id); return { code: submission.code, id: submission.id, label: problem ? getLocalized(problem.problem.title_i18n, locale) : copy.problem, maximumPoints: problem?.max_points, points: submission.points, score: submission.score, submittedAt: submission.submitted_at }; })} />}</CardContent></Card>
+          <Card><CardContent className="p-5"><div className="mb-5"><h2 className="font-semibold">{copy.mySubmissions}</h2><p className="mt-1 text-sm text-muted-foreground">{copy.submissionDescription}</p></div>{submissionsQuery.isPending ? <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div> : <SubmissionHistory locale={locale} items={(submissionsQuery.data?.submissions || []).map((submission) => { const problem = problemMap.get(submission.competition_problem_id); return { code: submission.code, id: submission.id, label: problem ? getLocalized(problem.problem.title_i18n, locale) : copy.problem, maximumPoints: problem?.max_points, points: submission.points, score: submission.score, submittedAt: submission.submitted_at }; })} />}</CardContent></Card>
         </TabsContent>
       </Tabs>
     </div>
@@ -692,7 +783,7 @@ function CompetitionDetailContent() {
 
 export default function CompetitionDetailPage() {
   return (
-    <Suspense fallback={<div className="min-h-[70vh]" />}>
+    <Suspense fallback={<CompetitionDetailSkeleton />}>
       <RouteGuard requireAuth><CompetitionDetailContent /></RouteGuard>
     </Suspense>
   );

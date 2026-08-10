@@ -41,11 +41,11 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-[calc(100vh-140px)] items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-11 items-center justify-center rounded-full bg-zinc-100">
+          <div className="mx-auto mb-2 flex size-11 items-center justify-center rounded-full bg-muted">
             {sent ? (
-              <CheckCircle2 className="size-5 text-emerald-600" />
+              <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <Mail className="size-5 text-zinc-700" />
+              <Mail className="size-5 text-foreground" />
             )}
           </div>
           <CardTitle className="text-2xl">
@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
         <CardContent className="space-y-4">
           {sent ? (
             <>
-              <p className="text-center text-sm leading-6 text-zinc-600">
+              <p className="text-center text-sm leading-6 text-muted-foreground">
                 {t("forgotPassword.sentDescription")}
               </p>
               <Button asChild variant="outline" className="w-full">
@@ -70,7 +70,7 @@ export default function ForgotPasswordPage() {
             </>
           ) : (
             <>
-              <p className="text-center text-sm leading-6 text-zinc-600">
+              <p className="text-center text-sm leading-6 text-muted-foreground">
                 {t("forgotPassword.description")}
               </p>
               <Input
@@ -84,7 +84,7 @@ export default function ForgotPasswordPage() {
                 }}
               />
               {error && (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                   {error}
                 </p>
               )}

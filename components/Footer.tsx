@@ -60,7 +60,7 @@ export function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-16 border-t border-zinc-200/70 bg-white">
+    <footer className="mt-16 border-t bg-background">
       <div className="mx-auto max-w-6xl px-6 py-12">
 
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 md:grid-cols-4">
@@ -94,7 +94,7 @@ export function Footer() {
 
         </div>
 
-        <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-zinc-200/70 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
+        <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
           <span>© {year} ScripticX. {copy.rights}</span>
           <span>scripticx.org</span>
         </div>

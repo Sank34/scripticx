@@ -61,8 +61,8 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
 
   if (inviteQuery.isLoading) {
     return (
-      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,_#d1fae5,_transparent_34%),#fafafa] p-6">
-        <div className="w-full max-w-xl rounded-3xl border bg-white/85 p-8 shadow-2xl shadow-emerald-950/10 backdrop-blur">
+      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,_#d1fae5,_transparent_34%),#fafafa] p-6 dark:bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_transparent_34%),var(--background)]">
+        <div className="w-full max-w-xl rounded-3xl border bg-card/85 p-8 text-card-foreground shadow-2xl shadow-emerald-950/10 backdrop-blur">
           <Skeleton className="mx-auto size-16 rounded-2xl" />
           <Skeleton className="mx-auto mt-6 h-8 w-2/3" />
           <Skeleton className="mx-auto mt-3 h-4 w-5/6" />
@@ -85,9 +85,9 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
         : t("groups.invitePage.unavailableDescription");
 
     return (
-      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-zinc-50 p-6">
+      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-muted/60 p-6">
         <EmptyState
-          className="w-full max-w-xl rounded-3xl border bg-white p-10 shadow-xl"
+          className="w-full max-w-xl rounded-3xl border bg-card p-10 text-card-foreground shadow-xl"
           icon={<Lock className="size-8" />}
           title={title}
           description={description}
@@ -102,10 +102,10 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_45%,#ffffff_100%)] p-6">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border bg-white/90 text-center shadow-2xl shadow-emerald-950/10 backdrop-blur">
+    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_45%,#ffffff_100%)] p-6 dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_45%,#09090b_100%)]">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border bg-card/90 text-center text-card-foreground shadow-2xl shadow-emerald-950/10 backdrop-blur">
         <div
-          className="h-28 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#e7fff5_42%,#eef2ff_100%)] bg-cover bg-center"
+          className="h-28 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#e7fff5_42%,#eef2ff_100%)] bg-cover bg-center dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_42%,#1e1b4b_100%)]"
           style={
             group.banner_url
               ? {
@@ -134,7 +134,7 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
             {t("groups.invitePage.subtitle")}
           </p>
 
-          <div className="mt-8 rounded-2xl border bg-white p-5 text-left shadow-sm">
+          <div className="mt-8 rounded-2xl border bg-background p-5 text-left shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -152,11 +152,11 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
                 </p>
               </div>
               <div className="flex shrink-0 gap-2 text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-3 py-1">
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1">
                   <Users className="size-4" />
                   {preview?.memberCount || 0} {t("groups.invitePage.members")}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-3 py-1">
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1">
                   <Hash className="size-4" />
                   {preview?.channelCount || 0} {t("groups.invitePage.channels")}
                 </span>

@@ -378,7 +378,7 @@ function SettingsContent() {
           <CardTitle>{t("settings.profile")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="overflow-hidden rounded-2xl border bg-zinc-50">
+          <div className="overflow-hidden rounded-2xl border bg-muted/40">
             <div
               className="relative h-36 bg-gradient-to-br from-zinc-950 via-zinc-800 to-emerald-400 bg-cover bg-center"
               style={

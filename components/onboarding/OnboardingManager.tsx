@@ -112,7 +112,7 @@ export function OnboardingManager() {
 
   if (resolvingProfile) {
     return (
-      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-white text-zinc-500">
+      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-background text-muted-foreground">
         <LoaderCircle className="h-6 w-6 animate-spin" aria-label="Loading onboarding" />
       </div>
     );

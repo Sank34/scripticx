@@ -521,13 +521,13 @@ export default function LearnRoadmapPage() {
   }));
 
   return (
-    <div className="scroll-smooth bg-white px-4 py-6 md:px-8">
+    <div className="scroll-smooth bg-background px-4 py-6 md:px-8">
       <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_320px]">
         <section className="space-y-6">
           <div
             id="miniscript-roadmap"
             data-tour="roadmap-workspace"
-            className="scroll-mt-24 rounded-[28px] border border-zinc-200 bg-gradient-to-br from-emerald-500 to-lime-500 p-6 text-white shadow-sm"
+            className="scroll-mt-24 rounded-[28px] border border-zinc-200 bg-gradient-to-br from-emerald-500 to-lime-500 p-6 text-white shadow-sm dark:border-emerald-800"
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
@@ -598,7 +598,7 @@ export default function LearnRoadmapPage() {
                 )}
 
                 {group.sections.length === 0 && (
-                  <Card className="scroll-mt-24 rounded-[24px] border-dashed border-zinc-200">
+                  <Card className="scroll-mt-24 rounded-[24px] border-dashed border-border">
                     <CardContent className="p-5">
                       <p className="text-sm text-muted-foreground">{group.description}</p>
                     </CardContent>
@@ -614,12 +614,12 @@ export default function LearnRoadmapPage() {
                   <Card
                     id={section.id}
                     key={section.id}
-                    className="scroll-mt-24 overflow-hidden rounded-[24px] border-zinc-200"
+                    className="scroll-mt-24 overflow-hidden rounded-[24px] border-border"
                   >
                     <CardContent className="p-0">
-                      <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-5 py-4">
+                      <div className="flex items-center justify-between border-b border-border bg-muted/50 px-5 py-4">
                         <div>
-                          <p className="text-xs font-semibold uppercase text-emerald-700">
+                          <p className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">
                             {text(section.label, lessonLocale)}
                           </p>
                           <h2 className="mt-1 text-lg font-semibold">
@@ -640,7 +640,7 @@ export default function LearnRoadmapPage() {
                       </div>
 
                       <div className="relative px-4 py-8 md:px-8">
-                        <div className="absolute left-1/2 top-10 hidden h-[calc(100%-80px)] w-1 -translate-x-1/2 rounded-full bg-zinc-100 md:block" />
+                        <div className="absolute left-1/2 top-10 hidden h-[calc(100%-80px)] w-1 -translate-x-1/2 rounded-full bg-muted md:block" />
 
                         <div className="space-y-6">
                           {sectionLessons.map((lesson) => {
@@ -675,32 +675,32 @@ export default function LearnRoadmapPage() {
                               >
                                 <div
                                   className={cn(
-                                    "rounded-[22px] border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
-                                    cleared && "border-emerald-200 bg-emerald-50/70",
+                                    "rounded-[22px] border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+                                    cleared && "border-emerald-200 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-950/30",
                                     isCurrent &&
                                       !cleared &&
-                                      "border-lime-300 ring-4 ring-lime-100",
+                                      "border-lime-300 ring-4 ring-lime-100 dark:border-lime-700 dark:ring-lime-900/50",
                                     isBonus &&
                                       !cleared &&
                                       !isCurrent &&
-                                      "border-sky-100 bg-sky-50/50",
+                                      "border-sky-100 bg-sky-50/50 dark:border-sky-900 dark:bg-sky-950/25",
                                     isTheory &&
                                       !cleared &&
                                       !isCurrent &&
-                                      "border-emerald-100 bg-emerald-50/50",
+                                      "border-emerald-100 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/25",
                                     isVideo &&
                                       !cleared &&
                                       !isCurrent &&
-                                      "border-blue-100 bg-blue-50/50",
+                                      "border-blue-100 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/25",
                                     isChallenge &&
                                       !cleared &&
                                       !isCurrent &&
-                                      "border-amber-100 bg-amber-50/50",
+                                      "border-amber-100 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/25",
                                     isAssessment &&
                                       !cleared &&
                                       !isCurrent &&
-                                      "border-violet-100 bg-violet-50/50",
-                                    locked && "bg-zinc-50"
+                                      "border-violet-100 bg-violet-50/50 dark:border-violet-900 dark:bg-violet-950/25",
+                                    locked && "bg-muted/50"
                                   )}
                                 >
                                   <div className="flex items-start gap-4">
@@ -721,7 +721,7 @@ export default function LearnRoadmapPage() {
                                                   ? "bg-blue-500"
                                               : isBonus
                                                 ? "bg-sky-400"
-                                                : "bg-zinc-300"
+                                                : "bg-muted-foreground/40"
                                       )}
                                     >
                                       {cleared ? (
@@ -757,7 +757,7 @@ export default function LearnRoadmapPage() {
                                         {isBonus && (
                                           <Badge
                                             variant="outline"
-                                            className="rounded-full border-sky-200 bg-sky-50 text-sky-700"
+                                            className="rounded-full border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
                                           >
                                             <Sparkles className="mr-1 h-3 w-3" />
                                             {c.bonus}
@@ -766,7 +766,7 @@ export default function LearnRoadmapPage() {
                                         {isChallenge && (
                                           <Badge
                                             variant="outline"
-                                            className="rounded-full border-amber-200 bg-amber-50 text-amber-700"
+                                            className="rounded-full border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                                           >
                                             <Trophy className="mr-1 h-3 w-3" />
                                             {c.challenge}
@@ -775,7 +775,7 @@ export default function LearnRoadmapPage() {
                                         {isTheory && (
                                           <Badge
                                             variant="outline"
-                                            className="rounded-full border-emerald-200 bg-emerald-50 text-emerald-700"
+                                            className="rounded-full border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                                           >
                                             <BookOpen className="mr-1 h-3 w-3" />
                                             {c.theory}
@@ -784,7 +784,7 @@ export default function LearnRoadmapPage() {
                                         {isVideo && (
                                           <Badge
                                             variant="outline"
-                                            className="rounded-full border-blue-200 bg-blue-50 text-blue-700"
+                                            className="rounded-full border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
                                           >
                                             <Video className="mr-1 h-3 w-3" />
                                             {c.video}
@@ -793,7 +793,7 @@ export default function LearnRoadmapPage() {
                                         {isAssessment && (
                                           <Badge
                                             variant="outline"
-                                            className="rounded-full border-violet-200 bg-violet-50 text-violet-700"
+                                            className="rounded-full border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300"
                                           >
                                             <ListChecks className="mr-1 h-3 w-3" />
                                             {c.assessment}
@@ -823,7 +823,7 @@ export default function LearnRoadmapPage() {
                                           {done && !quizPassed && (
                                             <Badge
                                               variant="outline"
-                                              className="rounded-full border-amber-200 bg-amber-50 text-amber-700"
+                                              className="rounded-full border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                                             >
                                               {c.quizGate}
                                             </Badge>
@@ -834,8 +834,8 @@ export default function LearnRoadmapPage() {
                                               className={cn(
                                                 "rounded-full",
                                                 practiced
-                                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                                  : "border-orange-200 bg-orange-50 text-orange-700"
+                                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                  : "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
                                               )}
                                             >
                                               {practiced ? c.practiced : c.practiceGate}
@@ -844,7 +844,7 @@ export default function LearnRoadmapPage() {
                                         </div>
                                       )}
                                       {locked && (
-                                        <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+                                        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                                           {c.unlockHint}
                                         </p>
                                       )}
@@ -867,7 +867,7 @@ export default function LearnRoadmapPage() {
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <div className="-m-1 space-y-4 p-1 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <Card className="rounded-[24px] border-zinc-200 bg-zinc-950 text-white">
+            <Card className="rounded-[24px] border-border bg-zinc-950 text-white">
               <CardContent className="space-y-5 p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -897,10 +897,10 @@ export default function LearnRoadmapPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[24px] border-zinc-200">
+            <Card className="rounded-[24px] border-border">
               <CardContent className="p-5">
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                     <BookOpen className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
@@ -927,14 +927,14 @@ export default function LearnRoadmapPage() {
                     return (
                       <div
                         key={group.id}
-                        className="rounded-3xl border border-zinc-100 bg-zinc-50/70 p-2"
+                        className="rounded-3xl border border-border bg-muted/40 p-2"
                       >
                         <a
                           href={`#${group.id}`}
-                          className="group flex items-center justify-between rounded-2xl px-3 py-3 text-sm transition hover:bg-white"
+                          className="group flex items-center justify-between rounded-2xl px-3 py-3 text-sm transition hover:bg-accent"
                         >
                           <span className="min-w-0">
-                            <span className="block text-[10px] font-semibold uppercase text-emerald-700">
+                            <span className="block text-[10px] font-semibold uppercase text-emerald-700 dark:text-emerald-400">
                               {group.label}
                             </span>
                             <span className="mt-0.5 block truncate font-semibold">
@@ -944,7 +944,7 @@ export default function LearnRoadmapPage() {
                               {completedInGroup}/{groupLessons.length} {c.stats[2]}
                             </span>
                           </span>
-                          <ArrowRight className="h-4 w-4 shrink-0 text-zinc-400 transition group-hover:translate-x-0.5 group-hover:text-emerald-700" />
+                          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-emerald-700 dark:group-hover:text-emerald-400" />
                         </a>
 
                         <div className="mt-1 space-y-1">
@@ -969,10 +969,10 @@ export default function LearnRoadmapPage() {
                                 key={section.id}
                                 href={`#${section.id}`}
                                 className={cn(
-                                  "flex items-center justify-between rounded-2xl border px-3 py-2.5 text-sm transition hover:border-emerald-200 hover:bg-emerald-50/60",
+                                  "flex items-center justify-between rounded-2xl border px-3 py-2.5 text-sm transition hover:border-emerald-200 hover:bg-emerald-50/60 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/30",
                                   isCurrentSection
-                                    ? "border-emerald-200 bg-emerald-50"
-                                    : "border-transparent bg-white"
+                                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
+                                    : "border-transparent bg-background"
                                 )}
                               >
                                 <span className="min-w-0">
@@ -984,7 +984,7 @@ export default function LearnRoadmapPage() {
                                     {c.stats[2]}
                                   </span>
                                 </span>
-                                <ArrowRight className="h-4 w-4 shrink-0 text-zinc-400" />
+                                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                               </a>
                             );
                           })}

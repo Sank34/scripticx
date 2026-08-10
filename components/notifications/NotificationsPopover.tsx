@@ -524,7 +524,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-zinc-600 transition hover:border-zinc-200 hover:bg-zinc-100 hover:text-zinc-950"
+          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent hover:text-accent-foreground"
           aria-label={t("notifications.open")}
         >
           {unreadCount ? <BellRing size={18} /> : <Bell size={18} />}
@@ -566,7 +566,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
         </div>
 
         {browserPermission === "default" ? (
-          <div className="border-b bg-zinc-50 px-4 py-2">
+          <div className="border-b bg-muted/60 px-4 py-2">
             <Button
               variant="outline"
               size="sm"
@@ -583,10 +583,10 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
             <div className="space-y-3 p-4">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div key={index} className="flex gap-3">
-                  <div className="h-9 w-9 rounded-full bg-zinc-100" />
+                  <div className="h-9 w-9 rounded-full bg-muted" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 w-3/4 rounded bg-zinc-100" />
-                    <div className="h-3 w-1/2 rounded bg-zinc-100" />
+                    <div className="h-3 w-3/4 rounded bg-muted" />
+                    <div className="h-3 w-1/2 rounded bg-muted" />
                   </div>
                 </div>
               ))}
@@ -602,8 +602,8 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                     key={notification.id}
                     onClick={() => void openNotification(notification)}
                     className={cn(
-                      "flex w-full gap-3 px-4 py-3 text-left transition hover:bg-zinc-50",
-                      unread && "bg-red-50/40"
+                      "flex w-full gap-3 px-4 py-3 text-left transition hover:bg-accent/70",
+                      unread && "bg-red-50/40 dark:bg-red-950/20"
                     )}
                   >
                     <UserAvatar
@@ -640,8 +640,8 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
             </div>
           ) : (
             <div className="flex h-64 flex-col items-center justify-center px-6 text-center">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100">
-                <Inbox size={18} className="text-zinc-500" />
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                <Inbox size={18} className="text-muted-foreground" />
               </div>
               <p className="text-sm font-medium">{t("notifications.empty")}</p>
               <p className="mt-1 text-xs text-muted-foreground">

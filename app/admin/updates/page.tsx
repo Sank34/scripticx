@@ -83,10 +83,10 @@ function AdminUpdatesContent() {
   }
 
   function tagStyle(tag: UpdateEntry["tag"]) {
-    if (tag === "new") return "bg-emerald-100 text-emerald-700";
-    if (tag === "fix") return "bg-amber-100 text-amber-700";
-    if (tag === "improved") return "bg-blue-100 text-blue-700";
-    return "bg-zinc-100 text-zinc-700";
+    if (tag === "new") return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300";
+    if (tag === "fix") return "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300";
+    if (tag === "improved") return "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300";
+    return "bg-muted text-muted-foreground";
   }
 
   return (
@@ -167,7 +167,7 @@ function AdminUpdatesContent() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-lg text-red-600 hover:text-red-700"
+                    className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => setDeleting(u)}
                   >
                     <Trash size={16} />
@@ -216,7 +216,7 @@ function AdminUpdatesContent() {
             <AlertDialogCancel>{t("admin.updates.deleteDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {t("admin.updates.deleteDialog.confirm")}
             </AlertDialogAction>

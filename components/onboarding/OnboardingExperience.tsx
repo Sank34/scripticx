@@ -262,9 +262,9 @@ export function OnboardingExperience({
   }
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-hidden bg-white text-zinc-950">
+    <div className="fixed inset-0 z-[120] overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none fixed inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-sky-500 to-violet-500" />
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(14,165,233,0.12),transparent_42%),linear-gradient(to_bottom,rgba(255,255,255,0),rgba(248,250,252,0.65))]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(14,165,233,0.12),transparent_42%),linear-gradient(to_bottom,rgba(255,255,255,0),rgba(248,250,252,0.65))] dark:bg-[radial-gradient(circle_at_50%_-20%,rgba(14,165,233,0.14),transparent_42%),linear-gradient(to_bottom,rgba(9,9,11,0),rgba(24,24,27,0.68))]" />
 
       <div className="relative mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col px-5 py-4 sm:px-8 sm:py-5">
         <header className="flex shrink-0 items-center justify-between gap-4">
@@ -273,7 +273,7 @@ export function OnboardingExperience({
             <img src="/logoSCX.svg" alt="ScripticX" className="h-9 w-9 dark:invert" />
             <span className="text-lg font-semibold">ScripticX</span>
           </div>
-          <div className="flex items-center rounded-lg border bg-white p-1 shadow-sm">
+          <div className="flex items-center rounded-lg border bg-card p-1 shadow-sm">
             {(["en", "ro"] as const).map((item) => (
               <button
                 key={item}
@@ -282,8 +282,8 @@ export function OnboardingExperience({
                 className={cn(
                   "h-8 min-w-10 rounded-md px-2 text-xs font-semibold uppercase transition",
                   locale === item
-                    ? "bg-zinc-950 text-white"
-                    : "text-zinc-500 hover:bg-zinc-100"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent"
                 )}
                 aria-label={`${c.language}: ${item.toUpperCase()}`}
               >
@@ -299,7 +299,7 @@ export function OnboardingExperience({
               key={index}
               className={cn(
                 "h-1 flex-1 rounded-full transition-colors duration-500",
-                index <= step ? "bg-zinc-950" : "bg-zinc-200"
+                index <= step ? "bg-primary" : "bg-muted"
               )}
             />
           ))}
@@ -312,13 +312,13 @@ export function OnboardingExperience({
           >
             {step === 0 && (
               <div className="mx-auto max-w-xl text-center">
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-lg border border-sky-200 bg-gradient-to-br from-emerald-50 via-white to-sky-100 shadow-[0_18px_60px_rgba(14,165,233,0.18)] sm:h-20 sm:w-20">
+                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-lg border border-sky-500/30 bg-gradient-to-br from-emerald-500/10 via-card to-sky-500/15 shadow-[0_18px_60px_rgba(14,165,233,0.18)] sm:h-20 sm:w-20">
                   <Code2 className="h-9 w-9 text-sky-600" />
                 </div>
                 <h1 className="text-4xl font-semibold tracking-normal sm:text-5xl">
                   {c.welcomeTitle}
                 </h1>
-                <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-zinc-600 sm:text-lg">
+                <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
                   {c.welcomeDescription}
                 </p>
               </div>
@@ -328,11 +328,11 @@ export function OnboardingExperience({
               <div>
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.profileTitle}</h1>
-                  <p className="mt-3 text-zinc-600">{c.profileDescription}</p>
+                  <p className="mt-3 text-muted-foreground">{c.profileDescription}</p>
                 </div>
                 <div className="mx-auto mt-5 max-w-lg space-y-3 sm:mt-7 sm:space-y-4">
                   <div className="flex flex-col items-center gap-3">
-                    <Avatar className="h-20 w-20 border-4 border-white shadow-[0_12px_40px_rgba(37,99,235,0.2)] ring-1 ring-zinc-200 sm:h-24 sm:w-24">
+                    <Avatar className="h-20 w-20 border-4 border-background shadow-[0_12px_40px_rgba(37,99,235,0.2)] ring-1 ring-border sm:h-24 sm:w-24">
                       {draft.avatarPreview ? <AvatarImage src={draft.avatarPreview} /> : null}
                       <AvatarFallback className="bg-gradient-to-br from-emerald-100 to-sky-100 text-xl font-semibold text-sky-800">
                         {initials}
@@ -348,7 +348,7 @@ export function OnboardingExperience({
                         onChange={(event) => chooseAvatar(event.target.files?.[0])}
                       />
                     </label>
-                    <p className="text-xs text-zinc-500">{c.skipAvatar}</p>
+                    <p className="text-xs text-muted-foreground">{c.skipAvatar}</p>
                   </div>
                   <label className="block space-y-2 text-sm font-medium">
                     {c.username}
@@ -372,7 +372,7 @@ export function OnboardingExperience({
                       placeholder={c.bioPlaceholder}
                       className="min-h-20 resize-none sm:min-h-24"
                     />
-                    <span className="block text-right text-xs text-zinc-400">{draft.bio.length}/180</span>
+                    <span className="block text-right text-xs text-muted-foreground/70">{draft.bio.length}/180</span>
                   </label>
                 </div>
               </div>
@@ -383,7 +383,7 @@ export function OnboardingExperience({
                 <section>
                   <div className="text-center">
                     <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">{c.experienceTitle}</h1>
-                    <p className="mt-2 text-sm text-zinc-600 sm:text-base">{c.experienceDescription}</p>
+                    <p className="mt-2 text-sm text-muted-foreground sm:text-base">{c.experienceDescription}</p>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-3">
                     {experienceOptions.map((option) => (
@@ -394,22 +394,22 @@ export function OnboardingExperience({
                           setDraft((current) => ({ ...current, experience: option.id }))
                         }
                         className={cn(
-                          "flex min-h-24 items-start gap-2.5 rounded-lg border p-3 text-left transition hover:border-sky-300 hover:bg-sky-50/50 sm:gap-3 sm:p-4",
+                          "flex min-h-24 items-start gap-2.5 rounded-lg border p-3 text-left transition hover:border-sky-500/50 hover:bg-sky-500/10 sm:gap-3 sm:p-4",
                           draft.experience === option.id &&
-                            "border-sky-500 bg-sky-50 shadow-[0_8px_30px_rgba(14,165,233,0.12)]"
+                            "border-sky-500 bg-sky-500/10 shadow-[0_8px_30px_rgba(14,165,233,0.12)]"
                         )}
                       >
                         <span className={cn(
                           "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
                           draft.experience === option.id
                             ? "border-sky-600 bg-sky-600 text-white"
-                            : "border-zinc-300"
+                            : "border-border"
                         )}>
                           {draft.experience === option.id ? <Check className="h-3 w-3" /> : null}
                         </span>
                         <span className="min-w-0">
                           <span className="block text-sm font-semibold sm:text-base">{option.label[language]}</span>
-                          <span className="mt-1 line-clamp-2 block text-xs leading-4 text-zinc-500 sm:text-sm sm:leading-5">{option.description[language]}</span>
+                          <span className="mt-1 line-clamp-2 block text-xs leading-4 text-muted-foreground sm:text-sm sm:leading-5">{option.description[language]}</span>
                         </span>
                       </button>
                     ))}
@@ -419,7 +419,7 @@ export function OnboardingExperience({
                 <section>
                   <div className="text-center">
                     <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">{c.goalTitle}</h2>
-                    <p className="mt-2 text-sm text-zinc-500 sm:text-base">{c.goalDescription}</p>
+                    <p className="mt-2 text-sm text-muted-foreground sm:text-base">{c.goalDescription}</p>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-3">
                     {goalOptions.map((option) => {
@@ -432,8 +432,8 @@ export function OnboardingExperience({
                           className={cn(
                             "flex min-h-14 items-center gap-2.5 rounded-lg border px-3 text-left text-xs font-medium transition hover:border-violet-300 sm:gap-3 sm:px-4 sm:text-sm lg:min-h-24",
                             draft.goal === option.id
-                              ? "border-violet-500 bg-violet-50 text-violet-900"
-                              : "bg-white"
+                              ? "border-violet-500 bg-violet-500/10 text-violet-900 dark:text-violet-200"
+                              : "bg-card"
                           )}
                         >
                           <Icon className="h-4 w-4 shrink-0" />
@@ -450,7 +450,7 @@ export function OnboardingExperience({
               <div>
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.interestsTitle}</h1>
-                  <p className="mt-3 text-zinc-600">{c.interestsDescription}</p>
+                  <p className="mt-3 text-muted-foreground">{c.interestsDescription}</p>
                 </div>
                 <div className="mx-auto mt-5 grid max-w-xl grid-cols-2 gap-2.5 sm:mt-7 sm:gap-3">
                   {interestOptions.map((option) => {
@@ -461,16 +461,16 @@ export function OnboardingExperience({
                         type="button"
                         onClick={() => toggleInterest(option.id)}
                         className={cn(
-                          "flex min-h-12 items-center justify-between gap-2 rounded-lg border bg-white px-3 text-left text-xs font-medium transition sm:h-14 sm:px-4 sm:text-sm",
+                          "flex min-h-12 items-center justify-between gap-2 rounded-lg border bg-card px-3 text-left text-xs font-medium transition sm:h-14 sm:px-4 sm:text-sm",
                           selected
-                            ? "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-[0_8px_24px_rgba(16,185,129,0.1)]"
-                            : "hover:border-zinc-400"
+                            ? "border-emerald-500 bg-emerald-500/10 text-emerald-900 shadow-[0_8px_24px_rgba(16,185,129,0.1)] dark:text-emerald-200"
+                            : "hover:border-foreground/35"
                         )}
                       >
                         {option.label[language]}
                         <span className={cn(
                           "flex h-5 w-5 items-center justify-center rounded-md border",
-                          selected ? "border-emerald-600 bg-emerald-600 text-white" : "border-zinc-300"
+                          selected ? "border-emerald-600 bg-emerald-600 text-white" : "border-border"
                         )}>
                           {selected ? <Check className="h-3 w-3" /> : null}
                         </span>
@@ -488,10 +488,10 @@ export function OnboardingExperience({
                     <Sparkles className="h-6 w-6" />
                   </div>
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.readyTitle}</h1>
-                  <p className="mt-3 text-zinc-600">{c.readyDescription}</p>
+                  <p className="mt-3 text-muted-foreground">{c.readyDescription}</p>
                 </div>
 
-                <div className="mx-auto mt-6 max-w-xl rounded-lg border border-sky-200 bg-gradient-to-r from-emerald-50 via-white to-sky-50 p-5 shadow-[0_16px_50px_rgba(14,165,233,0.1)] sm:mt-8">
+                <div className="mx-auto mt-6 max-w-xl rounded-lg border border-sky-500/30 bg-gradient-to-r from-emerald-500/10 via-card to-sky-500/10 p-5 shadow-[0_16px_50px_rgba(14,165,233,0.1)] sm:mt-8">
                   <div className="flex items-center gap-4">
                     <Avatar className="h-12 w-12">
                       {draft.avatarPreview ? <AvatarImage src={draft.avatarPreview} /> : null}
@@ -499,7 +499,7 @@ export function OnboardingExperience({
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold">@{normalizedUsername}</p>
-                      <p className="mt-0.5 text-sm text-zinc-500">
+                      <p className="mt-0.5 text-sm text-muted-foreground">
                         {selectedGoal?.label[language]} · {draft.interests.length} interests
                       </p>
                     </div>
@@ -537,14 +537,14 @@ export function OnboardingExperience({
                   setStep((current) => current + 1);
                 }
               }}
-              className="h-12 flex-1 bg-zinc-950 text-white hover:bg-zinc-800"
+              className="h-12 flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
               {step === totalSteps - 1 ? c.complete : c.continue}
               {!saving ? <ArrowRight className="h-4 w-4" /> : null}
             </Button>
           </div>
-          <p className="mt-2 truncate text-center text-xs text-zinc-400 sm:mt-3">
+          <p className="mt-2 truncate text-center text-xs text-muted-foreground/70 sm:mt-3">
             {c.emailVerified} {user.email}
           </p>
         </footer>

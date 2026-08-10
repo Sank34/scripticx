@@ -183,7 +183,7 @@ export default function SolvePage() {
 
         {/* Problem */}
         <Card className="h-[520px] overflow-hidden">
-          <CardHeader className="shrink-0 border-b bg-white">
+          <CardHeader className="shrink-0 border-b bg-background">
             <CardTitle>
               {problem?.title || t("classes.solve.problemFallback")}
             </CardTitle>
@@ -197,7 +197,7 @@ export default function SolvePage() {
 
         {/* Editor */}
         <Card className="h-[520px] overflow-hidden">
-          <CardHeader className="shrink-0 border-b bg-white">
+          <CardHeader className="shrink-0 border-b bg-background">
             <CardTitle>{t("classes.solve.yourSolution")}</CardTitle>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-6">

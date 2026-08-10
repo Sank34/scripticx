@@ -43,9 +43,9 @@ export function SubmissionHistory({
 
   if (!items.length) {
     return (
-      <div className="rounded-xl border border-dashed border-zinc-200 px-5 py-10 text-center">
-        <Code2 className="mx-auto size-7 text-zinc-300" />
-        <p className="mt-3 text-sm text-zinc-500">{emptyDescription}</p>
+      <div className="rounded-xl border border-dashed px-5 py-10 text-center">
+        <Code2 className="mx-auto size-7 text-muted-foreground/50" />
+        <p className="mt-3 text-sm text-muted-foreground">{emptyDescription}</p>
       </div>
     );
   }
@@ -60,7 +60,7 @@ export function SubmissionHistory({
               key={item.id}
               type="button"
               onClick={() => setSelectedId(item.id)}
-              className="flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-zinc-50"
+              className="flex w-full items-center justify-between gap-4 rounded-xl border bg-card px-4 py-3 text-left text-card-foreground transition hover:border-foreground/20 hover:bg-accent/50"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -68,8 +68,8 @@ export function SubmissionHistory({
                     className={cn(
                       "flex size-7 shrink-0 items-center justify-center rounded-lg",
                       perfect
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-zinc-100 text-zinc-600"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        : "bg-muted text-muted-foreground"
                     )}
                   >
                     {perfect ? (
@@ -79,10 +79,10 @@ export function SubmissionHistory({
                     )}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-zinc-900">
+                    <p className="truncate text-sm font-semibold text-foreground">
                       {item.label || `Submission ${item.id.slice(0, 8)}`}
                     </p>
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock3 className="size-3" />
                       {new Date(item.submittedAt).toLocaleString(
                         locale === "ro" ? "ro-RO" : "en-US"

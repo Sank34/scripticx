@@ -28,16 +28,16 @@ export function TestResultCard({ index, labels, result }: TestResultCardProps) {
     : String(result.input);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
-      <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2.5">
-        <p className="text-sm font-semibold text-zinc-900">
+    <div className="overflow-hidden rounded-lg border bg-card text-card-foreground">
+      <div className="flex items-center justify-between border-b bg-muted/60 px-4 py-2.5">
+        <p className="text-sm font-semibold text-foreground">
           {labels.test} #{index + 1}
         </p>
         <span
           className={`rounded px-2 py-1 text-xs font-medium ${
             result.passed
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-red-100 text-red-700"
+              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+              : "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300"
           }`}
         >
           {result.passed ? labels.correct : labels.wrong}
@@ -69,8 +69,8 @@ export function TestResultCard({ index, labels, result }: TestResultCardProps) {
 function TestOutputBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs font-medium text-zinc-500">{label}</p>
-      <pre className="whitespace-pre-wrap break-all rounded bg-zinc-100 px-3 py-2 font-mono text-xs">
+      <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
+      <pre className="whitespace-pre-wrap break-all rounded bg-muted px-3 py-2 font-mono text-xs text-foreground">
         {value}
       </pre>
     </div>

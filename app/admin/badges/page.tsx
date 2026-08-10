@@ -261,7 +261,7 @@ function AdminBadgesContent() {
         {stats.map(({ Icon, label, value }) => (
           <Card key={label} className="py-0 shadow-none">
             <CardContent className="flex items-center gap-3 p-4">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                 <Icon className="size-5" />
               </span>
               <div>
@@ -332,7 +332,7 @@ function AdminBadgesContent() {
                         <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                           {badge.description}
                         </p>
-                        <code className="mt-2 inline-block rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
+                        <code className="mt-2 inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                           {badge.key}
                         </code>
                       </div>
@@ -366,8 +366,8 @@ function AdminBadgesContent() {
             })}
           </div>
         ) : (
-          <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed bg-zinc-50 text-center">
-            <Award className="size-9 text-zinc-300" />
+          <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/30 text-center">
+            <Award className="size-9 text-muted-foreground/50" />
             <p className="mt-3 font-medium">{copy.empty}</p>
           </div>
         )}

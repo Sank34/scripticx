@@ -71,11 +71,11 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-[calc(100vh-140px)] items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-11 items-center justify-center rounded-full bg-zinc-100">
+          <div className="mx-auto mb-2 flex size-11 items-center justify-center rounded-full bg-muted">
             {success ? (
-              <CheckCircle2 className="size-5 text-emerald-600" />
+              <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <KeyRound className="size-5 text-zinc-700" />
+              <KeyRound className="size-5 text-foreground" />
             )}
           </div>
           <CardTitle className="text-2xl">
@@ -88,11 +88,11 @@ export default function ResetPasswordPage() {
         <CardContent className="space-y-4">
           {checkingSession ? (
             <div className="flex justify-center py-6">
-              <LoaderCircle className="size-6 animate-spin text-zinc-600" />
+              <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
             </div>
           ) : success ? (
             <>
-              <p className="text-center text-sm leading-6 text-zinc-600">
+              <p className="text-center text-sm leading-6 text-muted-foreground">
                 {t("resetPassword.successDescription")}
               </p>
               <Button asChild className="w-full">
@@ -103,7 +103,7 @@ export default function ResetPasswordPage() {
             </>
           ) : !hasSession ? (
             <>
-              <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-red-800">
+              <div className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
                 <CircleAlert className="mt-0.5 size-4 shrink-0" />
                 <p className="text-sm">{t("resetPassword.invalidLink")}</p>
               </div>
@@ -115,7 +115,7 @@ export default function ResetPasswordPage() {
             </>
           ) : (
             <>
-              <p className="text-center text-sm leading-6 text-zinc-600">
+              <p className="text-center text-sm leading-6 text-muted-foreground">
                 {t("resetPassword.description")}
               </p>
               <Input
@@ -136,7 +136,7 @@ export default function ResetPasswordPage() {
                 }}
               />
               {error && (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                   {error}
                 </p>
               )}

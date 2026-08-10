@@ -166,8 +166,8 @@ export default function ContactPage() {
 
             {done ? (
               <div className="flex flex-col items-center text-center gap-3 py-6">
-                <div className="rounded-full bg-emerald-100 p-3">
-                  <CheckCircle2 size={24} className="text-emerald-600" />
+                <div className="rounded-full bg-emerald-100 p-3 dark:bg-emerald-950/50">
+                  <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <h2 className="text-lg font-semibold">{copy.successTitle}</h2>
                 <p className="text-sm text-muted-foreground max-w-sm">
@@ -239,7 +239,7 @@ export default function ContactPage() {
                 </div>
 
                 {error && (
-                  <p className="text-sm text-red-600">{error}</p>
+                  <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                 )}
 
                 <Button

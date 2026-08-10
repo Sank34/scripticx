@@ -163,7 +163,7 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
       <div className="overflow-hidden rounded-[2rem] border bg-background shadow-sm">
-        <div className="relative border-b bg-[linear-gradient(135deg,#fafafa_0%,#ecfdf5_52%,#f4f4f5_100%)] p-6 sm:p-8">
+        <div className="relative border-b bg-[linear-gradient(135deg,#fafafa_0%,#ecfdf5_52%,#f4f4f5_100%)] p-6 sm:p-8 dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_52%,#27272a_100%)]">
           <div className="absolute right-8 top-8 hidden size-32 rounded-full bg-emerald-200/40 blur-3xl md:block" />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <PageHeader
@@ -228,7 +228,7 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
 
       <section className="space-y-3">
         {invitedGroups.length ? (
-          <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+          <div className="rounded-3xl border border-emerald-500/30 bg-emerald-50/60 p-4 sm:p-5 dark:bg-emerald-950/25">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
@@ -243,7 +243,7 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
                   </p>
                 </div>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1 text-xs font-medium text-emerald-700 shadow-sm">
+              <div className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1 text-xs font-medium text-emerald-700 shadow-sm dark:text-emerald-300">
                 {invitedGroups.length} {t("groups.sections.pendingInvites")}
                 <ArrowRight className="size-3.5" />
               </div>

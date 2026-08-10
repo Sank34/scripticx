@@ -182,9 +182,9 @@ export default function LoginPage() {
           </Button>
 
           <div className="flex items-center gap-3" aria-hidden="true">
-            <div className="h-px flex-1 bg-zinc-200" />
-            <span className="text-xs text-zinc-500">{t("login.or")}</span>
-            <div className="h-px flex-1 bg-zinc-200" />
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">{t("login.or")}</span>
+            <div className="h-px flex-1 bg-border" />
           </div>
 
           <Tabs defaultValue="login" className="space-y-4">
@@ -216,7 +216,7 @@ export default function LoginPage() {
               <div className="flex justify-end">
                 <Link
                   href="/forgot-password"
-                  className="text-sm text-zinc-600 underline-offset-4 hover:text-zinc-950 hover:underline"
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                 >
                   {t("login.forgotPassword")}
                 </Link>

@@ -228,7 +228,7 @@ export default async function PublicProfile({
   };
 
   return (
-    <div className="relative isolate min-h-full w-full overflow-hidden pb-16 md:pb-0">
+    <div className="relative isolate min-h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
       {backgroundReward && <ProfileBackground reward={backgroundReward} />}
       <div className="relative z-[1] mx-auto max-w-5xl space-y-6 p-6">
       <script
@@ -238,9 +238,9 @@ export default async function PublicProfile({
         }}
       />
 
-      <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
         <div
-          className="relative h-44 bg-zinc-100 bg-cover bg-center sm:h-52"
+          className="relative h-44 bg-muted bg-cover bg-center sm:h-52"
           style={
             profile.banner_url
               ? {
@@ -249,7 +249,10 @@ export default async function PublicProfile({
               : undefined
           }
         >
-          <div className="absolute inset-x-0 bottom-0 h-px bg-zinc-200/90 shadow-[0_1px_0_rgba(255,255,255,0.9)]" />
+          {profile.banner_url && (
+            <div className="absolute inset-0 bg-transparent transition-colors duration-300 dark:bg-background/55" />
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-px bg-border" />
         </div>
 
         <div className="px-6 py-5">
@@ -259,7 +262,7 @@ export default async function PublicProfile({
                 alt={`${profile.username} profile picture`}
                 avatarUrl={profile.avatar_url}
                 equippedRewards={equippedRewards}
-                className="h-20 w-20 border border-zinc-200 shadow-sm sm:h-24 sm:w-24"
+                className="h-20 w-20 border border-border shadow-sm sm:h-24 sm:w-24"
                 fallback={initial}
               />
 
@@ -268,7 +271,7 @@ export default async function PublicProfile({
                   {profile.username}
                 </h1>
                 {equippedTitle && (
-                  <Badge variant="outline" className="mt-1.5 bg-white">
+                  <Badge variant="outline" className="mt-1.5 bg-background">
                     {equippedTitle}
                   </Badge>
                 )}
@@ -365,8 +368,8 @@ export default async function PublicProfile({
               })}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-50 px-4 py-10 text-center">
-              <Award className="size-8 text-zinc-300" />
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/40 px-4 py-10 text-center">
+              <Award className="size-8 text-muted-foreground/50" />
               <p className="mt-2 text-sm font-medium">
                 {locale === "ro" ? "Nu există badge-uri încă." : "No badges yet."}
               </p>

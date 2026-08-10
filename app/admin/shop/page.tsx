@@ -230,7 +230,7 @@ function AdminShopContent() {
         {stats.map(({ Icon, label, value }) => (
           <Card key={label} className="py-0 shadow-none">
             <CardContent className="flex items-center gap-3 p-4">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-zinc-100"><Icon className="size-4" /></span>
+              <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground"><Icon className="size-4" /></span>
               <div><p className="text-2xl font-semibold">{value}</p><p className="text-xs text-muted-foreground">{label}</p></div>
             </CardContent>
           </Card>
@@ -257,7 +257,7 @@ function AdminShopContent() {
         </div>
       ) : productsQuery.isError ? (
         <div className="flex min-h-72 flex-col items-center justify-center rounded-xl border border-dashed text-center">
-          <PackageOpen className="size-9 text-zinc-300" />
+          <PackageOpen className="size-9 text-muted-foreground/50" />
           <p className="mt-3 max-w-md text-sm text-muted-foreground">{copy.loadError}</p>
           <Button variant="outline" className="mt-4" onClick={() => void productsQuery.refetch()}>{copy.retry}</Button>
         </div>
@@ -303,7 +303,7 @@ function AdminShopContent() {
         </div>
       ) : (
         <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed text-center">
-          <PackageOpen className="size-9 text-zinc-300" /><p className="mt-3 text-sm text-muted-foreground">{copy.empty}</p>
+          <PackageOpen className="size-9 text-muted-foreground/50" /><p className="mt-3 text-sm text-muted-foreground">{copy.empty}</p>
         </div>
       )}
 

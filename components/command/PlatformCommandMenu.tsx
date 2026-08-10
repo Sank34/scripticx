@@ -313,7 +313,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hidden h-9 w-full max-w-md items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 text-sm text-zinc-500 shadow-inner transition hover:border-zinc-300 hover:bg-white sm:flex"
+        className="hidden h-9 w-full max-w-md items-center justify-between gap-3 rounded-xl border bg-muted/60 px-3 text-sm text-muted-foreground shadow-inner transition hover:border-foreground/20 hover:bg-accent sm:flex"
       >
         <span className="flex min-w-0 items-center gap-2">
           <Search className="h-4 w-4 shrink-0" />
@@ -327,7 +327,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         onOpenChange={setOpen}
         title={t("command.title")}
         description={t("command.description")}
-        className={`max-w-xl border-zinc-200 bg-white/95 shadow-2xl backdrop-blur-xl ${
+        className={`max-w-xl border-border bg-popover/95 text-popover-foreground shadow-2xl backdrop-blur-xl ${
           isSafari ? "" : "max-h-[calc(100vh-4rem)]"
         }`}
         contentStyle={

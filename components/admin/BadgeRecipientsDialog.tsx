@@ -119,7 +119,7 @@ export function BadgeRecipientsDialog({
       <DialogContent className="grid h-[min(560px,calc(100dvh-3rem))] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden sm:max-w-xl">
         <DialogHeader>
           <div className="flex items-center gap-3 pr-8">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
               <AchievementIcon
                 iconName={badge?.iconName}
                 iconUrl={badge?.iconUrl}
@@ -162,7 +162,7 @@ export function BadgeRecipientsDialog({
             visibleRecipients.map((recipient) => (
               <div
                 key={recipient.id}
-                className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 transition hover:bg-zinc-50"
+                className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 transition hover:bg-accent/70"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <UserAvatar

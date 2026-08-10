@@ -35,8 +35,7 @@ export function ProfileBackground({
     resolved.id === "aurora-profile" ||
     resolved.visual === "leaf-canopy";
   const style = resolved.styleConfig || {};
-  const backgroundColor = style.backgroundColor ||
-    (isLeafCanopy ? "#f6f8f4" : "#f7f7f6");
+  const hasCustomBackgroundColor = Boolean(style.backgroundColor);
   const opacity = Math.min(1, Math.max(0.02, style.patternOpacity ?? 0.08));
   const imageOpacity = Math.min(1, Math.max(0.08, style.imageOpacity ?? 1));
   const patternSize = Math.min(320, Math.max(32, style.patternSize ?? 96));
@@ -47,11 +46,19 @@ export function ProfileBackground({
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none absolute inset-0 overflow-hidden text-emerald-950",
+        "pointer-events-none absolute inset-0 overflow-hidden",
+        !hasCustomBackgroundColor && isLeafCanopy &&
+          "bg-[#f6f8f4] dark:bg-[#101713]",
+        !hasCustomBackgroundColor && !isLeafCanopy &&
+          "bg-[#f7f7f6] dark:bg-muted",
         preview && "h-full",
         className
       )}
-      style={{ backgroundColor }}
+      style={
+        style.backgroundColor
+          ? { backgroundColor: style.backgroundColor }
+          : undefined
+      }
     >
       {isLeafCanopy && (
         <svg
@@ -67,22 +74,20 @@ export function ProfileBackground({
             >
               <g opacity={opacity}>
                 <Leaf
+                  className="fill-emerald-100 stroke-emerald-600 dark:fill-emerald-950 dark:stroke-emerald-400"
                   x={patternSize * 0.08}
                   y={leafTileHeight * 0.2}
                   width={leafSize}
                   height={leafSize}
-                  fill="#d1fae5"
-                  stroke="#059669"
                   strokeWidth={1.75}
                   transform={`rotate(-35 ${patternSize * 0.28} ${leafTileHeight * 0.46})`}
                 />
                 <Leaf
+                  className="fill-emerald-100 stroke-emerald-600 dark:fill-emerald-950 dark:stroke-emerald-400"
                   x={patternSize * 0.5}
                   y={leafTileHeight * 0.2}
                   width={leafSize}
                   height={leafSize}
-                  fill="#d1fae5"
-                  stroke="#059669"
                   strokeWidth={1.75}
                   transform={`rotate(215 ${patternSize * 0.7} ${leafTileHeight * 0.46})`}
                 />
@@ -114,6 +119,10 @@ export function ProfileBackground({
           className="absolute inset-0 size-full object-cover"
           style={{ opacity: imageOpacity }}
         />
+      )}
+
+      {(!isLeafCanopy || hasCustomBackgroundColor) && (
+        <div className="absolute inset-0 bg-transparent transition-colors duration-300 dark:bg-background/60" />
       )}
     </div>
   );

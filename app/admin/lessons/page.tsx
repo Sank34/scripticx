@@ -233,40 +233,40 @@ const HANDLE_SNAP_DISTANCE = 34;
 
 const ruleStyles = {
   required: {
-    badge: "border-zinc-200 bg-zinc-50 text-zinc-700",
-    border: "border-zinc-200",
-    icon: "bg-zinc-300",
-    node: "bg-white",
+    badge: "border-border bg-muted text-foreground",
+    border: "border-border",
+    icon: "bg-muted-foreground",
+    node: "bg-card",
   },
   bonus: {
-    badge: "border-sky-200 bg-sky-50 text-sky-700",
-    border: "border-sky-100",
+    badge: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300",
+    border: "border-sky-100 dark:border-sky-900",
     icon: "bg-sky-400",
-    node: "bg-sky-50/50",
+    node: "bg-sky-50/50 dark:bg-sky-950/30",
   },
   challenge: {
-    badge: "border-amber-200 bg-amber-50 text-amber-700",
-    border: "border-amber-100",
+    badge: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+    border: "border-amber-100 dark:border-amber-900",
     icon: "bg-amber-400",
-    node: "bg-amber-50/50",
+    node: "bg-amber-50/50 dark:bg-amber-950/30",
   },
   theory: {
-    badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    border: "border-emerald-100",
+    badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
+    border: "border-emerald-100 dark:border-emerald-900",
     icon: "bg-emerald-500",
-    node: "bg-emerald-50/50",
+    node: "bg-emerald-50/50 dark:bg-emerald-950/30",
   },
   video: {
-    badge: "border-blue-200 bg-blue-50 text-blue-700",
-    border: "border-blue-100",
+    badge: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
+    border: "border-blue-100 dark:border-blue-900",
     icon: "bg-blue-500",
-    node: "bg-blue-50/50",
+    node: "bg-blue-50/50 dark:bg-blue-950/30",
   },
   assessment: {
-    badge: "border-violet-200 bg-violet-50 text-violet-700",
-    border: "border-violet-100",
+    badge: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300",
+    border: "border-violet-100 dark:border-violet-900",
     icon: "bg-violet-500",
-    node: "bg-violet-50/50",
+    node: "bg-violet-50/50 dark:bg-violet-950/30",
   },
 } as const;
 
@@ -2410,37 +2410,37 @@ function LessonsAdminContent() {
                         icon: Video,
                         label: c.addVideo,
                         onClick: () => addLesson("video" as const),
-                        tone: "text-blue-600",
+                        tone: "text-blue-600 dark:text-blue-400",
                       },
                       {
                         icon: BookOpen,
                         label: c.addTheory,
                         onClick: () => addLesson("theory" as const),
-                        tone: "text-emerald-600",
+                        tone: "text-emerald-600 dark:text-emerald-400",
                       },
                       {
                         icon: Trophy,
                         label: c.addChallenge,
                         onClick: () => addLesson("challenge" as const),
-                        tone: "text-amber-600",
+                        tone: "text-amber-600 dark:text-amber-400",
                       },
                       {
                         icon: ClipboardList,
                         label: c.addAssessment,
                         onClick: () => addLesson("assessment" as const),
-                        tone: "text-violet-600",
+                        tone: "text-violet-600 dark:text-violet-400",
                       },
                       {
                         icon: Plus,
                         label: c.addSection,
                         onClick: () => openCreateDialog("section"),
-                        tone: "text-zinc-700",
+                        tone: "text-foreground",
                       },
                       {
                         icon: ClipboardList,
                         label: c.addCategory,
                         onClick: () => openCreateDialog("category"),
-                        tone: "text-zinc-700",
+                        tone: "text-foreground",
                       },
                     ].map((item) => {
                       const Icon = item.icon;
@@ -2534,8 +2534,8 @@ function LessonsAdminContent() {
                     className={cn(
                       "pointer-events-none absolute rounded-lg border bg-background/25 transition-colors",
                       active
-                        ? "z-[4] border-blue-500 bg-blue-50/35 shadow-[0_0_0_1px_rgba(59,130,246,0.18)]"
-                        : "z-[3] border-dashed border-zinc-300/90"
+                        ? "z-[4] border-blue-500 bg-blue-50/35 shadow-[0_0_0_1px_rgba(59,130,246,0.18)] dark:bg-blue-950/35"
+                        : "z-[3] border-dashed border-border"
                     )}
                     style={{
                       left: frame.x,
@@ -2584,7 +2584,7 @@ function LessonsAdminContent() {
                           type="button"
                           aria-label={`Resize ${text(section.title, lessonLocale)} ${corner}`}
                           className={cn(
-                            "pointer-events-auto absolute z-20 h-[18px] w-[18px] rounded-[3px] border-2 border-blue-500 bg-white shadow-sm",
+                            "pointer-events-auto absolute z-20 h-[18px] w-[18px] rounded-[3px] border-2 border-blue-500 bg-background shadow-sm",
                             corner === "nw" && "-left-[10px] -top-[10px] cursor-nwse-resize",
                             corner === "ne" && "-right-[10px] -top-[10px] cursor-nesw-resize",
                             corner === "sw" && "-bottom-[10px] -left-[10px] cursor-nesw-resize",
@@ -2597,8 +2597,8 @@ function LessonsAdminContent() {
                     <button
                       type="button"
                       className={cn(
-                        "pointer-events-auto absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] cursor-move items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-semibold text-zinc-700 shadow-sm transition hover:border-blue-400 active:cursor-grabbing",
-                        active && "border-blue-500 text-blue-700"
+                        "pointer-events-auto absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] cursor-move items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm transition hover:border-blue-400 active:cursor-grabbing",
+                        active && "border-blue-500 text-blue-700 dark:text-blue-300"
                       )}
                       onPointerDown={(event) => beginSectionMove(event, frame)}
                       onContextMenu={() => {
@@ -2718,7 +2718,7 @@ function LessonsAdminContent() {
                       selectedCategoryId === category.id &&
                         !selectedLesson &&
                         !selectedSectionDetails &&
-                        "ring-4 ring-blue-100"
+                        "ring-4 ring-blue-100 dark:ring-blue-900"
                     )}
                     style={{ left: x, top: y }}
                     onPointerDown={(event) => event.stopPropagation()}
@@ -2763,7 +2763,7 @@ function LessonsAdminContent() {
                       "group absolute z-10 flex h-[94px] w-[210px] cursor-grab flex-col items-start justify-between rounded-lg border p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
                       styles.node,
                       styles.border,
-                      isSelected && "ring-4 ring-blue-100",
+                      isSelected && "ring-4 ring-blue-100 dark:ring-blue-900",
                       isSelected &&
                         selectedIds.length > 1 &&
                         "outline outline-2 outline-blue-500"
@@ -2831,12 +2831,12 @@ function LessonsAdminContent() {
                           type="button"
                           aria-label={`${c.connectHint}: ${side}`}
                           className={cn(
-                            "absolute z-20 h-3.5 w-3.5 rounded-full border-2 border-blue-500 bg-white shadow-sm transition-all hover:scale-125 hover:bg-blue-500",
+                            "absolute z-20 h-3.5 w-3.5 rounded-full border-2 border-blue-500 bg-background shadow-sm transition-all hover:scale-125 hover:bg-blue-500",
                             getHandleClass(side),
                             isSelected || connectionDraft
                               ? "opacity-100"
                               : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-                            isSnapTarget && "scale-150 bg-blue-500 ring-4 ring-blue-200"
+                            isSnapTarget && "scale-150 bg-blue-500 ring-4 ring-blue-200 dark:ring-blue-900"
                           )}
                           onPointerDown={(event) => beginConnection(event, node, side)}
                         />
@@ -2875,7 +2875,7 @@ function LessonsAdminContent() {
         >
         <aside className="h-full overflow-y-auto rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur sm:p-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {selectedConnection && (
-            <Card className="border-blue-200">
+            <Card className="border-blue-200 dark:border-blue-800">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -2948,7 +2948,7 @@ function LessonsAdminContent() {
             </Card>
           )}
           {!selectedConnection && !selectedLesson && !selectedSectionDetails && selectedCategoryDetails && (
-            <Card className="border-zinc-200">
+            <Card className="border-border">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -3016,7 +3016,7 @@ function LessonsAdminContent() {
             </Card>
           )}
           {!selectedConnection && !selectedLesson && selectedSectionDetails && (
-            <Card className="border-zinc-200">
+            <Card className="border-border">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -3122,7 +3122,7 @@ function LessonsAdminContent() {
           )}
           {!selectedConnection && selectedLesson && selectedDraft && selectedRule && (
             <div className="space-y-4">
-              <Card className="border-zinc-200">
+              <Card className="border-border">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -3552,7 +3552,7 @@ function LessonsAdminContent() {
         <button
           type="button"
           aria-label="Resize inspector"
-          className="absolute -bottom-1.5 -left-1.5 hidden h-5 w-5 cursor-nesw-resize items-center justify-center rounded-md border border-zinc-300 bg-background text-muted-foreground shadow-sm hover:border-blue-400 hover:text-blue-600 sm:flex"
+          className="absolute -bottom-1.5 -left-1.5 hidden h-5 w-5 cursor-nesw-resize items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300 sm:flex"
           onPointerDown={(event) => beginWidgetResize(event, "inspector", -1)}
         >
           <Scaling className="h-3 w-3" />

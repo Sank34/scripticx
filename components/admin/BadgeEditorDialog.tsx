@@ -351,7 +351,7 @@ export function BadgeEditorDialog({
             )}
 
             {draft.trigger === "automatic" && (
-              <div className="space-y-3 rounded-xl border bg-zinc-50/70 p-3">
+              <div className="space-y-3 rounded-xl border bg-muted/60 p-3">
                 <div>
                   <p className="text-sm font-medium">{copy.ruleTitle}</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
@@ -360,7 +360,7 @@ export function BadgeEditorDialog({
                 </div>
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-medium text-zinc-700">{copy.ruleMetric}</span>
+                    <span className="text-xs font-medium text-foreground/80">{copy.ruleMetric}</span>
                     <Select
                       value={draft.automaticRule?.metric || "problems_solved"}
                       onValueChange={(value) => update("automaticRule", {
@@ -368,7 +368,7 @@ export function BadgeEditorDialog({
                         threshold: draft.automaticRule?.threshold || 1,
                       })}
                     >
-                      <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-full bg-background"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {(Object.keys(copy.ruleMetrics) as BadgeRuleMetric[]).map((metric) => (
                           <SelectItem key={metric} value={metric}>{copy.ruleMetrics[metric]}</SelectItem>
@@ -377,7 +377,7 @@ export function BadgeEditorDialog({
                     </Select>
                   </label>
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-medium text-zinc-700">{copy.ruleThreshold}</span>
+                    <span className="text-xs font-medium text-foreground/80">{copy.ruleThreshold}</span>
                     <Input
                       type="number"
                       min={1}
@@ -389,7 +389,7 @@ export function BadgeEditorDialog({
                         metric: draft.automaticRule?.metric || "problems_solved",
                         threshold: Number(event.target.value),
                       })}
-                      className="bg-white"
+                      className="bg-background"
                     />
                   </label>
                 </div>
@@ -400,7 +400,7 @@ export function BadgeEditorDialog({
               type="button"
               aria-pressed={draft.active}
               onClick={() => update("active", !draft.active)}
-              className="flex w-full items-center justify-between gap-4 rounded-xl border p-3 text-left transition hover:bg-zinc-50"
+              className="flex w-full items-center justify-between gap-4 rounded-xl border p-3 text-left transition hover:bg-accent/70"
             >
               <span>
                 <span className="block text-sm font-medium">{copy.status}</span>
@@ -409,7 +409,7 @@ export function BadgeEditorDialog({
               <span
                 className={cn(
                   "relative h-6 w-11 shrink-0 rounded-full transition",
-                  draft.active ? "bg-emerald-500" : "bg-zinc-300"
+                  draft.active ? "bg-emerald-500" : "bg-muted-foreground/35"
                 )}
               >
                 <span
@@ -453,10 +453,10 @@ export function BadgeEditorDialog({
                       update("iconUrl", undefined);
                     }}
                     className={cn(
-                      "flex aspect-square items-center justify-center rounded-lg border transition hover:bg-zinc-100",
+                      "flex aspect-square items-center justify-center rounded-lg border transition hover:bg-accent",
                       draft.iconName === iconName && !draft.iconUrl
-                        ? "border-zinc-900 bg-zinc-900 text-white"
-                        : "border-zinc-200"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border"
                     )}
                   >
                     <AchievementIcon iconName={iconName} className="size-4" />
@@ -476,7 +476,7 @@ export function BadgeEditorDialog({
                 onChange={(event) => update("iconUrl", event.target.value || undefined)}
                 placeholder={copy.iconUrl}
               />
-              <label className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-white text-xs font-medium transition hover:bg-zinc-50">
+              <label className="flex h-8 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-background text-xs font-medium transition hover:bg-accent">
                 <Upload className="size-3.5" />
                 {uploadingIcon ? "..." : copy.upload}
                 <input

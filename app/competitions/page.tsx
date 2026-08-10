@@ -40,6 +40,33 @@ const phaseLabels = {
   },
 };
 
+function CompetitionCardSkeleton() {
+  return (
+    <Card aria-hidden className="gap-0 overflow-hidden py-0">
+      <CardContent className="flex h-56 flex-col p-5">
+        <div className="flex items-start justify-between gap-4">
+          <Skeleton className="size-11 shrink-0 rounded-xl" />
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-5 w-14 rounded-full" />
+          </div>
+        </div>
+        <Skeleton className="mt-5 h-6 w-2/3" />
+        <div className="mt-3 space-y-2">
+          <Skeleton className="h-3.5 w-full" />
+          <Skeleton className="h-3.5 w-4/5" />
+        </div>
+        <div className="mt-auto grid grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-3.5 w-full" />
+          ))}
+        </div>
+        <Skeleton className="mt-5 h-9 w-full rounded-md" />
+      </CardContent>
+    </Card>
+  );
+}
+
 function CompetitionsContent() {
   const { locale } = useLanguage();
   const language = locale === "ro" ? "ro" : "en";
@@ -58,7 +85,7 @@ function CompetitionsContent() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 py-2">
-      <header className="rounded-2xl border border-zinc-200 bg-zinc-950 px-6 py-7 text-white md:px-8">
+      <header className="rounded-2xl border border-zinc-200 bg-zinc-950 px-6 py-7 text-white dark:border-zinc-800 md:px-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
@@ -80,7 +107,11 @@ function CompetitionsContent() {
               [finished.length, language === "ro" ? "încheiate" : "finished"],
             ].map(([value, label]) => (
               <div key={String(label)} className="rounded-xl border border-zinc-800 px-4 py-3">
-                <p className="text-xl font-semibold">{value}</p>
+                {query.isPending ? (
+                  <Skeleton className="mx-auto mb-1 h-6 w-8 bg-zinc-700" />
+                ) : (
+                  <p className="text-xl font-semibold">{value}</p>
+                )}
                 <p className="text-[11px] text-zinc-400">{label}</p>
               </div>
             ))}
@@ -89,21 +120,21 @@ function CompetitionsContent() {
       </header>
 
       {query.isPending ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div aria-busy="true" aria-label="Loading competitions" className="grid gap-4 md:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-56 rounded-2xl" />
+            <CompetitionCardSkeleton key={index} />
           ))}
         </div>
       ) : query.isError ? (
-        <Card><CardContent className="p-8 text-center text-sm text-red-600">{language === "ro" ? "Nu am putut încărca competițiile." : "Could not load competitions."}</CardContent></Card>
+        <Card><CardContent className="p-8 text-center text-sm text-red-600 dark:text-red-400">{language === "ro" ? "Nu am putut încărca competițiile." : "Could not load competitions."}</CardContent></Card>
       ) : !competitions.length ? (
         <Card>
           <CardContent className="flex flex-col items-center py-14 text-center">
-            <Medal className="size-10 text-zinc-300" />
+            <Medal className="size-10 text-muted-foreground/50" />
             <h2 className="mt-4 text-lg font-semibold">
               {language === "ro" ? "Nu există competiții publicate" : "No published competitions"}
             </h2>
-            <p className="mt-2 max-w-md text-sm text-zinc-500">
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
               {language === "ro"
                 ? "Când un administrator publică prima competiție, o vei găsi aici."
                 : "The first published competition will appear here."}
@@ -116,7 +147,7 @@ function CompetitionsContent() {
             <Card key={competition.id} className="gap-0 overflow-hidden py-0 shadow-sm">
               <CardContent className="flex h-full flex-col p-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-800">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
                     <Trophy className="size-5" />
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
@@ -139,14 +170,14 @@ function CompetitionsContent() {
                   </div>
                 </div>
 
-                <h2 className="mt-5 text-xl font-semibold tracking-tight text-zinc-950">
+                <h2 className="mt-5 text-xl font-semibold tracking-tight text-foreground">
                   {competition.name}
                 </h2>
-                <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-500">
+                <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
                   {competition.description || "ScripticX coding competition"}
                 </p>
 
-                <div className="mt-5 grid grid-cols-2 gap-2 text-xs text-zinc-600 sm:grid-cols-4">
+                <div className="mt-5 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
                   <span className="flex items-center gap-1.5"><CalendarClock className="size-3.5" />{new Date(competition.starts_at).toLocaleDateString(language === "ro" ? "ro-RO" : "en-US")}</span>
                   <span className="flex items-center gap-1.5"><Clock3 className="size-3.5" />{new Date(competition.starts_at).toLocaleTimeString(language === "ro" ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span>
                   <span className="flex items-center gap-1.5"><Users className="size-3.5" />{competition.participantCount}</span>

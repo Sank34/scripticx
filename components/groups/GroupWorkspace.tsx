@@ -288,7 +288,7 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
   const initial = username.slice(0, 1).toUpperCase();
 
   return (
-    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-64 -translate-x-1/2 overflow-hidden rounded-2xl border bg-white text-left text-zinc-950 shadow-xl group-hover/mention:block">
+    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-64 -translate-x-1/2 overflow-hidden rounded-2xl border bg-popover text-left text-popover-foreground shadow-xl group-hover/mention:block">
       <span
         className="block h-14 bg-gradient-to-br from-zinc-900 via-zinc-700 to-emerald-400 bg-cover bg-center"
         style={
@@ -301,7 +301,7 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
       />
       <span className="-mt-5 flex items-end gap-3 px-3 pb-3">
         <span
-          className="flex size-12 shrink-0 items-center justify-center rounded-full border-4 border-white bg-zinc-100 bg-cover bg-center text-sm font-semibold text-zinc-500 shadow-sm"
+          className="flex size-12 shrink-0 items-center justify-center rounded-full border-4 border-popover bg-muted bg-cover bg-center text-sm font-semibold text-muted-foreground shadow-sm"
           style={
             profile.avatar_url
               ? { backgroundImage: `url(${profile.avatar_url})` }
@@ -454,7 +454,7 @@ function StudyGroupMemberPreview({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-white"
+          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-sm transition hover:bg-accent"
         >
           <UserAvatar
             avatarUrl={profile?.avatar_url}
@@ -463,7 +463,7 @@ function StudyGroupMemberPreview({
             className="size-8"
           />
           <div className="min-w-0">
-            <p className="truncate font-medium text-zinc-950">{username}</p>
+            <p className="truncate font-medium text-foreground">{username}</p>
             <p className="text-xs text-muted-foreground">{roleLabel}</p>
           </div>
         </button>
@@ -472,7 +472,7 @@ function StudyGroupMemberPreview({
         side="left"
         align="start"
         sideOffset={12}
-        className="w-80 overflow-hidden rounded-3xl border-zinc-200 bg-white p-0 shadow-2xl"
+        className="w-80 overflow-hidden rounded-3xl border-border bg-popover p-0 text-popover-foreground shadow-2xl"
       >
         <div
           className={
@@ -494,13 +494,13 @@ function StudyGroupMemberPreview({
               equippedRewards={profile?.equipped_rewards}
               className="size-20 border-4 border-white shadow-sm"
             />
-            <span className="rounded-full border bg-white px-3 py-1 text-xs font-medium text-zinc-700 shadow-sm">
+            <span className="rounded-full border bg-popover px-3 py-1 text-xs font-medium text-popover-foreground shadow-sm">
               {roleLabel}
             </span>
           </div>
 
           <div className="mt-4 space-y-1">
-            <h3 className="truncate text-2xl font-bold text-zinc-950">
+            <h3 className="truncate text-2xl font-bold text-foreground">
               {username}
             </h3>
             <p className="truncate text-sm text-muted-foreground">
@@ -509,19 +509,19 @@ function StudyGroupMemberPreview({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border bg-zinc-50 px-3 py-2">
+            <div className="rounded-2xl border bg-muted/60 px-3 py-2">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 {t("groups.memberPreview.role")}
               </p>
-              <p className="mt-1 truncate text-sm font-semibold text-zinc-950">
+              <p className="mt-1 truncate text-sm font-semibold text-foreground">
                 {roleLabel}
               </p>
             </div>
-            <div className="rounded-2xl border bg-zinc-50 px-3 py-2">
+            <div className="rounded-2xl border bg-muted/60 px-3 py-2">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 {t("groups.memberPreview.score")}
               </p>
-              <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-zinc-950">
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-foreground">
                 <Award className="size-3.5 text-amber-500" />
                 {totalScore ?? 0} pts
               </p>
@@ -1733,14 +1733,14 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
   return (
     <div className="grid h-full min-h-0 grid-cols-1 overflow-hidden md:grid-cols-[230px_1fr] xl:grid-cols-[240px_1fr_260px]">
-      <aside className="flex min-h-0 flex-col border-b bg-zinc-50/80 md:border-b-0 md:border-r">
+      <aside className="flex min-h-0 flex-col border-b bg-muted/45 md:border-b-0 md:border-r">
         <div className="border-b p-4">
           <div className="flex items-start justify-between gap-2">
             <p className="truncate text-lg font-semibold">{group.name}</p>
             {canManage && (
               <button
                 onClick={() => setSettingsDialogOpen(true)}
-                className="rounded-md p-1 text-muted-foreground hover:bg-zinc-200 hover:text-foreground"
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                 aria-label={t("groups.actions.settings")}
               >
                 <Settings className="size-4" />
@@ -1757,7 +1757,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           {canManageChannels && (
             <button
               onClick={() => setChannelDialogOpen(true)}
-              className="rounded-md p-1 hover:bg-zinc-200"
+              className="rounded-md p-1 hover:bg-accent"
               aria-label={t("groups.actions.newChannel")}
             >
               <Plus className="size-4" />
@@ -1811,7 +1811,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                       <AlertDialogTrigger asChild>
                         <button
                           type="button"
-                          className="mr-1 rounded-lg p-1.5 text-muted-foreground opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover/channel:opacity-100"
+                          className="mr-1 rounded-lg p-1.5 text-muted-foreground opacity-0 transition hover:bg-red-500/10 hover:text-red-600 group-hover/channel:opacity-100 dark:hover:text-red-400"
                           aria-label={t("groups.actions.deleteChannel")}
                         >
                           <Trash2 className="size-3.5" />
@@ -1886,7 +1886,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     size="sm"
                     variant="outline"
                     disabled={leavingGroup}
-                    className="gap-2 border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    className="gap-2 border-red-500/25 text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                   >
                     <LogOut className="size-4" />
                     <span className="hidden sm:inline">
@@ -2041,7 +2041,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           }`}
                         >
                           {isEditing ? (
-                            <div className="w-[min(30rem,78vw)] rounded-2xl border bg-white p-2 shadow-sm">
+                            <div className="w-[min(30rem,78vw)] rounded-2xl border bg-card p-2 text-card-foreground shadow-sm">
                               <Textarea
                                 value={editingMessageText}
                                 onChange={(event) =>
@@ -2061,7 +2061,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                     void saveEditedMessage(item);
                                   }
                                 }}
-                                className="min-h-20 resize-none rounded-xl border-zinc-200 text-sm"
+                                className="min-h-20 resize-none rounded-xl border-border text-sm"
                                 autoFocus
                               />
                               <div className="mt-2 flex justify-end gap-2">
@@ -2104,7 +2104,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                     ? "bg-transparent p-0 shadow-none"
                                     : isMine
                                     ? "bg-zinc-950 text-white"
-                                    : "bg-zinc-100 text-zinc-950"
+                                    : "bg-muted text-foreground"
                                 }`}
                               >
                                 {isStickerMessage && stickerData?.stickerUrl ? (
@@ -2127,16 +2127,16 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                 <BubbleReactions
                                   align={isMine ? "end" : "start"}
                                   side="bottom"
-                                  className="bg-white text-xs shadow-sm ring-white"
+                                  className="bg-popover text-xs text-popover-foreground shadow-sm ring-background"
                                 >
                                   {reactionGroups.map((reaction) => (
                                     <Popover key={reaction.emoji}>
                                       <PopoverTrigger asChild>
                                         <button
                                           type="button"
-                                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 leading-none transition hover:bg-zinc-200 ${
+                                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 leading-none transition hover:bg-accent ${
                                             reaction.reactedByMe
-                                              ? "bg-emerald-50 text-emerald-700"
+                                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
                                               : ""
                                           }`}
                                           aria-label={`${reaction.emoji} ${reaction.count}`}
@@ -2156,10 +2156,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                       </PopoverTrigger>
                                       <PopoverContent
                                         align={isMine ? "end" : "start"}
-                                        className="w-72 gap-3 rounded-2xl border-zinc-200 bg-white p-3 shadow-xl"
+                                        className="w-72 gap-3 rounded-2xl border-border bg-popover p-3 text-popover-foreground shadow-xl"
                                       >
                                         <div className="flex items-center justify-between gap-3">
-                                          <div className="text-sm font-semibold text-zinc-950">
+                                          <div className="text-sm font-semibold text-foreground">
                                             {reaction.emoji}{" "}
                                             {t("groups.workspace.reactionsTitle").replace(
                                               "{count}",
@@ -2196,7 +2196,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                                   }
                                                   className="size-10"
                                                 />
-                                                <span className="max-w-20 truncate text-xs font-medium text-zinc-700">
+                                                <span className="max-w-20 truncate text-xs font-medium text-foreground/80">
                                                   {reactionUser.username}
                                                 </span>
                                               </>
@@ -2207,7 +2207,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                               <Link
                                                 key={`${reaction.emoji}-${reactionUser.id}`}
                                                 href={`/u/${reactionUser.username}`}
-                                                className="flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1.5 transition hover:bg-zinc-100"
+                                                className="flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1.5 transition hover:bg-accent"
                                               >
                                                 {userNode}
                                               </Link>
@@ -2229,7 +2229,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             </Bubble>
                           )}
                           <div
-                            className={`absolute -top-8 z-20 items-center gap-1 rounded-full border bg-white/95 p-1 shadow-lg ${
+                            className={`absolute -top-8 z-20 items-center gap-1 rounded-full border bg-popover/95 p-1 text-popover-foreground shadow-lg ${
                               emojiPickerMessageId === item.id
                                 ? "flex"
                                 : "hidden group-hover/reaction:flex"
@@ -2247,7 +2247,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                               <PopoverTrigger asChild>
                                 <button
                                   type="button"
-                                  className="rounded-full px-1.5 py-0.5 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950"
+                                  className="rounded-full px-1.5 py-0.5 text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
                                   aria-label={t("groups.actions.moreReactions")}
                                 >
                                   <SmilePlus className="size-3.5" />
@@ -2257,12 +2257,12 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                 align={isMine ? "end" : "start"}
                                 side="top"
                                 sideOffset={10}
-                                className="w-72 gap-2 rounded-2xl border-zinc-200 bg-white p-2 shadow-xl"
+                                className="w-72 gap-2 rounded-2xl border-border bg-popover p-2 text-popover-foreground shadow-xl"
                               >
                                 {emojiPickerMessageId === item.id ? (
                                   <>
                                     <div className="relative">
-                                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                                       <Input
                                         value={emojiSearch}
                                         onChange={(event) =>
@@ -2289,7 +2289,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                                   emojiItem.emoji
                                                 );
                                               }}
-                                              className="flex size-8 items-center justify-center rounded-lg text-xl transition hover:bg-zinc-100"
+                                              className="flex size-8 items-center justify-center rounded-lg text-xl transition hover:bg-accent"
                                               title={emojiItem.label}
                                               aria-label={`${t(
                                                 "groups.actions.react"
@@ -2317,7 +2317,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                   closeEmojiPicker();
                                   void toggleReaction(item, emoji);
                                 }}
-                                className="rounded-full px-1.5 py-0.5 text-sm transition hover:bg-zinc-100"
+                                className="rounded-full px-1.5 py-0.5 text-sm transition hover:bg-accent"
                                 aria-label={`${t("groups.actions.react")} ${emoji}`}
                               >
                                 {emoji}
@@ -2330,7 +2330,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                   closeEmojiPicker();
                                   startEditingMessage(item);
                                 }}
-                                className="rounded-full px-1.5 py-0.5 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950"
+                                className="rounded-full px-1.5 py-0.5 text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
                                 aria-label={t("groups.actions.editMessage")}
                               >
                                 <Pencil className="size-3.5" />
@@ -2341,7 +2341,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                 <AlertDialogTrigger asChild>
                                   <button
                                     type="button"
-                                    className="rounded-full px-1.5 py-0.5 text-red-500 transition hover:bg-red-50"
+                                    className="rounded-full px-1.5 py-0.5 text-red-500 transition hover:bg-red-500/10"
                                     aria-label={t("groups.actions.deleteMessage")}
                                   >
                                     <Trash2 className="size-3.5" />
@@ -2407,10 +2407,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           : t("groups.workspace.typingMany")}
                       </MessageHeader>
                       <Bubble variant="muted">
-                        <BubbleContent className="flex items-center gap-1 rounded-2xl border-transparent bg-zinc-100 px-3 py-2 text-zinc-500">
-                          <span className="size-1.5 animate-bounce rounded-full bg-zinc-500 [animation-delay:-0.2s]" />
-                          <span className="size-1.5 animate-bounce rounded-full bg-zinc-500 [animation-delay:-0.1s]" />
-                          <span className="size-1.5 animate-bounce rounded-full bg-zinc-500" />
+                        <BubbleContent className="flex items-center gap-1 rounded-2xl border-transparent bg-muted px-3 py-2 text-muted-foreground">
+                          <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.2s]" />
+                          <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.1s]" />
+                          <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
                         </BubbleContent>
                       </Bubble>
                       <MessageFooter>
@@ -2440,7 +2440,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         <div className="border-t p-3">
           <div className="relative flex items-end gap-2">
             {mentionOpen ? (
-              <div className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-2xl border bg-white shadow-xl">
+              <div className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-xl">
                 <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   {t("groups.workspace.mentions")}
                 </div>
@@ -2454,8 +2454,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                         onClick={() => insertMention(candidate)}
                         className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm transition ${
                           index === mentionActiveIndex
-                            ? "bg-zinc-100 text-zinc-950"
-                            : "hover:bg-zinc-50"
+                            ? "bg-accent text-accent-foreground"
+                            : "hover:bg-accent/70"
                         }`}
                       >
                         <UserAvatar
@@ -2565,7 +2565,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             key={`${item.emoji}-${item.label}`}
                             type="button"
                             onClick={() => insertComposerEmoji(item.emoji)}
-                            className="flex size-10 items-center justify-center rounded-xl text-xl transition hover:bg-zinc-100"
+                            className="flex size-10 items-center justify-center rounded-xl text-xl transition hover:bg-accent"
                             aria-label={item.label}
                           >
                             {item.emoji}
@@ -2592,7 +2592,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             key={sticker.id}
                             type="button"
                             onClick={() => insertComposerSticker(sticker)}
-                            className="group flex min-h-24 flex-col items-center justify-center rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white via-white to-zinc-50/80 p-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_14px_32px_rgba(16,185,129,0.12)] disabled:translate-y-0 disabled:opacity-50"
+                            className="group flex min-h-24 flex-col items-center justify-center rounded-2xl border bg-card p-2 text-center text-card-foreground shadow-sm ring-1 ring-foreground/5 transition hover:-translate-y-0.5 hover:border-emerald-500/40 hover:shadow-md disabled:translate-y-0 disabled:opacity-50"
                           >
                             <img
                               src={sticker.image_url}
@@ -2625,7 +2625,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         </div>
       </main>
 
-      <aside className="hidden min-h-0 flex-col border-l bg-zinc-50/80 xl:flex">
+      <aside className="hidden min-h-0 flex-col border-l bg-muted/45 xl:flex">
         <div className="border-b px-4 py-3">
           <p className="text-sm font-semibold">{t("groups.workspace.members")}</p>
           <p className="text-xs text-muted-foreground">
@@ -2661,11 +2661,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               onChange={(event) => setNewChannelName(event.target.value)}
               placeholder={t("groups.dialog.channelName")}
             />
-            <div className="rounded-xl border bg-zinc-50 px-3 py-2 text-sm">
+            <div className="rounded-xl border bg-muted/60 px-3 py-2 text-sm">
               <span className="text-muted-foreground">
                 {t("groups.dialog.channelSlugPreview")}
               </span>
-              <span className="ml-2 font-mono text-zinc-950">
+              <span className="ml-2 font-mono text-foreground">
                 #{channelSlugPreview}
               </span>
             </div>
@@ -2683,7 +2683,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           <DialogHeader>
             <DialogTitle>{t("groups.dialog.inviteTitle")}</DialogTitle>
           </DialogHeader>
-          <div className="rounded-xl border bg-zinc-50/70 p-3">
+          <div className="rounded-xl border bg-muted/50 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex items-center gap-2 text-sm font-semibold">
@@ -2738,7 +2738,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 inviteCandidates.map((candidate) => (
                   <div
                     key={candidate.id}
-                    className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 hover:bg-zinc-50"
+                    className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 hover:bg-accent/70"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <UserAvatar
@@ -2803,7 +2803,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                       {t("groups.dialog.settingsSubtitle")}
                     </p>
                   </DialogHeader>
-                  <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+                  <div className="overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm">
                     <Skeleton className="h-24 rounded-none sm:h-32" />
                     <div className="space-y-3 p-5">
                       <Skeleton className="h-5 w-40" />
@@ -2815,7 +2815,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               }
               render={() => (
                 <>
-          <div className="border-b bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),linear-gradient(180deg,#ffffff,#fafafa)] px-5 py-5 sm:px-7">
+          <div className="border-b bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),linear-gradient(180deg,#ffffff,#fafafa)] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,#27272a,#18181b)] sm:px-7">
             <DialogHeader>
               <DialogTitle className="text-2xl">
                 {t("groups.dialog.settingsTitle")}
@@ -2824,9 +2824,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 {t("groups.dialog.settingsSubtitle")}
               </p>
             </DialogHeader>
-            <div className="mt-5 overflow-hidden rounded-2xl border bg-white/90 shadow-sm">
+            <div className="mt-5 overflow-hidden rounded-2xl border bg-card/90 text-card-foreground shadow-sm">
               <div
-                className="h-24 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center sm:h-32"
+                className="h-24 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_48%,#1e1b4b_100%)] sm:h-32"
                 style={
                   settingsBannerPreview
                     ? { backgroundImage: `url("${settingsBannerPreview}")` }
@@ -2848,7 +2848,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">
                       {t("groups.dialog.serverPreview")}
                     </p>
-                    <h3 className="mt-1 truncate text-xl font-bold text-zinc-950">
+                    <h3 className="mt-1 truncate text-xl font-bold text-foreground">
                       {settingsName || group?.name || t("groups.dialog.name")}
                     </h3>
                     <p className="mt-1 line-clamp-2 max-w-2xl text-sm text-muted-foreground">
@@ -2859,14 +2859,14 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 pb-1 sm:justify-end">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-foreground/80">
                     <Users className="size-3.5" />
                     {t("groups.dialog.membersCount").replace(
                       "{count}",
                       String(members.length)
                     )}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-foreground/80">
                     <Hash className="size-3.5" />
                     {t("groups.dialog.channelsCount").replace(
                       "{count}",
@@ -2884,10 +2884,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             className="min-h-0"
           >
             <div className="px-5 py-4 sm:px-7">
-              <TabsList className="mx-auto grid h-11 w-full max-w-2xl grid-cols-3 overflow-hidden rounded-2xl bg-zinc-100 p-1">
+              <TabsList className="mx-auto grid h-11 w-full max-w-2xl grid-cols-3 overflow-hidden rounded-2xl bg-muted p-1">
                 <TabsTrigger
                   value="general"
-                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-white data-active:shadow-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-background data-active:shadow-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
                 >
                   <span className="block max-w-full truncate">
                     {t("groups.dialog.settingsGeneralTab")}
@@ -2895,7 +2895,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 </TabsTrigger>
                 <TabsTrigger
                   value="stickers"
-                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-white data-active:shadow-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-background data-active:shadow-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
                 >
                   <span className="block max-w-full truncate">
                     {t("groups.dialog.settingsStickersTab")}
@@ -2903,7 +2903,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 </TabsTrigger>
                 <TabsTrigger
                   value="permissions"
-                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-white data-active:shadow-sm data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                  className="flex h-full min-w-0 items-center justify-center rounded-xl border-0 px-3 py-0 text-center text-sm leading-none shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 data-active:bg-background data-active:shadow-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
                 >
                   <span className="block max-w-full truncate">
                     {t("groups.dialog.settingsPermissionsTab")}
@@ -2932,7 +2932,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                         className="min-h-28 resize-none"
                       />
                       <div className="grid gap-3 md:grid-cols-2">
-                        <label className="rounded-2xl border bg-white p-4 text-sm shadow-sm transition hover:border-emerald-200">
+                        <label className="rounded-2xl border bg-card p-4 text-sm text-card-foreground shadow-sm transition hover:border-emerald-500/40">
                           <div className="flex items-start gap-3">
                             <ImagePlus className="mt-0.5 size-4 text-emerald-600" />
                             <div>
@@ -2955,7 +2955,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             }
                           />
                         </label>
-                        <label className="rounded-2xl border bg-white p-4 text-sm shadow-sm transition hover:border-emerald-200">
+                        <label className="rounded-2xl border bg-card p-4 text-sm text-card-foreground shadow-sm transition hover:border-emerald-500/40">
                           <div className="flex items-start gap-3">
                             <ImagePlus className="mt-0.5 size-4 text-emerald-600" />
                             <div>
@@ -2980,7 +2980,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                         </label>
                       </div>
                     </div>
-                    <div className="rounded-2xl border bg-zinc-50 p-4">
+                    <div className="rounded-2xl border bg-muted/60 p-4">
                       <p className="text-sm font-semibold">
                         {t("groups.dialog.visibility")}
                       </p>
@@ -2993,7 +2993,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           setSettingsVisibility(value as "public" | "private")
                         }
                       >
-                        <SelectTrigger className="mt-4 bg-white">
+                        <SelectTrigger className="mt-4 bg-background">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -3013,9 +3013,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 {settingsTab === "stickers" ? (
                 <TabsContent value="stickers" className="mt-0">
                   {canManageStickers ? (
-                    <div className="rounded-2xl border bg-zinc-50/70 p-4">
+                    <div className="rounded-2xl border bg-muted/50 p-4">
                       <div className="flex items-start gap-2">
-                        <ImagePlus className="mt-0.5 size-4 text-zinc-500" />
+                        <ImagePlus className="mt-0.5 size-4 text-muted-foreground" />
                         <div>
                           <p className="text-sm font-semibold">
                             {t("groups.stickers.manageTitle")}
@@ -3061,9 +3061,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             stickers.map((sticker) => (
                               <div
                                 key={sticker.id}
-                                className="group relative rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white via-white to-zinc-50/80 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(15,23,42,0.04)] ring-1 ring-white/80 transition hover:border-emerald-200 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_14px_32px_rgba(16,185,129,0.12)]"
+                                className="group relative rounded-2xl border bg-card p-2 text-card-foreground shadow-sm ring-1 ring-foreground/5 transition hover:border-emerald-500/40 hover:shadow-md"
                               >
-                                <div className="flex min-h-20 items-center justify-center rounded-xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_55%),linear-gradient(180deg,#ffffff,#fafafa)]">
+                                <div className="flex min-h-20 items-center justify-center rounded-xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_55%),linear-gradient(180deg,#ffffff,#fafafa)] dark:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.14),transparent_55%),linear-gradient(180deg,#27272a,#18181b)]">
                                   <img
                                     src={sticker.image_url}
                                     alt={sticker.name}
@@ -3077,7 +3077,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                   <AlertDialogTrigger asChild>
                                     <button
                                       type="button"
-                                      className="absolute right-2 top-2 rounded-full bg-white/90 p-1 text-red-500 opacity-0 shadow-sm transition hover:bg-red-50 group-hover:opacity-100"
+                                      className="absolute right-2 top-2 rounded-full bg-card/90 p-1 text-red-500 opacity-0 shadow-sm transition hover:bg-red-500/10 group-hover:opacity-100"
                                       aria-label={t("groups.stickers.delete")}
                                     >
                                       <Trash2 className="size-3.5" />
@@ -3115,7 +3115,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                               </div>
                             ))
                           ) : (
-                            <p className="col-span-full rounded-xl border border-dashed bg-white px-3 py-6 text-center text-sm text-muted-foreground">
+                            <p className="col-span-full rounded-xl border border-dashed bg-card px-3 py-6 text-center text-sm text-muted-foreground">
                               {t("groups.stickers.emptySettings")}
                             </p>
                           )}
@@ -3135,7 +3135,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
                 {settingsTab === "permissions" ? (
                 <TabsContent value="permissions" className="mt-0 space-y-4">
-                  <div className="rounded-2xl border bg-zinc-50 p-4 sm:p-5">
+                  <div className="rounded-2xl border bg-muted/60 p-4 sm:p-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-sm font-semibold">
@@ -3145,7 +3145,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                       {t("groups.dialog.permissionsDescription")}
                     </p>
                       </div>
-                      <span className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-white px-3 py-1 text-xs font-medium text-zinc-700">
+                      <span className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-foreground/80">
                         <Lock className="size-3.5" />
                         {isGroupOwner
                           ? t("groups.dialog.ownerControls")
@@ -3154,15 +3154,15 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-red-100 bg-red-50/60 p-4 sm:p-5">
+                  <div className="rounded-2xl border border-red-500/25 bg-red-50/60 p-4 sm:p-5 dark:bg-red-950/25">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-red-950">
+                        <p className="text-sm font-semibold text-red-950 dark:text-red-200">
                           {isGroupOwner
                             ? t("groups.dialog.ownerLeaveTitle")
                             : t("groups.dialog.leaveServerTitle")}
                         </p>
-                        <p className="mt-1 max-w-2xl text-sm text-red-900/70">
+                        <p className="mt-1 max-w-2xl text-sm text-red-900/70 dark:text-red-300/75">
                           {isGroupOwner
                             ? t("groups.dialog.ownerLeaveDescription")
                             : t("groups.dialog.leaveServerDescription")}
@@ -3227,7 +3227,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                       return (
                         <div
                           key={member.user_id}
-                          className="flex flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-3 rounded-2xl border bg-card p-4 text-card-foreground shadow-sm sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="flex min-w-0 items-center gap-3">
                             <UserAvatar
@@ -3237,7 +3237,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                               className="size-11"
                             />
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-zinc-950">
+                              <p className="truncate text-sm font-semibold text-foreground">
                                 {username}
                               </p>
                               <p className="text-xs text-muted-foreground">
@@ -3314,7 +3314,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                               </AlertDialog>
                             </div>
                           ) : (
-                            <span className="inline-flex w-fit rounded-full border bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-600">
+                            <span className="inline-flex w-fit rounded-full border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
                               {getGroupRoleLabel(member.role, t)}
                             </span>
                           )}
@@ -3328,7 +3328,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             </ScrollArea>
           </Tabs>
 
-          <DialogFooter className="border-t bg-zinc-50 px-5 pb-6 pt-4 sm:px-7 sm:pb-7">
+          <DialogFooter className="border-t bg-muted/60 px-5 pb-6 pt-4 sm:px-7 sm:pb-7">
             <Button
               onClick={updateSettings}
               disabled={!settingsName.trim() || savingSettings}

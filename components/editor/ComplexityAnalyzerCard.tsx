@@ -50,7 +50,7 @@ function ComplexityCircle({
           stroke="currentColor"
           strokeWidth="8"
           fill="transparent"
-          className={compact ? "text-zinc-100" : "text-muted"}
+          className="text-muted"
         />
         <circle
           cx="50"
@@ -72,7 +72,7 @@ function ComplexityCircle({
           {score}%
         </div>
         <div
-          className={`${compact ? "text-[9px] text-zinc-500" : "text-[10px] text-muted-foreground"} uppercase tracking-wide`}
+          className={`${compact ? "text-[9px]" : "text-[10px]"} text-muted-foreground uppercase tracking-wide`}
         >
           {label}
         </div>
@@ -89,9 +89,9 @@ function ComplexityContent({
   compact: boolean;
 }) {
   const { t } = useLanguage();
-  const mutedText = compact ? "text-zinc-500" : "text-muted-foreground";
-  const softBox = compact ? "bg-zinc-50" : "bg-muted";
-  const borderClass = compact ? "border border-zinc-200" : "border";
+  const mutedText = "text-muted-foreground";
+  const softBox = "bg-muted";
+  const borderClass = "border";
 
   if (!analysis) {
     return (
@@ -143,10 +143,10 @@ function ComplexityContent({
 
       {analysis.warnings.length > 0 && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-          <div className="mb-2 font-semibold text-amber-700">
+          <div className="mb-2 font-semibold text-amber-700 dark:text-amber-300">
             {t("editor.complexity.warnings")}
           </div>
-          <ul className="space-y-2 text-amber-700">
+          <ul className="space-y-2 text-amber-700 dark:text-amber-300">
             {analysis.warnings.map((warning, index) => (
               <li key={index}>• {warning}</li>
             ))}
@@ -184,8 +184,8 @@ export function ComplexityAnalyzerCard({
 
   if (frame === "section") {
     return (
-      <section className="rounded-xl border border-zinc-200 bg-white">
-        <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <section className="rounded-xl border bg-card text-card-foreground">
+        <div className="flex items-center gap-2 border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Gauge size={14} />
           {t("editor.complexity.title")}
         </div>

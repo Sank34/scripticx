@@ -38,8 +38,8 @@ export default function UpdatesLayout({
 
       <section className="md:hidden">
         <div className="mb-2 flex items-center gap-2 px-1">
-          <Sparkles size={16} className="text-zinc-500" />
-          <span className="text-sm font-semibold text-zinc-900">
+          <Sparkles size={16} className="text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">
             {title}
           </span>
         </div>
@@ -61,8 +61,8 @@ export default function UpdatesLayout({
                   href={href}
                   className={`flex max-w-44 shrink-0 flex-col rounded-xl border px-3 py-2 text-left text-xs transition ${
                     active
-                      ? "border-zinc-900 bg-zinc-950 text-white"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-950"
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:border-foreground/20 hover:text-foreground"
                   }`}
                 >
                   <span className="line-clamp-1 font-medium">
@@ -70,7 +70,7 @@ export default function UpdatesLayout({
                   </span>
                   <span
                     className={`mt-0.5 text-[11px] ${
-                      active ? "text-white/65" : "text-zinc-400"
+                      active ? "text-primary-foreground/65" : "text-muted-foreground/70"
                     }`}
                   >
                     {u.date}
@@ -86,8 +86,8 @@ export default function UpdatesLayout({
         <div className="sticky top-0 max-h-[calc(100vh-3.5rem)] overflow-y-auto py-1 pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 
           <div className="flex items-center gap-2 px-3 pb-3">
-            <Sparkles size={16} className="text-zinc-500" />
-            <span className="text-sm font-semibold text-zinc-900">
+            <Sparkles size={16} className="text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">
               {title}
             </span>
           </div>
@@ -99,7 +99,7 @@ export default function UpdatesLayout({
               <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-            <nav className="space-y-0.5 border-l border-zinc-200/80">
+            <nav className="space-y-0.5 border-l border-border">
               {updates.map((u) => {
                 const href = `/updates/${u.slug}`;
                 const active = pathname === href;
@@ -109,12 +109,12 @@ export default function UpdatesLayout({
                     href={href}
                     className={`-ml-px block border-l-2 px-3 py-2 text-[13px] leading-snug transition ${
                       active
-                        ? "border-zinc-900 font-medium text-zinc-900"
-                        : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-900"
+                        ? "border-foreground font-medium text-foreground"
+                        : "border-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground"
                     }`}
                   >
                     <div className="line-clamp-2">{getLocalized(u.title_i18n, locale)}</div>
-                    <div className="mt-0.5 text-[11px] text-zinc-400">
+                    <div className="mt-0.5 text-[11px] text-muted-foreground/70">
                       {u.date}
                     </div>
                   </Link>

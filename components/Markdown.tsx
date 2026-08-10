@@ -60,7 +60,7 @@ export function Markdown({ children }: { children: string }) {
             if (!isBlock) {
               return (
                 <code
-                  className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-800"
+                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.9em] text-foreground"
                   {...props}
                 >
                   {children}
@@ -87,22 +87,22 @@ export function Markdown({ children }: { children: string }) {
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="border-b border-zinc-200 text-left">
+            <thead className="border-b text-left">
               {children}
             </thead>
           ),
           th: ({ children }) => (
-            <th className="px-3 py-2 font-semibold text-zinc-900">
+            <th className="px-3 py-2 font-semibold text-foreground">
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="border-b border-zinc-100 px-3 py-2 text-zinc-700">
+            <td className="border-b px-3 py-2 text-foreground/80">
               {children}
             </td>
           ),
           strong: ({ children }) => (
-            <strong className="font-semibold text-zinc-900">{children}</strong>
+            <strong className="font-semibold text-foreground">{children}</strong>
           ),
         }}
       >

@@ -33,14 +33,14 @@ export function RewardProductPreview({
     return (
       <div
         className={cn(
-          "relative h-full w-full overflow-hidden rounded-xl border bg-zinc-50",
+          "relative h-full w-full overflow-hidden rounded-xl border bg-muted/60",
           className
         )}
       >
         <ProfileBackground product={product} preview />
         <div
           className={cn(
-            "absolute flex items-center border bg-white/90 shadow-sm",
+            "absolute flex items-center border bg-card/90 shadow-sm",
             compact
               ? "inset-x-1.5 bottom-1.5 gap-1.5 rounded-md px-1.5 py-1"
               : "inset-x-3 bottom-3 gap-2.5 rounded-lg p-2.5"
@@ -54,13 +54,13 @@ export function RewardProductPreview({
           <div className="min-w-0 flex-1">
             <div
               className={cn(
-                "rounded bg-zinc-700/80",
+                "rounded bg-foreground/70",
                 compact ? "h-1.5 w-7 max-w-full" : "h-2 w-16 max-w-full"
               )}
             />
             <div
               className={cn(
-                "rounded bg-zinc-300",
+                "rounded bg-muted-foreground/40",
                 compact ? "mt-1 h-1 w-4 max-w-full" : "mt-1.5 h-1.5 w-10 max-w-full"
               )}
             />
@@ -74,7 +74,7 @@ export function RewardProductPreview({
     return (
       <div
         className={cn(
-          "flex h-full w-full flex-col items-center justify-center rounded-xl bg-zinc-100",
+          "flex h-full w-full flex-col items-center justify-center rounded-xl bg-muted",
           compact ? "gap-1" : "gap-3",
           className
         )}
@@ -84,13 +84,13 @@ export function RewardProductPreview({
           username={username}
           equippedRewards={equipped}
           className={cn(
-            "border-2 border-white shadow-sm",
+            "border-2 border-background shadow-sm",
             compact ? "size-7" : "size-14"
           )}
         />
         <div
           className={cn(
-            "max-w-[85%] truncate rounded-full border bg-white font-medium",
+            "max-w-[85%] truncate rounded-full border bg-card font-medium text-card-foreground",
             compact ? "px-1.5 py-0.5 text-[8px] leading-none" : "px-3 py-1 text-xs"
           )}
         >
@@ -103,7 +103,7 @@ export function RewardProductPreview({
   return (
     <div
       className={cn(
-        "flex h-full w-full items-center justify-center rounded-xl bg-zinc-100",
+        "flex h-full w-full items-center justify-center rounded-xl bg-muted",
         className
       )}
     >
@@ -112,7 +112,7 @@ export function RewardProductPreview({
         username={username}
         equippedRewards={previewRewards}
         className={cn(
-          "border-2 border-white shadow-sm",
+          "border-2 border-background shadow-sm",
           compact ? "size-12" : "size-20"
         )}
       />

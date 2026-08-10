@@ -446,10 +446,10 @@ export default function LessonPage() {
 
   if (!lesson) {
     return (
-      <main className="flex min-h-full items-center justify-center bg-white p-6">
-        <Card className="max-w-md rounded-[24px] border-zinc-200 text-center">
+      <main className="flex min-h-full items-center justify-center bg-background p-6">
+        <Card className="max-w-md rounded-[24px] border-border text-center">
           <CardContent className="space-y-4 p-8">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
               <ListChecks className="h-5 w-5" />
             </div>
             <div>
@@ -490,7 +490,7 @@ export default function LessonPage() {
         ];
 
   return (
-    <main className="min-h-full overflow-y-auto bg-white px-4 py-6 md:px-8">
+    <main className="min-h-full overflow-y-auto bg-background px-4 py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <Button asChild variant="ghost" className="w-fit rounded-full">
@@ -516,7 +516,7 @@ export default function LessonPage() {
           </div>
         </div>
 
-        <section className="rounded-[28px] border border-zinc-200 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 p-6 text-white shadow-sm md:p-8">
+        <section className="rounded-[28px] border border-zinc-200 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 p-6 text-white shadow-sm dark:border-zinc-800 md:p-8">
           <p className="text-xs font-semibold uppercase text-emerald-300">
             {lesson.order.toString().padStart(2, "0")} ·{" "}
             {c.lessonTypes[lessonKind]}
@@ -551,9 +551,9 @@ export default function LessonPage() {
           {!isAssessmentLesson && (
           <section className="space-y-6">
             {isVideoLesson && (
-            <Card className="overflow-hidden rounded-[24px] border-zinc-200">
+            <Card className="overflow-hidden rounded-[24px] border-border">
               <CardContent className="p-0">
-                <div className="border-b border-zinc-100 px-5 py-4">
+                <div className="border-b border-border px-5 py-4">
                   <h2 className="text-lg font-semibold">{c.videoLabel}</h2>
                 </div>
                 {embedUrl ? (
@@ -568,7 +568,7 @@ export default function LessonPage() {
                     allowFullScreen
                   />
                 ) : (
-                  <div className="flex aspect-video flex-col items-center justify-center bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:36px_36px] p-6 text-center">
+                  <div className="flex aspect-video flex-col items-center justify-center bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:36px_36px] p-6 text-center">
                     <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black text-white shadow-sm">
                       <Play className="h-6 w-6 fill-current" />
                     </div>
@@ -584,9 +584,9 @@ export default function LessonPage() {
             </Card>
             )}
 
-            <Card className="rounded-[24px] border-zinc-200">
+            <Card className="rounded-[24px] border-border">
               <CardContent className="space-y-3 p-5">
-                <p className="text-xs font-semibold uppercase text-emerald-700">
+                <p className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">
                   {c.explanation}
                 </p>
                 {isTheoryLesson ? (
@@ -594,7 +594,7 @@ export default function LessonPage() {
                     {theoryBlocks.map((block, index) => (
                       <article
                         key={`${text(block.heading, lessonLocale)}-${index}`}
-                        className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4"
+                        className="rounded-2xl border border-border bg-muted/40 p-4"
                       >
                         <div className="flex gap-3">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white">
@@ -604,7 +604,7 @@ export default function LessonPage() {
                             <h2 className="font-semibold">
                               {text(block.heading, lessonLocale)}
                             </h2>
-                            <p className="text-base leading-7 text-zinc-700">
+                            <p className="text-base leading-7 text-foreground/90">
                               {text(block.body, lessonLocale)}
                             </p>
                             {block.bullets?.length ? (
@@ -626,7 +626,7 @@ export default function LessonPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-base leading-7 text-zinc-700">
+                  <p className="text-base leading-7 text-foreground/90">
                     {text(lesson.transcript, lessonLocale)}
                   </p>
                 )}
@@ -634,9 +634,9 @@ export default function LessonPage() {
             </Card>
 
             {hasPlayground && (
-            <Card className="overflow-hidden rounded-[24px] border-zinc-200">
+            <Card className="overflow-hidden rounded-[24px] border-border">
               <CardContent className="p-0">
-                <div className="flex flex-col gap-3 border-b border-zinc-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col gap-3 border-b border-border px-5 py-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold">{c.playground}</h2>
                     <p className="text-sm text-muted-foreground">
@@ -668,7 +668,7 @@ export default function LessonPage() {
                 </div>
 
                 <div className="grid min-h-[480px] lg:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="min-h-[420px] border-b border-zinc-100 lg:border-b-0 lg:border-r">
+                  <div className="min-h-[420px] border-b border-border lg:border-b-0 lg:border-r">
                     <MiniScriptMonacoEditor
                       value={code}
                       onChange={setCode}
@@ -683,14 +683,14 @@ export default function LessonPage() {
                   </div>
 
                   <div className="flex min-h-[420px] flex-col">
-                    <div className="border-b border-zinc-100 p-4">
+                    <div className="border-b border-border p-4">
                       <label className="text-xs font-semibold uppercase text-muted-foreground">
                         {c.sampleInput}
                       </label>
                       <textarea
                         value={input}
                         onChange={(event) => setInput(event.target.value)}
-                        className="mt-2 h-28 w-full resize-none rounded-2xl border border-zinc-200 bg-white p-3 font-mono text-sm outline-none focus:border-zinc-400"
+                        className="mt-2 h-28 w-full resize-none rounded-2xl border border-input bg-background p-3 font-mono text-sm text-foreground outline-none focus:border-ring"
                       />
                     </div>
                     <div className="flex-1 bg-zinc-950 p-4 text-emerald-300">
@@ -705,7 +705,7 @@ export default function LessonPage() {
                   </div>
 
                   {showComplexityAnalyzer && (
-                    <div className="border-t border-zinc-100 bg-zinc-50/50 p-4 lg:col-span-2">
+                    <div className="border-t border-border bg-muted/30 p-4 lg:col-span-2">
                       <ComplexityAnalyzerCard
                         analysis={complexityAnalysis}
                         compact
@@ -727,10 +727,10 @@ export default function LessonPage() {
             )}
           >
             {showQuiz && (
-            <Card className="rounded-[24px] border-zinc-200">
+            <Card className="rounded-[24px] border-border">
               <CardContent className="space-y-4 p-5">
                 <div>
-                  <p className="text-xs font-semibold uppercase text-emerald-700">
+                  <p className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">
                     {c.quiz}
                   </p>
                   <h2 className="mt-1 text-xl font-semibold">
@@ -761,10 +761,10 @@ export default function LessonPage() {
                               }))
                             }
                             className={cn(
-                              "w-full rounded-2xl border border-zinc-200 px-3 py-2 text-left text-sm transition hover:bg-zinc-50",
-                              selected && "border-black bg-zinc-50",
-                              correct && "border-emerald-300 bg-emerald-50",
-                              wrong && "border-red-300 bg-red-50"
+                              "w-full rounded-2xl border border-border px-3 py-2 text-left text-sm transition hover:bg-muted/60",
+                              selected && "border-foreground bg-muted/60",
+                              correct && "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40",
+                              wrong && "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40"
                             )}
                           >
                             {text(option, lessonLocale)}
@@ -788,23 +788,23 @@ export default function LessonPage() {
             )}
 
             {showRecommendedProblems && (
-            <Card className="rounded-[24px] border-zinc-200">
+            <Card className="rounded-[24px] border-border">
               <CardContent className="space-y-3 p-5">
-                <p className="text-xs font-semibold uppercase text-emerald-700">
+                <p className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">
                   {c.recommended}
                 </p>
                 {lesson.recommendedProblems.map((problem) => (
                   <Link
                     key={`${text(problem.title, lessonLocale)}-${problem.href}`}
                     href={problem.href}
-                    className="flex items-center justify-between rounded-2xl border border-zinc-200 px-3 py-3 text-sm transition hover:bg-zinc-50"
+                    className="flex items-center justify-between rounded-2xl border border-border px-3 py-3 text-sm transition hover:bg-muted/60"
                   >
                     <span className="min-w-0">
                       <span className="block truncate font-medium">
                         {problem.code ? `#${problem.code} ` : ""}
                         {text(problem.title, lessonLocale)}
                       </span>
-                      <span className="text-xs text-zinc-500">{problem.topic}</span>
+                      <span className="text-xs text-muted-foreground">{problem.topic}</span>
                     </span>
                     {problem.difficulty ? (
                       <Badge variant="secondary" className="rounded-full capitalize">
@@ -817,7 +817,7 @@ export default function LessonPage() {
             </Card>
             )}
 
-            <Card className="rounded-[24px] border-zinc-200 bg-zinc-950 text-white">
+            <Card className="rounded-[24px] border-border bg-zinc-950 text-white">
               <CardContent className="space-y-4 p-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400 text-black">
@@ -842,7 +842,7 @@ export default function LessonPage() {
           </aside>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-zinc-100 pt-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-t border-border pt-4 md:flex-row md:items-center md:justify-between">
           {previousLesson ? (
             <Button asChild variant="outline" className="rounded-full">
               <Link href={`/learn/lesson/${previousLesson.id}`}>

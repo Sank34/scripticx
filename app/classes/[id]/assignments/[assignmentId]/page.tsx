@@ -234,7 +234,7 @@ export default function AssignmentPage() {
 
         {problems.map((p, i) => (
           <Card key={p.id} className="flex h-[430px] overflow-hidden">
-            <CardHeader className="shrink-0 border-b bg-white">
+            <CardHeader className="shrink-0 border-b bg-background">
               <CardTitle className="flex items-center gap-2">
                 <span>{t("classes.assignment.problems.problemPrefix")} {i + 1}: {p.title}</span>
                 {submissions.some((s) => s.problem_id === p.id && s.user_id === userId) && (
@@ -267,7 +267,7 @@ export default function AssignmentPage() {
               );
 
               return (
-                <div className="shrink-0 border-t bg-white p-4">
+                <div className="shrink-0 border-t bg-background p-4">
                   <Button
                     disabled={isSolved}
                     variant={isSolved ? "secondary" : "default"}
@@ -330,9 +330,9 @@ export default function AssignmentPage() {
                         allSolved
                           ? isLate
                             ? "text-red-500"
-                            : "text-green-600"
+                            : "text-green-600 dark:text-green-400"
                           : userSubs.length > 0
-                          ? "text-yellow-600"
+                          ? "text-yellow-600 dark:text-yellow-400"
                           : "text-muted-foreground"
                       }`}
                     >

@@ -119,10 +119,10 @@ export default function ProblemsPage() {
 
       {dailyChallenge?.problems && (
         <Link href={`/problems/${dailyChallenge.problem_id}`} className="block">
-          <Card className="border-orange-200 bg-orange-50/60 transition hover:shadow-md">
+          <Card className="border-orange-200 bg-orange-50/60 transition hover:shadow-md dark:border-orange-900 dark:bg-orange-950/30">
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-orange-700">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-orange-700 dark:text-orange-300">
                   <CalendarDays className="h-4 w-4" />
                   {locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
                 </div>

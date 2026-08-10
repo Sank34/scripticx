@@ -448,13 +448,13 @@ function ProfileContent() {
   };
 
   return (
-    <div className="relative isolate min-h-full w-full overflow-hidden pb-16 md:pb-0">
+    <div className="relative isolate min-h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
       {backgroundReward && <ProfileBackground reward={backgroundReward} />}
       <div className="relative z-[1] mx-auto max-w-6xl space-y-6 p-6">
 
-      <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
         <div
-          className="relative h-44 bg-zinc-100 bg-cover bg-center sm:h-52"
+          className="relative h-44 bg-muted bg-cover bg-center sm:h-52"
           style={
             banner
               ? {
@@ -463,7 +463,10 @@ function ProfileContent() {
               : undefined
           }
         >
-          <div className="absolute inset-x-0 bottom-0 h-px bg-zinc-200/90 shadow-[0_1px_0_rgba(255,255,255,0.9)]" />
+          {banner && (
+            <div className="absolute inset-0 bg-transparent transition-colors duration-300 dark:bg-background/55" />
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-px bg-border" />
         </div>
 
         <div className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -472,7 +475,7 @@ function ProfileContent() {
               alt={`${displayName} profile picture`}
               avatarUrl={avatar}
               equippedRewards={equippedRewards}
-              className="h-20 w-20 border border-zinc-200 shadow-sm"
+              className="h-20 w-20 border border-border shadow-sm"
               fallback={initial}
             />
 
@@ -481,7 +484,7 @@ function ProfileContent() {
                 {displayName}
               </h1>
               {equippedTitle && (
-                <Badge variant="outline" className="mt-1.5 bg-white">
+                <Badge variant="outline" className="mt-1.5 bg-background">
                   {equippedTitle}
                 </Badge>
               )}
@@ -619,8 +622,8 @@ function ProfileContent() {
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-zinc-50 px-4 py-10 text-center">
-                  <Award className="size-8 text-zinc-300" />
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/40 px-4 py-10 text-center">
+                  <Award className="size-8 text-muted-foreground/50" />
                   <p className="mt-2 text-sm font-medium">
                     {locale === "ro" ? "Primele badge-uri sunt pe drum." : "Your first badges are on the way."}
                   </p>

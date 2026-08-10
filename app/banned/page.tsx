@@ -44,7 +44,7 @@ export default function BannedPage() {
   if (loading || !user || !profile?.banned) return null;
 
   return (
-    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center rounded-[20px] bg-white p-6">
+    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center rounded-[20px] bg-background p-6">
 
       <Card className="max-w-md w-full border-red-500/30 shadow-xl">
         <CardContent className="flex flex-col items-center text-center space-y-4 p-8">
@@ -53,7 +53,7 @@ export default function BannedPage() {
             <Ban className="w-7 h-7 text-red-500" />
           </div>
 
-          <h1 className="text-2xl font-bold text-red-600">
+          <h1 className="text-2xl font-bold text-red-600 dark:text-red-400">
             {t("banned.title")}
           </h1>
 

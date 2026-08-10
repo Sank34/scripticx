@@ -77,7 +77,8 @@ nextjs-portal {
   --chart-4: #eda100;
   --chart-5: #e87ba4;
   --radius: 0.625rem;
-  --sidebar: oklch(0.965 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar: color-mix(in oklab, var(--muted) 50%, var(--background));
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -112,7 +113,8 @@ nextjs-portal {
   --chart-3: #199e70;
   --chart-4: #c98500;
   --chart-5: #d55181;
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.207 0 0);
+  --sidebar: color-mix(in oklab, var(--muted) 50%, var(--background));
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -122,14 +124,34 @@ nextjs-portal {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Keep theme changes calm and readable without animating regular navigation. */
-html.theme-transition,
+/* Theme changes use one compositor crossfade instead of animating every node. */
 html.theme-transition *,
 html.theme-transition *::before,
 html.theme-transition *::after {
-  transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
-  transition-duration: 320ms !important;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+  transition: none !important;
+}
+
+html.theme-transition::view-transition-old(root),
+html.theme-transition::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  mix-blend-mode: normal;
+}
+
+html.theme-transition::view-transition-old(root) {
+  animation-name: theme-fade-out;
+}
+
+html.theme-transition::view-transition-new(root) {
+  animation-name: theme-fade-in;
+}
+
+@keyframes theme-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes theme-fade-in {
+  from { opacity: 0; }
 }
 
 /*
@@ -336,11 +358,9 @@ html.theme-transition *::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.theme-transition,
-  html.theme-transition *,
-  html.theme-transition *::before,
-  html.theme-transition *::after {
-    transition-duration: 0.01ms !important;
+  html.theme-transition::view-transition-old(root),
+  html.theme-transition::view-transition-new(root) {
+    animation-duration: 0.01ms;
   }
 
   .onboarding-preparing-blob {

@@ -149,7 +149,7 @@ export function TopbarBreadcrumbs() {
 
   return (
     <Breadcrumb className="hidden w-full min-w-0 overflow-hidden md:block">
-      <BreadcrumbList className="w-full min-w-0 flex-nowrap gap-1.5 overflow-hidden text-xs text-zinc-500">
+      <BreadcrumbList className="w-full min-w-0 flex-nowrap gap-1.5 overflow-hidden text-xs text-muted-foreground">
         {breadcrumbEntries.map((entry, index) => {
           const isLast = index === breadcrumbEntries.length - 1;
 
@@ -162,7 +162,7 @@ export function TopbarBreadcrumbs() {
               }
             >
               {index > 0 && (
-                <BreadcrumbSeparator className="text-zinc-300">
+                <BreadcrumbSeparator className="text-border">
                   <span>/</span>
                 </BreadcrumbSeparator>
               )}
@@ -230,8 +230,8 @@ function CrumbNode({
 }) {
   const className = cn(
     "block max-w-[6rem] truncate rounded-md px-1.5 py-1 transition-colors lg:max-w-[8rem] xl:max-w-[10rem]",
-    strong && "font-semibold text-zinc-800",
-    isLast && "bg-zinc-100 text-zinc-950"
+    strong && "font-semibold text-foreground/90",
+    isLast && "bg-accent text-accent-foreground"
   );
 
   if (!isLast && crumb.href) {
@@ -248,7 +248,7 @@ function CrumbNode({
 function HiddenCrumbsMenu({ crumbs }: { crumbs: Crumb[] }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="rounded-md px-1 py-0.5 hover:bg-zinc-100">
+      <DropdownMenuTrigger className="rounded-md px-1 py-0.5 hover:bg-accent">
         <BreadcrumbEllipsis className="h-5 w-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">

@@ -69,19 +69,19 @@ async function fetchContactMessages(): Promise<ContactMessage[]> {
 
 function topicStyle(t: Topic) {
   switch (t) {
-    case "bug": return "bg-red-100 text-red-700";
-    case "feature": return "bg-violet-100 text-violet-700";
-    case "account": return "bg-amber-100 text-amber-700";
-    case "feedback": return "bg-blue-100 text-blue-700";
-    case "other": return "bg-zinc-100 text-zinc-700";
+    case "bug": return "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300";
+    case "feature": return "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300";
+    case "account": return "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300";
+    case "feedback": return "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300";
+    case "other": return "bg-muted text-muted-foreground";
   }
 }
 
 function statusStyle(s: Status) {
   switch (s) {
-    case "new": return "bg-emerald-100 text-emerald-700";
-    case "read": return "bg-zinc-100 text-zinc-700";
-    case "resolved": return "bg-blue-100 text-blue-700";
+    case "new": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300";
+    case "read": return "bg-muted text-muted-foreground";
+    case "resolved": return "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300";
   }
 }
 
@@ -265,7 +265,7 @@ function AdminContactContent() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="rounded-lg text-blue-600 hover:text-blue-700"
+                      className="rounded-lg text-blue-600 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                       onClick={() => setStatus(m.id, "resolved")}
                       title={t("admin.contact.actions.markResolved")}
                     >
@@ -275,7 +275,7 @@ function AdminContactContent() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-lg text-red-600 hover:text-red-700"
+                    className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => setDeleting(m)}
                     title={t("admin.contact.actions.delete")}
                   >
@@ -309,7 +309,7 @@ function AdminContactContent() {
 
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-zinc-100 text-zinc-700">
+                    <AvatarFallback className="bg-muted text-muted-foreground">
                       {(viewing.name || "U")[0]?.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -319,7 +319,7 @@ function AdminContactContent() {
                       <User size={14} className="text-muted-foreground" />
                       <span className="font-medium truncate">{viewing.name}</span>
                       {viewing.user_id && (
-                        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                           {t("admin.contact.dialog.registeredBadge")}
                         </span>
                       )}
@@ -360,7 +360,7 @@ function AdminContactContent() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => {
                     setDeleting(viewing);
                     setViewing(null);
@@ -422,7 +422,7 @@ function AdminContactContent() {
             <AlertDialogCancel>{t("admin.contact.deleteDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {t("admin.contact.deleteDialog.confirm")}
             </AlertDialogAction>

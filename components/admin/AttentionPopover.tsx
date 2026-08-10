@@ -168,8 +168,8 @@ function AttentionEntryRow({
               entry.done
                 ? "bg-muted text-muted-foreground"
                 : entry.severity === "warn"
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-blue-100 text-blue-700"
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                  : "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -378,7 +378,7 @@ export function AttentionPopover({ isAdmin }: { isAdmin: boolean }) {
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
-            className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-zinc-600 transition hover:border-zinc-200 hover:bg-zinc-100 hover:text-zinc-950"
+            className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent hover:text-accent-foreground"
             aria-label={t("admin.overview.attention.title")}
           >
             {openCount ? <ListTodo size={18} /> : <ListChecks size={18} />}
@@ -428,10 +428,10 @@ export function AttentionPopover({ isAdmin }: { isAdmin: boolean }) {
               <div className="space-y-3 p-4">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <div key={index} className="flex gap-3">
-                    <div className="h-7 w-7 rounded-full bg-zinc-100" />
+                    <div className="h-7 w-7 rounded-full bg-muted" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3 w-3/4 rounded bg-zinc-100" />
-                      <div className="h-3 w-1/2 rounded bg-zinc-100" />
+                      <div className="h-3 w-3/4 rounded bg-muted" />
+                      <div className="h-3 w-1/2 rounded bg-muted" />
                     </div>
                   </div>
                 ))}
@@ -449,7 +449,7 @@ export function AttentionPopover({ isAdmin }: { isAdmin: boolean }) {
               </div>
             ) : (
               <div className="flex h-64 flex-col items-center justify-center px-6 text-center">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/50">
                   <CircleCheck size={18} className="text-emerald-500" />
                 </div>
                 <p className="text-sm font-medium">

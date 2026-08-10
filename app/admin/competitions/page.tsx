@@ -229,20 +229,20 @@ function AdminCompetitionsContent() {
     <div className="mx-auto max-w-6xl space-y-6 p-2 md:p-4">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500"><Trophy className="size-4" />Competition control</div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground"><Trophy className="size-4" />Competition control</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">{copy.title}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-zinc-500">{copy.subtitle}</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="size-4" />{copy.new}</Button>
       </header>
 
-      <Card className={`border-2 ${lockdownEnabled ? "border-red-300" : "border-zinc-200"}`}>
+      <Card className={`border-2 ${lockdownEnabled ? "border-red-300 dark:border-red-800" : "border-border"}`}>
         <CardContent className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex gap-4">
-            <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${lockdownEnabled ? "bg-red-100 text-red-700" : "bg-zinc-100 text-zinc-700"}`}><ShieldAlert className="size-5" /></div>
+            <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${lockdownEnabled ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300" : "bg-muted text-muted-foreground"}`}><ShieldAlert className="size-5" /></div>
             <div>
               <div className="flex items-center gap-2"><h2 className="font-semibold">{copy.maintenance}</h2><Badge variant={lockdownEnabled ? "destructive" : "secondary"}>{lockdownEnabled ? copy.on : copy.off}</Badge></div>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-500">{copy.maintenanceDescription}</p>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{copy.maintenanceDescription}</p>
             </div>
           </div>
           <div className="flex min-w-0 flex-col gap-2 sm:min-w-[300px] sm:flex-row"><Input aria-label={copy.maintenanceMessage} value={lockdownMessage} onChange={(event) => setLockdownMessage(event.target.value)} maxLength={500} /><Button className="shrink-0" variant={lockdownEnabled ? "outline" : "destructive"} disabled={lockdownMutation.isPending} onClick={() => lockdownEnabled ? lockdownMutation.mutate(false) : setLockdownWarningOpen(true)}>{lockdownEnabled ? copy.disable : copy.enable}</Button></div>
@@ -252,11 +252,11 @@ function AdminCompetitionsContent() {
       {competitionsQuery.isPending ? (
         <div className="space-y-3"><Skeleton className="h-28 rounded-2xl" /><Skeleton className="h-28 rounded-2xl" /></div>
       ) : !competitions.length ? (
-        <Card><CardContent className="py-14 text-center"><Trophy className="mx-auto size-9 text-zinc-300" /><h2 className="mt-4 font-semibold">{copy.emptyTitle}</h2><p className="mt-2 text-sm text-zinc-500">{copy.emptyDescription}</p></CardContent></Card>
+        <Card><CardContent className="py-14 text-center"><Trophy className="mx-auto size-9 text-muted-foreground/50" /><h2 className="mt-4 font-semibold">{copy.emptyTitle}</h2><p className="mt-2 text-sm text-muted-foreground">{copy.emptyDescription}</p></CardContent></Card>
       ) : (
         <div className="space-y-3">
           {competitions.map((competition) => (
-            <Card key={competition.id} className="gap-0 py-0 shadow-sm"><CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate font-semibold">{competition.name}</h2><Badge variant={competition.status === "published" ? "default" : "secondary"}>{competition.status}</Badge>{competition.visibility === "private" && <Badge variant="outline" className="gap-1"><LockKeyhole className="size-3" />Private</Badge>}</div><div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-500"><span className="flex items-center gap-1.5"><CalendarClock className="size-3.5" />{new Date(competition.starts_at).toLocaleString(language === "ro" ? "ro-RO" : "en-US")}</span><span className="flex items-center gap-1.5"><Users className="size-3.5" />{competition.participantCount} {copy.participants}</span><span>{competition.problemCount} {copy.problems} · {competition.maximumPoints} {copy.points}</span></div></div><div className="flex gap-2"><Button variant="outline" size="sm" className="gap-2" onClick={() => void downloadLeaderboard(competition)}><Download className="size-4" />CSV</Button><Button asChild size="sm" className="gap-2"><Link href={`/admin/competitions/${competition.id}`}>{copy.manage}<ChevronRight className="size-4" /></Link></Button></div></CardContent></Card>
+            <Card key={competition.id} className="gap-0 py-0 shadow-sm"><CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="truncate font-semibold">{competition.name}</h2><Badge variant={competition.status === "published" ? "default" : "secondary"}>{competition.status}</Badge>{competition.visibility === "private" && <Badge variant="outline" className="gap-1"><LockKeyhole className="size-3" />Private</Badge>}</div><div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground"><span className="flex items-center gap-1.5"><CalendarClock className="size-3.5" />{new Date(competition.starts_at).toLocaleString(language === "ro" ? "ro-RO" : "en-US")}</span><span className="flex items-center gap-1.5"><Users className="size-3.5" />{competition.participantCount} {copy.participants}</span><span>{competition.problemCount} {copy.problems} · {competition.maximumPoints} {copy.points}</span></div></div><div className="flex gap-2"><Button variant="outline" size="sm" className="gap-2" onClick={() => void downloadLeaderboard(competition)}><Download className="size-4" />CSV</Button><Button asChild size="sm" className="gap-2"><Link href={`/admin/competitions/${competition.id}`}>{copy.manage}<ChevronRight className="size-4" /></Link></Button></div></CardContent></Card>
           ))}
         </div>
       )}
@@ -275,7 +275,7 @@ function AdminCompetitionsContent() {
       </Dialog>
 
       <AlertDialog open={lockdownWarningOpen} onOpenChange={setLockdownWarningOpen}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="flex items-center gap-2"><ShieldAlert className="size-5 text-red-600" />{copy.warningTitle}</AlertDialogTitle><AlertDialogDescription>{copy.warningDescription}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{copy.cancel}</AlertDialogCancel><AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" onClick={() => lockdownMutation.mutate(true)}>{copy.enable}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="flex items-center gap-2"><ShieldAlert className="size-5 text-destructive" />{copy.warningTitle}</AlertDialogTitle><AlertDialogDescription>{copy.warningDescription}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{copy.cancel}</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => lockdownMutation.mutate(true)}>{copy.enable}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </div>
   );

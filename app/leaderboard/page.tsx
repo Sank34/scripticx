@@ -81,7 +81,7 @@ export default function LeaderboardPage() {
               <PodiumCard
                 className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-muted dark:to-muted/60 cursor-pointer hover:scale-[1.02] transition"
                 icon={Medal}
-                iconClassName="w-6 h-6 text-gray-500"
+                iconClassName="w-6 h-6 text-muted-foreground"
                 pointsLabel={t("leaderboard.points")}
                 rank={2}
                 user={top3[1]}
@@ -103,7 +103,7 @@ export default function LeaderboardPage() {
               <PodiumCard
                 className="bg-gradient-to-br from-orange-200 to-orange-400 dark:from-orange-500/30 dark:to-orange-600/20 cursor-pointer hover:scale-[1.02] transition"
                 icon={Trophy}
-                iconClassName="w-6 h-6 text-orange-600"
+                iconClassName="w-6 h-6 text-orange-600 dark:text-orange-400"
                 pointsLabel={t("leaderboard.points")}
                 rank={3}
                 user={top3[2]}

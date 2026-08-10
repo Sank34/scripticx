@@ -114,17 +114,17 @@ function AssetGuide({
       };
 
   return (
-    <div className="grid gap-4 rounded-xl border bg-zinc-50 p-4 sm:grid-cols-[150px_1fr] sm:items-center">
-      <div className="relative mx-auto aspect-square w-[140px] rounded-xl border-2 border-dashed border-zinc-300 bg-[linear-gradient(45deg,#eee_25%,transparent_25%),linear-gradient(-45deg,#eee_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#eee_75%),linear-gradient(-45deg,transparent_75%,#eee_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px]">
+    <div className="grid gap-4 rounded-xl border bg-muted/60 p-4 sm:grid-cols-[150px_1fr] sm:items-center">
+      <div className="relative mx-auto aspect-square w-[140px] rounded-xl border-2 border-dashed bg-[linear-gradient(45deg,var(--muted)_25%,transparent_25%),linear-gradient(-45deg,var(--muted)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--muted)_75%),linear-gradient(-45deg,transparent_75%,var(--muted)_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px]">
         <div
           className={cn(
-            "absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-dashed bg-white/90 text-center text-[10px] leading-tight text-zinc-500",
+            "absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-dashed bg-card/90 text-center text-[10px] leading-tight text-muted-foreground",
             isFrame ? "size-[66%]" : "size-[62.5%]"
           )}
         >
           {isFrame ? "340 px" : "320 px"}
         </div>
-        <span className="absolute bottom-1.5 right-2 text-[9px] font-medium text-zinc-500">512 px</span>
+        <span className="absolute bottom-1.5 right-2 text-[9px] font-medium text-muted-foreground">512 px</span>
       </div>
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm font-semibold">
@@ -495,10 +495,10 @@ export function ShopItemEditorDialog({
                 type="button"
                 aria-pressed={draft.active}
                 onClick={() => update("active", !draft.active)}
-                className="flex w-full items-center justify-between rounded-xl border p-3 text-left hover:bg-zinc-50"
+                className="flex w-full items-center justify-between rounded-xl border p-3 text-left hover:bg-accent/70"
               >
                 <span className="text-sm font-medium">{copy.active}</span>
-                <span className={cn("relative h-6 w-11 rounded-full transition", draft.active ? "bg-emerald-500" : "bg-zinc-300")}>
+                <span className={cn("relative h-6 w-11 rounded-full transition", draft.active ? "bg-emerald-500" : "bg-muted-foreground/35")}>
                   <span className={cn("absolute top-1 size-4 rounded-full bg-white shadow-sm transition", draft.active ? "left-6" : "left-1")} />
                 </span>
               </button>
@@ -510,7 +510,7 @@ export function ShopItemEditorDialog({
               {isOverlay && (
                 <>
                   <AssetGuide category={draft.category as "avatar-frame" | "avatar-decoration"} locale={locale} />
-                  <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-white text-sm font-medium hover:bg-zinc-50">
+                  <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-background text-sm font-medium hover:bg-accent">
                     <Upload className="size-4" />
                     {uploading === "asset" ? "..." : draft.assetUrl ? copy.replace : copy.upload}
                     <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void upload(event, "asset")} disabled={Boolean(uploading)} />
@@ -553,7 +553,7 @@ export function ShopItemEditorDialog({
                             updateStyle("backgroundColor", event.target.value);
                             update("visual", "custom-background");
                           }}
-                          className="h-9 w-12 cursor-pointer rounded-md border bg-white p-1"
+                          className="h-9 w-12 cursor-pointer rounded-md border bg-background p-1"
                         />
                         <Input value={draft.styleConfig?.backgroundColor || "#f3f7f1"} onChange={(event) => updateStyle("backgroundColor", event.target.value)} className="font-mono" />
                       </div>
@@ -561,12 +561,12 @@ export function ShopItemEditorDialog({
                   </div>
 
                   {backgroundMode === "pattern" ? (
-                    <div className="space-y-4 rounded-xl border bg-zinc-50 p-4">
+                    <div className="space-y-4 rounded-xl border bg-muted/60 p-4">
                       <div className="flex items-start gap-3">
                         <Repeat2 className="mt-0.5 size-4 shrink-0" />
                         <div><p className="text-sm font-medium">{copy.patternIcon}</p><p className="text-xs leading-relaxed text-muted-foreground">{copy.patternGuide}</p></div>
                       </div>
-                      <label className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-white text-sm font-medium hover:bg-zinc-50">
+                      <label className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-background text-sm font-medium hover:bg-accent">
                         <Upload className="size-4" />{uploading === "pattern" ? "..." : draft.styleConfig?.patternUrl ? copy.replace : copy.upload}
                         <input className="sr-only" type="file" accept="image/png,image/webp" onChange={(event) => void upload(event, "pattern")} disabled={Boolean(uploading)} />
                       </label>
@@ -576,12 +576,12 @@ export function ShopItemEditorDialog({
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4 rounded-xl border bg-zinc-50 p-4">
+                    <div className="space-y-4 rounded-xl border bg-muted/60 p-4">
                       <div className="flex items-start gap-3">
                         <ImageIcon className="mt-0.5 size-4 shrink-0" />
                         <div><p className="text-sm font-medium">{copy.image}</p><p className="text-xs leading-relaxed text-muted-foreground">{copy.imageGuide}</p></div>
                       </div>
-                      <label className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-white text-sm font-medium hover:bg-zinc-50">
+                      <label className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-background text-sm font-medium hover:bg-accent">
                         <Upload className="size-4" />{uploading === "asset" ? "..." : draft.assetUrl ? copy.replace : copy.upload}
                         <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void upload(event, "asset")} disabled={Boolean(uploading)} />
                       </label>
@@ -592,7 +592,7 @@ export function ShopItemEditorDialog({
               )}
 
               {draft.category === "profile-title" && (
-                <div className="flex items-start gap-3 rounded-xl border bg-zinc-50 p-4">
+                <div className="flex items-start gap-3 rounded-xl border bg-muted/60 p-4">
                   <Palette className="mt-0.5 size-4" />
                   <p className="text-sm text-muted-foreground">{copy.titleGuide}</p>
                 </div>
@@ -602,7 +602,7 @@ export function ShopItemEditorDialog({
 
           <aside className="lg:sticky lg:top-0 lg:self-start">
             <p className="mb-2 text-sm font-medium">{copy.preview}</p>
-            <div className="h-64 rounded-xl border bg-white p-3 shadow-sm">
+            <div className="h-64 rounded-xl border bg-background p-3 shadow-sm">
               <RewardProductPreview
                 product={draft}
                 locale={locale}
@@ -610,7 +610,7 @@ export function ShopItemEditorDialog({
                 username={previewUsername || "scripticx"}
               />
             </div>
-            <div className="mt-3 rounded-xl border bg-zinc-50 p-3 text-xs leading-relaxed text-muted-foreground">
+            <div className="mt-3 rounded-xl border bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
               {draft.category === "profile-background"
                 ? backgroundMode === "pattern" ? copy.patternGuide : copy.imageGuide
                 : isOverlay ? copy.uploadRules : copy.titleGuide}

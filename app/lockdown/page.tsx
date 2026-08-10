@@ -72,32 +72,32 @@ function LockdownContent() {
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-xl border-zinc-200 shadow-sm">
+      <Card className="w-full max-w-xl border-border shadow-sm">
         <CardContent className="space-y-6 p-8 text-center">
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-zinc-950 text-white">
             <LockKeyhole className="size-6" />
           </div>
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               ScripticX
             </p>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               Maintenance
             </h1>
-            <p className="mx-auto max-w-md text-sm leading-6 text-zinc-600">
+            <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
               {maintenanceMessage}
             </p>
           </div>
 
           {isAdmin && !loading && (
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-left">
+            <div className="rounded-xl border border-border bg-muted/40 p-4 text-left">
               <div className="flex gap-3">
-                <ShieldCheck className="mt-0.5 size-5 shrink-0 text-zinc-700" />
+                <ShieldCheck className="mt-0.5 size-5 shrink-0 text-foreground" />
                 <div>
                   <p className="text-sm font-semibold">
                     {ro ? "Cont de administrator" : "Administrator account"}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     {ro
                       ? "Poți continua configurarea și verificarea platformei."
                       : "You can continue configuring and reviewing the platform."}

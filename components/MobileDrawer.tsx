@@ -174,7 +174,7 @@ export function MobileDrawer() {
           </button>
         </DrawerTrigger>
 
-        <DrawerContent className="h-[82vh] rounded-t-[32px] border-border bg-background/95 backdrop-blur-xl">
+        <DrawerContent className="h-[82vh] rounded-t-[32px] border-border bg-sidebar/95 backdrop-blur-xl">
           <DrawerTitle className="sr-only">
             {t("mobileDrawer.title")}
           </DrawerTitle>
@@ -184,7 +184,7 @@ export function MobileDrawer() {
               <Link
                 href="/dashboard"
                 aria-label="ScripticX Dashboard"
-                className="mb-5 flex items-center gap-3 rounded-2xl p-2 transition-colors active:bg-accent"
+                className="mb-5 flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-sidebar-accent active:bg-sidebar-accent"
               >
                 <Image
                   src="/logoSCX.svg"

@@ -42,34 +42,72 @@ export function Topbar() {
   const { theme, setTheme } = useTheme();
   const { profile, user } = useAuth();
   const [themeMounted, setThemeMounted] = useState(false);
-  const themeTransitionTimeout = useRef<number | null>(null);
+  const themeTransitionId = useRef(0);
+  const requestedTheme = useRef<string | undefined>(theme);
 
   useEffect(() => {
     setThemeMounted(true);
 
     return () => {
-      if (themeTransitionTimeout.current) {
-        window.clearTimeout(themeTransitionTimeout.current);
-      }
       document.documentElement.classList.remove("theme-transition");
     };
   }, []);
 
+  useEffect(() => {
+    requestedTheme.current = theme;
+  }, [theme]);
+
   function changeTheme(nextTheme: "light" | "dark" | "system") {
-    if (theme === nextTheme) return;
+    if (requestedTheme.current === nextTheme) return;
+    requestedTheme.current = nextTheme;
 
     const root = document.documentElement;
-    root.classList.add("theme-transition");
-    void root.offsetWidth;
-    setTheme(nextTheme);
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const viewTransitionDocument = document as Document & {
+      startViewTransition?: (update: () => void) => {
+        finished: Promise<void>;
+      };
+    };
+    const resolvedNextTheme =
+      nextTheme === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : nextTheme;
+    const applyTheme = () => {
+      root.classList.toggle("dark", resolvedNextTheme === "dark");
+      root.style.colorScheme = resolvedNextTheme;
+      setTheme(nextTheme);
+    };
 
-    if (themeTransitionTimeout.current) {
-      window.clearTimeout(themeTransitionTimeout.current);
+    if (reduceMotion || !viewTransitionDocument.startViewTransition) {
+      applyTheme();
+      return;
     }
-    themeTransitionTimeout.current = window.setTimeout(() => {
-      root.classList.remove("theme-transition");
-      themeTransitionTimeout.current = null;
-    }, 360);
+
+    const transitionId = ++themeTransitionId.current;
+    const finishTransition = () => {
+      if (themeTransitionId.current === transitionId) {
+        root.classList.remove("theme-transition");
+      }
+    };
+
+    root.classList.add("theme-transition");
+    try {
+      const transition = viewTransitionDocument.startViewTransition(() => {
+        if (themeTransitionId.current !== transitionId) return;
+        applyTheme();
+      });
+
+      void transition.finished.then(finishTransition, finishTransition);
+    } catch {
+      if (themeTransitionId.current === transitionId) {
+        applyTheme();
+      }
+      finishTransition();
+    }
   }
 
   async function logout() {

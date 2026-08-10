@@ -151,14 +151,14 @@ export function NetworkStatus() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[80] flex justify-center px-4">
-      <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-2xl shadow-amber-950/10">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+      <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-amber-500/35 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-2xl shadow-amber-950/10 dark:bg-amber-950/80 dark:text-amber-100">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/80 dark:text-amber-300">
           <WifiOff className="h-4 w-4" />
         </span>
 
         <div className="min-w-0">
           <p className="font-semibold">{t("network.offlineTitle")}</p>
-          <p className="text-xs text-amber-800">
+          <p className="text-xs text-amber-800 dark:text-amber-300">
             {t("network.reconnecting").replace("{seconds}", String(retryIn))}
           </p>
         </div>

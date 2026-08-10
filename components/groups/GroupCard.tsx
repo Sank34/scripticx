@@ -64,7 +64,7 @@ export function GroupCard({
     <Card className="gap-0 overflow-hidden py-0 transition hover:-translate-y-0.5 hover:shadow-sm">
       <CardContent className="flex h-full flex-col gap-4 p-0">
         <div
-          className="h-20 w-full border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center"
+          className="h-20 w-full border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_48%,#1e1b4b_100%)]"
           style={bannerStyle}
         />
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
@@ -106,7 +106,7 @@ export function GroupCard({
               ) : hasActivity ? (
                 <Badge
                   variant="secondary"
-                  className="gap-1 bg-zinc-100 text-zinc-600"
+                  className="gap-1 bg-muted text-muted-foreground"
                   title={activityLabel}
                 >
                   <MessageCircle className="size-3" />

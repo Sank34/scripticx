@@ -106,7 +106,7 @@ function InventoryDrawer({
       <DrawerContent className="w-[92vw] sm:max-w-md">
         <DrawerHeader className="border-b p-5">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-zinc-100">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-muted">
               <PackageOpen className="size-5" />
             </span>
             <div>
@@ -162,7 +162,7 @@ function InventoryDrawer({
             ))
           ) : (
             <div className="flex h-72 flex-col items-center justify-center px-8 text-center">
-              <PackageOpen className="size-10 text-zinc-300" />
+              <PackageOpen className="size-10 text-muted-foreground/50" />
               <p className="mt-3 text-sm text-muted-foreground">{copy.empty}</p>
             </div>
           )}
@@ -340,7 +340,7 @@ function ShopContent() {
   if (shopQuery.isError || !data) {
     return (
       <div className="flex min-h-[55vh] flex-col items-center justify-center rounded-2xl border border-dashed text-center">
-        <ShoppingBag className="size-10 text-zinc-300" />
+        <ShoppingBag className="size-10 text-muted-foreground/50" />
         <p className="mt-3 max-w-md text-sm text-muted-foreground">{copy.loadError}</p>
         <Button variant="outline" className="mt-4" onClick={() => void shopQuery.refetch()}>{copy.retry}</Button>
       </div>
@@ -349,24 +349,24 @@ function ShopContent() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border bg-zinc-50 p-6 sm:p-8">
+      <section className="rounded-2xl border bg-muted/40 p-6 sm:p-8">
         <div className="grid gap-7 lg:grid-cols-[1fr_310px] lg:items-end">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-sm font-medium text-zinc-600">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <ShoppingBag className="size-4" />
               {copy.eyebrow}
             </div>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.title}</h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{copy.subtitle}</p>
 
-            <Button variant="outline" className="mt-5 bg-white" onClick={() => setInventoryOpen(true)}>
+            <Button variant="outline" className="mt-5 bg-background" onClick={() => setInventoryOpen(true)}>
               <PackageOpen className="size-4" />
               {copy.inventory}
               <Badge variant="secondary" className="ml-1">{data.inventory.length}</Badge>
             </Button>
           </div>
 
-          <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <div className="rounded-xl border bg-card p-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{copy.balance}</p>
             <p className="mt-1 flex items-center gap-2 text-3xl font-semibold">
               <Coins className="size-6 text-amber-500" />
@@ -409,7 +409,7 @@ function ShopContent() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={copy.search}
-            className="h-9 bg-white pl-9"
+            className="h-9 bg-background pl-9"
           />
         </div>
       </div>
@@ -464,8 +464,8 @@ function ShopContent() {
           })}
         </div>
       ) : (
-        <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed bg-zinc-50 text-center">
-          <Gift className="size-9 text-zinc-300" />
+        <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/40 text-center">
+          <Gift className="size-9 text-muted-foreground/50" />
           <p className="mt-3 font-medium">{copy.empty}</p>
         </div>
       )}
@@ -488,7 +488,7 @@ function ShopContent() {
             <DialogDescription>{copy.confirmDescription}</DialogDescription>
           </DialogHeader>
           {selectedProduct && (
-            <div className="flex items-center gap-3 rounded-xl border bg-zinc-50 p-3">
+            <div className="flex items-center gap-3 rounded-xl border bg-muted/40 p-3">
               <div className="size-16 shrink-0">
                 <RewardProductPreview
                   product={selectedProduct}
