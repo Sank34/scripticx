@@ -8,8 +8,10 @@ import {
   BookOpen,
   Check,
   Code2,
+  GraduationCap,
   ImagePlus,
   LoaderCircle,
+  Presentation,
   Route,
   Sparkles,
   Target,
@@ -30,17 +32,23 @@ import {
   type OnboardingDraft,
   type OnboardingExperienceLevel,
   type OnboardingGoal,
+  type OnboardingPersona,
 } from "@/lib/onboarding";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import {
+  getDefaultWorkspaceKind,
+  WORKSPACE_SETUP_VERSION,
+  workspaceMetadataKeys,
+} from "@/lib/workspaces";
 
 type OnboardingExperienceProps = {
-  onComplete: () => void;
+  onComplete: (persona: OnboardingPersona) => void;
   profile: ProfileSummary | null;
   user: User;
 };
 
-const totalSteps = 5;
+const totalSteps = 6;
 
 const copy = {
   en: {
@@ -57,6 +65,8 @@ const copy = {
     interestsDescription: "Pick as many as you like. You can change these later.",
     interestsTitle: "Choose your learning interests",
     language: "Language",
+    personaDescription: "Choose the space that best fits how you want to use ScripticX. You can switch workspaces later.",
+    personaTitle: "What brings you to ScripticX?",
     profileDescription: "This is how classmates and collaborators will recognize you.",
     profileTitle: "Make the space yours",
     readyDescription: "Your editor, roadmap and practice workspace are ready.",
@@ -81,6 +91,8 @@ const copy = {
     interestsDescription: "Poți alege oricâte. Le poți schimba mai târziu.",
     interestsTitle: "Alege ce vrei să aprofundezi",
     language: "Limbă",
+    personaDescription: "Alege spațiul potrivit modului în care vrei să folosești ScripticX. Vei putea schimba workspace-ul oricând.",
+    personaTitle: "Cum vrei să folosești ScripticX?",
     profileDescription: "Așa te vor recunoaște colegii și colaboratorii.",
     profileTitle: "Personalizează-ți spațiul",
     readyDescription: "Editorul, roadmap-ul și spațiul de practică sunt pregătite.",
@@ -92,6 +104,43 @@ const copy = {
     welcomeTitle: "Bine ai venit pe ScripticX",
   },
 } as const;
+
+const personaOptions: Array<{
+  id: OnboardingPersona;
+  icon: typeof Code2;
+  label: { en: string; ro: string };
+  description: { en: string; ro: string };
+  badge?: { en: string; ro: string };
+}> = [
+  {
+    id: "student",
+    icon: GraduationCap,
+    label: { en: "I am a student", ro: "Sunt elev" },
+    description: {
+      en: "Notes, whiteboards and graph tools alongside your programming practice.",
+      ro: "Notițe, whiteboard și grafuri alături de exercițiile de programare.",
+    },
+  },
+  {
+    id: "teacher",
+    icon: Presentation,
+    label: { en: "I am a teacher", ro: "Sunt profesor" },
+    description: {
+      en: "Prepare a teaching workspace now; class collaboration is coming next.",
+      ro: "Pregătește spațiul de profesor; colaborarea cu clasele urmează.",
+    },
+    badge: { en: "Preview", ro: "Preview" },
+  },
+  {
+    id: "learner",
+    icon: Code2,
+    label: { en: "I just want to learn", ro: "Vreau doar să învăț" },
+    description: {
+      en: "Keep the focused ScripticX programming workspace.",
+      ro: "Păstrează workspace-ul ScripticX concentrat pe programare.",
+    },
+  },
+];
 
 const experienceOptions: Array<{
   id: OnboardingExperienceLevel;
@@ -158,6 +207,7 @@ export function OnboardingExperience({
     experience: "beginner",
     goal: "learn-programming",
     interests: ["fundamentals", "visual-execution"],
+    persona: "learner",
     username: profile?.username || user.email?.split("@")[0] || "",
   }));
 
@@ -171,10 +221,14 @@ export function OnboardingExperience({
 
   const initials = (draft.username || user.email || "S").slice(0, 2).toUpperCase();
   const normalizedUsername = normalizeOnboardingUsername(draft.username);
-  const canContinue = step !== 1 || normalizedUsername.length >= 3;
+  const canContinue = step !== 2 || normalizedUsername.length >= 3;
   const selectedGoal = useMemo(
     () => goalOptions.find((option) => option.id === draft.goal),
     [draft.goal]
+  );
+  const selectedPersona = useMemo(
+    () => personaOptions.find((option) => option.id === draft.persona),
+    [draft.persona]
   );
 
   function chooseAvatar(file: File | undefined) {
@@ -244,13 +298,18 @@ export function OnboardingExperience({
         [onboardingMetadataKeys.experience]: draft.experience,
         [onboardingMetadataKeys.goal]: draft.goal,
         [onboardingMetadataKeys.interests]: draft.interests,
+        [onboardingMetadataKeys.persona]: draft.persona,
         [onboardingMetadataKeys.required]: false,
+        [workspaceMetadataKeys.activeWorkspaceKind]: getDefaultWorkspaceKind(
+          draft.persona
+        ),
+        [workspaceMetadataKeys.setupVersion]: WORKSPACE_SETUP_VERSION,
       });
       if (metadataError) throw metadataError;
 
       localStorage.setItem(productTourStorageKey, "pending");
       window.dispatchEvent(new Event("profile-updated"));
-      onComplete();
+      onComplete(draft.persona);
     } catch (error) {
       toast.error(
         language === "ro" ? "Nu am putut salva profilul." : "Could not save your profile.",
@@ -327,6 +386,81 @@ export function OnboardingExperience({
             {step === 1 && (
               <div>
                 <div className="text-center">
+                  <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
+                    {c.personaTitle}
+                  </h1>
+                  <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
+                    {c.personaDescription}
+                  </p>
+                </div>
+
+                <div className="mx-auto mt-6 grid max-w-4xl gap-3 md:grid-cols-3 sm:mt-8">
+                  {personaOptions.map((option) => {
+                    const Icon = option.icon;
+                    const selected = draft.persona === option.id;
+
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() =>
+                          setDraft((current) => ({
+                            ...current,
+                            persona: option.id,
+                            goal:
+                              option.id === "teacher"
+                                ? "teach-with-scripticx"
+                                : current.goal === "teach-with-scripticx"
+                                  ? "learn-programming"
+                                  : current.goal,
+                          }))
+                        }
+                        className={cn(
+                          "group relative flex min-h-44 flex-col rounded-2xl border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-sky-500/50 hover:shadow-lg",
+                          selected &&
+                            "border-sky-500 bg-sky-500/10 shadow-[0_16px_45px_rgba(14,165,233,0.14)] ring-1 ring-sky-500/20"
+                        )}
+                        aria-pressed={selected}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-muted-foreground transition-colors",
+                            selected && "border-sky-500/40 bg-sky-500 text-white"
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="mt-5 flex items-center gap-2 font-semibold">
+                          {option.label[language]}
+                          {option.badge ? (
+                            <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+                              {option.badge[language]}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {option.description[language]}
+                        </span>
+                        <span
+                          className={cn(
+                            "absolute right-4 top-4 flex h-5 w-5 items-center justify-center rounded-full border",
+                            selected
+                              ? "border-sky-600 bg-sky-600 text-white"
+                              : "border-border"
+                          )}
+                        >
+                          {selected ? <Check className="h-3 w-3" /> : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div>
+                <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.profileTitle}</h1>
                   <p className="mt-3 text-muted-foreground">{c.profileDescription}</p>
                 </div>
@@ -378,7 +512,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 2 && (
+            {step === 3 && (
               <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
                 <section>
                   <div className="text-center">
@@ -446,7 +580,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 3 && (
+            {step === 4 && (
               <div>
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.interestsTitle}</h1>
@@ -481,7 +615,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 4 && (
+            {step === 5 && (
               <div>
                 <div className="text-center">
                   <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 via-sky-500 to-violet-500 text-white shadow-[0_16px_45px_rgba(14,165,233,0.22)]">
@@ -500,7 +634,7 @@ export function OnboardingExperience({
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold">@{normalizedUsername}</p>
                       <p className="mt-0.5 text-sm text-muted-foreground">
-                        {selectedGoal?.label[language]} · {draft.interests.length} interests
+                        {selectedPersona?.label[language]} · {selectedGoal?.label[language]}
                       </p>
                     </div>
                     <Sparkles className="h-5 w-5 text-violet-500" />

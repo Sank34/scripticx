@@ -1,15 +1,38 @@
 "use client";
 
-import ReactMarkdown from "react-markdown";
+import { useEffect, useState } from "react";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { Separator } from "@/components/ui/separator";
+import {
+  getWorkspaceImage,
+  parseWorkspaceImageId,
+} from "@/lib/workspace-assets";
+import { cn } from "@/lib/utils";
 
-export function Markdown({ children }: { children: string }) {
+export function Markdown({
+  children,
+  workspaceImageUserId,
+}: {
+  children: string;
+  workspaceImageUserId?: string;
+}) {
   return (
     <div className="space-y-4 text-[15px] leading-7 text-foreground/80">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        urlTransform={(url, key, node) => {
+          if (
+            workspaceImageUserId &&
+            key === "src" &&
+            node.tagName === "img" &&
+            parseWorkspaceImageId(url)
+          ) {
+            return url;
+          }
+          return defaultUrlTransform(url);
+        }}
         components={{
           h1: ({ children }) => (
             <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground first:mt-0">
@@ -37,6 +60,34 @@ export function Markdown({ children }: { children: string }) {
               {children}
             </a>
           ),
+          img: ({ alt, className, src }) => {
+            const imageSource = typeof src === "string" ? src : undefined;
+            const assetId = parseWorkspaceImageId(imageSource);
+            if (assetId && workspaceImageUserId) {
+              return (
+                <WorkspaceMarkdownImage
+                  alt={alt || ""}
+                  assetId={assetId}
+                  userId={workspaceImageUserId}
+                />
+              );
+            }
+            if (!imageSource) return null;
+            return (
+              // eslint-disable-next-line @next/next/no-img-element -- Markdown images can use arbitrary external URLs.
+              <img
+                alt={alt || ""}
+                className={cn(
+                  "my-5 h-auto max-h-[36rem] max-w-full rounded-xl border bg-muted/20 object-contain",
+                  className
+                )}
+                decoding="async"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                src={imageSource}
+              />
+            );
+          },
           ul: ({ children }) => (
             <ul className="ml-6 list-disc space-y-1.5 text-foreground/80">
               {children}
@@ -109,5 +160,70 @@ export function Markdown({ children }: { children: string }) {
         {children}
       </ReactMarkdown>
     </div>
+  );
+}
+
+function WorkspaceMarkdownImage({
+  alt,
+  assetId,
+  userId,
+}: {
+  alt: string;
+  assetId: string;
+  userId: string;
+}) {
+  const [source, setSource] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+
+    void getWorkspaceImage(userId, assetId)
+      .then((blob) => {
+        if (!active) return;
+        if (!blob) {
+          setFailed(true);
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setSource(objectUrl);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [assetId, userId]);
+
+  if (failed) {
+    return (
+      <span className="my-4 flex min-h-24 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center text-xs text-muted-foreground">
+        {alt || "Image unavailable"}
+      </span>
+    );
+  }
+
+  if (!source) {
+    return (
+      <span
+        aria-label={alt || "Loading image"}
+        className="my-4 block h-40 animate-pulse rounded-xl border bg-muted/40"
+        role="img"
+      />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- Local IndexedDB blobs do not have a Next image URL.
+    <img
+      alt={alt}
+      className="my-5 h-auto max-h-[36rem] max-w-full rounded-xl border bg-muted/20 object-contain"
+      decoding="async"
+      src={source}
+    />
   );
 }

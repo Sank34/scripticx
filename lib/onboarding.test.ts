@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getOnboardingLandingRoute,
+  getOnboardingPersona,
   hasCompletedProductTour,
   needsOnboarding,
   normalizeOnboardingUsername,
@@ -40,5 +42,20 @@ describe("normalizeOnboardingUsername", () => {
 
   it("limits usernames to 24 characters", () => {
     expect(normalizeOnboardingUsername("a".repeat(40))).toHaveLength(24);
+  });
+});
+
+describe("workspace persona onboarding", () => {
+  it("keeps legacy accounts on the learner workspace", () => {
+    expect(getOnboardingPersona(undefined)).toBe("learner");
+    expect(getOnboardingLandingRoute("learner")).toBe("/dashboard");
+  });
+
+  it("routes student and teacher personas to their workspace", () => {
+    expect(
+      getOnboardingPersona({ [onboardingMetadataKeys.persona]: "student" })
+    ).toBe("student");
+    expect(getOnboardingLandingRoute("student")).toBe("/workspace/student");
+    expect(getOnboardingLandingRoute("teacher")).toBe("/workspace/teacher");
   });
 });

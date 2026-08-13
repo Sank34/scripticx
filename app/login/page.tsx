@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 import { siGoogle } from "simple-icons";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { onboardingMetadataKeys } from "@/lib/onboarding";
+import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 import { AppModal } from "@/components/ui/app-modal";
 
 import {
@@ -22,7 +24,7 @@ import { Button } from "@/components/ui/button";
 
 import { useLanguage } from "@/components/LanguageProvider";
 
-type AuthAction = "login" | "register" | "google" | null;
+type AuthAction = "login" | "register" | "google" | "resend" | null;
 
 function GoogleIcon() {
   return (
@@ -42,9 +44,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<
+    string | null
+  >(null);
 
   const router = useRouter();
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState({
@@ -58,7 +63,9 @@ export default function LoginPage() {
       const { data } = await api.auth.getSession();
 
       if (data.session) {
-        router.replace("/dashboard");
+        router.replace(
+          getWorkspaceLandingRoute(data.session.user.user_metadata)
+        );
       } else {
         setLoading(false);
       }
@@ -70,9 +77,11 @@ export default function LoginPage() {
   function showModal(
     title: string,
     description: string,
-    type: "error" | "success" | "info" = "info"
+    type: "error" | "success" | "info" = "info",
+    verificationEmail: string | null = null
   ) {
     setModalData({ title, description, type });
+    setPendingVerificationEmail(verificationEmail);
     setModalOpen(true);
   }
 
@@ -80,15 +89,32 @@ export default function LoginPage() {
     if (!email.trim() || !password) return;
 
     setAuthAction("login");
-    const { error } = await api.auth.signInWithPassword(email.trim(), password);
+    const { data, error } = await api.auth.signInWithPassword(
+      email.trim(),
+      password
+    );
     setAuthAction(null);
 
     if (error) {
+      const isEmailNotConfirmed =
+        error.code === "email_not_confirmed" ||
+        /email[^.]*not[^.]*confirm/i.test(error.message);
+
+      if (isEmailNotConfirmed) {
+        showModal(
+          t("login.modal.verificationRequiredTitle"),
+          t("login.modal.verificationRequiredDescription"),
+          "info",
+          email.trim()
+        );
+        return;
+      }
+
       showModal(t("login.modal.loginErrorTitle"), error.message, "error");
       return;
     }
 
-    router.replace("/dashboard");
+    router.replace(getWorkspaceLandingRoute(data.user?.user_metadata));
   }
 
   async function handleRegister() {
@@ -100,9 +126,16 @@ export default function LoginPage() {
     if (!email.trim() || !password) return;
 
     setAuthAction("register");
-    const { data, error } = await api.auth.signUp(email.trim(), password, {
-      [onboardingMetadataKeys.required]: true,
-    });
+    const { data, error } = await api.auth.signUp(
+      email.trim(),
+      password,
+      {
+        [onboardingMetadataKeys.required]: true,
+        preferred_username: username.trim(),
+        locale,
+      },
+      `${window.location.origin}/auth/callback`
+    );
 
     if (error) {
       setAuthAction(null);
@@ -112,7 +145,7 @@ export default function LoginPage() {
 
     const user = data.user;
 
-    if (user) {
+    if (user && data.session) {
       try {
         await api.profiles.saveRegistrationProfile(user.id, username);
       } catch (profileError) {
@@ -130,15 +163,36 @@ export default function LoginPage() {
 
     setAuthAction(null);
     if (data.session) {
-      router.replace("/dashboard");
+      router.replace(
+        getWorkspaceLandingRoute(data.session.user.user_metadata)
+      );
       return;
     }
 
     showModal(
       t("login.modal.accountCreatedTitle"),
       t("login.modal.accountCreatedDescription"),
-      "success"
+      "success",
+      email.trim()
     );
+  }
+
+  async function handleResendConfirmation() {
+    if (!pendingVerificationEmail || authAction) return;
+
+    setAuthAction("resend");
+    const { error } = await api.auth.resendSignupConfirmation(
+      pendingVerificationEmail,
+      `${window.location.origin}/auth/callback`
+    );
+    setAuthAction(null);
+
+    if (error) {
+      toast.error(t("login.modal.resendError"));
+      return;
+    }
+
+    toast.success(t("login.modal.resendSuccess"));
   }
 
   async function handleGoogleLogin() {
@@ -284,6 +338,16 @@ export default function LoginPage() {
         title={modalData.title}
         description={modalData.description}
         type={modalData.type}
+        closeLabel={t("login.modal.close")}
+        actionLabel={
+          pendingVerificationEmail
+            ? t("login.modal.resendConfirmation")
+            : t("login.modal.ok")
+        }
+        actionLoading={authAction === "resend"}
+        onAction={
+          pendingVerificationEmail ? handleResendConfirmation : undefined
+        }
       />
     </div>
   );

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { UserAvatar } from "@/components/user/UserAvatar";
+import { EmailVerificationNotification } from "@/components/account/EmailVerification";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -365,6 +366,10 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
     () => notifications.filter((notification) => !notification.read_at).length,
     [notifications]
   );
+  const needsEmailVerification = Boolean(
+    user?.email && !user.email_confirmed_at
+  );
+  const visibleUnreadCount = unreadCount + (needsEmailVerification ? 1 : 0);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -527,11 +532,11 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
           className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent hover:text-accent-foreground"
           aria-label={t("notifications.open")}
         >
-          {unreadCount ? <BellRing size={18} /> : <Bell size={18} />}
+          {visibleUnreadCount ? <BellRing size={18} /> : <Bell size={18} />}
 
-          {unreadCount ? (
+          {visibleUnreadCount ? (
             <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-              {unreadCount > 99 ? "99+" : unreadCount}
+              {visibleUnreadCount > 99 ? "99+" : visibleUnreadCount}
             </span>
           ) : null}
         </button>
@@ -547,8 +552,11 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
           <div>
             <h2 className="text-base font-semibold">{t("notifications.title")}</h2>
             <p className="text-xs text-muted-foreground">
-              {unreadCount
-                ? t("notifications.unread").replace("{count}", String(unreadCount))
+              {visibleUnreadCount
+                ? t("notifications.unread").replace(
+                    "{count}",
+                    String(visibleUnreadCount)
+                  )
                 : t("notifications.allCaughtUp")}
             </p>
           </div>
@@ -579,6 +587,8 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
         ) : null}
 
         <ScrollArea className="h-[min(28rem,calc(100vh-12rem))]">
+          <EmailVerificationNotification />
+
           {isLoading ? (
             <div className="space-y-3 p-4">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -638,7 +648,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                 );
               })}
             </div>
-          ) : (
+          ) : !needsEmailVerification ? (
             <div className="flex h-64 flex-col items-center justify-center px-6 text-center">
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                 <Inbox size={18} className="text-muted-foreground" />
@@ -648,7 +658,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                 {t("notifications.emptyHint")}
               </p>
             </div>
-          )}
+          ) : null}
         </ScrollArea>
       </PopoverContent>
     </Popover>

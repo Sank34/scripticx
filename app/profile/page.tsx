@@ -26,6 +26,8 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
 import { ProfileBackground } from "@/components/user/ProfileBackground";
+import { EmailVerificationProfileStatus } from "@/components/account/EmailVerification";
+import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
 import { AchievementBadgeCard } from "@/components/achievements/AchievementBadgeCard";
 import {
   getLegacyBadgeRarity,
@@ -33,6 +35,12 @@ import {
   type EquippedRewards,
   type RewardRarity,
 } from "@/lib/rewards";
+import {
+  buildSubmissionActivityHeatmap,
+  buildSubmissionActivityHeatmapFromDailyRows,
+  type SubmissionActivityAggregateRow,
+  type SubmissionActivityHeatmap,
+} from "@/lib/submissionActivity";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -49,6 +57,7 @@ type DifficultyStats = {
 };
 
 type ProfileData = {
+  activity: SubmissionActivityHeatmap;
   avatar: string | null;
   banner: string | null;
   username: string | null;
@@ -98,8 +107,13 @@ function ProfileContent() {
   const queryClient = useQueryClient();
 
   async function fetchData(): Promise<ProfileData> {
+    const emptyActivity = buildSubmissionActivityHeatmap([], {
+      timeZone: "UTC",
+    });
+
     if (!user) {
       return {
+        activity: emptyActivity,
         avatar: null,
         banner: null,
         username: null,
@@ -162,24 +176,44 @@ function ProfileContent() {
       following = followingCount || 0;
     }
 
-    const { data } = await supabase
-      .from("submissions")
-      .select(`
-        id,
-        user_id,
-        problem_id,
-        score,
-        created_at,
-        problems (
-          title_i18n,
-          difficulty
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    const [submissionResult, activityResult] = await Promise.all([
+      supabase
+        .from("submissions")
+        .select(`
+          id,
+          user_id,
+          problem_id,
+          score,
+          created_at,
+          verified_at,
+          problems (
+            title_i18n,
+            difficulty
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase.rpc("get_profile_submission_activity", {
+        p_user_id: user.id,
+        p_start_date: emptyActivity.startDate,
+        p_end_date: emptyActivity.endDate,
+      }),
+    ]);
+    const data = submissionResult.data;
+    const fallbackActivity = buildSubmissionActivityHeatmap(
+      (data || []).filter((submission) => Boolean(submission.verified_at)),
+      { endDate: emptyActivity.endDate, timeZone: "UTC" }
+    );
+    const activity = activityResult.error
+      ? fallbackActivity
+      : buildSubmissionActivityHeatmapFromDailyRows(
+          (activityResult.data || []) as SubmissionActivityAggregateRow[],
+          { endDate: emptyActivity.endDate, timeZone: "UTC" }
+        );
 
     if (!data) {
       return {
+        activity,
         avatar: validAvatar ? profile.avatar_url : null,
         banner: validBanner ? profile.banner_url : null,
         username: profile?.username || null,
@@ -279,6 +313,7 @@ function ProfileContent() {
       .eq("user_id", user.id);
 
     return {
+      activity,
       avatar: validAvatar ? profile.avatar_url : null,
       banner: validBanner ? profile.banner_url : null,
       username: profile?.username || null,
@@ -308,6 +343,9 @@ function ProfileContent() {
   });
 
   const avatar = profileData?.avatar || null;
+  const activity =
+    profileData?.activity ||
+    buildSubmissionActivityHeatmap([], { timeZone: "UTC" });
   const banner = profileData?.banner || null;
   const username = profileData?.username || null;
   const bio = profileData?.bio || "";
@@ -368,6 +406,8 @@ function ProfileContent() {
           <Skeleton className="h-9 w-9 rounded-md" />
         </div>
 
+        <Skeleton className="h-72 w-full rounded-2xl" />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-6">
             <Card>
@@ -427,6 +467,7 @@ function ProfileContent() {
             </Card>
           </div>
         </div>
+
       </div>
     );
   }
@@ -489,6 +530,7 @@ function ProfileContent() {
                 </Badge>
               )}
               <p className="text-muted-foreground">{email}</p>
+              <EmailVerificationProfileStatus />
 
             <div className="flex gap-4 mt-1 text-sm">
               <span><b>{followers}</b> {t("profile.followers")}</span>
@@ -531,6 +573,8 @@ function ProfileContent() {
           </Button>
         </div>
       </div>
+
+      <ContributionHeatmap data={activity} locale={locale} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 

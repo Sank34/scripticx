@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { onboardingMetadataKeys } from "@/lib/onboarding";
+import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,7 +55,9 @@ export default function AuthCallbackPage() {
           });
           if (metadataError) throw metadataError;
         }
-        if (active) router.replace("/dashboard");
+        if (active) {
+          router.replace(getWorkspaceLandingRoute(user.user_metadata));
+        }
       } catch (profileError) {
         isFinalizing.current = false;
         if (active) {

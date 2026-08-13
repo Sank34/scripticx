@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ImagePlus } from "lucide-react";
 
 import { UserAvatar } from "@/components/user/UserAvatar";
+import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
 import type { EquippedRewards } from "@/lib/rewards";
 
 import {
@@ -487,6 +488,8 @@ function SettingsContent() {
         </CardContent>
       </Card>
       <Button onClick={updateProfile}>{t("settings.saveProfile")}</Button>
+
+      <EmailPreferencesCard />
 
       <Card>
         <CardHeader>

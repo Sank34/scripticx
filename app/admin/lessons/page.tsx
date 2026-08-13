@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
@@ -34,6 +34,7 @@ import {
 
 import RouteGuard from "@/components/RouteGuard";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useUndoHistory } from "@/hooks/useUndoHistory";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -198,6 +199,15 @@ type LessonDraft = {
   videoUrl: string;
 };
 
+type LessonConfiguratorSnapshot = {
+  categories: RoadmapCategory[];
+  connections: RoadmapConfigConnection[];
+  drafts: Record<string, LessonDraft>;
+  nodes: CanvasNode[];
+  sectionFrames: RoadmapSectionFrame[];
+  sections: LearnSection[];
+};
+
 type SelectionRect = {
   currentX: number;
   currentY: number;
@@ -290,7 +300,7 @@ const copy = {
     delete: "Delete selected",
     hideWidgets: "Hide widgets",
     showWidgets: "Show widgets",
-    keybinds: "Space + drag to pan, Ctrl + wheel to zoom",
+    keybinds: "Space + drag to pan, Ctrl + wheel to zoom, Cmd/Ctrl + Z to undo",
     connectHint: "Drag from a node handle to another node",
     connectionAdded: "Connection added",
     connectionDeleted: "Connection deleted",
@@ -387,7 +397,7 @@ const copy = {
     delete: "Șterge selecția",
     hideWidgets: "Ascunde widget-uri",
     showWidgets: "Arată widget-uri",
-    keybinds: "Space + drag pentru pan, Ctrl + wheel pentru zoom",
+    keybinds: "Space + drag pentru pan, Ctrl + wheel pentru zoom, Cmd/Ctrl + Z pentru anulare",
     connectHint: "Trage dintr-un punct al nodului spre alt nod",
     connectionAdded: "Conexiune adăugată",
     connectionDeleted: "Conexiune ștearsă",
@@ -911,6 +921,61 @@ function LessonsAdminContent() {
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
   const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState("");
+  const historySnapshot = useMemo<LessonConfiguratorSnapshot>(
+    () => ({
+      categories,
+      connections,
+      drafts,
+      nodes,
+      sectionFrames,
+      sections,
+    }),
+    [
+      categories,
+      connections,
+      drafts,
+      nodes,
+      sectionFrames,
+      sections,
+    ]
+  );
+  const applyHistorySnapshot = useCallback((snapshot: LessonConfiguratorSnapshot) => {
+    const categoryIds = new Set(snapshot.categories.map((category) => category.id));
+    const connectionIds = new Set(snapshot.connections.map((connection) => connection.id));
+    const nodeIds = new Set(snapshot.nodes.map((node) => node.id));
+    const sectionIds = new Set(snapshot.sections.map((section) => section.id));
+
+    setCategories(snapshot.categories);
+    setConnections(snapshot.connections);
+    setDrafts(snapshot.drafts);
+    setNodes(snapshot.nodes);
+    setSectionFrames(snapshot.sectionFrames);
+    setSections(snapshot.sections);
+    setSelectedCategoryId((current) =>
+      !current || categoryIds.has(current) ? current : snapshot.categories[0]?.id ?? ""
+    );
+    setSelectedConnectionId((current) =>
+      !current || connectionIds.has(current) ? current : ""
+    );
+    setSelectedId((current) =>
+      !current || nodeIds.has(current) ? current : snapshot.nodes[0]?.id ?? ""
+    );
+    setSelectedIds((current) => current.filter((id) => nodeIds.has(id)));
+    setSelectedSectionFrameId((current) =>
+      !current || sectionIds.has(current) ? current : ""
+    );
+    setSelectedSectionId((current) =>
+      !current || sectionIds.has(current) ? current : snapshot.sections[0]?.id ?? ""
+    );
+  }, []);
+  const {
+    redo: redoConfiguratorChange,
+    reset: resetConfiguratorHistory,
+    undo: undoConfiguratorChange,
+  } = useUndoHistory({
+    value: historySnapshot,
+    onApply: applyHistorySnapshot,
+  });
   const [widgetSizes, setWidgetSizes] = useState<Record<ResizableWidgetId, { height: number; width: number }>>({
     inspector: { height: 680, width: 460 },
   });
@@ -1016,26 +1081,49 @@ function LessonsAdminContent() {
         })
         .filter((node): node is CanvasNode => Boolean(node))
     );
+    const remoteSectionFrames = buildInitialSectionFrames(
+      remoteNodes,
+      sections,
+      remoteConfig.sectionFrames
+    );
+    const remoteDrafts = buildInitialDrafts(lessonLocale, lessons);
+    const remoteSelectedId = remoteNodes[0]?.id ?? "";
+    const remoteSelectedIds = remoteSelectedId ? [remoteSelectedId] : [];
+    const remoteSelectedSectionId =
+      remoteNodes[0]?.sectionId ?? sections[0]?.id ?? "";
+    const remoteSelectedCategoryId =
+      categories.find((category) =>
+        category.sectionIds.includes(remoteSelectedSectionId)
+      )?.id ?? categories[0]?.id ?? "";
+
+    resetConfiguratorHistory({
+      categories,
+      connections: remoteConfig.connections,
+      drafts: remoteDrafts,
+      nodes: remoteNodes,
+      sectionFrames: remoteSectionFrames,
+      sections,
+    });
 
     setCategories(categories);
     setSections(sections);
     setNodes(remoteNodes);
-    setSectionFrames(
-      buildInitialSectionFrames(remoteNodes, sections, remoteConfig.sectionFrames)
-    );
+    setSectionFrames(remoteSectionFrames);
     setConnections(remoteConfig.connections);
-    setDrafts(buildInitialDrafts(lessonLocale, lessons));
-    setSelectedId(remoteNodes[0]?.id ?? "");
-    setSelectedIds(remoteNodes[0]?.id ? [remoteNodes[0].id] : []);
-    setSelectedSectionId(remoteNodes[0]?.sectionId ?? sections[0]?.id ?? "");
-    setSelectedCategoryId(
-      categories.find((category) =>
-        category.sectionIds.includes(remoteNodes[0]?.sectionId ?? sections[0]?.id ?? "")
-      )?.id ?? categories[0]?.id ?? ""
-    );
+    setDrafts(remoteDrafts);
+    setSelectedId(remoteSelectedId);
+    setSelectedIds(remoteSelectedIds);
+    setSelectedSectionId(remoteSelectedSectionId);
+    setSelectedCategoryId(remoteSelectedCategoryId);
     setSelectedConnectionId("");
     setSelectedSectionFrameId("");
-  }, [c.localFallback, lessonLocale, remoteConfig, remoteConfigFailed]);
+  }, [
+    c.localFallback,
+    lessonLocale,
+    remoteConfig,
+    remoteConfigFailed,
+    resetConfiguratorHistory,
+  ]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -1078,6 +1166,28 @@ function LessonsAdminContent() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      const key = event.key.toLowerCase();
+      const modifierPressed = event.metaKey || event.ctrlKey;
+
+      if (modifierPressed && !event.altKey && (key === "z" || key === "y")) {
+        const usesConfiguratorHistory =
+          event.target instanceof Element &&
+          Boolean(event.target.closest("[data-config-history]"));
+
+        if (isTextEditingTarget(event.target) && !usesConfiguratorHistory) {
+          return;
+        }
+
+        event.preventDefault();
+
+        if (key === "y" || event.shiftKey) {
+          redoConfiguratorChange();
+        } else {
+          undoConfiguratorChange();
+        }
+        return;
+      }
+
       if (
         event.key === "Escape" &&
         !isTextEditingTarget(event.target) &&
@@ -1125,7 +1235,7 @@ function LessonsAdminContent() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, []);
+  }, [redoConfiguratorChange, undoConfiguratorChange]);
 
   const filteredNodes = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -2865,9 +2975,10 @@ function LessonsAdminContent() {
             </div>
 
         {!widgetsHidden && hasConfigurableSelection && (
-        <div
-          data-canvas-widget
-          className="absolute bottom-2 left-2 right-2 z-20 max-h-[58dvh] w-auto sm:bottom-auto sm:left-auto sm:right-4 sm:top-20 sm:h-[var(--inspector-height)] sm:max-h-[calc(100%-6rem)] sm:w-[var(--inspector-width)]"
+          <div
+            data-canvas-widget
+            data-config-history
+            className="absolute bottom-2 left-2 right-2 z-20 max-h-[58dvh] w-auto sm:bottom-auto sm:left-auto sm:right-4 sm:top-20 sm:h-[var(--inspector-height)] sm:max-h-[calc(100%-6rem)] sm:w-[var(--inspector-width)]"
           style={{
             "--inspector-height": `${widgetSizes.inspector.height}px`,
             "--inspector-width": `${widgetSizes.inspector.width}px`,

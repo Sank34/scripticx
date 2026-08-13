@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { queueContactAdminEmails } from "@/lib/mail/service";
 import { createAdminSupabase, createServerSupabase } from "@/lib/supabaseServer";
 import {
   enforceRateLimit,
@@ -63,14 +64,32 @@ export async function POST(request: Request) {
       throw new HttpError(400, "Invalid contact message");
     }
 
-    const { error } = await admin.from("contact_messages").insert({
-      user_id: userId,
-      name,
-      email,
-      topic,
-      description,
-    });
+    const { data: contact, error } = await admin
+      .from("contact_messages")
+      .insert({
+        user_id: userId,
+        name,
+        email,
+        topic,
+        description,
+      })
+      .select("id")
+      .single<{ id: string }>();
     if (error) throw error;
+
+    try {
+      await queueContactAdminEmails({
+        contactId: contact.id,
+        name,
+        email,
+        topic,
+        description,
+      });
+    } catch (mailError) {
+      // Contact persistence is authoritative; an email outage must never make
+      // the user retry and create a duplicate contact message.
+      console.error("Could not queue contact admin email:", mailError);
+    }
 
     return NextResponse.json({ submitted: true }, { status: 201 });
   } catch (error) {

@@ -3,6 +3,7 @@ export const onboardingMetadataKeys = {
   experience: "scripticx_experience_level",
   goal: "scripticx_learning_goal",
   interests: "scripticx_learning_interests",
+  persona: "scripticx_workspace_persona",
   required: "scripticx_onboarding_required",
   tourCompletedAt: "scripticx_product_tour_completed_at",
 } as const;
@@ -21,6 +22,8 @@ export type OnboardingGoal =
   | "prepare-interviews"
   | "teach-with-scripticx";
 
+export type OnboardingPersona = "learner" | "student" | "teacher";
+
 export type OnboardingDraft = {
   avatarFile: File | null;
   avatarPreview: string | null;
@@ -28,8 +31,22 @@ export type OnboardingDraft = {
   experience: OnboardingExperienceLevel;
   goal: OnboardingGoal;
   interests: string[];
+  persona: OnboardingPersona;
   username: string;
 };
+
+export function getOnboardingPersona(
+  metadata: Record<string, unknown> | undefined
+): OnboardingPersona {
+  const persona = metadata?.[onboardingMetadataKeys.persona];
+  return persona === "student" || persona === "teacher" ? persona : "learner";
+}
+
+export function getOnboardingLandingRoute(persona: OnboardingPersona) {
+  if (persona === "student") return "/workspace/student";
+  if (persona === "teacher") return "/workspace/teacher";
+  return "/dashboard";
+}
 
 export function needsOnboarding(metadata: Record<string, unknown> | undefined) {
   return (

@@ -7,6 +7,7 @@ import { LoaderCircle } from "lucide-react";
 
 import { api, type ProfileSummary } from "@/lib/api";
 import {
+  getOnboardingLandingRoute,
   hasCompletedProductTour,
   needsOnboarding,
   productTourStorageKey,
@@ -14,11 +15,13 @@ import {
 import { OnboardingExperience } from "@/components/onboarding/OnboardingExperience";
 import { OnboardingPreparing } from "@/components/onboarding/OnboardingPreparing";
 import { ProductTour } from "@/components/onboarding/ProductTour";
+import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 
 export function OnboardingManager() {
   const router = useRouter();
   const preparingRef = useRef(false);
   const tourActiveRef = useRef(false);
+  const landingRouteRef = useRef("/dashboard");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [resolvingProfile, setResolvingProfile] = useState(false);
@@ -50,6 +53,10 @@ export function OnboardingManager() {
         setShowTour(false);
         return;
       }
+
+      landingRouteRef.current = getWorkspaceLandingRoute(
+        currentUser.user_metadata
+      );
 
       const requiresOnboarding = needsOnboarding(currentUser.user_metadata);
       setResolvingProfile(requiresOnboarding);
@@ -127,8 +134,9 @@ export function OnboardingManager() {
       <OnboardingExperience
         user={user}
         profile={profile}
-        onComplete={() => {
+        onComplete={(persona) => {
           preparingRef.current = true;
+          landingRouteRef.current = getOnboardingLandingRoute(persona);
           localStorage.setItem(productTourStorageKey, user.id);
           setShowOnboarding(false);
           setShowTour(false);
@@ -145,6 +153,7 @@ export function OnboardingManager() {
         onComplete={() => {
           tourActiveRef.current = false;
           setShowTour(false);
+          router.replace(landingRouteRef.current);
         }}
       />
     );

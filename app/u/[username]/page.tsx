@@ -22,6 +22,7 @@ import { getLocalized } from "@/lib/getLocalized";
 import { translations } from "@/lib/i18n";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
 import { ProfileBackground } from "@/components/user/ProfileBackground";
+import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
 import {
   getLegacyBadgeRarity,
   resolveEquippedReward,
@@ -35,6 +36,11 @@ import {
   metadataExcerpt,
   siteConfig,
 } from "@/lib/metadata";
+import {
+  buildSubmissionActivityHeatmap,
+  buildSubmissionActivityHeatmapFromDailyRows,
+  type SubmissionActivityAggregateRow,
+} from "@/lib/submissionActivity";
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -114,37 +120,62 @@ export default async function PublicProfile({
 
   if (!profile) notFound();
 
-  const { data: submissions } = await supabase
-    .from("submissions")
-    .select(`
-      id,
-      user_id,
-      problem_id,
-      score,
-      created_at,
-      problems (
-        title_i18n,
-        difficulty
-      )
-    `)
-    .eq("user_id", profile.id)
-    .order("created_at", { ascending: false });
-
-  const { data: achievements } = await supabase
-    .from("user_achievements")
-    .select(`
-      achievement:achievements (
-        *
-      )
-    `)
-    .eq("user_id", profile.id);
-
-  const { data: posts } = await supabase
-    .from("posts")
-    .select("id, content, image_url, created_at")
-    .eq("user_id", profile.id)
-    .order("created_at", { ascending: false })
-    .limit(3);
+  const emptyActivity = buildSubmissionActivityHeatmap([], {
+    timeZone: "UTC",
+  });
+  const [submissionResult, activityResult, achievementResult, postResult] =
+    await Promise.all([
+      supabase
+        .from("submissions")
+        .select(`
+          id,
+          user_id,
+          problem_id,
+          score,
+          created_at,
+          verified_at,
+          problems (
+            title_i18n,
+            difficulty
+          )
+        `)
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false }),
+      supabase.rpc("get_profile_submission_activity", {
+        p_user_id: profile.id,
+        p_start_date: emptyActivity.startDate,
+        p_end_date: emptyActivity.endDate,
+      }),
+      supabase
+        .from("user_achievements")
+        .select(`
+          achievement:achievements (
+            *
+          )
+        `)
+        .eq("user_id", profile.id),
+      supabase
+        .from("posts")
+        .select("id, content, image_url, created_at")
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
+  const submissions = submissionResult.data;
+  const achievements = achievementResult.data;
+  const posts = postResult.data;
+  const fallbackActivity = buildSubmissionActivityHeatmap(
+    (submissions || []).filter((submission) =>
+      Boolean(submission.verified_at)
+    ),
+    { endDate: emptyActivity.endDate, timeZone: "UTC" }
+  );
+  const activity = activityResult.error
+    ? fallbackActivity
+    : buildSubmissionActivityHeatmapFromDailyRows(
+        (activityResult.data || []) as SubmissionActivityAggregateRow[],
+        { endDate: emptyActivity.endDate, timeZone: "UTC" }
+      );
 
   const best: Record<string, any> = {};
   const days = new Set<string>();
@@ -319,6 +350,8 @@ export default async function PublicProfile({
           </div>
         </div>
       </div>
+
+      <ContributionHeatmap data={activity} locale={locale} />
 
       <div className="grid grid-cols-3 gap-4">
 

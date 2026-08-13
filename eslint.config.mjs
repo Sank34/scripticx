@@ -22,6 +22,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "public/monaco/**",
+    "supabase/functions/**",
     "next-env.d.ts",
   ]),
 ]);

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="{{ if eq .Data.locale "ro" }}ro{{ else }}en{{ end }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ if eq .Data.locale "ro" }}Confirmă noua adresă de email{{ else }}Confirm your new email address{{ end }}</title>
+  </head>
+  <body style="margin:0;background:#f6f7fb;color:#0f172a;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:#f6f7fb;padding:32px 12px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:620px;">
+          <tr><td style="padding:0 8px 20px;"><img src="https://platform.scripticx.org/scripticx-logo-lung.png" width="150" alt="ScripticX" style="display:block;height:auto;border:0;" /></td></tr>
+          <tr><td style="overflow:hidden;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;box-shadow:0 10px 30px rgba(15,23,42,.06);">
+            <div style="height:5px;background:#6366f1;"></div>
+            <div style="padding:38px 38px 34px;">
+              {{ if eq .Data.locale "ro" }}
+              <p style="margin:0 0 10px;color:#6366f1;font-size:13px;font-weight:700;">Securitatea contului</p>
+              <h1 style="margin:0 0 20px;color:#0f172a;font-size:29px;line-height:1.2;">Confirmă noul email</h1>
+              <p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Confirmă schimbarea adresei asociate contului tău ScripticX. Adresa nouă va deveni activă numai după confirmare.</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0 20px;"><tr><td style="border-radius:10px;background:#111827;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">Confirmă schimbarea</a></td></tr></table>
+              <p style="margin:0;color:#64748b;font-size:13px;line-height:1.65;">Dacă nu ai făcut această solicitare, nu deschide linkul și schimbă parola contului.</p>
+              {{ else }}
+              <p style="margin:0 0 10px;color:#6366f1;font-size:13px;font-weight:700;">Account security</p>
+              <h1 style="margin:0 0 20px;color:#0f172a;font-size:29px;line-height:1.2;">Confirm your new email</h1>
+              <p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Confirm the address change for your ScripticX account. The new address becomes active only after confirmation.</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0 20px;"><tr><td style="border-radius:10px;background:#111827;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">Confirm change</a></td></tr></table>
+              <p style="margin:0;color:#64748b;font-size:13px;line-height:1.65;">If you did not make this request, do not open the link and change your account password.</p>
+              {{ end }}
+            </div>
+          </td></tr>
+          <tr><td style="padding:20px 10px;text-align:center;color:#94a3b8;font-size:12px;line-height:1.6;">© 2026 ScripticX · {{ if eq .Data.locale "ro" }}Mesaj automat de securitate.{{ else }}Automated security message.{{ end }}</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>

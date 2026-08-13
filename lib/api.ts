@@ -321,12 +321,27 @@ class AuthApi {
   signUp(
     email: string,
     password: string,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
+    emailRedirectTo?: string
   ) {
     return this.client.auth.signUp({
       email,
       password,
-      options: metadata ? { data: metadata } : undefined,
+      options:
+        metadata || emailRedirectTo
+          ? {
+              ...(metadata ? { data: metadata } : {}),
+              ...(emailRedirectTo ? { emailRedirectTo } : {}),
+            }
+          : undefined,
+    });
+  }
+
+  resendSignupConfirmation(email: string, redirectTo: string) {
+    return this.client.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: redirectTo },
     });
   }
 

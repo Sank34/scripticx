@@ -1,0 +1,7 @@
+project_id = "scripticx-local"
+
+# This endpoint is invoked by pg_cron/pg_net, not by a signed-in user. The
+# platform JWT check is therefore disabled, while the function itself requires
+# the independent MAIL_WORKER_SECRET on every request.
+[functions.email-worker]
+verify_jwt = false

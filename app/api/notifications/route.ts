@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { queueNotificationEmail } from "@/lib/mail/service";
 import { createAdminSupabase } from "@/lib/supabaseServer";
 import {
   enforceRateLimit,
@@ -241,6 +242,21 @@ export async function POST(request: Request) {
       { onConflict: "dedupe_key", ignoreDuplicates: true }
     );
     if (error) throw error;
+
+    try {
+      await queueNotificationEmail({
+        recipientId,
+        type,
+        title: draft.title,
+        body: draft.body,
+        href: draft.href,
+        dedupeKey,
+      });
+    } catch (mailError) {
+      // In-app delivery is authoritative. Email is a best-effort secondary
+      // channel and remains retryable through its own outbox.
+      console.error("Could not queue notification email:", mailError);
+    }
 
     return NextResponse.json({ created: true }, { status: 201 });
   } catch (error) {

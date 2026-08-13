@@ -21,8 +21,11 @@ const ALWAYS_AVAILABLE = new Set([
   "/login",
   "/reset-password",
   "/api/auth/access",
+  "/api/cron/email",
   "/api/platform/status",
   "/api/cron/competitions",
+  "/api/mail/unsubscribe",
+  "/api/mail/verification/resend",
 ]);
 
 function isPublicAsset(pathname: string) {

@@ -56,6 +56,7 @@ export function TopbarBreadcrumbs() {
     contact: t("nav.contact"),
     dashboard: t("nav.dashboard"),
     editor: t("nav.editor"),
+    email: t("admin.emailCenter.cardTitle"),
     examples: t("nav.examples"),
     feed: t("nav.feed"),
     followers: "Followers",
@@ -74,6 +75,12 @@ export function TopbarBreadcrumbs() {
     profile: t("user.profile"),
     search: t("nav.search"),
     settings: t("user.settings"),
+    workspace: locale === "ro" ? "Workspace-uri" : "Workspaces",
+    student: locale === "ro" ? "Elev" : "Student",
+    teacher: locale === "ro" ? "Profesor" : "Teacher",
+    notes: locale === "ro" ? "Notițe" : "Notes",
+    whiteboard: "Whiteboard",
+    graph: locale === "ro" ? "Grafuri" : "Graphs",
     assignments: "Assignments",
     solve: "Solve",
     u: t("user.profile"),
@@ -100,6 +107,8 @@ export function TopbarBreadcrumbs() {
     });
   } else {
     segments.forEach((segment, index) => {
+      if (index === 0 && segment === "workspace") return;
+
       const isLast = index === segments.length - 1;
       const previous = segments[index - 1];
       const label =
@@ -111,6 +120,10 @@ export function TopbarBreadcrumbs() {
               ? "Session"
               : previous === "problems"
                 ? "Problem"
+                : previous === "whiteboard"
+                  ? locale === "ro"
+                    ? "Tablă"
+                    : "Board"
                 : "Details"
           : formatSegment(decodeURIComponent(segment)));
 
@@ -188,6 +201,12 @@ export function TopbarBreadcrumbs() {
 
 function userHomeHref(segments: string[]) {
   if (segments.length === 0) return undefined;
+  if (segments[0] === "workspace" && segments[1] === "student") {
+    return "/workspace/student";
+  }
+  if (segments[0] === "workspace" && segments[1] === "teacher") {
+    return "/workspace/teacher";
+  }
   return "/dashboard";
 }
 

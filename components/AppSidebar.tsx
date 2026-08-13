@@ -41,15 +41,26 @@ import {
   Sparkles,
   ShoppingBag,
   Mail,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
 import { useEffect, useState, useRef } from "react";
-import type { User } from "@supabase/supabase-js";
-import { api, type ProfileSummary } from "@/lib/api";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useGroupActivity } from "@/hooks/useGroupActivity";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
+import { useAuth } from "@/hooks/useAuth";
+import { WorkspaceSwitcher } from "@/components/workspaces/WorkspaceSwitcher";
+import {
+  getStudentStudyNavigation,
+  getStudentWorkspaceNavigation,
+  isStudentWorkspaceContext,
+} from "@/components/workspaces/WorkspaceNavigation";
+import {
+  formatWorkspaceNoteTime,
+  useRecentWorkspaceNotes,
+} from "@/components/workspaces/useRecentWorkspaceNotes";
+import type { WorkspaceNote } from "@/lib/workspace-storage";
 
 type NavItemProps = {
   href: string;
@@ -93,6 +104,7 @@ function NavItem({
     >
       <Link
         href={href}
+        aria-current={active ? "page" : undefined}
         data-tour={
           href === "/editor"
             ? "nav-editor"
@@ -161,19 +173,83 @@ function SubItem({ href, label }: SubItemProps) {
   );
 }
 
+function RecentNoteItem({
+  note,
+  locale,
+}: {
+  note: WorkspaceNote;
+  locale: string;
+}) {
+  const pathname = usePathname();
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+  const href = `/workspace/student/notes/${note.id}`;
+  const active = pathname === href;
+  const time = formatWorkspaceNoteTime(note.updatedAt, locale);
+  const title = note.title.trim() || (locale === "ro" ? "Fără titlu" : "Untitled");
+
+  const content = (
+    <Button
+      asChild
+      variant={active ? "secondary" : "ghost"}
+      className={`group/note h-10 w-full rounded-xl px-2 transition-all duration-200 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-[0.98] ${
+        active
+          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+          : "text-muted-foreground"
+      } ${collapsed ? "justify-center" : "justify-start"}`}
+    >
+      <Link href={href} aria-current={active ? "page" : undefined}>
+        <FileText className="size-4 shrink-0 transition-transform duration-200 group-hover/note:translate-x-0.5" />
+        {!collapsed && (
+          <span className="flex min-w-0 flex-1 items-baseline gap-2">
+            <span className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-foreground/85">
+              {title}
+            </span>
+            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/65">
+              {time}
+            </span>
+          </span>
+        )}
+      </Link>
+    </Button>
+  );
+
+  if (!collapsed) return content;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="right">
+          <span>{title}</span>
+          {time && <span className="ml-1 text-background/65">· {time}</span>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
+  const { user, isAdmin } = useAuth();
   const {
     hasUnread: hasUnreadUpdates,
     latestSlug: latestUpdateSlug,
   } = useUnreadUpdates();
 
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string | null>(null);
   const groupActivity = useGroupActivity(user?.id);
+  const studentWorkspaceActive = isStudentWorkspaceContext(
+    pathname,
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
+  const studentWorkspaceNavigation = getStudentWorkspaceNavigation(locale);
+  const studentStudyNavigation = getStudentStudyNavigation(locale);
+  const recentNotes = useRecentWorkspaceNotes(
+    studentWorkspaceActive ? user?.id : null
+  );
 
   const [docsOpenOverride, setDocsOpenOverride] = useState<boolean | null>(null);
   const [examplesOpenOverride, setExamplesOpenOverride] = useState<boolean | null>(null);
@@ -186,55 +262,6 @@ export function AppSidebar() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadRole(currentUser: User) {
-      const profile: ProfileSummary | null = await api.profiles.getSummary(
-        currentUser.id
-      );
-
-      if (!active) return;
-
-      setRole(profile?.role || "user");
-    }
-
-    async function load() {
-      const { data } = await api.auth.getSession();
-      const currentUser = data.session?.user ?? null;
-
-      if (!active) return;
-
-      setUser(currentUser);
-
-      if (!currentUser) return;
-
-      await loadRole(currentUser);
-    }
-
-    void load();
-
-    const subscription = api.auth.onAuthStateChange((session) => {
-      const currentUser = session?.user ?? null;
-
-      setUser(currentUser);
-
-      if (!currentUser) {
-        setRole(null);
-        return;
-      }
-
-      window.setTimeout(() => {
-        void loadRole(currentUser);
-      }, 0);
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     const scrollElement = scrollRef.current;
@@ -294,46 +321,24 @@ export function AppSidebar() {
       <SidebarContent className="flex h-full flex-col overflow-hidden">
 
         <div
-          className={`sticky top-0 z-20 flex items-center justify-between bg-sidebar px-3 py-3 transition-all duration-200 ${
+          className={`sticky top-0 z-20 flex items-center bg-sidebar transition-all duration-200 ${
+            collapsed
+              ? "flex-col gap-1 px-1 py-2"
+              : "justify-between gap-1 px-2 py-2"
+          } ${
             canScrollUp
               ? "border-b border-sidebar-border shadow-[0_5px_14px_rgba(0,0,0,0.06)] dark:shadow-[0_6px_18px_rgba(0,0,0,0.32)]"
               : "border-transparent"
           }`}
         >
-          <div
-            className={`flex items-center gap-2 overflow-hidden transition-all duration-300 ${
-              collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
-            }`}
-          >
-            <Link
-              href="/dashboard"
-              aria-label="ScripticX Dashboard"
-              className="flex min-w-0 items-center gap-2 rounded-2xl px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logoSCX.svg"
-                alt="ScripticX"
-                className="h-9 w-9 object-contain dark:invert"
-              />
-
-              <div className="flex flex-col leading-none">
-                <span className="font-semibold text-[17px] tracking-tight">
-                  ScripticX
-                </span>
-
-                <span className="text-xs text-muted-foreground">
-                  {t("sidebar.platform")}
-                </span>
-              </div>
-            </Link>
-          </div>
+          <WorkspaceSwitcher collapsed={collapsed} />
 
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className="shrink-0"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="size-10 shrink-0 rounded-xl"
           >
             <PanelLeft
               size={18}
@@ -358,7 +363,65 @@ export function AppSidebar() {
             }
           `}</style>
 
-        <SidebarGroup className="py-1.5">
+        {user && studentWorkspaceActive && (
+          <SidebarGroup className="py-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
+            {!collapsed && (
+              <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/70">
+                {locale === "ro" ? "Workspace elev" : "Student workspace"}
+              </SidebarGroupLabel>
+            )}
+
+            <SidebarGroupContent className="space-y-1">
+              {studentWorkspaceNavigation.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  active={item.active(pathname)}
+                />
+              ))}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {user && studentWorkspaceActive && recentNotes.length > 0 && (
+          <SidebarGroup className="py-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
+            {!collapsed && (
+              <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/70">
+                {locale === "ro" ? "Notițe recente" : "Recent notes"}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent className="space-y-0.5">
+              {recentNotes.map((note) => (
+                <RecentNoteItem key={note.id} note={note} locale={locale} />
+              ))}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {user && studentWorkspaceActive && (
+          <SidebarGroup className="py-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
+            {!collapsed && (
+              <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/70">
+                {locale === "ro" ? "Învățare" : "Study"}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent className="space-y-1">
+              {studentStudyNavigation.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  active={item.active(pathname)}
+                />
+              ))}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {!studentWorkspaceActive && <SidebarGroup className="py-1.5">
           {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.platform")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
@@ -378,13 +441,13 @@ export function AppSidebar() {
             {user && (
               <NavItem href="/search" icon={Search} label={t("nav.search")} active={pathname.startsWith("/search")} />
             )}
-            {role === "admin" && (
+            {isAdmin && (
               <NavItem href="/admin" icon={Shield} label={t("nav.admin")} active={pathname.startsWith("/admin")} />
             )}
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>}
 
-        <SidebarGroup className="py-1.5">
+        {!studentWorkspaceActive && <SidebarGroup className="py-1.5">
           {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.community")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
@@ -409,9 +472,9 @@ export function AppSidebar() {
               />
             )}
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>}
 
-        <SidebarGroup className="py-1.5">
+        {!studentWorkspaceActive && <SidebarGroup className="py-1.5">
           {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.learn")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
@@ -512,12 +575,12 @@ export function AppSidebar() {
             </div>
 
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>}
 
         </div>
 
       </SidebarContent>
-      <div
+      {!studentWorkspaceActive && <div
         className={`sticky bottom-0 z-20 mt-auto bg-sidebar px-2 py-3 transition-all duration-200 ${
           canScrollDown
             ? "border-t border-sidebar-border shadow-[0_-6px_16px_rgba(0,0,0,0.07)] dark:shadow-[0_-7px_20px_rgba(0,0,0,0.34)]"
@@ -576,7 +639,7 @@ export function AppSidebar() {
             </Link>
           </Button>
         </div>
-      </div>
+      </div>}
       <SidebarResizeHandle
         aria-label={t("sidebar.resize")}
         title={`${t("sidebar.resize")}. ${t("sidebar.resetWidth")}`}

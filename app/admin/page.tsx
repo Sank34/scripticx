@@ -13,6 +13,7 @@ import {
   GitBranch,
   Inbox,
   Mail,
+  Mails,
   Megaphone,
   RefreshCw,
   Send,
@@ -485,6 +486,17 @@ function AdminContent() {
                     }
                   : null
               }
+            />
+          </div>
+
+          <div className="min-w-0">
+            <AdminNavCard
+              href="/admin/email"
+              icon={<Mails className="h-5 w-5 text-blue-500" />}
+              ringClassName="ring-blue-500/50"
+              title={t("admin.emailCenter.cardTitle")}
+              description={t("admin.emailCenter.cardDescription")}
+              count={null}
             />
           </div>
 

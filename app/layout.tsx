@@ -13,6 +13,7 @@ import Providers from "@/components/Providers";
 import { NetworkStatus } from "@/components/NetworkStatus";
 import { OnboardingManager } from "@/components/onboarding/OnboardingManager";
 import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
+import { EmailVerificationBanner } from "@/components/account/EmailVerification";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
@@ -142,14 +143,25 @@ export default function RootLayout({
             <LanguageProvider>
               <GlobalContextMenu>
                 <SidebarProvider>
-                  <div className="h-screen w-full overflow-hidden bg-sidebar p-2">
-                    <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-sidebar">
+                  <div
+                    data-shell-root
+                    className="h-screen w-full overflow-hidden bg-sidebar p-2"
+                  >
+                    <div
+                      data-shell-frame
+                      className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-sidebar"
+                    >
 
                       <AppSidebar />
 
-                      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background shadow-sm">
+                      <div
+                        data-shell-surface
+                        className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background shadow-sm"
+                      >
 
                         <Topbar />
+
+                        <EmailVerificationBanner />
 
                         <MainWrapper>{children}</MainWrapper>
 

@@ -485,7 +485,7 @@ function DashboardContent() {
           )}
 
           {topUser && (
-            <div className="mb-2 rounded-2xl bg-gradient-to-r from-yellow-50 to-orange-50 p-4">
+            <div className="mb-2 rounded-2xl border border-amber-200/70 bg-amber-50 p-4 text-zinc-950 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-foreground">
               <div className="flex items-center gap-3">
                 <UserAvatar
                   avatarUrl={topUser.avatar_url}
@@ -495,7 +495,7 @@ function DashboardContent() {
                 />
                 <div>
                   <p className="font-semibold">{topUser.username}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-zinc-600 dark:text-amber-100/70">
                     {topUser.total_score || 0} pts
                   </p>
                 </div>

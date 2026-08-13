@@ -17,7 +17,8 @@ async function countRows(
   apply?: (query: CountQuery) => CountQuery
 ): Promise<CountResult> {
   let query = supabase.from(table).select("*", { count: "exact", head: true });
-  if (apply) query = apply(query);
+  if (apply)
+    query = apply(query);
 
   const { count, error } = await query;
 

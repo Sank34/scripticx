@@ -26,20 +26,32 @@ import {
   SquareTerminal,
   Trophy,
   UsersRound,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { WorkspaceSwitcher } from "@/components/workspaces/WorkspaceSwitcher";
+import {
+  getStudentStudyNavigation,
+  getStudentWorkspaceNavigation,
+  isStudentWorkspaceContext,
+} from "@/components/workspaces/WorkspaceNavigation";
+import {
+  formatWorkspaceNoteTime,
+  useRecentWorkspaceNotes,
+} from "@/components/workspaces/useRecentWorkspaceNotes";
 import { useAuth } from "@/hooks/useAuth";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 type MobileNavItem = {
   href: string;
   icon: LucideIcon;
   label: string;
+  meta?: string;
   active?: (pathname: string) => boolean;
   children?: Array<{
     href: string;
@@ -49,21 +61,59 @@ type MobileNavItem = {
 
 export function MobileDrawer() {
   const pathname = usePathname();
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const {
     hasUnread: hasUnreadUpdates,
     latestSlug: latestUpdateSlug,
   } = useUnreadUpdates();
   const { user, isAdmin } = useAuth();
+  const studentWorkspaceActive = isStudentWorkspaceContext(
+    pathname,
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
+  const recentNotes = useRecentWorkspaceNotes(
+    studentWorkspaceActive ? user?.id : null
+  );
 
   if (pathname.startsWith("/live/")) {
     return null;
   }
 
   const isLoggedIn = Boolean(user);
+  const studentWorkspaceNavigation = getStudentWorkspaceNavigation(locale);
+  const studentStudyNavigation = getStudentStudyNavigation(locale);
 
-  const navItems: Array<{ label: string; items: MobileNavItem[] }> = [
-    {
+  const navItems: Array<{ label: string; items: MobileNavItem[] }> =
+    isLoggedIn && studentWorkspaceActive
+      ? [
+          {
+            label: locale === "ro" ? "Workspace elev" : "Student workspace",
+            items: studentWorkspaceNavigation,
+          },
+          ...(recentNotes.length
+            ? [
+                {
+                  label: locale === "ro" ? "Notițe recente" : "Recent notes",
+                  items: recentNotes.map((note) => ({
+                    href: `/workspace/student/notes/${note.id}`,
+                    icon: FileText,
+                    label:
+                      note.title.trim() ||
+                      (locale === "ro" ? "Fără titlu" : "Untitled"),
+                    meta: formatWorkspaceNoteTime(note.updatedAt, locale),
+                    active: (currentPath: string) =>
+                      currentPath === `/workspace/student/notes/${note.id}`,
+                  })),
+                },
+              ]
+            : []),
+          {
+            label: locale === "ro" ? "Învățare" : "Study",
+            items: studentStudyNavigation,
+          },
+        ]
+      : [{
       label: t("sidebar.platform"),
       items: [
         ...(isLoggedIn
@@ -147,8 +197,7 @@ export function MobileDrawer() {
           ],
         },
       ],
-    },
-  ];
+    }];
 
   const footerItems = [
     {
@@ -163,7 +212,7 @@ export function MobileDrawer() {
 
   return (
     <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 -translate-x-1/2 md:hidden">
-      <Drawer>
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerTrigger asChild>
           <button
             aria-label={t("mobileDrawer.open")}
@@ -180,30 +229,12 @@ export function MobileDrawer() {
           </DrawerTitle>
 
           <div className="flex h-full flex-col overflow-hidden px-5 pb-6 pt-5">
-            <DrawerClose asChild>
-              <Link
-                href="/dashboard"
-                aria-label="ScripticX Dashboard"
-                className="mb-5 flex items-center gap-3 rounded-2xl p-2 transition-colors hover:bg-sidebar-accent active:bg-sidebar-accent"
-              >
-                <Image
-                  src="/logoSCX.svg"
-                  alt="ScripticX"
-                  width={44}
-                  height={44}
-                  className="h-11 w-11 object-contain dark:invert"
-                />
-
-                <div className="min-w-0 text-left">
-                  <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                    ScripticX
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {t("mobileDrawer.subtitle")}
-                  </p>
-                </div>
-              </Link>
-            </DrawerClose>
+            <div className="mb-5 rounded-2xl border border-sidebar-border/80 bg-background/55 p-1 shadow-sm">
+              <WorkspaceSwitcher
+                variant="mobile"
+                onNavigate={() => setDrawerOpen(false)}
+              />
+            </div>
 
             <div
               className="flex-1 overflow-y-auto"
@@ -219,12 +250,19 @@ export function MobileDrawer() {
               `}</style>
 
               <div className="mx-auto flex w-full max-w-sm flex-col gap-6 pb-8">
-                {navItems.map((section) => (
+                {navItems.map((section, sectionIndex) => (
                   <div
                     key={section.label}
-                    className="flex w-full flex-col"
+                    className="flex w-full flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
+                    style={{ animationDelay: `${sectionIndex * 45}ms` }}
                   >
-                    <h3 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                    <h3
+                      className={`mb-2 px-3 text-[10px] font-semibold uppercase text-muted-foreground/70 ${
+                        studentWorkspaceActive
+                          ? "tracking-normal"
+                          : "tracking-[0.18em]"
+                      }`}
+                    >
                       {section.label}
                     </h3>
 
@@ -240,14 +278,24 @@ export function MobileDrawer() {
                             <DrawerClose asChild>
                               <Link
                                 href={item.href}
-                                className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all duration-200 active:scale-[0.98] ${
+                                aria-current={active ? "page" : undefined}
+                                className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] ${
                                   active
                                     ? "bg-accent text-accent-foreground shadow-sm"
                                     : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                                 }`}
                               >
                                 <Icon size={22} />
-                                <span>{item.label}</span>
+                                <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                                  <span className="min-w-0 flex-1 truncate text-left">
+                                    {item.label}
+                                  </span>
+                                  {item.meta && (
+                                    <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground/65">
+                                      {item.meta}
+                                    </span>
+                                  )}
+                                </span>
                               </Link>
                             </DrawerClose>
 
@@ -280,9 +328,9 @@ export function MobileDrawer() {
                   </div>
                 ))}
 
-                <div className="h-px w-full bg-border" />
+                {!studentWorkspaceActive && <div className="h-px w-full bg-border" />}
 
-                <div className="flex w-full flex-col gap-1">
+                {!studentWorkspaceActive && <div className="flex w-full flex-col gap-1">
                   {footerItems.map((item) => {
                     const active = pathname.startsWith(item.href);
                     const Icon = item.icon;
@@ -311,7 +359,7 @@ export function MobileDrawer() {
                       </DrawerClose>
                     );
                   })}
-                </div>
+                </div>}
               </div>
             </div>
           </div>

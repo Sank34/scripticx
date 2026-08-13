@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 
+import { queueNotificationEmail } from "@/lib/mail/service";
 import { createAdminSupabase } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +102,18 @@ export async function GET(request: Request) {
         });
         if (notificationError?.code !== "23505" && notificationError) {
           throw notificationError;
+        }
+        try {
+          await queueNotificationEmail({
+            recipientId: participant.user_id,
+            type: "competition_time",
+            title: `${competition.name}: timp rămas`,
+            body: `Mai sunt ${formatRemaining(remainingMinutes)} din competiție.`,
+            href: `/competitions/${competition.id}`,
+            dedupeKey,
+          });
+        } catch (mailError) {
+          console.error("Could not queue competition reminder email:", mailError);
         }
         delivered += 1;
       }
