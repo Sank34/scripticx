@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { WorkspaceCloudSync } from "@/components/workspaces/WorkspaceCloudSync";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
@@ -12,5 +13,10 @@ export const metadata: Metadata = createPageMetadata({
 export default function StudentWorkspaceLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return children;
+  return (
+    <>
+      <WorkspaceCloudSync />
+      {children}
+    </>
+  );
 }

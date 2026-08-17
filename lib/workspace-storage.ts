@@ -47,6 +47,12 @@ export type UpdateWorkspaceWhiteboardPatch = {
   scene?: WorkspaceWhiteboardScene;
 };
 
+export type WorkspaceCloudDocuments = {
+  notes: WorkspaceNote[];
+  whiteboards: WorkspaceWhiteboardDocument[];
+  activeWhiteboardId?: string | null;
+};
+
 export type WorkspaceGraphPosition = {
   x: number;
   y: number;
@@ -141,6 +147,7 @@ export type WorkspaceStorageChangeReason =
   | "whiteboard-deleted"
   | "whiteboard-active-changed"
   | "whiteboard-saved"
+  | "cloud-synced"
   | "graph-saved"
   | "graph-deleted"
   | "graph-queued"
@@ -152,6 +159,7 @@ export type WorkspaceStorageEventDetail = {
   userId: string;
   storageKey: string;
   reason: WorkspaceStorageChangeReason;
+  entityId?: string;
 };
 
 export type WorkspaceStorageRepositoryOptions = {
@@ -193,6 +201,7 @@ export type WorkspaceStorageRepository = {
   ): GraphWhiteboardPayload;
   getQueuedGraphForWhiteboard(): GraphWhiteboardPayload | null;
   consumeGraphForWhiteboard(): GraphWhiteboardPayload | null;
+  hydrateCloudDocuments(input: WorkspaceCloudDocuments): StudentWorkspaceSnapshot;
   reset(): void;
 };
 
@@ -535,6 +544,28 @@ export function createWelcomeNote(now: string): WorkspaceNote {
   };
 }
 
+/**
+ * Matches only the untouched note seeded by older workspace versions.
+ *
+ * Keep the identity, timestamps and full payload checks strict: a user note
+ * with a similar title, or an edited former seed, must never be discarded.
+ */
+export function isPristineLegacyWelcomeNote(note: WorkspaceNote) {
+  return note.id === WELCOME_NOTE_ID && hasPristineWelcomeNotePayload(note);
+}
+
+/** Matches the generated payload even after its legacy id was aliased to a UUID. */
+export function hasPristineWelcomeNotePayload(note: WorkspaceNote) {
+  if (note.createdAt !== note.updatedAt) return false;
+  const legacySeed = createWelcomeNote(note.createdAt);
+  return (
+    note.title === legacySeed.title &&
+    note.content === legacySeed.content &&
+    note.icon === legacySeed.icon &&
+    note.favorite === legacySeed.favorite
+  );
+}
+
 export function createInitialStudentWorkspaceSnapshot(
   now = new Date().toISOString()
 ): StudentWorkspaceSnapshot {
@@ -543,7 +574,7 @@ export function createInitialStudentWorkspaceSnapshot(
   return {
     version: STUDENT_WORKSPACE_STORAGE_VERSION,
     workspaceId: STUDENT_WORKSPACE_ID,
-    notes: [createWelcomeNote(safeNow)],
+    notes: [],
     whiteboard: defaultWhiteboard.scene,
     whiteboards: [defaultWhiteboard],
     activeWhiteboardId: defaultWhiteboard.id,
@@ -576,6 +607,7 @@ export function parseStudentWorkspaceSnapshot(
       (Array.isArray(value.notes) ? value.notes : [])
         .map((item) => parseNote(item, fallback.updatedAt))
         .filter((item): item is WorkspaceNote => Boolean(item))
+        .filter((note) => !isPristineLegacyWelcomeNote(note))
     );
     const graphs = uniqueById(
       (Array.isArray(value.graphs) ? value.graphs : [])
@@ -681,7 +713,8 @@ export function createWorkspaceStorageRepository(
 
   function write(
     snapshot: StudentWorkspaceSnapshot,
-    reason: WorkspaceStorageChangeReason
+    reason: WorkspaceStorageChangeReason,
+    entityId?: string
   ) {
     if (!storage) throw new WorkspaceStorageUnavailableError();
     const next = withWhiteboardProjection({ ...snapshot, updatedAt: now() });
@@ -701,7 +734,7 @@ export function createWorkspaceStorageRepository(
       if (error instanceof WorkspaceStorageVersionError) throw error;
       throw new WorkspaceStorageWriteError(error);
     }
-    notify({ userId, storageKey, reason });
+    notify({ userId, storageKey, reason, ...(entityId ? { entityId } : {}) });
     return next;
   }
 
@@ -737,7 +770,8 @@ export function createWorkspaceStorageRepository(
       };
       write(
         { ...snapshot, notes: [note, ...snapshot.notes] },
-        "note-created"
+        "note-created",
+        note.id
       );
       return note;
     },
@@ -766,7 +800,8 @@ export function createWorkspaceStorageRepository(
           ...snapshot,
           notes: snapshot.notes.map((item) => (item.id === id ? note : item)),
         },
-        "note-updated"
+        "note-updated",
+        id
       );
       return note;
     },
@@ -778,7 +813,8 @@ export function createWorkspaceStorageRepository(
           ...snapshot,
           notes: snapshot.notes.filter((note) => note.id !== id),
         },
-        "note-deleted"
+        "note-deleted",
+        id
       );
       return true;
     },
@@ -811,7 +847,8 @@ export function createWorkspaceStorageRepository(
           activeWhiteboardId: document.id,
           whiteboard: document.scene,
         },
-        "whiteboard-created"
+        "whiteboard-created",
+        document.id
       );
       return document;
     },
@@ -846,7 +883,8 @@ export function createWorkspaceStorageRepository(
             item.id === id ? document : item
           ),
         },
-        "whiteboard-updated"
+        "whiteboard-updated",
+        id
       );
       return document;
     },
@@ -888,7 +926,8 @@ export function createWorkspaceStorageRepository(
           whiteboards,
           activeWhiteboardId: selectedId,
         },
-        "whiteboard-deleted"
+        "whiteboard-deleted",
+        id
       );
       return true;
     },
@@ -906,7 +945,8 @@ export function createWorkspaceStorageRepository(
           activeWhiteboardId: id,
           whiteboard: document.scene,
         },
-        "whiteboard-active-changed"
+        "whiteboard-active-changed",
+        id
       );
       return id;
     },
@@ -934,7 +974,8 @@ export function createWorkspaceStorageRepository(
               : document
           ),
         },
-        "whiteboard-saved"
+        "whiteboard-saved",
+        activeId
       );
       return whiteboard;
     },
@@ -1022,6 +1063,35 @@ export function createWorkspaceStorageRepository(
       );
       return payload;
     },
+    hydrateCloudDocuments(input) {
+      const snapshot = read();
+      const timestamp = now();
+      const notes = uniqueById(
+        input.notes
+          .map((item) => parseNote(item, timestamp))
+          .filter((item): item is WorkspaceNote => Boolean(item))
+      );
+      const whiteboards = uniqueById(
+        input.whiteboards
+          .map((item) => parseWhiteboardDocument(item, timestamp))
+          .filter(
+            (item): item is WorkspaceWhiteboardDocument => Boolean(item)
+          )
+      );
+      const selectedId = activeWhiteboardId(
+        whiteboards,
+        input.activeWhiteboardId ?? snapshot.activeWhiteboardId
+      );
+      return write(
+        {
+          ...snapshot,
+          notes,
+          whiteboards,
+          activeWhiteboardId: selectedId,
+        },
+        "cloud-synced"
+      );
+    },
     reset() {
       if (!storage) throw new WorkspaceStorageUnavailableError();
       try {
@@ -1060,6 +1130,13 @@ export function updateNote(
 
 export function deleteNote(userId: string, id: string) {
   return createWorkspaceStorageRepository(userId).deleteNote(id);
+}
+
+export function hydrateWorkspaceCloudDocuments(
+  userId: string,
+  input: WorkspaceCloudDocuments
+) {
+  return createWorkspaceStorageRepository(userId).hydrateCloudDocuments(input);
 }
 
 export function listWhiteboards(userId: string) {

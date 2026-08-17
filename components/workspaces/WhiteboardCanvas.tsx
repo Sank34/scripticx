@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -24,7 +25,12 @@ import {
 import { WhiteboardLibraryTrigger } from "@/components/workspaces/WhiteboardLibrary";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  persistWorkspaceWhiteboard,
+  synchronizeStudentWorkspace,
+} from "@/lib/workspace-cloud";
+import {
   consumeQueuedGraphForWhiteboard,
+  getActiveWhiteboardId,
   getWhiteboardDocument,
   getQueuedGraphForWhiteboard,
   getWhiteboard,
@@ -76,6 +82,7 @@ const copy = {
     graphAdded: "Graph added to the whiteboard",
     loadError: "The whiteboard could not be loaded.",
     loading: "Loading your whiteboard…",
+    localOnly: "Saved locally",
     retry: "Try again",
     save: "Save now",
     saved: "Saved",
@@ -89,6 +96,7 @@ const copy = {
     graphAdded: "Graful a fost adăugat în whiteboard",
     loadError: "Whiteboard-ul nu a putut fi încărcat.",
     loading: "Se încarcă whiteboard-ul…",
+    localOnly: "Salvat local",
     retry: "Încearcă din nou",
     save: "Salvează acum",
     saved: "Salvat",
@@ -459,6 +467,7 @@ export function WhiteboardCanvas({
   const language = locale === "ro" ? "ro" : "en";
   const c = copy[language];
   const { resolvedTheme } = useTheme();
+  const router = useRouter();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
@@ -483,15 +492,21 @@ export function WhiteboardCanvas({
   copyRef.current = c;
 
   const writeScene = useCallback(
-    (scene: WhiteboardScene) => {
+    async (scene: WhiteboardScene) => {
       if (!userId) return null;
       const storedScene = sceneForStorage(scene);
-      if (!whiteboardId) return saveWhiteboard(userId, storedScene);
-      const document = updateWhiteboard(userId, whiteboardId, {
-        scene: storedScene,
-      });
+      const document = whiteboardId
+        ? updateWhiteboard(userId, whiteboardId, { scene: storedScene })
+        : (() => {
+            saveWhiteboard(userId, storedScene);
+            const activeId = getActiveWhiteboardId(userId);
+            return activeId
+              ? getWhiteboardDocument(userId, activeId)
+              : null;
+          })();
       if (!document) throw new Error(copyRef.current.loadError);
-      return document.scene;
+      const saved = await persistWorkspaceWhiteboard(userId, document);
+      return saved.scene;
     },
     [userId, whiteboardId]
   );
@@ -548,10 +563,33 @@ export function WhiteboardCanvas({
       try {
         const currentTheme = themeRef.current;
         const currentCopy = copyRef.current;
-        const selectedDocument = whiteboardId
-          ? getWhiteboardDocument(userId, whiteboardId)
+        let canonicalWhiteboardId = whiteboardId;
+        let cloudConfirmed = true;
+        try {
+          const cloud = await synchronizeStudentWorkspace(userId);
+          canonicalWhiteboardId = whiteboardId
+            ? cloud.whiteboardAliases[whiteboardId] || whiteboardId
+            : whiteboardId;
+        } catch {
+          // The local scene remains available while the browser is offline.
+          cloudConfirmed = false;
+        }
+        if (
+          whiteboardId &&
+          canonicalWhiteboardId &&
+          canonicalWhiteboardId !== whiteboardId
+        ) {
+          router.replace(
+            `/workspace/student/whiteboard/${encodeURIComponent(
+              canonicalWhiteboardId
+            )}`
+          );
+          return;
+        }
+        const selectedDocument = canonicalWhiteboardId
+          ? getWhiteboardDocument(userId, canonicalWhiteboardId)
           : null;
-        if (whiteboardId && !selectedDocument) {
+        if (canonicalWhiteboardId && !selectedDocument) {
           throw new Error(currentCopy.loadError);
         }
         if (selectedDocument) {
@@ -618,7 +656,11 @@ export function WhiteboardCanvas({
                 files,
               });
         setSaveStatus(
-          savedFingerprintRef.current === loadedFingerprint ? "saved" : "idle"
+          cloudConfirmed
+            ? savedFingerprintRef.current === loadedFingerprint
+              ? "saved"
+              : "idle"
+            : "error"
         );
         setLoading(false);
         if (queuedGraph) {
@@ -637,7 +679,7 @@ export function WhiteboardCanvas({
     return () => {
       active = false;
     };
-  }, [loadGeneration, userId, whiteboardId, writeScene]);
+  }, [loadGeneration, router, userId, whiteboardId, writeScene]);
 
   useEffect(() => {
     apiRef.current?.updateScene({ appState: { theme } });
@@ -655,12 +697,11 @@ export function WhiteboardCanvas({
         fingerprint !== savedFingerprintRef.current &&
         userId
       ) {
-        try {
-          writeScene(pending);
-          savedFingerprintRef.current = fingerprint;
-        } catch {
-          // Navigation should not be blocked if browser storage is unavailable.
-        }
+        void writeScene(pending)
+          .then(() => {
+            savedFingerprintRef.current = fingerprint;
+          })
+          .catch(() => undefined);
       }
     };
   }, [userId, writeScene]);
@@ -796,7 +837,7 @@ export function WhiteboardCanvas({
           <span className="mr-1 min-w-12 text-right text-xs text-muted-foreground" aria-live="polite">
             {saveStatus === "saving" && c.saving}
             {saveStatus === "saved" && c.saved}
-            {saveStatus === "error" && c.saveError}
+            {saveStatus === "error" && c.localOnly}
           </span>
           <QuickGraphPopover
             disabled={!apiReady}

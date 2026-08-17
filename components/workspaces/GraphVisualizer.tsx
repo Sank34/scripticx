@@ -22,6 +22,17 @@ import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -47,10 +58,15 @@ const copy = {
   en: {
     addToWhiteboard: "Add to whiteboard",
     back: "Student workspace",
+    cancel: "Cancel",
     custom: "Custom labels",
     customHelp:
       "One label per line, or comma-separated. Quote labels containing spaces in the edge list.",
     customPlaceholder: "Start\nMiddle\nEnd",
+    deleteGraph: "Delete graph",
+    deleteGraphDescription: (title: string) =>
+      `“${title}” will be permanently removed. This cannot be undone.`,
+    deleteGraphTitle: "Delete this graph?",
     directed: "Directed",
     download: "Download PNG",
     edgeHelp: "One edge per line: 0 1, 0 -> 1, or A B. # comments are allowed.",
@@ -83,10 +99,15 @@ const copy = {
   ro: {
     addToWhiteboard: "Adaugă în whiteboard",
     back: "Workspace elev",
+    cancel: "Anulează",
     custom: "Etichete proprii",
     customHelp:
       "O etichetă pe linie sau separate prin virgulă. Pune între ghilimele etichetele cu spații din lista de muchii.",
     customPlaceholder: "Start\nMijloc\nFinal",
+    deleteGraph: "Șterge graful",
+    deleteGraphDescription: (title: string) =>
+      `„${title}” va fi șters definitiv. Acțiunea nu poate fi anulată.`,
+    deleteGraphTitle: "Ștergi acest graf?",
     directed: "Orientat",
     download: "Descarcă PNG",
     edgeHelp: "O muchie pe linie: 0 1, 0 -> 1 sau A B. Poți folosi comentarii cu #.",
@@ -214,6 +235,7 @@ export function GraphVisualizer() {
   const [edgeList, setEdgeList] = useState(defaultEdges);
   const [savedGraphs, setSavedGraphs] = useState<WorkspaceGraph[]>([]);
   const [saving, setSaving] = useState<"graph" | "whiteboard" | null>(null);
+  const [graphToDelete, setGraphToDelete] = useState<WorkspaceGraph | null>(null);
 
   const graph = useMemo(
     () =>
@@ -479,17 +501,18 @@ export function GraphVisualizer() {
   }
 
   function removeSavedGraph(savedGraph: WorkspaceGraph) {
+    setGraphToDelete(savedGraph);
+  }
+
+  function confirmGraphDeletion() {
+    const savedGraph = graphToDelete;
     if (!user) return;
-    const confirmed = window.confirm(
-      language === "ro"
-        ? `Ștergi definitiv „${savedGraph.title}”?`
-        : `Permanently delete “${savedGraph.title}”?`
-    );
-    if (!confirmed) return;
+    if (!savedGraph) return;
 
     try {
       deleteGraph(user.id, savedGraph.id);
       if (graphIdRef.current === savedGraph.id) startNewGraph();
+      setGraphToDelete(null);
       toast.success(language === "ro" ? "Graful a fost șters." : "Graph deleted.");
     } catch (error) {
       toast.error(
@@ -877,6 +900,32 @@ export function GraphVisualizer() {
           </div>
         </section>
       </div>
+
+      <AlertDialog
+        open={Boolean(graphToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setGraphToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <Trash2 className="text-destructive" />
+            </AlertDialogMedia>
+            <AlertDialogTitle>{c.deleteGraphTitle}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {c.deleteGraphDescription(graphToDelete?.title || "")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{c.cancel}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmGraphDeletion}>
+              <Trash2 />
+              {c.deleteGraph}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

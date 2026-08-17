@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Area,
@@ -49,6 +50,27 @@ type DashboardData = {
   feed: any[];
   dailyChallenge: DailyChallenge | null;
   dailySolved: boolean;
+};
+
+const CHART_TOOLTIP_CONTENT_STYLE: CSSProperties = {
+  backgroundColor: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: "0.75rem",
+  boxShadow: "0 12px 30px rgb(0 0 0 / 0.18)",
+  color: "var(--popover-foreground)",
+  fontSize: "0.75rem",
+  padding: "0.625rem 0.75rem",
+};
+
+const CHART_TOOLTIP_LABEL_STYLE: CSSProperties = {
+  color: "var(--popover-foreground)",
+  fontWeight: 600,
+  marginBottom: "0.25rem",
+};
+
+const CHART_TOOLTIP_ITEM_STYLE: CSSProperties = {
+  color: "var(--popover-foreground)",
+  padding: 0,
 };
 
 function DashboardContent() {
@@ -395,9 +417,29 @@ function DashboardContent() {
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                    <Tooltip />
+                    <CartesianGrid
+                      stroke="var(--border)"
+                      strokeDasharray="3 3"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="name"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{
+                        fill: "var(--muted-foreground)",
+                        fontSize: 12,
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                      itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                      labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                      cursor={{
+                        stroke: "var(--muted-foreground)",
+                        strokeOpacity: 0.45,
+                      }}
+                    />
                     <Area
                       type="monotone"
                       dataKey="score"
@@ -432,12 +474,19 @@ function DashboardContent() {
                       innerRadius={48}
                       outerRadius={72}
                       paddingAngle={4}
+                      stroke="var(--card)"
+                      strokeWidth={2}
                     >
                       {scoreDistribution.map((entry) => (
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
+                      itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                      labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                      cursor={false}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (

@@ -16,9 +16,6 @@ import {
   Bold,
   Braces,
   Check,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Code2,
   Columns2,
   FileCode2,
@@ -39,6 +36,7 @@ import {
   Quote,
   Redo2,
   Star,
+  Table2,
   Undo2,
   Upload,
 } from "lucide-react";
@@ -55,6 +53,7 @@ import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { Markdown } from "@/components/Markdown";
+import { NoteOverviewRail } from "@/components/workspaces/NoteOverviewRail";
 import { NotionMarkdownSurface } from "@/components/workspaces/NotionMarkdownSurface";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,7 +87,17 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useUndoHistory } from "@/hooks/useUndoHistory";
 import { saveWorkspaceImage } from "@/lib/workspace-assets";
+import {
+  buildPortableNoteMarkdown,
+  prepareNoteExportSurface,
+} from "@/lib/note-export";
+import {
+  persistWorkspaceNote,
+  subscribeWorkspaceCloudStatus,
+  synchronizeStudentWorkspace,
+} from "@/lib/workspace-cloud";
 import { buildNoteOutline, getVisualMarkdownSupport } from "@/lib/note-outline";
+import { DEFAULT_NOTE_TABLE_MARKDOWN } from "@/lib/note-table";
 import {
   getNote,
   updateNote,
@@ -106,6 +115,7 @@ type NoteHistorySnapshot = {
 };
 
 type SlashCommand = {
+  cursorOffset?: number;
   id: string;
   icon: typeof Pilcrow;
   label: { en: string; ro: string };
@@ -131,6 +141,14 @@ const slashCommands: SlashCommand[] = [
   { id: "todo", icon: ListChecks, label: { en: "To-do", ro: "Task" }, hint: "[]", value: "- [ ] " },
   { id: "quote", icon: Quote, label: { en: "Quote", ro: "Citat" }, hint: ">", value: "> " },
   { id: "code", icon: Code2, label: { en: "Code block", ro: "Bloc de cod" }, hint: "```", value: "```\n\n```" },
+  {
+    id: "table",
+    icon: Table2,
+    label: { en: "Table", ro: "Tabel" },
+    hint: "3 × 3",
+    cursorOffset: 2,
+    value: DEFAULT_NOTE_TABLE_MARKDOWN,
+  },
   {
     id: "image-url",
     icon: ImagePlus,
@@ -164,6 +182,9 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   const floatingToolbarFrameRef = useRef<number | null>(null);
   const slashMenuRef = useRef<HTMLDivElement | null>(null);
   const visualEditorRef = useRef<Editor | null>(null);
+  const visualScrollRef = useRef<HTMLDivElement | null>(null);
+  const previewScrollRef = useRef<HTMLElement | null>(null);
+  const outlineScrollFrameRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInsertionRef = useRef<{ end: number; start: number } | null>(null);
   const visualImageInsertionRef = useRef(false);
@@ -171,7 +192,12 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   const slashRef = useRef<{ end: number; query: string; start: number } | null>(null);
   const previousEditorModeRef = useRef<EditorMode>("edit");
   const loadedRef = useRef(false);
+  const saveGenerationRef = useRef(0);
   const savedSnapshotRef = useRef("");
+  const pendingSnapshotRef = useRef("");
+  const saveStateRef = useRef<"saved" | "saving" | "dirty" | "offline">(
+    "saved"
+  );
   const latestDraftRef = useRef({
     content: "",
     favorite: false,
@@ -185,7 +211,9 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   const [favorite, setFavorite] = useState(false);
   const [icon, setIcon] = useState("📝");
   const [mode, setMode] = useState<EditorMode>("edit");
-  const [saveState, setSaveState] = useState<"saved" | "saving" | "dirty">("saved");
+  const [saveState, setSaveState] = useState<
+    "saved" | "saving" | "dirty" | "offline"
+  >("saved");
   const [slash, setSlash] = useState<{ end: number; query: string; start: number } | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
@@ -200,6 +228,12 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null);
   const outline = useMemo(() => buildNoteOutline(content), [content]);
   const visualMarkdownSupport = useMemo(() => getVisualMarkdownSupport(content), [content]);
+  const effectiveMode: EditorMode =
+    mode === "edit" && !visualMarkdownSupport.supported
+      ? "source"
+      : mode === "split" && !wideSplit
+        ? "source"
+        : mode;
   const historySnapshot = useMemo<NoteHistorySnapshot>(
     () => ({ content, favorite, icon, title }),
     [content, favorite, icon, title]
@@ -231,31 +265,99 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   }, [content, favorite, icon, title]);
 
   useEffect(() => {
+    saveStateRef.current = saveState;
+  }, [saveState]);
+
+  useEffect(() => {
     if (!user) return;
-    const storedNote = getNote(user.id, noteId);
-    if (!storedNote) {
-      setMissing(true);
-      return;
-    }
-    setNote(storedNote);
-    setTitle(storedNote.title);
-    setContent(storedNote.content);
-    setFavorite(storedNote.favorite);
-    setIcon(storedNote.icon || "📝");
-    resetNoteHistory({
-      content: storedNote.content,
-      favorite: storedNote.favorite,
-      icon: storedNote.icon || "📝",
-      title: storedNote.title,
+    let active = true;
+    const userId = user.id;
+    saveGenerationRef.current += 1;
+    pendingSnapshotRef.current = "";
+    loadedRef.current = false;
+    setMissing(false);
+    setNote(null);
+
+    const applyStoredNote = (
+      storedNote: WorkspaceNote,
+      cloudConfirmed = false
+    ) => {
+      if (!active) return;
+      const snapshot = {
+        content: storedNote.content,
+        favorite: storedNote.favorite,
+        icon: storedNote.icon || "📝",
+        title: storedNote.title,
+      };
+      setNote(storedNote);
+      setTitle(snapshot.title);
+      setContent(snapshot.content);
+      setFavorite(snapshot.favorite);
+      setIcon(snapshot.icon);
+      resetNoteHistory(snapshot);
+      savedSnapshotRef.current = JSON.stringify(snapshot);
+      pendingSnapshotRef.current = "";
+      latestDraftRef.current = snapshot;
+      loadedRef.current = true;
+      setSaveState(cloudConfirmed ? "saved" : "saving");
+    };
+
+    const localNote = getNote(userId, noteId);
+    if (localNote) applyStoredNote(localNote);
+
+    void synchronizeStudentWorkspace(userId)
+      .then((result) => {
+        if (!active) return;
+        const canonicalId = result.noteAliases[noteId] || noteId;
+        if (canonicalId !== noteId) {
+          router.replace(
+            `/workspace/student/notes/${encodeURIComponent(canonicalId)}`
+          );
+          return;
+        }
+        const syncedNote = getNote(userId, canonicalId);
+        if (!syncedNote) {
+          if (!localNote) setMissing(true);
+          return;
+        }
+
+        const currentDraft = JSON.stringify(latestDraftRef.current);
+        if (!loadedRef.current || currentDraft === savedSnapshotRef.current) {
+          applyStoredNote(syncedNote, true);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        if (!localNote) setMissing(true);
+        else setSaveState("offline");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [noteId, resetNoteHistory, router, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeWorkspaceCloudStatus(user.id, (detail) => {
+      if (
+        detail.status !== "synced" ||
+        !loadedRef.current ||
+        saveStateRef.current !== "offline"
+      ) {
+        return;
+      }
+      const latest = latestDraftRef.current;
+      savedSnapshotRef.current = JSON.stringify({
+        ...latest,
+        title:
+          latest.title.trim() ||
+          (ro ? "Notiță fără titlu" : "Untitled note"),
+      });
+      pendingSnapshotRef.current = "";
+      setSaveState("saved");
     });
-    savedSnapshotRef.current = JSON.stringify({
-      content: storedNote.content,
-      favorite: storedNote.favorite,
-      icon: storedNote.icon || "📝",
-      title: storedNote.title,
-    });
-    loadedRef.current = true;
-  }, [noteId, resetNoteHistory, user]);
+  }, [ro, user]);
 
   useEffect(() => {
     if (!loadedRef.current || visualMarkdownSupport.supported || mode !== "edit") return;
@@ -282,9 +384,17 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
     if (!user || !note || !loadedRef.current) return;
     const normalizedTitle = title.trim() || (ro ? "Notiță fără titlu" : "Untitled note");
     const snapshot = JSON.stringify({ content, favorite, icon, title: normalizedTitle });
-    if (snapshot === savedSnapshotRef.current) return;
+    if (
+      snapshot === savedSnapshotRef.current ||
+      snapshot === pendingSnapshotRef.current
+    ) {
+      return;
+    }
+    pendingSnapshotRef.current = snapshot;
     setSaveState("saving");
+    const generation = ++saveGenerationRef.current;
     const timer = window.setTimeout(() => {
+      void (async () => {
       try {
         const updated = updateNote(user.id, note.id, {
           content,
@@ -292,15 +402,22 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
           icon,
           title: normalizedTitle,
         });
-        if (updated) setNote(updated);
+        if (!updated) throw new Error("The note no longer exists.");
+        setNote(updated);
+        await persistWorkspaceNote(user.id, updated);
+        if (generation !== saveGenerationRef.current) return;
         savedSnapshotRef.current = snapshot;
+        pendingSnapshotRef.current = "";
         setSaveState("saved");
       } catch (error) {
-        setSaveState("dirty");
-        toast.error(ro ? "Notița nu a putut fi salvată." : "Could not save the note.", {
+        if (generation !== saveGenerationRef.current) return;
+        pendingSnapshotRef.current = "";
+        setSaveState("offline");
+        toast.warning(ro ? "Notița este salvată local." : "The note is saved locally.", {
           description: error instanceof Error ? error.message : undefined,
         });
       }
+      })();
     }, 650);
     return () => window.clearTimeout(timer);
   }, [content, favorite, icon, note, ro, title, user]);
@@ -329,7 +446,6 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
           icon: latest.icon,
           title: normalizedTitle,
         });
-        savedSnapshotRef.current = snapshot;
       } catch {
         // Navigation must not be blocked if browser storage becomes unavailable.
       }
@@ -358,6 +474,23 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
       ?.scrollIntoView({ block: "nearest" });
   }, [slash, slashIndex]);
 
+  useEffect(
+    () => () => {
+      if (outlineScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(outlineScrollFrameRef.current);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    setActiveOutlineId((current) =>
+      current && outline.some((item) => item.id === current)
+        ? current
+        : outline[0]?.id ?? null
+    );
+  }, [outline]);
+
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
     const update = () => setWideSplit(media.matches);
@@ -365,39 +498,6 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-
-  useEffect(() => {
-    // Keep the server and first client render identical, then reveal the
-    // persistent outline only where it has dedicated desktop space.
-    setOutlineOpen(window.matchMedia("(min-width: 1280px)").matches);
-  }, []);
-
-  useEffect(() => {
-    if (!outlineOpen) return;
-
-    const closeOverlayOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (
-        event.key !== "Escape" ||
-        event.defaultPrevented ||
-        !window.matchMedia("(max-width: 1279px)").matches ||
-        slashRef.current
-      ) {
-        return;
-      }
-      const target = event.target;
-      if (
-        target instanceof Element &&
-        target.closest('[role="dialog"], [role="listbox"], [role="menu"]')
-      ) {
-        return;
-      }
-      event.preventDefault();
-      setOutlineOpen(false);
-    };
-
-    document.addEventListener("keydown", closeOverlayOnEscape);
-    return () => document.removeEventListener("keydown", closeOverlayOnEscape);
-  }, [outlineOpen]);
 
   useEffect(() => {
     if (mode !== "split" || !wideSplit) return;
@@ -577,9 +677,31 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
     });
   }
 
+  function insertMarkdownBlock(block: string) {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = content.slice(0, start);
+    const after = content.slice(end);
+    const leading = before && !before.endsWith("\n\n") ? (before.endsWith("\n") ? "\n" : "\n\n") : "";
+    const trailing = after && !after.startsWith("\n\n") ? (after.startsWith("\n") ? "\n" : "\n\n") : "";
+    const insertion = `${leading}${block}${trailing}`;
+    const next = `${before}${insertion}${after}`;
+    const cursor = start + leading.length + 2;
+    setContent(next);
+    closeSlash();
+    setFloatingToolbar(null);
+    markDirty();
+    window.requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  }
+
   function focusOutlineItem(item: ReturnType<typeof buildNoteOutline>[number]) {
     setActiveOutlineId(item.id);
-    if (mode === "source" || mode === "split") {
+    if (effectiveMode === "source" || effectiveMode === "split") {
       const textarea = textareaRef.current;
       if (!textarea) {
         setMode("source");
@@ -593,19 +715,58 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
       return;
     }
 
-    const visualEditor = visualEditorRef.current;
-    if (!visualEditor) return;
-    const targetText = item.text.toLocaleLowerCase(locale);
-    let targetPosition: number | null = null;
-    visualEditor.state.doc.descendants((node, position) => {
-      if (targetPosition !== null || !node.isTextblock) return;
-      if (node.textContent.trim().toLocaleLowerCase(locale).includes(targetText)) {
-        targetPosition = position + 1;
-      }
-    });
-    if (targetPosition !== null) {
-      visualEditor.chain().focus().setTextSelection(targetPosition).scrollIntoView().run();
+    const outlineIndex = outline.findIndex((candidate) => candidate.id === item.id);
+    if (outlineIndex < 0) return;
+
+    if (effectiveMode === "preview") {
+      const target = previewScrollRef.current?.querySelectorAll<HTMLElement>(
+        "h1, h2, h3, li.task-list-item"
+      )[outlineIndex];
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
     }
+
+    const visualEditor = visualEditorRef.current;
+    const target = visualEditor?.view.dom.querySelectorAll<HTMLElement>(
+      "h1, h2, h3, li[data-type='taskItem']"
+    )[outlineIndex];
+    if (visualEditor && target) {
+      try {
+        const position = visualEditor.view.posAtDOM(target, 0) + 1;
+        visualEditor.chain().focus().setTextSelection(position).scrollIntoView().run();
+      } catch {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }
+
+  function trackSourceOutlineFromScroll(textarea: HTMLTextAreaElement) {
+    if (!outline.length) return;
+    const lineHeight = Number.parseFloat(window.getComputedStyle(textarea).lineHeight) || 28;
+    const visibleLine = Math.max(
+      1,
+      Math.floor((textarea.scrollTop + textarea.clientHeight * 0.24) / lineHeight) + 1
+    );
+    const active = outline.reduce<ReturnType<typeof buildNoteOutline>[number] | null>(
+      (candidate, item) => (item.line <= visibleLine ? item : candidate),
+      null
+    );
+    setActiveOutlineId(active?.id ?? outline[0]?.id ?? null);
+  }
+
+  function trackRenderedOutlineFromScroll(container: HTMLElement, selector: string) {
+    if (outlineScrollFrameRef.current !== null) return;
+    outlineScrollFrameRef.current = window.requestAnimationFrame(() => {
+      outlineScrollFrameRef.current = null;
+      const anchors = Array.from(container.querySelectorAll<HTMLElement>(selector));
+      if (!anchors.length || !outline.length) return;
+      const threshold = container.getBoundingClientRect().top + container.clientHeight * 0.28;
+      let activeIndex = 0;
+      anchors.forEach((anchor, index) => {
+        if (anchor.getBoundingClientRect().top <= threshold) activeIndex = index;
+      });
+      setActiveOutlineId(outline[Math.min(activeIndex, outline.length - 1)]?.id ?? null);
+    });
   }
 
   function formatSelectionAsHeading(range: { end: number; start: number }) {
@@ -666,7 +827,9 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
       return;
     }
     const next = `${content.slice(0, slash.start)}${command.value}${content.slice(slash.end)}`;
-    const cursor = slash.start + command.value.length - (command.id === "code" ? 4 : 0);
+    const cursor =
+      slash.start +
+      (command.cursorOffset ?? command.value.length - (command.id === "code" ? 4 : 0));
     setContent(next);
     closeSlash();
     markDirty();
@@ -846,7 +1009,18 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
     try {
       const asset = await saveWorkspaceImage(user.id, file);
       insertMarkdownImage(asset.url, imageAlt || file.name.replace(/\.[^.]+$/, ""));
-      toast.success(ro ? "Imagine adăugată în notiță." : "Image added to the note.");
+      if (asset.cloudSynced) {
+        toast.success(ro ? "Imagine adăugată în notiță." : "Image added to the note.");
+      } else {
+        toast.warning(
+          ro ? "Imagine adăugată și păstrată local." : "Image added and cached locally.",
+          {
+            description: ro
+              ? "Va fi încărcată automat când sincronizarea revine online."
+              : "It will upload automatically when cloud sync is available.",
+          }
+        );
+      }
     } catch (error) {
       toast.error(ro ? "Imaginea nu a putut fi încărcată." : "Could not upload the image.", {
         description: error instanceof Error ? error.message : undefined,
@@ -885,47 +1059,11 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
   }
 
-  async function buildSelfContainedHtml() {
-    const source = exportSurfaceRef.current;
-    if (!source) throw new Error(ro ? "Preview-ul nu este pregătit." : "Preview is not ready.");
+  function buildSelfContainedHtml(source: HTMLElement, omittedImages: number) {
     const clone = source.cloneNode(true) as HTMLElement;
-    const sourceImages = Array.from(source.querySelectorAll("img"));
-    const clonedImages = Array.from(clone.querySelectorAll("img"));
-    let omittedImages = 0;
-
-    await Promise.all(
-      clonedImages.map(async (image, index) => {
-        const sourceImage = sourceImages[index];
-        const sourceUrl = sourceImage?.currentSrc || sourceImage?.src || image.src;
-        if (!sourceUrl) return;
-        try {
-          const response = await fetch(sourceUrl);
-          if (!response.ok) throw new Error();
-          image.src = await blobToDataUrl(await response.blob());
-          image.removeAttribute("srcset");
-        } catch {
-          omittedImages += 1;
-          const fallback = document.createElement("span");
-          fallback.textContent = image.alt
-            ? `[${image.alt}]`
-            : ro
-              ? "[Imagine indisponibilă offline]"
-              : "[Image unavailable offline]";
-          fallback.setAttribute("role", "img");
-          fallback.setAttribute("aria-label", image.alt || "Image");
-          image.replaceWith(fallback);
-        }
-      })
-    );
-
-    clone.querySelectorAll("script, iframe, object, embed").forEach((element) => element.remove());
-    clone.querySelectorAll("*").forEach((element) => {
-      for (const attribute of Array.from(element.attributes)) {
-        if (attribute.name.toLowerCase().startsWith("on")) {
-          element.removeAttribute(attribute.name);
-        }
-      }
-    });
+    const computed = window.getComputedStyle(source);
+    clone.style.backgroundColor = computed.backgroundColor;
+    clone.style.color = computed.color;
 
     const safeTitle = escapeHtml(title.trim() || (ro ? "Notiță" : "Note"));
     const html = `<!doctype html>
@@ -948,7 +1086,7 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
     pre code { padding: 0; background: transparent; }
     img { display: block; max-width: 100%; height: auto; margin: 1.5rem auto; border-radius: 10px; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); padding: .55rem .75rem; text-align: left; }
+    th, td { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); padding: .55rem .75rem; }
     @media print { article { width: auto; padding: 24px; } }
   </style>
 </head>
@@ -960,80 +1098,109 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   async function exportNote(format: ExportFormat) {
     setExporting(format);
     setFloatingToolbar(null);
+    let cleanupExportSurface: (() => void) | null = null;
     try {
-      if (format !== "md") {
-        const surface = exportSurfaceRef.current;
-        if (!surface) throw new Error(ro ? "Preview-ul nu este pregătit." : "Preview is not ready.");
-        const imagesReady = await waitForExportImages(surface);
-        if (!imagesReady) {
-          toast.warning(
-            ro
-              ? "Unele imagini încă se încărcau și pot apărea ca placeholder."
-              : "Some images were still loading and may appear as placeholders."
-          );
-        }
-      }
+      let omittedImages = 0;
       if (format === "md") {
+        const portable = await buildPortableNoteMarkdown(content, user?.id);
+        omittedImages = portable.omittedImages;
         downloadBlob(
-          new Blob([content], { type: "text/markdown;charset=utf-8" }),
+          new Blob([portable.markdown], { type: "text/markdown;charset=utf-8" }),
           exportFileName("md")
         );
-      } else if (format === "html") {
-        const { html, omittedImages } = await buildSelfContainedHtml();
-        downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), exportFileName("html"));
-        if (omittedImages) {
-          toast.warning(
-            ro
-              ? `${omittedImages} imagini externe nu au permis exportul offline.`
-              : `${omittedImages} external images could not be embedded offline.`
-          );
-        }
       } else {
-        const surface = exportSurfaceRef.current;
-        if (!surface) throw new Error(ro ? "Preview-ul nu este pregătit." : "Preview is not ready.");
+        const source = exportSurfaceRef.current;
+        if (!source) throw new Error(ro ? "Preview-ul nu este pregătit." : "Preview is not ready.");
         await document.fonts.ready;
-        const { toPng } = await import("html-to-image");
-        const height = Math.max(surface.scrollHeight, surface.getBoundingClientRect().height);
-        const pixelRatio = Math.max(1, Math.min(2, 12_000 / Math.max(height, 1)));
-        const dataUrl = await toPng(surface, {
-          backgroundColor: window.getComputedStyle(surface).backgroundColor || "#ffffff",
-          cacheBust: true,
-          imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=",
-          pixelRatio,
-        });
+        const prepared = await prepareNoteExportSurface(source, { ro, userId: user?.id });
+        cleanupExportSurface = prepared.cleanup;
+        omittedImages = prepared.omittedImages;
+        const surface = prepared.surface;
 
-        if (format === "png") {
-          const anchor = document.createElement("a");
-          anchor.href = dataUrl;
-          anchor.download = exportFileName("png");
-          anchor.click();
+        if (format === "html") {
+          const { html } = buildSelfContainedHtml(surface, omittedImages);
+          downloadBlob(
+            new Blob([html], { type: "text/html;charset=utf-8" }),
+            exportFileName("html")
+          );
         } else {
-          const { jsPDF } = await import("jspdf");
-          const pdf = new jsPDF({ compress: true, format: "a4", orientation: "portrait", unit: "mm" });
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          const margin = 12;
-          const usableWidth = pageWidth - margin * 2;
-          const usableHeight = pageHeight - margin * 2;
-          const image = pdf.getImageProperties(dataUrl);
-          const renderedHeight = (image.height * usableWidth) / image.width;
-          const pageCount = Math.max(1, Math.ceil(renderedHeight / usableHeight));
-          for (let page = 0; page < pageCount; page += 1) {
-            if (page) pdf.addPage();
-            pdf.addImage(
-              dataUrl,
-              "PNG",
-              margin,
-              margin - page * usableHeight,
-              usableWidth,
-              renderedHeight,
-              undefined,
-              "FAST"
+          const { toCanvas } = await import("html-to-image");
+          const height = Math.max(surface.scrollHeight, surface.getBoundingClientRect().height);
+          const pixelRatio = Math.max(1, Math.min(2, 12_000 / Math.max(height, 1)));
+          const canvas = await toCanvas(surface, {
+            backgroundColor: window.getComputedStyle(surface).backgroundColor || "#ffffff",
+            cacheBust: false,
+            pixelRatio,
+          });
+
+          if (format === "png") {
+            const blob = await canvasToBlob(canvas, "image/png");
+            downloadBlob(blob, exportFileName("png"));
+          } else {
+            const { jsPDF } = await import("jspdf");
+            const pdf = new jsPDF({
+              compress: true,
+              format: "a4",
+              orientation: "portrait",
+              unit: "mm",
+            });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 12;
+            const usableWidth = pageWidth - margin * 2;
+            const usableHeight = pageHeight - margin * 2;
+            const sourcePageHeight = Math.max(
+              1,
+              Math.floor((canvas.width * usableHeight) / usableWidth)
             );
+            const pageCount = Math.max(1, Math.ceil(canvas.height / sourcePageHeight));
+            for (let page = 0; page < pageCount; page += 1) {
+              if (page) pdf.addPage();
+              const sourceY = page * sourcePageHeight;
+              const sliceHeight = Math.min(sourcePageHeight, canvas.height - sourceY);
+              const pageCanvas = document.createElement("canvas");
+              pageCanvas.width = canvas.width;
+              pageCanvas.height = sliceHeight;
+              const context = pageCanvas.getContext("2d");
+              if (!context) {
+                throw new Error(
+                  ro ? "PDF-ul nu a putut fi randat." : "Could not render PDF."
+                );
+              }
+              context.drawImage(
+                canvas,
+                0,
+                sourceY,
+                canvas.width,
+                sliceHeight,
+                0,
+                0,
+                canvas.width,
+                sliceHeight
+              );
+              const renderedHeight = (sliceHeight * usableWidth) / canvas.width;
+              pdf.addImage(
+                pageCanvas.toDataURL("image/png"),
+                "PNG",
+                margin,
+                margin,
+                usableWidth,
+                renderedHeight,
+                undefined,
+                "FAST"
+              );
+            }
+            pdf.setProperties({ title: title.trim() || (ro ? "Notiță" : "Note") });
+            pdf.save(exportFileName("pdf"));
           }
-          pdf.setProperties({ title: title.trim() || (ro ? "Notiță" : "Note") });
-          pdf.save(exportFileName("pdf"));
         }
+      }
+      if (omittedImages) {
+        toast.warning(
+          ro
+            ? `${omittedImages} imagini nu au putut fi incluse în export.`
+            : `${omittedImages} images could not be included in the export.`
+        );
       }
       toast.success(ro ? "Export pregătit." : "Export ready.");
     } catch (error) {
@@ -1041,6 +1208,7 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
         description: error instanceof Error ? error.message : undefined,
       });
     } finally {
+      cleanupExportSurface?.();
       setExporting(null);
     }
   }
@@ -1066,13 +1234,6 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
     );
   }
 
-  const effectiveMode: EditorMode =
-    mode === "edit" && !visualMarkdownSupport.supported
-      ? "source"
-      : mode === "split" && !wideSplit
-        ? "source"
-        : mode;
-
   const undoCurrentEditor = () => {
     if (effectiveMode === "edit" && visualEditorRef.current) {
       visualEditorRef.current.commands.undo();
@@ -1087,6 +1248,39 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
       return;
     }
     redoNoteChange();
+  };
+
+  const runVisualBlockAction = (action: (editor: Editor) => void) => {
+    const visualEditor = visualEditorRef.current;
+    if (!visualEditor) return;
+    if (visualEditor.isActive("table")) {
+      toast.info(
+        ro
+          ? "Celulele păstrează formatarea pe o singură linie pentru compatibilitate Markdown."
+          : "Table cells stay single-line for Markdown compatibility."
+      );
+      return;
+    }
+    action(visualEditor);
+  };
+
+  const insertVisualTable = () => {
+    const visualEditor = visualEditorRef.current;
+    if (!visualEditor) return;
+    if (
+      visualEditor.isActive("table") ||
+      visualEditor.isActive("bulletList") ||
+      visualEditor.isActive("orderedList") ||
+      visualEditor.isActive("taskList")
+    ) {
+      toast.info(
+        ro
+          ? "Inserează tabelul într-un paragraf liber, nu într-o listă sau alt tabel."
+          : "Insert the table in a free paragraph, not inside a list or another table."
+      );
+      return;
+    }
+    visualEditor.chain().focus().insertTable({ cols: 3, rows: 3, withHeaderRow: true }).run();
   };
 
   const sourcePane = (
@@ -1118,6 +1312,7 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
         onMouseUp={refreshFloatingToolbar}
         onScroll={() => {
           setFloatingToolbar(null);
+          if (textareaRef.current) trackSourceOutlineFromScroll(textareaRef.current);
           if (slashRef.current) {
             const position = positionNearCursor(slashRef.current.end, "slash");
             if (position) setSlashPosition(position);
@@ -1128,7 +1323,7 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
           refreshFloatingToolbar();
         }}
         spellCheck
-        className="mx-auto block h-full min-h-0 w-full max-w-4xl resize-none bg-transparent px-6 py-10 font-mono text-[14px] leading-7 outline-none placeholder:text-muted-foreground/60 selection:bg-primary/20 sm:px-10 sm:py-14"
+        className="note-scrollbar mx-auto block h-full min-h-0 w-full max-w-4xl resize-none bg-transparent px-6 py-10 font-mono text-[14px] leading-7 outline-none placeholder:text-muted-foreground/60 selection:bg-primary/20 sm:px-10 sm:py-14"
         placeholder={
           ro
             ? "Scrie notițele aici... Tastează / pentru blocuri."
@@ -1232,7 +1427,16 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   );
 
   const visualPane = (
-    <div className="h-full min-h-0 overflow-y-auto scroll-smooth bg-background">
+    <div
+      className="note-scrollbar h-full min-h-0 overflow-y-auto scroll-smooth bg-background"
+      onScroll={(event) =>
+        trackRenderedOutlineFromScroll(
+          event.currentTarget,
+          ".ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror li[data-type='taskItem']"
+        )
+      }
+      ref={visualScrollRef}
+    >
       <NotionMarkdownSurface
         content={content}
         editorRef={visualEditorRef}
@@ -1266,7 +1470,13 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
   );
 
   const previewPane = (
-    <article className="h-full min-h-0 overflow-y-auto bg-background px-6 py-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 sm:px-10 lg:px-12">
+    <article
+      className="note-scrollbar h-full min-h-0 overflow-y-auto bg-background px-6 py-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 sm:px-10 lg:px-12"
+      onScroll={(event) =>
+        trackRenderedOutlineFromScroll(event.currentTarget, "h1, h2, h3, li.task-list-item")
+      }
+      ref={previewScrollRef}
+    >
       <div className="mx-auto max-w-3xl">
         <FileText className="mb-5 size-5 text-muted-foreground/65" aria-hidden="true" />
         <h1 className="mb-8 text-4xl font-bold">{title}</h1>
@@ -1323,6 +1533,8 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
           {saveState === "saving" ? <LoaderCircle className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
           {saveState === "saving"
             ? ro ? "Se salvează..." : "Saving..."
+            : saveState === "offline"
+              ? ro ? "Salvat local" : "Saved locally"
             : saveState === "dirty"
               ? ro ? "Modificat" : "Edited"
               : ro ? "Salvat" : "Saved"}
@@ -1387,17 +1599,6 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
             );
           })}
         </div>
-        <Button
-          aria-expanded={outlineOpen}
-          aria-label={ro ? "Arată sau ascunde cuprinsul" : "Show or hide outline"}
-          className="size-9"
-          onClick={() => setOutlineOpen((current) => !current)}
-          size="icon"
-          type="button"
-          variant="ghost"
-        >
-          <ListChecks className="size-4" />
-        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -1486,12 +1687,13 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
           <MenubarMenu>
             <MenubarTrigger>{ro ? "Inserează" : "Insert"}</MenubarTrigger>
             <MenubarContent>
-              <MenubarItem onSelect={() => effectiveMode === "edit" ? visualEditorRef.current?.chain().focus().toggleHeading({ level: 2 }).run() : insertLinePrefix("## ")}>{ro ? "Titlu" : "Heading"}</MenubarItem>
-              <MenubarItem onSelect={() => effectiveMode === "edit" ? visualEditorRef.current?.chain().focus().toggleBulletList().run() : insertLinePrefix("- ")}>{ro ? "Listă" : "List"}</MenubarItem>
-              <MenubarItem onSelect={() => effectiveMode === "edit" ? visualEditorRef.current?.chain().focus().toggleTaskList().run() : insertLinePrefix("- [ ] ")}>{ro ? "Checkpoint" : "Checkpoint"}</MenubarItem>
-              <MenubarItem onSelect={() => effectiveMode === "edit" ? visualEditorRef.current?.chain().focus().toggleBlockquote().run() : insertLinePrefix("> ")}>{ro ? "Citat" : "Quote"}</MenubarItem>
+              <MenubarItem disabled={effectiveMode === "preview"} onSelect={() => effectiveMode === "edit" ? runVisualBlockAction((editor) => editor.chain().focus().toggleHeading({ level: 2 }).run()) : insertLinePrefix("## ")}>{ro ? "Titlu" : "Heading"}</MenubarItem>
+              <MenubarItem disabled={effectiveMode === "preview"} onSelect={() => effectiveMode === "edit" ? runVisualBlockAction((editor) => editor.chain().focus().toggleBulletList().run()) : insertLinePrefix("- ")}>{ro ? "Listă" : "List"}</MenubarItem>
+              <MenubarItem disabled={effectiveMode === "preview"} onSelect={() => effectiveMode === "edit" ? runVisualBlockAction((editor) => editor.chain().focus().toggleTaskList().run()) : insertLinePrefix("- [ ] ")}>{ro ? "Checkpoint" : "Checkpoint"}</MenubarItem>
+              <MenubarItem disabled={effectiveMode === "preview"} onSelect={() => effectiveMode === "edit" ? runVisualBlockAction((editor) => editor.chain().focus().toggleBlockquote().run()) : insertLinePrefix("> ")}>{ro ? "Citat" : "Quote"}</MenubarItem>
+              <MenubarItem disabled={effectiveMode === "preview"} onSelect={() => effectiveMode === "edit" ? insertVisualTable() : insertMarkdownBlock(DEFAULT_NOTE_TABLE_MARKDOWN.trimEnd())}>{ro ? "Tabel" : "Table"}</MenubarItem>
               <MenubarSeparator />
-              <MenubarItem onSelect={() => effectiveMode === "edit" ? openVisualImageDialog() : openImageDialog()}>{ro ? "Imagine…" : "Image…"}</MenubarItem>
+              <MenubarItem disabled={effectiveMode === "preview"} onSelect={() => effectiveMode === "edit" ? runVisualBlockAction(() => openVisualImageDialog()) : openImageDialog()}>{ro ? "Imagine…" : "Image…"}</MenubarItem>
             </MenubarContent>
           </MenubarMenu>
           <MenubarMenu>
@@ -1568,45 +1770,28 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
           previewPane
           )}
         </div>
-        {outlineOpen ? (
-          <>
-            <button
-              aria-label={ro ? "Închide cuprinsul" : "Close outline"}
-              className="absolute inset-0 z-10 bg-background/35 backdrop-blur-[1px] motion-safe:animate-in motion-safe:fade-in xl:hidden"
-              onClick={() => setOutlineOpen(false)}
-              type="button"
-            />
-            <NoteOutlinePanel
-              activeId={activeOutlineId}
-              items={outline}
-              onClose={() => setOutlineOpen(false)}
-              onSelect={focusOutlineItem}
-              ro={ro}
-            />
-          </>
-        ) : (
-          <button
-            aria-label={ro ? "Deschide cuprinsul" : "Open outline"}
-            className="absolute right-3 top-3 z-20 flex size-9 items-center justify-center rounded-full border bg-background/90 text-muted-foreground shadow-sm backdrop-blur-lg transition-all hover:scale-105 hover:text-foreground xl:static xl:my-3 xl:mr-3"
-            onClick={() => setOutlineOpen(true)}
-            type="button"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-        )}
+        <NoteOverviewRail
+          activeId={activeOutlineId}
+          items={outline}
+          onNavigate={focusOutlineItem}
+          onOpenChange={setOutlineOpen}
+          open={outlineOpen}
+          ro={ro}
+        />
       </main>
       <div
         aria-hidden="true"
         className="pointer-events-none fixed -left-[10000px] top-0 w-[840px] opacity-0"
       >
         <article
+          data-note-export-surface
           ref={exportSurfaceRef}
           className="min-h-[1120px] w-[840px] bg-white px-16 py-16 text-slate-950 dark:bg-slate-950 dark:text-slate-50"
         >
           <FileText className="mb-5 size-5 text-slate-400" aria-hidden="true" />
           <h1 className="mb-8 text-5xl font-bold">{title}</h1>
           {content.trim() ? (
-            <Markdown workspaceImageUserId={user?.id}>{content}</Markdown>
+            <Markdown eagerImages workspaceImageUserId={user?.id}>{content}</Markdown>
           ) : (
             <p className="text-sm text-slate-500">
               {ro ? "Notiță fără conținut." : "Empty note."}
@@ -1762,81 +1947,6 @@ function ExportMenuItem({
   );
 }
 
-function NoteOutlinePanel({
-  activeId,
-  items,
-  onClose,
-  onSelect,
-  ro,
-}: {
-  activeId: string | null;
-  items: ReturnType<typeof buildNoteOutline>;
-  onClose: () => void;
-  onSelect: (item: ReturnType<typeof buildNoteOutline>[number]) => void;
-  ro: boolean;
-}) {
-  const completed = items.filter((item) => item.kind === "task" && item.checked).length;
-  const tasks = items.filter((item) => item.kind === "task").length;
-  const progressLabel = ro
-    ? `${completed} din ${tasks} checkpoints finalizate`
-    : `${completed} of ${tasks} checkpoints completed`;
-  return (
-    <aside
-      aria-labelledby="note-outline-title"
-      className="absolute inset-y-3 right-3 z-20 flex w-[min(19rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-2xl border border-border/70 bg-background/92 shadow-xl backdrop-blur-xl motion-safe:animate-in motion-safe:slide-in-from-right-4 motion-safe:fade-in xl:static xl:inset-auto xl:z-auto xl:my-3 xl:mr-3 xl:w-72 xl:shrink-0 xl:shadow-sm"
-    >
-      <div className="flex items-center gap-2 border-b px-4 py-3">
-        <ListChecks className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold" id="note-outline-title">
-          {ro ? "Cuprins" : "Outline"}
-        </h2>
-        {tasks ? (
-          <span
-            aria-label={progressLabel}
-            className="ml-auto text-xs text-muted-foreground"
-            title={progressLabel}
-          >
-            {completed}/{tasks}
-          </span>
-        ) : null}
-        <Button aria-label={ro ? "Închide cuprinsul" : "Close outline"} className="size-7" onClick={onClose} size="icon" variant="ghost">
-          <ChevronRight className="size-4" />
-        </Button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        {items.length ? (
-          <ol className="relative space-y-0.5 before:absolute before:bottom-2 before:left-[1.05rem] before:top-2 before:w-px before:bg-border">
-            {items.map((item) => (
-              <li key={item.id}>
-                <button
-                  className={cn(
-                    "group relative flex w-full items-center gap-2 rounded-lg py-2 pr-2 text-left text-xs text-muted-foreground outline-none transition-all hover:bg-accent/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/50",
-                    item.depth > 1 ? "pl-8" : "pl-2",
-                    activeId === item.id && "bg-accent text-foreground"
-                  )}
-                  onClick={() => onSelect(item)}
-                  title={`${item.text} · ${ro ? "linia" : "line"} ${item.line}`}
-                  type="button"
-                >
-                  <span className={cn("relative z-10 flex size-4 shrink-0 items-center justify-center rounded-full border bg-background transition-colors", item.checked && "border-primary bg-primary text-primary-foreground")}>
-                    {item.kind === "task" && item.checked ? <Check className="size-2.5" /> : item.kind === "heading" ? <span className="size-1.5 rounded-full bg-current" /> : null}
-                  </span>
-                  <span className={cn("truncate", item.kind === "heading" && "font-medium text-foreground/90", item.checked && "line-through opacity-65")}>{item.text}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <div className="px-2 py-10 text-center text-xs leading-5 text-muted-foreground">
-            <CheckCircle2 className="mx-auto mb-3 size-5 opacity-60" />
-            {ro ? "Adaugă titluri sau checklist-uri pentru a construi cuprinsul." : "Add headings or checklists to build your outline."}
-          </div>
-        )}
-      </div>
-    </aside>
-  );
-}
-
 function getTextareaCaretPosition(textarea: HTMLTextAreaElement, index: number) {
   const computed = window.getComputedStyle(textarea);
   const mirror = document.createElement("div");
@@ -1887,35 +1997,13 @@ function getTextareaCaretPosition(textarea: HTMLTextAreaElement, index: number) 
   return position;
 }
 
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error || new Error("Could not read image."));
-    reader.onload = () => resolve(String(reader.result));
-    reader.readAsDataURL(blob);
+function canvasToBlob(canvas: HTMLCanvasElement, type: string) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Could not encode image."));
+    }, type);
   });
-}
-
-async function waitForExportImages(surface: HTMLElement, timeoutMs = 3_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (surface.querySelector('[role="img"].animate-pulse') && Date.now() < deadline) {
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 60));
-  }
-
-  const images = Array.from(surface.querySelectorAll("img"));
-  await Promise.all(
-    images.map((image) => {
-      if (image.complete) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        const finish = () => resolve();
-        image.addEventListener("load", finish, { once: true });
-        image.addEventListener("error", finish, { once: true });
-        window.setTimeout(finish, Math.max(0, deadline - Date.now()));
-      });
-    })
-  );
-
-  return !surface.querySelector('[role="img"].animate-pulse') && images.every((image) => image.complete);
 }
 
 function escapeHtml(value: string) {

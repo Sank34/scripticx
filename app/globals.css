@@ -356,6 +356,103 @@ html.theme-transition::view-transition-new(root) {
 .notion-note-prose .is-empty::before { color: color-mix(in srgb, var(--muted-foreground) 70%, transparent); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
 .notion-note-prose:focus-visible { outline: none; }
 .notion-note-prose .ProseMirror-selectednode { outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: 3px; }
+.notion-note-prose .node-image.ProseMirror-selectednode { outline: none; }
+
+.notion-note-prose .tableWrapper {
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 34%, transparent) transparent;
+  scrollbar-width: thin;
+}
+.notion-note-prose .tableWrapper table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+.notion-note-prose .tableWrapper th,
+.notion-note-prose .tableWrapper td {
+  position: relative;
+  min-width: 8rem;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.8rem;
+  vertical-align: top;
+}
+.notion-note-prose .tableWrapper th:last-child,
+.notion-note-prose .tableWrapper td:last-child { border-right: 0; }
+.notion-note-prose .tableWrapper tr:last-child td { border-bottom: 0; }
+.notion-note-prose .tableWrapper th {
+  background: color-mix(in srgb, var(--muted) 62%, transparent);
+  color: var(--foreground);
+  font-weight: 600;
+}
+.notion-note-prose .tableWrapper td > p,
+.notion-note-prose .tableWrapper th > p { min-height: 1.5rem; margin: 0; }
+.notion-note-prose .tableWrapper .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  content: "";
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+[data-note-export-surface] [data-note-table-wrapper] {
+  overflow: visible !important;
+}
+[data-note-export-surface] [data-note-table-wrapper] table {
+  width: 100%;
+  table-layout: fixed;
+}
+[data-note-export-surface] [data-note-table-wrapper] th,
+[data-note-export-surface] [data-note-table-wrapper] td {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Notes keep native scrolling semantics while using a quieter, Notion-like rail. */
+.note-scrollbar,
+.note-scrollbar [data-slot="scroll-area-viewport"] {
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 36%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.note-scrollbar::-webkit-scrollbar,
+.note-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.note-scrollbar::-webkit-scrollbar-track,
+.note-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.note-scrollbar::-webkit-scrollbar-thumb,
+.note-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-thumb {
+  background-clip: content-box;
+  background-color: color-mix(in srgb, var(--muted-foreground) 34%, transparent);
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+
+.note-scrollbar::-webkit-scrollbar-thumb:hover,
+.note-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+@media (forced-colors: active) {
+  .note-scrollbar,
+  .note-scrollbar [data-slot="scroll-area-viewport"] {
+    scrollbar-color: CanvasText Canvas;
+  }
+}
 
 .cn-toast [data-close-button] {
   opacity: 0;

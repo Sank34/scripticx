@@ -3,16 +3,18 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_WHITEBOARD_ID,
   STUDENT_WORKSPACE_STORAGE_VERSION,
-  WELCOME_NOTE_ID,
   WorkspaceStorageUnavailableError,
   WorkspaceStorageVersionError,
   createInitialStudentWorkspaceSnapshot,
+  createWelcomeNote,
   createWorkspaceStorageRepository,
   getStudentWorkspaceStorageKey,
+  hasPristineWelcomeNotePayload,
   listNotes,
   parseStudentWorkspaceSnapshot,
   type WorkspaceStorageLike,
   type WorkspaceStorageChangeReason,
+  type WorkspaceStorageEventDetail,
 } from "@/lib/workspace-storage";
 import { STUDENT_WORKSPACE_ID } from "@/lib/workspaces";
 
@@ -37,15 +39,20 @@ function createHarness() {
   let timestamp = "2026-08-11T08:00:00.000Z";
   let sequence = 0;
   const reasons: WorkspaceStorageChangeReason[] = [];
+  const events: WorkspaceStorageEventDetail[] = [];
   const repository = createWorkspaceStorageRepository("user-1", {
     storage,
     now: () => new Date(timestamp),
     createId: () => `generated-${++sequence}`,
-    notify: (detail) => reasons.push(detail.reason),
+    notify: (detail) => {
+      reasons.push(detail.reason);
+      events.push(detail);
+    },
   });
 
   return {
     repository,
+    events,
     reasons,
     setTimestamp(value: string) {
       timestamp = value;
@@ -55,15 +62,13 @@ function createHarness() {
 }
 
 describe("student workspace snapshot parsing", () => {
-  it("seeds a welcome note and stable workspace identity", () => {
+  it("starts a new workspace with an empty notes collection", () => {
     const snapshot = createInitialStudentWorkspaceSnapshot(
       "2026-08-11T08:00:00.000Z"
     );
     expect(snapshot.version).toBe(STUDENT_WORKSPACE_STORAGE_VERSION);
     expect(snapshot.workspaceId).toBe(STUDENT_WORKSPACE_ID);
-    expect(snapshot.notes).toHaveLength(1);
-    expect(snapshot.notes[0].id).toBe(WELCOME_NOTE_ID);
-    expect(snapshot.notes[0]).toMatchObject({ icon: "👋", favorite: false });
+    expect(snapshot.notes).toEqual([]);
     expect(snapshot.whiteboards).toHaveLength(1);
     expect(snapshot.activeWhiteboardId).toBe(DEFAULT_WHITEBOARD_ID);
     expect(snapshot.whiteboards[0]).toMatchObject({
@@ -77,8 +82,8 @@ describe("student workspace snapshot parsing", () => {
   it("falls back safely for corrupt or future-version data", () => {
     expect(
       parseStudentWorkspaceSnapshot("not-json", "2026-08-11T08:00:00.000Z")
-        .notes[0].id
-    ).toBe(WELCOME_NOTE_ID);
+        .notes
+    ).toEqual([]);
     expect(
       parseStudentWorkspaceSnapshot(
         JSON.stringify({
@@ -87,8 +92,73 @@ describe("student workspace snapshot parsing", () => {
           notes: [],
         }),
         "2026-08-11T08:00:00.000Z"
-      ).notes[0].id
-    ).toBe(WELCOME_NOTE_ID);
+      ).notes
+    ).toEqual([]);
+  });
+
+  it("removes only the untouched legacy welcome seed", () => {
+    const timestamp = "2026-08-11T08:00:00.000Z";
+    const legacySeed = {
+      id: "student-workspace-welcome",
+      title: "Bine ai venit în workspace-ul de elev",
+      content: [
+        "# Bine ai venit! 👋",
+        "",
+        "Aici îți poți organiza notițele în Markdown, ideile și materialele de studiu.",
+        "",
+        "- Creează o notiță nouă pentru fiecare lecție.",
+        "- Folosește **titluri**, liste și blocuri de cod.",
+        "- Păstrează grafurile și schițele alături de notițe.",
+      ].join("\n"),
+      icon: "👋",
+      favorite: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const similarRealNote = {
+      ...legacySeed,
+      id: "real-note-with-similar-title",
+      content: "# Bine ai venit\nConținutul meu real.",
+    };
+
+    const migrated = parseStudentWorkspaceSnapshot(
+      JSON.stringify({
+        version: STUDENT_WORKSPACE_STORAGE_VERSION,
+        workspaceId: STUDENT_WORKSPACE_ID,
+        notes: [legacySeed, similarRealNote],
+        graphs: [],
+        whiteboards: [],
+        queuedGraphForWhiteboard: null,
+        updatedAt: timestamp,
+      }),
+      timestamp
+    );
+    expect(migrated.notes).toEqual([similarRealNote]);
+    expect(
+      hasPristineWelcomeNotePayload({
+        ...createWelcomeNote(timestamp),
+        id: "b19c5927-84a2-48e6-b1b6-0ea56a35288c",
+      })
+    ).toBe(true);
+
+    const editedFormerSeed = {
+      ...legacySeed,
+      content: `${legacySeed.content}\n\nNotița mea`,
+      updatedAt: "2026-08-11T09:00:00.000Z",
+    };
+    const preserved = parseStudentWorkspaceSnapshot(
+      JSON.stringify({
+        version: STUDENT_WORKSPACE_STORAGE_VERSION,
+        workspaceId: STUDENT_WORKSPACE_ID,
+        notes: [editedFormerSeed],
+        graphs: [],
+        whiteboards: [],
+        queuedGraphForWhiteboard: null,
+        updatedAt: editedFormerSeed.updatedAt,
+      }),
+      timestamp
+    );
+    expect(preserved.notes).toEqual([editedFormerSeed]);
   });
 
   it("keeps valid records and discards malformed records", () => {
@@ -147,7 +217,6 @@ describe("student workspace snapshot parsing", () => {
 describe("workspace local repository", () => {
   it("creates, updates, lists, and deletes markdown notes", () => {
     const harness = createHarness();
-    expect(harness.repository.deleteNote(WELCOME_NOTE_ID)).toBe(true);
 
     const created = harness.repository.createNote({
       title: "  Grafuri  ",
@@ -173,11 +242,52 @@ describe("workspace local repository", () => {
     expect(harness.repository.deleteNote(created.id)).toBe(true);
     expect(harness.repository.listNotes()).toEqual([]);
     expect(harness.reasons).toEqual([
-      "note-deleted",
       "note-created",
       "note-updated",
       "note-deleted",
     ]);
+    expect(harness.events[0]).toMatchObject({
+      reason: "note-created",
+      entityId: "generated-1",
+    });
+  });
+
+  it("hydrates cloud documents without overwriting local graph data", () => {
+    const harness = createHarness();
+    harness.repository.saveGraph({ id: "graph-1", title: "Local graph" });
+    const snapshot = harness.repository.hydrateCloudDocuments({
+      notes: [
+        {
+          id: "b19c5927-84a2-48e6-b1b6-0ea56a35288c",
+          title: "Cloud note",
+          content: "# Synced",
+          icon: "📝",
+          favorite: true,
+          createdAt: "2026-08-17T08:00:00.000Z",
+          updatedAt: "2026-08-17T09:00:00.000Z",
+        },
+      ],
+      whiteboards: [
+        {
+          id: "e0654a07-ff31-462a-ab92-901ec88e84f8",
+          title: "Cloud board",
+          createdAt: "2026-08-17T08:00:00.000Z",
+          updatedAt: "2026-08-17T09:00:00.000Z",
+          scene: {
+            elements: [{ id: "shape-1" }],
+            appState: {},
+            files: {},
+            updatedAt: "2026-08-17T09:00:00.000Z",
+          },
+        },
+      ],
+      activeWhiteboardId: "e0654a07-ff31-462a-ab92-901ec88e84f8",
+    });
+
+    expect(snapshot.notes[0].title).toBe("Cloud note");
+    expect(snapshot.whiteboards[0].title).toBe("Cloud board");
+    expect(snapshot.graphs[0].id).toBe("graph-1");
+    expect(harness.reasons.at(-1)).toBe("cloud-synced");
   });
 
   it("keeps the legacy scene API mapped to the active whiteboard", () => {
@@ -394,7 +504,7 @@ describe("browser convenience API", () => {
   });
 
   it("keeps reads SSR-safe and fails writes explicitly without localStorage", () => {
-    expect(listNotes("server-user")[0].id).toBe(WELCOME_NOTE_ID);
+    expect(listNotes("server-user")).toEqual([]);
     const repository = createWorkspaceStorageRepository("server-user", {
       storage: null,
     });

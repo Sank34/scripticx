@@ -42,6 +42,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/useAuth";
+import { synchronizeStudentWorkspace } from "@/lib/workspace-cloud";
 import {
   createWhiteboard,
   deleteWhiteboard,
@@ -64,7 +65,7 @@ const copy = {
     create: "New whiteboard",
     delete: "Delete",
     deleteDescription: (title: string) =>
-      `“${title}” will be permanently removed from this browser. This cannot be undone.`,
+      `“${title}” will be permanently removed from your workspace. This cannot be undone.`,
     deleteError: "The whiteboard could not be deleted.",
     deleteSuccess: "Whiteboard deleted.",
     deleteTitle: "Delete this whiteboard?",
@@ -88,7 +89,7 @@ const copy = {
     create: "Whiteboard nou",
     delete: "Șterge",
     deleteDescription: (title: string) =>
-      `„${title}” va fi șters definitiv din acest browser. Acțiunea nu poate fi anulată.`,
+      `„${title}” va fi șters definitiv din workspace. Acțiunea nu poate fi anulată.`,
     deleteError: "Whiteboard-ul nu a putut fi șters.",
     deleteSuccess: "Whiteboard șters.",
     deleteTitle: "Ștergi acest whiteboard?",
@@ -435,6 +436,9 @@ export function WhiteboardLibrary({
   useEffect(() => {
     refresh();
     if (!user) return;
+    void synchronizeStudentWorkspace(user.id)
+      .then(refresh)
+      .catch(() => undefined);
     return subscribeWorkspaceStorage(user.id, refresh);
   }, [refresh, user]);
 
@@ -618,25 +622,42 @@ export function WhiteboardRouteEntry() {
 
   useEffect(() => {
     if (loading || !user) return;
+    let active = true;
 
-    try {
-      const documents = listWhiteboards(user.id);
-      const storedActiveId = getActiveWhiteboardId(user.id);
-      const activeDocument = documents.find(
-        (document) => document.id === storedActiveId
-      );
-      const document =
-        activeDocument ??
-        documents[0] ??
-        createWhiteboard(user.id, { title: c.untitled });
+    void (async () => {
+      try {
+        await synchronizeStudentWorkspace(user.id);
+        if (!active) return;
+        const documents = listWhiteboards(user.id);
+        const storedActiveId = getActiveWhiteboardId(user.id);
+        const activeDocument = documents.find(
+          (document) => document.id === storedActiveId
+        );
+        const document =
+          activeDocument ??
+          documents[0] ??
+          createWhiteboard(user.id, { title: c.untitled });
 
-      setActiveWhiteboardId(user.id, document.id);
-      router.replace(whiteboardHref(document.id));
-    } catch (error) {
-      toast.error(c.error, {
-        description: error instanceof Error ? error.message : undefined,
-      });
-    }
+        setActiveWhiteboardId(user.id, document.id);
+        router.replace(whiteboardHref(document.id));
+      } catch (error) {
+        if (!active) return;
+        const documents = listWhiteboards(user.id);
+        const fallback = documents[0];
+        if (fallback) {
+          setActiveWhiteboardId(user.id, fallback.id);
+          router.replace(whiteboardHref(fallback.id));
+          return;
+        }
+        toast.error(c.error, {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [c.error, c.untitled, loading, router, user]);
 
   return (

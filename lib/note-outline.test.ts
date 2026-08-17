@@ -31,16 +31,13 @@ describe("buildNoteOutline", () => {
 
 describe("getVisualMarkdownSupport", () => {
   it("flags constructs that cannot safely round-trip through the visual editor", () => {
-    expect(getVisualMarkdownSupport("| A |\n| --- |\n| x |\n\n[^1]: hi").unsupported).toEqual([
-      "tables",
-      "footnotes",
-    ]);
+    expect(getVisualMarkdownSupport("| A |\n| --- |\n| x |\n\n[^1]: hi").unsupported).toEqual(["footnotes"]);
     expect(getVisualMarkdownSupport("[![alt](image.png)](https://example.com)").supported).toBe(false);
   });
 
-  it("flags permissive GFM tables, frontmatter, and nested linked images", () => {
-    expect(getVisualMarkdownSupport("A | B\n- | :-\nx | y").unsupported).toContain("tables");
-    expect(getVisualMarkdownSupport("A | B\n--- | ---\nx | y").unsupported).toContain("tables");
+  it("accepts GFM tables while protecting frontmatter and nested linked images", () => {
+    expect(getVisualMarkdownSupport("A | B\n- | :-\nx | y").supported).toBe(true);
+    expect(getVisualMarkdownSupport("A | B\n--- | ---\nx | y").supported).toBe(true);
     expect(getVisualMarkdownSupport("---\ntitle: Lesson\n---\n# Body").unsupported).toContain("frontmatter");
     expect(
       getVisualMarkdownSupport("[![diagram](<https://img.test/a_(1).png>)](https://site.test/a_(1))").unsupported
@@ -49,5 +46,11 @@ describe("getVisualMarkdownSupport", () => {
 
   it("accepts ordinary headings, lists, tasks and images", () => {
     expect(getVisualMarkdownSupport("# Hi\n- [ ] Task\n![alt](<https://example.com/a.png>)").supported).toBe(true);
+  });
+
+  it("keeps tables nested in lists in source mode because GFM cannot round-trip them visually", () => {
+    const nested = "- | A | B |\n  | --- | --- |\n  | x | y |";
+    expect(getVisualMarkdownSupport(nested).unsupported).toContain("nested-tables");
+    expect(getVisualMarkdownSupport("```md\n- | A | B |\n  | --- | --- |\n```").supported).toBe(true);
   });
 });

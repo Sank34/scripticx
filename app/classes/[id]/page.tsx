@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api";
 
@@ -205,7 +206,12 @@ export default function ClassPage() {
 
       if (error) {
         console.error("Assignment insert error (fallback):", error);
-        alert("Failed to create assignment. Check console.");
+        toast.error(
+          locale === "ro"
+            ? "Tema nu a putut fi creată."
+            : "The assignment could not be created.",
+          { description: error.message }
+        );
         return;
       }
     }

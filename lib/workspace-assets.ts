@@ -1,16 +1,25 @@
+import {
+  isWorkspaceImageId,
+  isWorkspaceImageMimeType,
+  MAX_WORKSPACE_IMAGE_BYTES,
+  WORKSPACE_IMAGE_BUCKET,
+  WORKSPACE_IMAGE_MIME_TYPES,
+  WORKSPACE_IMAGE_SCHEME,
+} from "@/lib/workspace-asset-contract";
+
+export { MAX_WORKSPACE_IMAGE_BYTES, WORKSPACE_IMAGE_SCHEME };
+
 const DATABASE_NAME = "scripticx-workspace-assets";
 const DATABASE_VERSION = 1;
 const IMAGE_STORE = "images";
+const CLOUD_ASSET_STATE_PREFIX = "scripticx:workspace-images:cloud:v1";
 
-export const WORKSPACE_IMAGE_SCHEME = "workspace-image://";
-export const MAX_WORKSPACE_IMAGE_BYTES = 8 * 1024 * 1024;
+const allowedImageTypes = new Set<string>(WORKSPACE_IMAGE_MIME_TYPES);
 
-const allowedImageTypes = new Set([
-  "image/gif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+async function workspaceSupabase() {
+  const { supabase } = await import("@/lib/supabase");
+  return supabase;
+}
 
 type StoredWorkspaceImage = {
   blob: Blob;
@@ -24,6 +33,7 @@ type StoredWorkspaceImage = {
 };
 
 export type WorkspaceImageAsset = Omit<StoredWorkspaceImage, "blob" | "key" | "userId"> & {
+  cloudSynced: boolean;
   url: string;
 };
 
@@ -43,7 +53,7 @@ export class WorkspaceAssetError extends Error {
 let databasePromise: Promise<IDBDatabase> | null = null;
 
 export function workspaceImageUrl(assetId: string) {
-  if (!/^[a-zA-Z0-9_-]{8,128}$/.test(assetId)) {
+  if (!isWorkspaceImageId(assetId)) {
     throw new WorkspaceAssetError("invalid-file", "Invalid workspace image id.");
   }
   return `${WORKSPACE_IMAGE_SCHEME}${assetId}`;
@@ -57,6 +67,37 @@ export function parseWorkspaceImageId(value: string | undefined) {
 
 function imageKey(userId: string, assetId: string) {
   return `${userId}:${assetId}`;
+}
+
+function cloudStateKey(userId: string) {
+  return `${CLOUD_ASSET_STATE_PREFIX}:${encodeURIComponent(userId)}`;
+}
+
+function readCloudAssetIds(userId: string) {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const value = JSON.parse(window.localStorage.getItem(cloudStateKey(userId)) || "[]");
+    return new Set(
+      Array.isArray(value)
+        ? value.filter((item): item is string =>
+            typeof item === "string" && isWorkspaceImageId(item)
+          )
+        : []
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function markCloudAsset(userId: string, assetId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const ids = readCloudAssetIds(userId);
+    ids.add(assetId);
+    window.localStorage.setItem(cloudStateKey(userId), JSON.stringify([...ids]));
+  } catch {
+    // Cloud storage remains usable if local metadata is unavailable.
+  }
 }
 
 function openDatabase() {
@@ -159,25 +200,8 @@ async function validateImage(file: File) {
   }
 }
 
-export async function saveWorkspaceImage(userId: string, file: File) {
-  if (!userId) {
-    throw new WorkspaceAssetError("storage-unavailable", "Sign in to upload images.");
-  }
-  await validateImage(file);
-
+async function putLocalWorkspaceImage(stored: StoredWorkspaceImage) {
   const database = await openDatabase();
-  const id = crypto.randomUUID();
-  const stored: StoredWorkspaceImage = {
-    blob: file,
-    createdAt: new Date().toISOString(),
-    id,
-    key: imageKey(userId, id),
-    mimeType: file.type,
-    name: file.name.slice(0, 180),
-    size: file.size,
-    userId,
-  };
-
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(IMAGE_STORE, "readwrite");
     transaction.objectStore(IMAGE_STORE).put(stored);
@@ -191,21 +215,10 @@ export async function saveWorkspaceImage(userId: string, file: File) {
       );
     transaction.onabort = transaction.onerror;
   });
-
-  return {
-    createdAt: stored.createdAt,
-    id: stored.id,
-    mimeType: stored.mimeType,
-    name: stored.name,
-    size: stored.size,
-    url: workspaceImageUrl(stored.id),
-  } satisfies WorkspaceImageAsset;
 }
 
-export async function getWorkspaceImage(userId: string, assetId: string) {
-  if (!userId || !parseWorkspaceImageId(`${WORKSPACE_IMAGE_SCHEME}${assetId}`)) {
-    return null;
-  }
+export async function getLocalWorkspaceImage(userId: string, assetId: string) {
+  if (!userId || !isWorkspaceImageId(assetId)) return null;
   const database = await openDatabase();
 
   return new Promise<Blob | null>((resolve, reject) => {
@@ -225,4 +238,192 @@ export async function getWorkspaceImage(userId: string, assetId: string) {
         )
       );
   });
+}
+
+async function accessTokenForUser(userId: string) {
+  const supabase = await workspaceSupabase();
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+  if (error || !session?.access_token || session.user.id !== userId) {
+    throw new WorkspaceAssetError(
+      "storage-unavailable",
+      "Sign in again to synchronize this image."
+    );
+  }
+  return session.access_token;
+}
+
+async function cloudRequest<T>(userId: string, path: string, init?: RequestInit) {
+  const accessToken = await accessTokenForUser(userId);
+  const response = await fetch(path, {
+    ...init,
+    cache: "no-store",
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${accessToken}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+    },
+  });
+  const value = (await response.json().catch(() => null)) as T | null;
+  if (!response.ok || !value) {
+    const errorMessage =
+      value && typeof value === "object" && "error" in value
+        ? String(value.error)
+        : "Image storage is temporarily unavailable.";
+    throw new WorkspaceAssetError("storage-failed", errorMessage);
+  }
+  return value;
+}
+
+export async function syncWorkspaceImage(
+  userId: string,
+  assetId: string,
+  blob: Blob
+) {
+  if (
+    !userId ||
+    !isWorkspaceImageId(assetId) ||
+    !isWorkspaceImageMimeType(blob.type) ||
+    !blob.size ||
+    blob.size > MAX_WORKSPACE_IMAGE_BYTES
+  ) {
+    throw new WorkspaceAssetError("invalid-file", "Invalid workspace image.");
+  }
+
+  const ticket = await cloudRequest<{ path: string; token: string }>(
+    userId,
+    "/api/workspace/assets",
+    {
+      method: "POST",
+      body: JSON.stringify({ assetId, mimeType: blob.type, size: blob.size }),
+    }
+  );
+  if (!ticket.path || !ticket.token) {
+    throw new WorkspaceAssetError("storage-failed", "Invalid upload ticket.");
+  }
+  const supabase = await workspaceSupabase();
+  const { error } = await supabase.storage
+    .from(WORKSPACE_IMAGE_BUCKET)
+    .uploadToSignedUrl(ticket.path, ticket.token, blob, {
+      cacheControl: "31536000",
+      contentType: blob.type,
+    });
+  if (error) {
+    throw new WorkspaceAssetError("storage-failed", error.message);
+  }
+  markCloudAsset(userId, assetId);
+}
+
+export async function saveWorkspaceImage(userId: string, file: File) {
+  if (!userId) {
+    throw new WorkspaceAssetError("storage-unavailable", "Sign in to upload images.");
+  }
+  await validateImage(file);
+
+  const id = crypto.randomUUID();
+  const stored: StoredWorkspaceImage = {
+    blob: file,
+    createdAt: new Date().toISOString(),
+    id,
+    key: imageKey(userId, id),
+    mimeType: file.type,
+    name: file.name.slice(0, 180),
+    size: file.size,
+    userId,
+  };
+
+  await putLocalWorkspaceImage(stored);
+
+  let cloudSynced = false;
+  try {
+    await syncWorkspaceImage(userId, id, file);
+    cloudSynced = true;
+  } catch {
+    // The local copy stays available and the workspace sync retries it later.
+  }
+
+  return {
+    cloudSynced,
+    createdAt: stored.createdAt,
+    id: stored.id,
+    mimeType: stored.mimeType,
+    name: stored.name,
+    size: stored.size,
+    url: workspaceImageUrl(stored.id),
+  } satisfies WorkspaceImageAsset;
+}
+
+export async function getWorkspaceImage(userId: string, assetId: string) {
+  if (!userId || !isWorkspaceImageId(assetId)) return null;
+  try {
+    const local = await getLocalWorkspaceImage(userId, assetId);
+    if (local) return local;
+  } catch {
+    // A cloud copy can still be loaded when IndexedDB is unavailable.
+  }
+
+  try {
+    const ticket = await cloudRequest<{ url: string }>(
+      userId,
+      `/api/workspace/assets/${encodeURIComponent(assetId)}`
+    );
+    if (!ticket.url) return null;
+    const response = await fetch(ticket.url, { cache: "no-store" });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (
+      !isWorkspaceImageMimeType(blob.type) ||
+      !blob.size ||
+      blob.size > MAX_WORKSPACE_IMAGE_BYTES
+    ) {
+      return null;
+    }
+    markCloudAsset(userId, assetId);
+    try {
+      await putLocalWorkspaceImage({
+        blob,
+        createdAt: new Date().toISOString(),
+        id: assetId,
+        key: imageKey(userId, assetId),
+        mimeType: blob.type,
+        name: `workspace-image-${assetId}`,
+        size: blob.size,
+        userId,
+      });
+    } catch {
+      // Rendering can continue directly from the downloaded blob.
+    }
+    return blob;
+  } catch {
+    return null;
+  }
+}
+
+export async function syncWorkspaceImagesForNotes(
+  userId: string,
+  notes: Array<{ content: string }>
+) {
+  const ids = new Set<string>();
+  for (const note of notes) {
+    for (const match of note.content.matchAll(/workspace-image:\/\/([a-zA-Z0-9_-]{8,128})/g)) {
+      ids.add(match[1]);
+    }
+  }
+
+  const cloudIds = readCloudAssetIds(userId);
+  let synced = 0;
+  for (const assetId of [...ids].filter((id) => !cloudIds.has(id)).slice(0, 20)) {
+    let blob: Blob | null = null;
+    try {
+      blob = await getLocalWorkspaceImage(userId, assetId);
+    } catch {
+      continue;
+    }
+    if (!blob) continue;
+    await syncWorkspaceImage(userId, assetId, blob);
+    synced += 1;
+  }
+  return synced;
 }

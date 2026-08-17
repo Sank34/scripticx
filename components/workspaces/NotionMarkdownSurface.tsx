@@ -1,24 +1,32 @@
 "use client";
 
 import Image from "@tiptap/extension-image";
-import type { Editor } from "@tiptap/core";
+import { decodeHtmlEntities, type Editor } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
+import { TableKit } from "@tiptap/extension-table";
 import { Markdown } from "@tiptap/markdown";
+import { closeHistory } from "@tiptap/pm/history";
+import { NodeSelection } from "@tiptap/pm/state";
 import {
   EditorContent,
   NodeViewWrapper,
   ReactNodeViewRenderer,
   useEditor,
+  useEditorState,
   type NodeViewProps,
 } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   Bold,
   CheckSquare2,
   Code2,
+  Eye,
   Heading1,
   Heading2,
   ImagePlus,
@@ -28,11 +36,31 @@ import {
   ListOrdered,
   Pilcrow,
   Quote,
+  RotateCcw,
+  Columns3,
+  Rows3,
+  Scaling,
   Strikethrough,
+  Table2,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import {
+  DEFAULT_NOTE_IMAGE_PRESENTATION,
+  normalizeNoteImagePresentation,
+  parseNoteImageTitle,
+  serializeNoteImageMarkdown,
+  serializeNoteImageTitle,
+  type NoteImageAlignment,
+} from "@/lib/note-image";
+import {
+  MarkdownNoteTable,
+  MarkdownNoteTableCell,
+  MarkdownNoteTableHeader,
+} from "@/lib/note-table";
 import { getWorkspaceImage, parseWorkspaceImageId } from "@/lib/workspace-assets";
 import { cn } from "@/lib/utils";
 
@@ -86,19 +114,71 @@ export function NotionMarkdownSurface({
         <WorkspaceImageNodeView {...props} ro={ro} userId={userId} />
       );
       return (
-      Image.extend({
-        addNodeView() {
-          return ReactNodeViewRenderer(ImageNodeView);
-        },
-      }).configure({
-        allowBase64: false,
-        HTMLAttributes: {
-          class:
-            "my-7 max-h-[38rem] max-w-full rounded-xl border border-border/70 bg-muted/20 object-contain",
-          loading: "lazy",
-          referrerpolicy: "no-referrer",
-        },
-      })
+        Image.extend({
+          addAttributes() {
+            return {
+              ...this.parent?.(),
+              align: {
+                default: DEFAULT_NOTE_IMAGE_PRESENTATION.align,
+                parseHTML: (element) =>
+                  normalizeNoteImagePresentation({ align: element.dataset.align }).align,
+                renderHTML: (attributes) => ({ "data-align": attributes.align }),
+              },
+              opacity: {
+                default: DEFAULT_NOTE_IMAGE_PRESENTATION.opacity,
+                parseHTML: (element) =>
+                  normalizeNoteImagePresentation({ opacity: element.dataset.opacity }).opacity,
+                renderHTML: (attributes) => ({ "data-opacity": attributes.opacity }),
+              },
+              widthPercent: {
+                default: DEFAULT_NOTE_IMAGE_PRESENTATION.widthPercent,
+                parseHTML: (element) =>
+                  normalizeNoteImagePresentation({ widthPercent: element.dataset.width })
+                    .widthPercent,
+                renderHTML: (attributes) => ({ "data-width": attributes.widthPercent }),
+              },
+            };
+          },
+          parseMarkdown(token, helpers) {
+            // Marked exposes escaped image attributes (`\\\\` and HTML
+            // entities). Decode exactly once so save/reload is lossless.
+            const alt = decodeHtmlEntities(String(token.text ?? "")).replace(/\\\\/g, "\\");
+            const parsedTitle =
+              token.title === null || token.title === undefined
+                ? null
+                : decodeHtmlEntities(String(token.title));
+            const { ordinaryTitle, presentation } = parseNoteImageTitle(parsedTitle);
+            return helpers.createNode("image", {
+              alt,
+              src: token.href,
+              title: ordinaryTitle,
+              ...presentation,
+            });
+          },
+          renderMarkdown(node) {
+            const src = String(node.attrs?.src ?? "");
+            const alt = String(node.attrs?.alt ?? "");
+            const title = serializeNoteImageTitle({
+              align: node.attrs?.align,
+              opacity: node.attrs?.opacity,
+              ordinaryTitle:
+                typeof node.attrs?.title === "string" ? node.attrs.title : null,
+              widthPercent: node.attrs?.widthPercent,
+            });
+            return serializeNoteImageMarkdown({ alt, src, title });
+          },
+          addNodeView() {
+            return ReactNodeViewRenderer(ImageNodeView);
+          },
+        }).configure({
+          allowBase64: false,
+          HTMLAttributes: {
+            class:
+              "my-7 max-w-full rounded-xl border border-border/70 bg-muted/20 object-contain",
+            loading: "lazy",
+            referrerpolicy: "no-referrer",
+          },
+        })
       );
     },
     [ro, userId]
@@ -119,12 +199,25 @@ export function NotionMarkdownSurface({
       imageExtension,
       TaskList,
       TaskItem.configure({ nested: true }),
+      TableKit.configure({
+        table: false,
+        tableCell: false,
+        tableHeader: false,
+      }),
+      MarkdownNoteTable.configure({
+        allowTableNodeSelection: true,
+        renderWrapper: true,
+        resizable: false,
+      }),
+      MarkdownNoteTableCell,
+      MarkdownNoteTableHeader,
       Placeholder.configure({
         placeholder,
         showOnlyWhenEditable: true,
       }),
       Markdown.configure({
         indentation: { style: "space", size: 2 },
+        markedOptions: { gfm: true },
       }),
     ],
     editorProps: {
@@ -134,10 +227,20 @@ export function NotionMarkdownSurface({
           "notion-note-prose min-h-[calc(100vh-17rem)] outline-none selection:bg-primary/20",
         spellcheck: "true",
       },
+      handleKeyDown(view, event) {
+        return event.key === "Enter" && selectionIsInsideTable(view.state.selection.$from);
+      },
+      handlePaste(view, event) {
+        if (!selectionIsInsideTable(view.state.selection.$from)) return false;
+        const plainText = event.clipboardData?.getData("text/plain");
+        if (!plainText || !/[\r\n]/.test(plainText)) return false;
+        view.dispatch(view.state.tr.insertText(plainText.replace(/\s+/g, " ").trim()));
+        return true;
+      },
     },
     onUpdate: ({ editor: currentEditor }) => {
       if (applyingExternalRef.current) return;
-      const markdown = currentEditor.getMarkdown();
+      const markdown = currentEditor.markdown?.serialize(currentEditor.getJSON()) ?? currentEditor.getMarkdown();
       lastEmittedRef.current = markdown;
       onChange(markdown);
       syncVisualSlash(currentEditor, setSlash, setSlashIndex);
@@ -147,6 +250,22 @@ export function NotionMarkdownSurface({
       activeTextCallbackRef.current?.(currentEditor.state.selection.$from.parent.textContent.trim());
     },
   }, [imageExtension]);
+  const tableActive =
+    useEditorState({
+      editor,
+      selector: ({ editor: current }) => current?.isActive("table") ?? false,
+    }) ?? false;
+  const tableInsertionBlocked =
+    useEditorState({
+      editor,
+      selector: ({ editor: current }) =>
+        current
+          ? current.isActive("table") ||
+            current.isActive("bulletList") ||
+            current.isActive("orderedList") ||
+            current.isActive("taskList")
+          : false,
+    }) ?? false;
 
   useEffect(() => {
     if (!editor || content === lastEmittedRef.current) return;
@@ -210,6 +329,15 @@ export function NotionMarkdownSurface({
         icon: Code2,
         label: ro ? "Bloc de cod" : "Code block",
         run: (current: Editor) => current.chain().focus().toggleCodeBlock().run(),
+      },
+      {
+        id: "table",
+        icon: Table2,
+        label: ro ? "Tabel" : "Table",
+        run: (current: Editor) =>
+          tableInsertionIsBlocked(current)
+            ? false
+            : current.chain().focus().insertTable({ cols: 3, rows: 3, withHeaderRow: true }).run(),
       },
       {
         id: "image",
@@ -329,7 +457,14 @@ export function NotionMarkdownSurface({
       <BubbleMenu
         editor={editor}
         className="flex items-center gap-0.5 rounded-xl border border-border/70 bg-popover/95 p-1 shadow-[0_16px_50px_-18px_rgba(0,0,0,.5)] backdrop-blur-xl"
-        shouldShow={({ editor: current }) => !current.state.selection.empty}
+        pluginKey="noteTextBubbleMenu"
+        shouldShow={({ editor: current }) => {
+          const selection = current.state.selection;
+          return (
+            !selection.empty &&
+            !(selection instanceof NodeSelection && selection.node.type.name === "image")
+          );
+        }}
       >
         <RichButton
           active={editor.isActive("bold")}
@@ -364,9 +499,14 @@ export function NotionMarkdownSurface({
         </RichButton>
       </BubbleMenu>
 
+      <ImageBubbleMenu editor={editor} ro={ro} />
+
+      <TableBubbleMenu editor={editor} ro={ro} />
+
       <div className="sticky top-3 z-10 mb-6 flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-border/60 bg-background/88 p-1 shadow-sm backdrop-blur-xl">
         <RichButton
           active={editor.isActive("heading", { level: 1 })}
+          disabled={tableActive}
           label={ro ? "Titlu 1" : "Heading 1"}
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         >
@@ -374,6 +514,7 @@ export function NotionMarkdownSurface({
         </RichButton>
         <RichButton
           active={editor.isActive("heading", { level: 2 })}
+          disabled={tableActive}
           label={ro ? "Titlu 2" : "Heading 2"}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         >
@@ -381,6 +522,7 @@ export function NotionMarkdownSurface({
         </RichButton>
         <RichButton
           active={editor.isActive("bulletList")}
+          disabled={tableActive}
           label={ro ? "Listă" : "Bullet list"}
           onClick={() => editor.chain().focus().toggleBulletList().run()}
         >
@@ -388,6 +530,7 @@ export function NotionMarkdownSurface({
         </RichButton>
         <RichButton
           active={editor.isActive("orderedList")}
+          disabled={tableActive}
           label={ro ? "Listă numerotată" : "Ordered list"}
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
         >
@@ -395,6 +538,7 @@ export function NotionMarkdownSurface({
         </RichButton>
         <RichButton
           active={editor.isActive("taskList")}
+          disabled={tableActive}
           label={ro ? "Listă de sarcini" : "Checklist"}
           onClick={() => editor.chain().focus().toggleTaskList().run()}
         >
@@ -402,12 +546,25 @@ export function NotionMarkdownSurface({
         </RichButton>
         <RichButton
           active={editor.isActive("blockquote")}
+          disabled={tableActive}
           label={ro ? "Citat" : "Quote"}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
         >
           <Quote />
         </RichButton>
-        <RichButton active={false} label={ro ? "Adaugă imagine" : "Add image"} onClick={onOpenImage}>
+        <RichButton
+          active={editor.isActive("table")}
+          disabled={tableInsertionBlocked}
+          label={ro ? "Inserează tabel" : "Insert table"}
+          onClick={() => {
+            if (!tableInsertionIsBlocked(editor)) {
+              editor.chain().focus().insertTable({ cols: 3, rows: 3, withHeaderRow: true }).run();
+            }
+          }}
+        >
+          <Table2 />
+        </RichButton>
+        <RichButton active={false} disabled={tableActive} label={ro ? "Adaugă imagine" : "Add image"} onClick={onOpenImage}>
           <ImagePlus />
         </RichButton>
       </div>
@@ -456,6 +613,58 @@ export function NotionMarkdownSurface({
   );
 }
 
+function TableBubbleMenu({ editor, ro }: { editor: Editor; ro: boolean }) {
+  return (
+    <BubbleMenu
+      editor={editor}
+      className="flex items-center gap-0.5 rounded-xl border border-border/70 bg-popover/95 p-1 shadow-[0_16px_50px_-18px_rgba(0,0,0,.5)] backdrop-blur-xl"
+      pluginKey="noteTableBubbleMenu"
+      shouldShow={({ editor: current }) =>
+        current.isActive("table") && current.state.selection.empty
+      }
+    >
+      <div aria-label={ro ? "Opțiuni tabel" : "Table options"} className="flex items-center gap-0.5" role="toolbar">
+        <RichButton
+          active={false}
+          label={ro ? "Adaugă rând dedesubt" : "Add row below"}
+          onClick={() => editor.chain().focus().addRowAfter().run()}
+        >
+          <Rows3 />
+        </RichButton>
+        <RichButton
+          active={false}
+          label={ro ? "Adaugă coloană la dreapta" : "Add column right"}
+          onClick={() => editor.chain().focus().addColumnAfter().run()}
+        >
+          <Columns3 />
+        </RichButton>
+        <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-border" />
+        <RichButton
+          active={false}
+          label={ro ? "Șterge rândul" : "Delete row"}
+          onClick={() => editor.chain().focus().deleteRow().run()}
+        >
+          <Rows3 />
+        </RichButton>
+        <RichButton
+          active={false}
+          label={ro ? "Șterge coloana" : "Delete column"}
+          onClick={() => editor.chain().focus().deleteColumn().run()}
+        >
+          <Columns3 />
+        </RichButton>
+        <RichButton
+          active={false}
+          label={ro ? "Șterge tabelul" : "Delete table"}
+          onClick={() => editor.chain().focus().deleteTable().run()}
+        >
+          <Trash2 />
+        </RichButton>
+      </div>
+    </BubbleMenu>
+  );
+}
+
 function syncVisualSlash(
   editor: Editor,
   setSlash: React.Dispatch<
@@ -463,6 +672,11 @@ function syncVisualSlash(
   >,
   setIndex: React.Dispatch<React.SetStateAction<number>>
 ) {
+  if (editor.isActive("table")) {
+    setSlash(null);
+    setIndex(0);
+    return;
+  }
   const { $from } = editor.state.selection;
   if (!$from.parent.isTextblock) {
     setSlash(null);
@@ -485,18 +699,70 @@ function syncVisualSlash(
   });
 }
 
+type ResizeCorner = "bottom-left" | "bottom-right" | "top-left" | "top-right";
+const NOTE_IMAGE_PREVIEW_EVENT = "scripticx:note-image-preview";
 
-function WorkspaceImageNodeView({ node, ro, userId }: NodeViewProps & { ro: boolean; userId?: string }) {
+type ImageControlPreview = {
+  opacity?: number;
+  widthPercent?: number;
+};
+
+type ImageResizeSession = {
+  corner: ResizeCorner;
+  parentWidth: number;
+  pointerId: number;
+  startClientX: number;
+  startRenderedWidth: number;
+  width: number;
+};
+
+function WorkspaceImageNodeView({
+  editor,
+  getPos,
+  node,
+  ro,
+  selected,
+  userId,
+}: NodeViewProps & { ro: boolean; userId?: string }) {
   const source = String(node.attrs.src || "");
   const assetId = parseWorkspaceImageId(source);
+  const presentation = normalizeNoteImagePresentation(node.attrs);
   const [resolvedSource, setResolvedSource] = useState(assetId ? "" : source);
   const [failed, setFailed] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [dragWidth, setDragWidth] = useState<number | undefined>();
+  const [controlPreview, setControlPreview] = useState<ImageControlPreview | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const resizeSessionRef = useRef<ImageResizeSession | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const renderedWidth =
+    dragWidth === undefined
+      ? controlPreview?.widthPercent ?? presentation.widthPercent
+      : dragWidth;
+  const renderedOpacity = controlPreview?.opacity ?? presentation.opacity;
 
   useEffect(() => {
+    const frame = wrapperRef.current;
+    if (!frame) return;
+    const onPreview = (event: Event) => {
+      const detail = (event as CustomEvent<ImageControlPreview | null>).detail;
+      setControlPreview(detail ? (current) => ({ ...current, ...detail }) : null);
+    };
+    frame.addEventListener(NOTE_IMAGE_PREVIEW_EVENT, onPreview);
+    return () => frame.removeEventListener(NOTE_IMAGE_PREVIEW_EVENT, onPreview);
+  }, []);
+
+  useEffect(() => {
+    setControlPreview(null);
+  }, [presentation.align, presentation.opacity, presentation.widthPercent, selected]);
+
+  useEffect(() => {
+    setFailed(false);
     if (!assetId || !userId) {
       setResolvedSource(source);
       return;
     }
+    setResolvedSource("");
     let active = true;
     let objectUrl = "";
     void getWorkspaceImage(userId, assetId)
@@ -517,36 +783,441 @@ function WorkspaceImageNodeView({ node, ro, userId }: NodeViewProps & { ro: bool
     };
   }, [assetId, source, userId]);
 
+  const beginResize = (event: React.PointerEvent<HTMLSpanElement>, corner: ResizeCorner) => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper || resizeSessionRef.current) return;
+    const parentWidth = wrapper.parentElement?.getBoundingClientRect().width || 0;
+    if (parentWidth <= 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const frame = wrapper.getBoundingClientRect();
+    const startRenderedWidth =
+      normalizeNoteImagePresentation({
+        widthPercent: (frame.width / parentWidth) * 100,
+      }).widthPercent ?? 100;
+    resizeSessionRef.current = {
+      corner,
+      parentWidth,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startRenderedWidth,
+      width: startRenderedWidth,
+    };
+    setDragWidth(startRenderedWidth);
+    setIsResizing(true);
+  };
+
+  const previewResize = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const session = resizeSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const horizontalDirection = session.corner.endsWith("left") ? -1 : 1;
+    const anchorFactor = presentation.align === "center" ? 2 : 1;
+    const pixelDelta =
+      (event.clientX - session.startClientX) * horizontalDirection * anchorFactor;
+    const startPixels = (session.startRenderedWidth / 100) * session.parentWidth;
+    const width = normalizeNoteImagePresentation({
+      widthPercent: ((startPixels + pixelDelta) / session.parentWidth) * 100,
+    }).widthPercent ?? session.startRenderedWidth;
+    session.width = width;
+    setDragWidth(width);
+  };
+
+  const commitResize = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const session = resizeSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    resizeSessionRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsResizing(false);
+    const widthPercent = Number(session.width.toFixed(2));
+    if (Math.abs(widthPercent - session.startRenderedWidth) >= 0.01) {
+      // A complete pointer drag deliberately creates one undoable document transaction.
+      commitImageNodeAttributes(editor, getPos, node, { widthPercent });
+    }
+    window.requestAnimationFrame(() => setDragWidth(undefined));
+  };
+
+  const cancelResize = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const session = resizeSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    resizeSessionRef.current = null;
+    setIsResizing(false);
+    setDragWidth(undefined);
+  };
+
+  const resizeCorners: ResizeCorner[] =
+    presentation.align === "left"
+      ? ["top-right", "bottom-right"]
+      : presentation.align === "right"
+        ? ["top-left", "bottom-left"]
+        : ["top-left", "top-right", "bottom-left", "bottom-right"];
+
   return (
-    <NodeViewWrapper className="my-7">
-      {resolvedSource && !failed ? (
-        // eslint-disable-next-line @next/next/no-img-element -- may be an IndexedDB object URL.
-        <img
-          alt={String(node.attrs.alt || "")}
-          className="max-h-[38rem] max-w-full rounded-xl border border-border/70 bg-muted/20 object-contain"
-          decoding="async"
-          referrerPolicy="no-referrer"
-          src={resolvedSource}
-        />
-      ) : (
-        <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 text-sm text-muted-foreground">
-          {failed
-            ? String(node.attrs.alt || (ro ? "Imagine indisponibilă" : "Image unavailable"))
-            : ro ? "Se încarcă imaginea…" : "Loading image…"}
-        </div>
+    <NodeViewWrapper
+      className={cn(
+        "my-7 flex w-full",
+        presentation.align === "left" && "justify-start",
+        presentation.align === "center" && "justify-center",
+        presentation.align === "right" && "justify-end"
       )}
+      contentEditable={false}
+    >
+      <div
+        className={cn(
+          "relative max-w-full ease-out",
+          renderedWidth !== null && "min-w-[20%]",
+          "transition-opacity duration-150",
+          selected && "rounded-xl ring-2 ring-primary/55 ring-offset-2 ring-offset-background"
+        )}
+        data-drag-handle
+        data-note-image-frame
+        ref={wrapperRef}
+        style={{ width: renderedWidth === null ? "fit-content" : `${renderedWidth}%` }}
+      >
+        {resolvedSource && !failed ? (
+          // eslint-disable-next-line @next/next/no-img-element -- may be an IndexedDB object URL.
+          <img
+            alt={String(node.attrs.alt || "")}
+            className="block h-auto max-w-full rounded-xl border border-border/70 bg-muted/20 object-contain shadow-sm"
+            decoding="async"
+            draggable={false}
+            ref={imageRef}
+            referrerPolicy="no-referrer"
+            src={resolvedSource}
+            style={{
+              opacity: renderedOpacity / 100,
+              width: renderedWidth === null ? "auto" : "100%",
+            }}
+            title={typeof node.attrs.title === "string" ? node.attrs.title : undefined}
+          />
+        ) : (
+          <div
+            className="flex min-h-32 min-w-40 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 text-sm text-muted-foreground"
+            style={{ opacity: renderedOpacity / 100 }}
+          >
+            {failed
+              ? String(node.attrs.alt || (ro ? "Imagine indisponibilă" : "Image unavailable"))
+              : ro ? "Se încarcă imaginea…" : "Loading image…"}
+          </div>
+        )}
+        {selected
+          ? resizeCorners.map(
+              (corner) => (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute z-10 size-3 touch-none rounded-[3px] border-2 border-background bg-primary shadow-sm after:absolute after:-inset-2 after:content-['']",
+                    corner === "top-left" && "-left-1.5 -top-1.5 cursor-nwse-resize",
+                    corner === "top-right" && "-right-1.5 -top-1.5 cursor-nesw-resize",
+                    corner === "bottom-left" && "-bottom-1.5 -left-1.5 cursor-nesw-resize",
+                    corner === "bottom-right" && "-bottom-1.5 -right-1.5 cursor-nwse-resize"
+                  )}
+                  key={corner}
+                  onPointerCancel={cancelResize}
+                  onPointerDown={(event) => beginResize(event, corner)}
+                  onLostPointerCapture={cancelResize}
+                  onPointerMove={previewResize}
+                  onPointerUp={commitResize}
+                />
+              )
+            )
+          : null}
+        {selected && isResizing ? (
+          <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-foreground/85 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-background shadow-sm">
+            {Math.round(renderedWidth ?? 100)}%
+          </span>
+        ) : null}
+      </div>
     </NodeViewWrapper>
+  );
+}
+
+function ImageBubbleMenu({ editor, ro }: { editor: Editor; ro: boolean }) {
+  const presentation = useEditorState({
+    editor,
+    selector: ({ editor: current }) =>
+      normalizeNoteImagePresentation(current.getAttributes("image")),
+  });
+  const selectedImageKey = useEditorState({
+    editor,
+    selector: ({ editor: current }) => {
+      const selection = current.state.selection;
+      return selection instanceof NodeSelection && selection.node.type.name === "image"
+        ? `${selection.from}:${String(selection.node.attrs.src || "")}`
+        : "none";
+    },
+  });
+  const updatePresentation = (attributes: {
+    align?: NoteImageAlignment;
+    opacity?: number;
+    widthPercent?: number | null;
+  }) => {
+    commitSelectedImageAttributes(editor, attributes);
+  };
+  const displayedWidth = presentation.widthPercent ?? 100;
+
+  return (
+    <BubbleMenu
+      editor={editor}
+      className="max-w-[calc(100vw-1rem)] overflow-x-auto rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground shadow-[0_16px_50px_-18px_rgba(0,0,0,.5)] backdrop-blur-xl"
+      getReferencedVirtualElement={() => {
+        const selection = editor.state.selection;
+        if (!(selection instanceof NodeSelection) || selection.node.type.name !== "image") {
+          return null;
+        }
+        const nodeDom = editor.view.nodeDOM(selection.from);
+        if (!(nodeDom instanceof HTMLElement)) return null;
+        return nodeDom.querySelector<HTMLElement>("[data-note-image-frame]") || nodeDom;
+      }}
+      pluginKey="noteImageBubbleMenu"
+      shouldShow={({ editor: current }) => {
+        const selection = current.state.selection;
+        return selection instanceof NodeSelection && selection.node.type.name === "image";
+      }}
+    >
+      <div
+        aria-label={ro ? "Opțiuni imagine" : "Image options"}
+        className="flex min-w-max items-center gap-1"
+        role="toolbar"
+      >
+        <div className="flex items-center gap-0.5 border-r border-border/70 pr-1">
+          <RichButton
+            active={presentation.align === "left"}
+            label={ro ? "Aliniază imaginea la stânga" : "Align image left"}
+            onClick={() => updatePresentation({ align: "left" })}
+          >
+            <AlignLeft />
+          </RichButton>
+          <RichButton
+            active={presentation.align === "center"}
+            label={ro ? "Centrează imaginea" : "Center image"}
+            onClick={() => updatePresentation({ align: "center" })}
+          >
+            <AlignCenter />
+          </RichButton>
+          <RichButton
+            active={presentation.align === "right"}
+            label={ro ? "Aliniază imaginea la dreapta" : "Align image right"}
+            onClick={() => updatePresentation({ align: "right" })}
+          >
+            <AlignRight />
+          </RichButton>
+        </div>
+
+        <ImageControlSlider
+          icon={Scaling}
+          key={`${selectedImageKey}:width:${presentation.widthPercent ?? "auto"}`}
+          label={ro ? "Lățimea imaginii" : "Image width"}
+          min={20}
+          onCancel={() => clearSelectedImagePreview(editor)}
+          onPreview={(value) => previewSelectedImageAttributes(editor, { widthPercent: value })}
+          onValueCommit={(value) => updatePresentation({ widthPercent: value })}
+          value={displayedWidth}
+        />
+        <ImageControlSlider
+          icon={Eye}
+          key={`${selectedImageKey}:opacity:${presentation.opacity}`}
+          label={ro ? "Opacitatea imaginii" : "Image opacity"}
+          min={10}
+          onCancel={() => clearSelectedImagePreview(editor)}
+          onPreview={(value) => previewSelectedImageAttributes(editor, { opacity: value })}
+          onValueCommit={(value) => updatePresentation({ opacity: value })}
+          value={presentation.opacity}
+        />
+        <Button
+          aria-label={ro ? "Resetează aspectul imaginii" : "Reset image appearance"}
+          className="ml-0.5 size-8 shrink-0"
+          onClick={() => updatePresentation(DEFAULT_NOTE_IMAGE_PRESENTATION)}
+          size="icon"
+          title={ro ? "Resetează" : "Reset"}
+          type="button"
+          variant="ghost"
+        >
+          <RotateCcw className="size-4" />
+        </Button>
+      </div>
+    </BubbleMenu>
+  );
+}
+
+function commitSelectedImageAttributes(
+  editor: Editor,
+  attributes: {
+    align?: NoteImageAlignment;
+    opacity?: number;
+    widthPercent?: number | null;
+  }
+) {
+  const selection = editor.state.selection;
+  if (!(selection instanceof NodeSelection) || selection.node.type.name !== "image") return;
+  clearSelectedImagePreview(editor);
+  if (
+    Object.entries(attributes).every(
+      ([key, value]) => Object.is(selection.node.attrs[key], value)
+    )
+  ) {
+    return;
+  }
+  const transaction = closeHistory(
+    editor.state.tr.setNodeMarkup(selection.from, undefined, {
+      ...selection.node.attrs,
+      ...attributes,
+    })
+  );
+  editor.view.dispatch(transaction);
+  closeImageHistoryEvent(editor);
+}
+
+function commitImageNodeAttributes(
+  editor: Editor,
+  getPos: NodeViewProps["getPos"],
+  originalNode: NodeViewProps["node"],
+  attributes: { widthPercent: number }
+) {
+  const position = getPos();
+  if (typeof position !== "number") return;
+  const currentNode = editor.state.doc.nodeAt(position);
+  if (
+    !currentNode ||
+    currentNode.type.name !== "image" ||
+    currentNode.attrs.src !== originalNode.attrs.src
+  ) {
+    return;
+  }
+  if (
+    Object.entries(attributes).every(
+      ([key, value]) => Object.is(currentNode.attrs[key], value)
+    )
+  ) {
+    return;
+  }
+  const transaction = closeHistory(
+    editor.state.tr.setNodeMarkup(position, undefined, {
+      ...currentNode.attrs,
+      ...attributes,
+    })
+  );
+  editor.view.dispatch(transaction);
+  closeImageHistoryEvent(editor);
+}
+
+function closeImageHistoryEvent(editor: Editor) {
+  editor.view.dispatch(closeHistory(editor.state.tr).setMeta("addToHistory", false));
+}
+
+function previewSelectedImageAttributes(
+  editor: Editor,
+  attributes: { opacity?: number; widthPercent?: number }
+) {
+  const selection = editor.state.selection;
+  if (!(selection instanceof NodeSelection) || selection.node.type.name !== "image") return;
+  const nodeDom = editor.view.nodeDOM(selection.from);
+  if (!(nodeDom instanceof HTMLElement)) return;
+  const frame = nodeDom.querySelector<HTMLElement>("[data-note-image-frame]");
+  if (!frame) return;
+  frame.dispatchEvent(new CustomEvent(NOTE_IMAGE_PREVIEW_EVENT, { detail: attributes }));
+}
+
+function clearSelectedImagePreview(editor: Editor) {
+  const selection = editor.state.selection;
+  if (!(selection instanceof NodeSelection) || selection.node.type.name !== "image") return;
+  const nodeDom = editor.view.nodeDOM(selection.from);
+  if (!(nodeDom instanceof HTMLElement)) return;
+  nodeDom
+    .querySelector<HTMLElement>("[data-note-image-frame]")
+    ?.dispatchEvent(new CustomEvent(NOTE_IMAGE_PREVIEW_EVENT, { detail: null }));
+}
+
+function ImageControlSlider({
+  icon: Icon,
+  label,
+  min,
+  onCancel,
+  onPreview,
+  onValueCommit,
+  value,
+}: {
+  icon: typeof Scaling;
+  label: string;
+  min: number;
+  onCancel: () => void;
+  onPreview: (value: number) => void;
+  onValueCommit: (value: number) => void;
+  value: number;
+}) {
+  const [draft, setDraft] = useState<number | null>(null);
+  const draftRef = useRef<number | null>(null);
+  const displayedValue = draft ?? value;
+
+  const cancelDraft = () => {
+    draftRef.current = null;
+    setDraft(null);
+    onCancel();
+  };
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg px-1.5 py-1" title={label}>
+      <Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+      <Slider
+        aria-label={label}
+        className="w-20 sm:w-24"
+        max={100}
+        min={min}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          cancelDraft();
+        }}
+        onLostPointerCapture={() => {
+          window.queueMicrotask(() => {
+            if (draftRef.current !== null) cancelDraft();
+          });
+        }}
+        onPointerCancel={cancelDraft}
+        onValueChange={(values) => {
+          const next = values[0] ?? displayedValue;
+          draftRef.current = next;
+          setDraft(next);
+          onPreview(next);
+        }}
+        onValueCommit={(values) => {
+          const next = values[0] ?? displayedValue;
+          draftRef.current = null;
+          onValueCommit(next);
+          setDraft(null);
+        }}
+        step={1}
+        value={[displayedValue]}
+      />
+      <output
+        aria-label={`${label}: ${Math.round(displayedValue)}%`}
+        className="w-9 text-right text-[11px] font-medium tabular-nums text-muted-foreground"
+      >
+        {Math.round(displayedValue)}%
+      </output>
+    </div>
   );
 }
 
 function RichButton({
   active,
   children,
+  disabled = false,
   label,
   onClick,
 }: {
   active: boolean;
   children: React.ReactElement;
+  disabled?: boolean;
   label: string;
   onClick: () => void;
 }) {
@@ -555,6 +1226,7 @@ function RichButton({
       aria-label={label}
       aria-pressed={active}
       className={cn("size-8 shrink-0", active && "bg-accent text-accent-foreground")}
+      disabled={disabled}
       onClick={onClick}
       size="icon"
       title={label}
@@ -563,5 +1235,22 @@ function RichButton({
     >
       {children}
     </Button>
+  );
+}
+
+function selectionIsInsideTable(position: import("@tiptap/pm/model").ResolvedPos) {
+  for (let depth = position.depth; depth >= 0; depth -= 1) {
+    const name = position.node(depth).type.name;
+    if (name === "tableCell" || name === "tableHeader") return true;
+  }
+  return false;
+}
+
+function tableInsertionIsBlocked(editor: Editor) {
+  return (
+    editor.isActive("table") ||
+    editor.isActive("bulletList") ||
+    editor.isActive("orderedList") ||
+    editor.isActive("taskList")
   );
 }

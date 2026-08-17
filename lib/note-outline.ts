@@ -10,25 +10,13 @@ export type NoteOutlineItem = {
 
 export type VisualMarkdownSupport = {
   supported: boolean;
-  unsupported: Array<"footnotes" | "frontmatter" | "linked-images" | "raw-html" | "tables">;
+  unsupported: Array<
+    "footnotes" | "frontmatter" | "linked-images" | "nested-tables" | "raw-html"
+  >;
 };
 
 export function getVisualMarkdownSupport(markdown: string): VisualMarkdownSupport {
   const unsupported: VisualMarkdownSupport["unsupported"] = [];
-  const lines = markdown.split("\n");
-  const delimiterCell = /^:?-+:?$/;
-  const isTableDelimiter = (line: string) => {
-    const trimmed = line.trim();
-    if (!trimmed.includes("|")) return false;
-    const cells = splitTableRow(trimmed);
-    // A pipe-wrapped, single-column table (`| A |` / `| --- |`) is valid GFM.
-    // Rows without boundary pipes still need at least one separator and
-    // therefore naturally produce two or more cells here.
-    return cells.length >= 1 && cells.every((cell) => delimiterCell.test(cell.trim()));
-  };
-  if (lines.some((line, index) => index > 0 && isTableDelimiter(line) && lines[index - 1].includes("|"))) {
-    unsupported.push("tables");
-  }
   if (/\[\^[^\]]+\]|^\s*\[\^[^\]]+\]:/m.test(markdown)) unsupported.push("footnotes");
   if (/^(?:\uFEFF)?---\s*\n[\s\S]*?\n(?:---|\.\.\.)\s*(?:\n|$)/.test(markdown)) {
     unsupported.push("frontmatter");
@@ -37,7 +25,41 @@ export function getVisualMarkdownSupport(markdown: string): VisualMarkdownSuppor
     unsupported.push("raw-html");
   }
   if (containsLinkedImage(markdown)) unsupported.push("linked-images");
+  if (containsNestedTable(markdown)) unsupported.push("nested-tables");
   return { supported: unsupported.length === 0, unsupported };
+}
+
+function containsNestedTable(markdown: string) {
+  const lines = markdown.split("\n");
+  let fence: { character: "`" | "~"; length: number } | null = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      const character = fenceMatch[1][0] as "`" | "~";
+      if (!fence) fence = { character, length: fenceMatch[1].length };
+      else if (fence.character === character && fenceMatch[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (fence || index === 0 || !isTableDelimiter(line)) continue;
+
+    const header = lines[index - 1];
+    if (
+      /^\s*(?:>|[-+*]\s+|\d+[.)]\s+)/.test(header) ||
+      /^\s{2,}\S/.test(header) ||
+      /^\s{2,}\S/.test(line)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isTableDelimiter(line: string) {
+  const value = line.trim();
+  return value.includes("|") && /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?$/.test(value);
 }
 
 export function buildNoteOutline(markdown: string): NoteOutlineItem[] {
@@ -98,31 +120,6 @@ function createHeading(text: string, lineIndex: number, offset: number, depth: n
     offset,
     text: cleanOutlineText(text),
   };
-}
-
-function splitTableRow(line: string) {
-  let value = line;
-  if (value.startsWith("|")) value = value.slice(1);
-  if (value.endsWith("|")) value = value.slice(0, -1);
-  const cells: string[] = [];
-  let current = "";
-  let escaped = false;
-  for (const character of value) {
-    if (escaped) {
-      current += character;
-      escaped = false;
-    } else if (character === "\\") {
-      current += character;
-      escaped = true;
-    } else if (character === "|") {
-      cells.push(current);
-      current = "";
-    } else {
-      current += character;
-    }
-  }
-  cells.push(current);
-  return cells;
 }
 
 function containsLinkedImage(markdown: string) {

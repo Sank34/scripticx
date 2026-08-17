@@ -6,6 +6,11 @@ import remarkGfm from "remark-gfm";
 
 import { Separator } from "@/components/ui/separator";
 import {
+  normalizeNoteImagePresentation,
+  parseNoteImageTitle,
+  type NoteImagePresentation,
+} from "@/lib/note-image";
+import {
   getWorkspaceImage,
   parseWorkspaceImageId,
 } from "@/lib/workspace-assets";
@@ -13,9 +18,11 @@ import { cn } from "@/lib/utils";
 
 export function Markdown({
   children,
+  eagerImages = false,
   workspaceImageUserId,
 }: {
   children: string;
+  eagerImages?: boolean;
   workspaceImageUserId?: string;
 }) {
   return (
@@ -60,32 +67,48 @@ export function Markdown({
               {children}
             </a>
           ),
-          img: ({ alt, className, src }) => {
+          img: ({ alt, className, src, title }) => {
             const imageSource = typeof src === "string" ? src : undefined;
             const assetId = parseWorkspaceImageId(imageSource);
+            const { ordinaryTitle, presentation } = parseNoteImageTitle(title);
             if (assetId && workspaceImageUserId) {
               return (
                 <WorkspaceMarkdownImage
                   alt={alt || ""}
                   assetId={assetId}
+                  eager={eagerImages}
+                  ordinaryTitle={ordinaryTitle}
+                  presentation={presentation}
                   userId={workspaceImageUserId}
                 />
               );
             }
             if (!imageSource) return null;
             return (
-              // eslint-disable-next-line @next/next/no-img-element -- Markdown images can use arbitrary external URLs.
-              <img
-                alt={alt || ""}
-                className={cn(
-                  "my-5 h-auto max-h-[36rem] max-w-full rounded-xl border bg-muted/20 object-contain",
-                  className
-                )}
-                decoding="async"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                src={imageSource}
-              />
+              <MarkdownImageFrame presentation={presentation}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- Markdown images can use arbitrary external URLs. */}
+                <img
+                  alt={alt || ""}
+                  className={cn(
+                    "block h-auto w-full max-w-full rounded-xl border bg-muted/20 object-contain shadow-sm",
+                    className
+                  )}
+                  decoding="async"
+                  data-note-image-alt={alt || ""}
+                  data-note-image-source={imageSource}
+                  loading={eagerImages ? "eager" : "lazy"}
+                  referrerPolicy="no-referrer"
+                  src={imageSource}
+                  style={{
+                    display: "block",
+                    height: "auto",
+                    margin: 0,
+                    maxWidth: "100%",
+                    width: presentation.widthPercent === null ? "auto" : "100%",
+                  }}
+                  title={ordinaryTitle || undefined}
+                />
+              </MarkdownImageFrame>
             );
           },
           ul: ({ children }) => (
@@ -98,7 +121,7 @@ export function Markdown({
               {children}
             </ol>
           ),
-          li: ({ children }) => <li>{children}</li>,
+          li: ({ children, className }) => <li className={className}>{children}</li>,
           blockquote: ({ children }) => (
             <blockquote className="border-l-2 border-border pl-4 italic text-muted-foreground">
               {children}
@@ -131,24 +154,33 @@ export function Markdown({
           ),
           hr: () => <Separator className="my-8" />,
           table: ({ children }) => (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
+            <div
+              className="note-scrollbar my-5 overflow-x-auto rounded-xl border border-border/80 bg-card/35"
+              data-note-table-wrapper
+            >
+              <table className="min-w-full border-collapse text-sm">
                 {children}
               </table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className="border-b text-left">
+            <thead className="bg-muted/55 text-left">
               {children}
             </thead>
           ),
-          th: ({ children }) => (
-            <th className="px-3 py-2 font-semibold text-foreground">
+          th: ({ align, children, style }) => (
+            <th
+              className="min-w-32 border-b border-r border-border/75 px-3 py-2.5 font-semibold text-foreground last:border-r-0"
+              style={{ ...style, textAlign: tableTextAlign(align) ?? style?.textAlign }}
+            >
               {children}
             </th>
           ),
-          td: ({ children }) => (
-            <td className="border-b px-3 py-2 text-foreground/80">
+          td: ({ align, children, style }) => (
+            <td
+              className="min-w-32 border-b border-r border-border/65 px-3 py-2.5 align-top text-foreground/80 last:border-r-0"
+              style={{ ...style, textAlign: tableTextAlign(align) ?? style?.textAlign }}
+            >
               {children}
             </td>
           ),
@@ -163,13 +195,23 @@ export function Markdown({
   );
 }
 
+function tableTextAlign(value: unknown): React.CSSProperties["textAlign"] | undefined {
+  return value === "center" || value === "left" || value === "right" ? value : undefined;
+}
+
 function WorkspaceMarkdownImage({
   alt,
   assetId,
+  eager,
+  ordinaryTitle,
+  presentation,
   userId,
 }: {
   alt: string;
   assetId: string;
+  eager: boolean;
+  ordinaryTitle: string | null;
+  presentation: NoteImagePresentation;
   userId: string;
 }) {
   const [source, setSource] = useState<string | null>(null);
@@ -178,6 +220,8 @@ function WorkspaceMarkdownImage({
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
+    setFailed(false);
+    setSource(null);
 
     void getWorkspaceImage(userId, assetId)
       .then((blob) => {
@@ -201,29 +245,103 @@ function WorkspaceMarkdownImage({
 
   if (failed) {
     return (
-      <span className="my-4 flex min-h-24 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center text-xs text-muted-foreground">
-        {alt || "Image unavailable"}
-      </span>
+      <MarkdownImageFrame presentation={presentation}>
+        <span
+          className="flex min-h-24 min-w-40 w-full items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center text-xs text-muted-foreground"
+          data-note-image-alt={alt}
+          data-workspace-image-id={assetId}
+          role="img"
+        >
+          {alt || "Image unavailable"}
+        </span>
+      </MarkdownImageFrame>
     );
   }
 
   if (!source) {
     return (
-      <span
-        aria-label={alt || "Loading image"}
-        className="my-4 block h-40 animate-pulse rounded-xl border bg-muted/40"
-        role="img"
-      />
+      <MarkdownImageFrame presentation={presentation}>
+        <span
+          aria-label={alt || "Loading image"}
+          className="block h-40 min-w-40 w-full animate-pulse rounded-xl border bg-muted/40"
+          data-note-image-alt={alt}
+          data-workspace-image-id={assetId}
+          role="img"
+        />
+      </MarkdownImageFrame>
     );
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- Local IndexedDB blobs do not have a Next image URL.
-    <img
-      alt={alt}
-      className="my-5 h-auto max-h-[36rem] max-w-full rounded-xl border bg-muted/20 object-contain"
-      decoding="async"
-      src={source}
-    />
+    <MarkdownImageFrame presentation={presentation}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- Local IndexedDB blobs do not have a Next image URL. */}
+      <img
+        alt={alt}
+        className="block h-auto w-full max-w-full rounded-xl border bg-muted/20 object-contain shadow-sm"
+        decoding="async"
+        data-note-image-alt={alt}
+        data-workspace-image-id={assetId}
+        loading={eager ? "eager" : "lazy"}
+        src={source}
+        style={{
+          display: "block",
+          height: "auto",
+          margin: 0,
+          maxWidth: "100%",
+          width: presentation.widthPercent === null ? "auto" : "100%",
+        }}
+        title={ordinaryTitle || undefined}
+      />
+    </MarkdownImageFrame>
+  );
+}
+
+function MarkdownImageFrame({
+  children,
+  presentation: input,
+}: {
+  children: React.ReactNode;
+  presentation: NoteImagePresentation;
+}) {
+  const presentation = normalizeNoteImagePresentation(input);
+  return (
+    <span
+      className={cn(
+        "my-5 flex w-full",
+        presentation.align === "left" && "justify-start",
+        presentation.align === "center" && "justify-center",
+        presentation.align === "right" && "justify-end"
+      )}
+      style={{
+        display: "flex",
+        justifyContent:
+          presentation.align === "left"
+            ? "flex-start"
+            : presentation.align === "right"
+              ? "flex-end"
+              : "center",
+        margin: "1.25rem 0",
+        width: "100%",
+      }}
+    >
+      <span
+        className={cn(
+          "block max-w-full",
+          presentation.widthPercent !== null && "min-w-[20%]"
+        )}
+        style={{
+          display: "block",
+          maxWidth: "100%",
+          minWidth: presentation.widthPercent === null ? undefined : "20%",
+          opacity: presentation.opacity / 100,
+          width:
+            presentation.widthPercent === null
+              ? "fit-content"
+              : `${presentation.widthPercent}%`,
+        }}
+      >
+        {children}
+      </span>
+    </span>
   );
 }
