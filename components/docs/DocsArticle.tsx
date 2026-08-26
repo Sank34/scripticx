@@ -81,7 +81,7 @@ export function DocsArticle({
           </details>
         )}
 
-        <DocsMarkdown content={page.content} runnable={collection === "examples"} />
+        <DocsMarkdown content={page.content} sourceTitle={page.title} />
 
         <nav aria-label={locale === "ro" ? "Paginare documentație" : "Documentation pagination"} className="mt-16 grid grid-cols-1 gap-3 border-t border-border pt-8 sm:grid-cols-2">
           {previous ? (

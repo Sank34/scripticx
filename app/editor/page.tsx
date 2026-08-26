@@ -90,6 +90,12 @@ import {
   isCloudRunnableLanguage,
 } from "@/lib/code-runner";
 import {
+  editorCodeTransferKey,
+  getEditorTransferFileName,
+  isEditorLanguageKey,
+  parseEditorCodeTransfer,
+} from "@/lib/editor-code-transfer";
+import {
   createProjectDirectory,
   createProjectFile,
   createProjectTemplate,
@@ -126,7 +132,6 @@ import {
 } from "@/lib/github-integration";
 import {
   ChevronDown,
-  Code2,
   FileDown,
   FileCode2,
   Files,
@@ -299,10 +304,16 @@ function EditorContent() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const initialFiles = useMemo(
-    () => [
-      createProjectFile(
-        "main.msp",
-        searchParams.get("code") ??
+    () => {
+      const directCode = searchParams.get("code");
+      const requestedLanguage = searchParams.get("language");
+      const language = isEditorLanguageKey(requestedLanguage) ? requestedLanguage : "msp";
+      const fileName = getEditorTransferFileName(language, searchParams.get("file"));
+
+      return [
+        createProjectFile(
+          directCode === null ? "main.msp" : fileName,
+          directCode ??
           `X = 0
 WHILE X < 3
   PRINT X
@@ -310,12 +321,13 @@ WHILE X < 3
 END
 # this is an example code
 # add your code here`
-      ),
-    ],
+        ),
+      ];
+    },
     [searchParams]
   );
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(() => searchParams.get("title") ?? "");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -401,6 +413,7 @@ END
   const preserveProjectOnLiveLoadRef = useRef(false);
   const lastLiveErrorRef = useRef<string | null>(null);
   const lastEditorActionRef = useRef<string | null>(null);
+  const lastEditorImportRef = useRef<string | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
@@ -409,6 +422,62 @@ END
     media.addEventListener("change", synchronize);
     return () => media.removeEventListener("change", synchronize);
   }, []);
+
+  useEffect(() => {
+    const importId = searchParams.get("import");
+    if (!importId || lastEditorImportRef.current === importId) return;
+    lastEditorImportRef.current = importId;
+
+    let transfer = null;
+    try {
+      const key = editorCodeTransferKey(importId);
+      transfer = parseEditorCodeTransfer(window.sessionStorage.getItem(key));
+      window.sessionStorage.removeItem(key);
+    } catch {
+      transfer = null;
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("import");
+    window.history.replaceState(null, "", url);
+
+    if (!transfer) {
+      toast.error(
+        locale === "ro"
+          ? "Codul din documentație nu a putut fi deschis."
+          : "The documentation code could not be opened.",
+      );
+      return;
+    }
+
+    const importedFile = createProjectFile(transfer.fileName, transfer.code);
+    setSavedId(null);
+    setProjectIsPublic(true);
+    setTitle(transfer.title ?? "");
+    setDescription("");
+    setFiles([importedFile]);
+    setDirectories([]);
+    setActiveFileId(importedFile.id);
+    setOpenFileIds([importedFile.id]);
+    setDirty(false);
+    setActivityView("explorer");
+    setSidePanelOpen(true);
+    setProgram([]);
+    setVariables({});
+    setCurrentLine(0);
+    setOutput([]);
+    setStopped(false);
+    setErrorLine(null);
+    setInputVar(null);
+    setInputValue("");
+    setIsRunning(false);
+    setComplexityEnabled(false);
+    toast.success(
+      locale === "ro"
+        ? "Codul a fost deschis în editor."
+        : "Code opened in the editor.",
+    );
+  }, [locale, searchParams]);
 
   useEffect(() => {
     const requestedView = searchParams.get("view");
@@ -2142,10 +2211,7 @@ END
       <TooltipProvider>
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
           <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b bg-background px-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="grid size-7 shrink-0 place-items-center rounded-md border bg-muted/50">
-                <Code2 size={15} />
-              </div>
+            <div className="flex min-w-0 items-center">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-1.5 text-sm">
                   <span className="hidden font-medium text-muted-foreground sm:inline">ScripticX</span>

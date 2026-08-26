@@ -12,8 +12,8 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
+import { OpenCodeInEditorButton } from "@/components/docs/OpenCodeInEditorButton";
 import { useLanguage } from "@/components/LanguageProvider";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   prepareDocsMarkdown,
@@ -140,10 +140,12 @@ function stripAdmonitionMarker(children: ReactNode): ReactNode {
 
 export function DocsMarkdown({
   content,
-  runnable = false,
+  openInEditor = true,
+  sourceTitle,
 }: {
   content: string;
-  runnable?: boolean;
+  openInEditor?: boolean;
+  sourceTitle?: string;
 }) {
   const { locale } = useLanguage();
   const headingIds = new Map<string, number>();
@@ -328,6 +330,7 @@ export function DocsMarkdown({
             const code = isValidElement(child)
               ? reactText(child.props.children).replace(/\n$/, "")
               : reactText(children).replace(/\n$/, "");
+            const editorLanguage = docsLanguage(rawLanguage);
             const languageDefinition = findNoteCodeLanguage(rawLanguage || "plaintext");
             const options = codeBlockOptions(meta);
             return (
@@ -339,19 +342,21 @@ export function DocsMarkdown({
                   copyLabel={locale === "ro" ? "Copiază codul" : "Copy code"}
                   emptyLabel={locale === "ro" ? "Bloc de cod gol" : "Empty code block"}
                   fileName={options.fileName}
-                  language={docsLanguage(rawLanguage)}
+                  language={editorLanguage}
                   languageLabel={
                     languageDefinition?.label || getNoteCodeLanguageLabel(rawLanguage)
                   }
                   showLineNumbers={options.showLineNumbers && code.includes("\n")}
                 />
-                {runnable && docsLanguage(rawLanguage) === "msp" && code.trim() && (
+                {openInEditor && code.trim() && (
                   <div className="mt-2 flex justify-end">
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/editor?code=${encodeURIComponent(code)}`}>
-                        {locale === "ro" ? "Deschide în editor" : "Open in editor"}
-                      </Link>
-                    </Button>
+                    <OpenCodeInEditorButton
+                      code={code}
+                      fileName={options.fileName}
+                      label={locale === "ro" ? "Deschide în editor" : "Open in editor"}
+                      language={editorLanguage}
+                      sourceTitle={sourceTitle}
+                    />
                   </div>
                 )}
               </div>
