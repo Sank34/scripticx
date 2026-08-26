@@ -516,7 +516,7 @@ function CompetitionDetailContent() {
               >
                 <div className="flex h-full min-h-0 flex-col bg-muted/30">
                   <div className="flex h-11 shrink-0 items-center justify-between border-b px-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{copy.problems}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{copy.problems}</p>
                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{competition.problems.length}</Badge>
                   </div>
                   <ScrollArea className="min-h-0 flex-1">
@@ -632,7 +632,7 @@ function CompetitionDetailContent() {
                 <div className="flex h-full min-h-0 flex-col bg-background">
                   <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-muted/60 px-4 py-2">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{copy.prompt}</p>
+                      <p className="text-xs font-medium text-muted-foreground">{copy.prompt}</p>
                       <h2 className="truncate text-sm font-semibold">
                         {selectedProblem ? getLocalized(selectedProblem.problem.title_i18n, locale) : "—"}
                       </h2>
@@ -751,7 +751,7 @@ function CompetitionDetailContent() {
                             <div className="flex min-w-0 items-center gap-2">
                               <p className="truncate text-sm font-semibold">{entry.username}</p>
                               {podium && (
-                                <span className="hidden rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline-flex">
+                                <span className="hidden rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
                                   {rankLabel}
                                 </span>
                               )}
@@ -762,7 +762,7 @@ function CompetitionDetailContent() {
 
                         <div className="text-right">
                           <p className="font-mono text-sm font-semibold tabular-nums sm:text-base">{entry.total_points}</p>
-                          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{copy.points}</p>
+                          <p className="text-[10px] font-medium text-muted-foreground">{copy.points}</p>
                         </div>
                       </div>
                     );

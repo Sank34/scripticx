@@ -6,7 +6,7 @@ import RouteGuard from "@/components/RouteGuard";
 import { SectionCard } from "@/components/common/SectionCard";
 import { StatCard } from "@/components/common/StatCard";
 import { useAuth } from "@/hooks/useAuth";
-import { Award, Flame, Globe, Share2 } from "lucide-react";
+import { Award, Flame, Globe, Share2, Trophy } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 import { toast } from "sonner";
 
@@ -41,6 +41,7 @@ import {
   type SubmissionActivityAggregateRow,
   type SubmissionActivityHeatmap,
 } from "@/lib/submissionActivity";
+import { normalizeProfilePronouns } from "@/lib/profile-pronouns";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -62,6 +63,8 @@ type ProfileData = {
   banner: string | null;
   username: string | null;
   bio: string;
+  pronouns: string;
+  points: number;
   github: string;
   twitter: string;
   website: string;
@@ -118,6 +121,8 @@ function ProfileContent() {
         banner: null,
         username: null,
         bio: "",
+        pronouns: "",
+        points: 0,
         github: "",
         twitter: "",
         website: "",
@@ -218,6 +223,8 @@ function ProfileContent() {
         banner: validBanner ? profile.banner_url : null,
         username: profile?.username || null,
         bio: profile?.bio || "",
+        pronouns: normalizeProfilePronouns(profile?.pronouns) || "",
+        points: Number(profile?.total_score) || 0,
         github: profile?.github || "",
         twitter: profile?.twitter || "",
         website: profile?.website || "",
@@ -318,6 +325,8 @@ function ProfileContent() {
       banner: validBanner ? profile.banner_url : null,
       username: profile?.username || null,
       bio: profile?.bio || "",
+      pronouns: normalizeProfilePronouns(profile?.pronouns) || "",
+      points: Number(profile?.total_score) || 0,
       github: profile?.github || "",
       twitter: profile?.twitter || "",
       website: profile?.website || "",
@@ -349,6 +358,8 @@ function ProfileContent() {
   const banner = profileData?.banner || null;
   const username = profileData?.username || null;
   const bio = profileData?.bio || "";
+  const pronouns = profileData?.pronouns || "";
+  const points = profileData?.points || 0;
   const github = profileData?.github || "";
   const twitter = profileData?.twitter || "";
   const website = profileData?.website || "";
@@ -390,7 +401,7 @@ function ProfileContent() {
 
   if (loading || !user) {
     return (
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Skeleton className="w-16 h-16 rounded-full" />
@@ -491,9 +502,9 @@ function ProfileContent() {
   return (
     <div className="relative isolate min-h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
       {backgroundReward && <ProfileBackground reward={backgroundReward} />}
-      <div className="relative z-[1] mx-auto max-w-6xl space-y-6 p-6">
+      <div className="relative z-[1] mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
 
-      <div className="overflow-hidden rounded-3xl border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
+      <div className="overflow-hidden rounded-[var(--sx-radius-panel)] border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
         <div
           className="relative h-44 bg-muted bg-cover bg-center sm:h-52"
           style={
@@ -521,9 +532,16 @@ function ProfileContent() {
             />
 
             <div className="pb-1">
-              <h1 className="text-2xl font-bold">
-                {displayName}
-              </h1>
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <h1 className="text-2xl font-bold">
+                  {displayName}
+                </h1>
+                {pronouns && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {pronouns}
+                  </span>
+                )}
+              </div>
               {equippedTitle && (
                 <Badge variant="outline" className="mt-1.5 bg-background">
                   {equippedTitle}
@@ -579,6 +597,12 @@ function ProfileContent() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         <div className="space-y-6">
+
+          <StatCard
+            icon={<Trophy className="size-5 text-amber-500" />}
+            title={t("profile.points")}
+            value={points.toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}
+          />
 
           <Card>
             <CardHeader>

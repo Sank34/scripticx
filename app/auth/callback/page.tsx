@@ -3,9 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { api } from "@/lib/api";
-import { onboardingMetadataKeys } from "@/lib/onboarding";
+import { isEmailVerificationCallback } from "@/lib/auth-callback";
+import { publishEmailVerificationCompleted } from "@/lib/email-verification";
+import {
+  getOnboardingPersona,
+  onboardingMetadataKeys,
+  productTourStorageKey,
+} from "@/lib/onboarding";
+import { registrationProfileMetadataKeys } from "@/lib/registration-onboarding";
+import { supabase } from "@/lib/supabase";
 import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/button";
@@ -16,6 +24,7 @@ export default function AuthCallbackPage() {
   const { t } = useLanguage();
   const isFinalizing = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -25,6 +34,15 @@ export default function AuthCallbackPage() {
       if (isFinalizing.current) return;
 
       const params = new URLSearchParams(window.location.search);
+      const verificationFlow = isEmailVerificationCallback(
+        window.location.search,
+        window.location.hash
+      );
+      const requestedRoute = params.get("next");
+      const nextRoute =
+        requestedRoute?.startsWith("/") && !requestedRoute.startsWith("//")
+          ? requestedRoute
+          : null;
       const providerError =
         params.get("error_description") || params.get("error");
 
@@ -48,15 +66,53 @@ export default function AuthCallbackPage() {
 
       try {
         const existingProfile = await api.profiles.getProfile(user.id);
-        await api.profiles.ensureForUser(user);
-        if (!existingProfile) {
+        const ensuredProfile = await api.profiles.ensureForUser(user);
+        const completedOnboarding = Boolean(
+          user.user_metadata?.[onboardingMetadataKeys.completedAt]
+        );
+
+        if (completedOnboarding) {
+          const preferredUsername = String(
+            existingProfile?.username ||
+              ensuredProfile.username ||
+              user.user_metadata?.preferred_username ||
+              user.email?.split("@")[0] ||
+              "user"
+          );
+          const registrationBio =
+            user.user_metadata?.[registrationProfileMetadataKeys.bio];
+
+          await api.profiles.saveRegistrationProfile(
+            user.id,
+            preferredUsername,
+            typeof registrationBio === "string" ? registrationBio : undefined
+          );
+
+          const { error: workspaceError } = await supabase.rpc(
+            "provision_default_workspaces",
+            {
+              p_persona: getOnboardingPersona(user.user_metadata),
+              p_workspace_name: null,
+            }
+          );
+          if (workspaceError) throw workspaceError;
+
+          window.localStorage.setItem(productTourStorageKey, user.id);
+        } else if (!existingProfile) {
           const { error: metadataError } = await api.auth.updateUserMetadata({
             [onboardingMetadataKeys.required]: true,
           });
           if (metadataError) throw metadataError;
         }
         if (active) {
-          router.replace(getWorkspaceLandingRoute(user.user_metadata));
+          if (verificationFlow) {
+            publishEmailVerificationCompleted(user.id);
+            setVerified(true);
+          } else {
+            router.replace(
+              nextRoute || getWorkspaceLandingRoute(user.user_metadata)
+            );
+          }
         }
       } catch (profileError) {
         isFinalizing.current = false;
@@ -90,8 +146,8 @@ export default function AuthCallbackPage() {
   }, [router, t]);
 
   return (
-    <div className="flex min-h-[calc(100vh-140px)] items-center justify-center p-6">
-      <Card className="w-full max-w-md">
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-md shadow-sm">
         <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
           {error ? (
             <>
@@ -107,6 +163,20 @@ export default function AuthCallbackPage() {
               <Button asChild>
                 <Link href="/login">{t("authCallback.backToLogin")}</Link>
               </Button>
+            </>
+          ) : verified ? (
+            <>
+              <div className="flex size-12 items-center justify-center rounded-full border bg-foreground text-background">
+                <Check className="size-5" strokeWidth={2.5} />
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-xl font-semibold tracking-normal sm:text-2xl">
+                  {t("authCallback.verifiedTitle")}
+                </h1>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {t("authCallback.verifiedDescription")}
+                </p>
+              </div>
             </>
           ) : (
             <>

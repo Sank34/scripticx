@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   GraduationCap,
   ImagePlus,
   LoaderCircle,
+  Languages,
   Presentation,
   Route,
   Sparkles,
@@ -43,12 +44,19 @@ import {
 } from "@/lib/workspaces";
 
 type OnboardingExperienceProps = {
-  onComplete: (persona: OnboardingPersona) => void;
+  onComplete?: (persona: OnboardingPersona) => void;
   profile: ProfileSummary | null;
-  user: User;
+  user?: User | null;
+  registration?: {
+    email: string;
+    username: string;
+    onSubmit: (draft: OnboardingDraft) => Promise<boolean>;
+  };
 };
 
-const totalSteps = 6;
+const totalSteps = 8;
+
+type StepTransitionPhase = "entering" | "idle" | "leaving";
 
 const copy = {
   en: {
@@ -56,8 +64,10 @@ const copy = {
     bio: "A short bio",
     bioPlaceholder: "What are you curious to build or understand?",
     complete: "Start exploring",
+    createAccount: "Create account",
     continue: "Continue",
     emailVerified: "Signed in as",
+    registrationEmail: "Creating account for",
     experienceDescription: "We will tune examples and recommendations to your current pace.",
     experienceTitle: "Where are you starting from?",
     goalDescription: "Choose the outcome that matters most right now.",
@@ -65,7 +75,13 @@ const copy = {
     interestsDescription: "Pick as many as you like. You can change these later.",
     interestsTitle: "Choose your learning interests",
     language: "Language",
-    personaDescription: "Choose the space that best fits how you want to use ScripticX. You can switch workspaces later.",
+    languageTitle: "Choose your default language",
+    languageDescription: "ScripticX will switch immediately and remember this preference for your account.",
+    english: "English",
+    englishDescription: "Use ScripticX in English by default.",
+    romanian: "Romanian",
+    romanianDescription: "Folosește ScripticX în limba română.",
+    personaDescription: "Choose how you will use ScripticX. Students also keep a personal practice space; teacher accounts stay focused on class management.",
     personaTitle: "What brings you to ScripticX?",
     profileDescription: "This is how classmates and collaborators will recognize you.",
     profileTitle: "Make the space yours",
@@ -82,8 +98,10 @@ const copy = {
     bio: "O scurtă descriere",
     bioPlaceholder: "Ce ești curios să construiești sau să înțelegi?",
     complete: "Începe explorarea",
+    createAccount: "Creează contul",
     continue: "Continuă",
     emailVerified: "Autentificat ca",
+    registrationEmail: "Creezi contul pentru",
     experienceDescription: "Vom adapta exemplele și recomandările la ritmul tău actual.",
     experienceTitle: "De unde începi?",
     goalDescription: "Alege rezultatul care contează cel mai mult acum.",
@@ -91,7 +109,13 @@ const copy = {
     interestsDescription: "Poți alege oricâte. Le poți schimba mai târziu.",
     interestsTitle: "Alege ce vrei să aprofundezi",
     language: "Limbă",
-    personaDescription: "Alege spațiul potrivit modului în care vrei să folosești ScripticX. Vei putea schimba workspace-ul oricând.",
+    languageTitle: "Alege limba implicită",
+    languageDescription: "ScripticX va schimba imediat textele și va reține preferința pentru contul tău.",
+    english: "Engleză",
+    englishDescription: "Use ScripticX in English by default.",
+    romanian: "Română",
+    romanianDescription: "Folosește ScripticX în limba română.",
+    personaDescription: "Alege cum vei folosi ScripticX. Elevii păstrează și spațiul personal pentru practică, iar conturile de profesor rămân concentrate pe clase.",
     personaTitle: "Cum vrei să folosești ScripticX?",
     profileDescription: "Așa te vor recunoaște colegii și colaboratorii.",
     profileTitle: "Personalizează-ți spațiul",
@@ -126,10 +150,9 @@ const personaOptions: Array<{
     icon: Presentation,
     label: { en: "I am a teacher", ro: "Sunt profesor" },
     description: {
-      en: "Prepare a teaching workspace now; class collaboration is coming next.",
-      ro: "Pregătește spațiul de profesor; colaborarea cu clasele urmează.",
+      en: "Manage classes, students, assignments, deadlines and learning progress.",
+      ro: "Administrează clase, elevi, teme, deadline-uri și progresul de învățare.",
     },
-    badge: { en: "Preview", ro: "Preview" },
   },
   {
     id: "learner",
@@ -193,12 +216,19 @@ export function OnboardingExperience({
   onComplete,
   profile,
   user,
+  registration,
 }: OnboardingExperienceProps) {
   const { locale, setLocale } = useLanguage();
   const c = copy[locale === "ro" ? "ro" : "en"];
   const language = locale === "ro" ? "ro" : "en";
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [transitionDirection, setTransitionDirection] = useState<1 | -1>(1);
+  const [transitionPhase, setTransitionPhase] =
+    useState<StepTransitionPhase>("idle");
+  const [transitionLocked, setTransitionLocked] = useState(false);
+  const transitionTimerRef = useRef<number | null>(null);
+  const transitionFrameRef = useRef<number | null>(null);
   const [draft, setDraft] = useState<OnboardingDraft>(() => ({
     avatarFile: null,
     avatarPreview:
@@ -207,21 +237,33 @@ export function OnboardingExperience({
     experience: "beginner",
     goal: "learn-programming",
     interests: ["fundamentals", "visual-execution"],
+    language: locale === "ro" ? "ro" : "en",
     persona: "learner",
-    username: profile?.username || user.email?.split("@")[0] || "",
+    username:
+      profile?.username ||
+      registration?.username ||
+      user?.email?.split("@")[0] ||
+      "",
   }));
 
   useEffect(() => {
     return () => {
+      if (transitionTimerRef.current !== null) {
+        window.clearTimeout(transitionTimerRef.current);
+      }
+      if (transitionFrameRef.current !== null) {
+        window.cancelAnimationFrame(transitionFrameRef.current);
+      }
       if (draft.avatarFile && draft.avatarPreview?.startsWith("blob:")) {
         URL.revokeObjectURL(draft.avatarPreview);
       }
     };
   }, [draft.avatarFile, draft.avatarPreview]);
 
-  const initials = (draft.username || user.email || "S").slice(0, 2).toUpperCase();
+  const accountEmail = registration?.email || user?.email || "";
+  const initials = (draft.username || accountEmail || "S").slice(0, 2).toUpperCase();
   const normalizedUsername = normalizeOnboardingUsername(draft.username);
-  const canContinue = step !== 2 || normalizedUsername.length >= 3;
+  const canContinue = step !== 3 || normalizedUsername.length >= 3;
   const selectedGoal = useMemo(
     () => goalOptions.find((option) => option.id === draft.goal),
     [draft.goal]
@@ -259,11 +301,73 @@ export function OnboardingExperience({
     }));
   }
 
+  function chooseLanguage(nextLanguage: "en" | "ro") {
+    setDraft((current) => ({ ...current, language: nextLanguage }));
+    setLocale(nextLanguage);
+  }
+
+  function moveToStep(nextStep: number) {
+    const targetStep = Math.min(totalSteps - 1, Math.max(0, nextStep));
+    if (
+      targetStep === step ||
+      saving ||
+      transitionLocked
+    ) {
+      return;
+    }
+
+    const direction = targetStep > step ? 1 : -1;
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    setTransitionDirection(direction);
+
+    if (reducedMotion) {
+      setStep(targetStep);
+      return;
+    }
+
+    setTransitionLocked(true);
+    setTransitionPhase("leaving");
+    transitionTimerRef.current = window.setTimeout(() => {
+      setStep(targetStep);
+      setTransitionPhase("entering");
+      transitionFrameRef.current = window.requestAnimationFrame(() => {
+        transitionFrameRef.current = window.requestAnimationFrame(() => {
+          setTransitionPhase("idle");
+          transitionFrameRef.current = null;
+          transitionTimerRef.current = window.setTimeout(() => {
+            setTransitionLocked(false);
+            transitionTimerRef.current = null;
+          }, 300);
+        });
+      });
+    }, 180);
+  }
+
   async function finishOnboarding() {
     if (!canContinue || saving) return;
     setSaving(true);
 
     try {
+      if (registration) {
+        await registration.onSubmit({
+          ...draft,
+          avatarFile: null,
+          avatarPreview: null,
+        });
+        return;
+      }
+
+      if (!user) {
+        throw new Error(
+          language === "ro"
+            ? "Sesiunea contului nu este disponibilă."
+            : "The account session is unavailable."
+        );
+      }
+
       let avatarUrl = draft.avatarPreview?.startsWith("http")
         ? draft.avatarPreview
         : null;
@@ -293,11 +397,21 @@ export function OnboardingExperience({
         .eq("id", user.id);
       if (profileError) throw profileError;
 
+      const { error: workspaceError } = await supabase.rpc(
+        "provision_default_workspaces",
+        {
+          p_persona: draft.persona,
+          p_workspace_name: null,
+        }
+      );
+      if (workspaceError) throw workspaceError;
+
       const { error: metadataError } = await api.auth.updateUserMetadata({
         [onboardingMetadataKeys.completedAt]: new Date().toISOString(),
         [onboardingMetadataKeys.experience]: draft.experience,
         [onboardingMetadataKeys.goal]: draft.goal,
         [onboardingMetadataKeys.interests]: draft.interests,
+        [onboardingMetadataKeys.language]: draft.language,
         [onboardingMetadataKeys.persona]: draft.persona,
         [onboardingMetadataKeys.required]: false,
         [workspaceMetadataKeys.activeWorkspaceKind]: getDefaultWorkspaceKind(
@@ -309,7 +423,7 @@ export function OnboardingExperience({
 
       localStorage.setItem(productTourStorageKey, "pending");
       window.dispatchEvent(new Event("profile-updated"));
-      onComplete(draft.persona);
+      onComplete?.(draft.persona);
     } catch (error) {
       toast.error(
         language === "ro" ? "Nu am putut salva profilul." : "Could not save your profile.",
@@ -321,12 +435,12 @@ export function OnboardingExperience({
   }
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-sky-500 to-violet-500" />
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(14,165,233,0.12),transparent_42%),linear-gradient(to_bottom,rgba(255,255,255,0),rgba(248,250,252,0.65))] dark:bg-[radial-gradient(circle_at_50%_-20%,rgba(14,165,233,0.14),transparent_42%),linear-gradient(to_bottom,rgba(9,9,11,0),rgba(24,24,27,0.68))]" />
+    <div className="onboarding-screen-enter fixed inset-0 z-[120] overflow-hidden bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-1 bg-primary" />
+      <div className="pointer-events-none fixed inset-0 bg-muted/20" />
 
       <div className="relative mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col px-5 py-4 sm:px-8 sm:py-5">
-        <header className="flex shrink-0 items-center justify-between gap-4">
+        <header className="onboarding-reveal onboarding-reveal-header flex shrink-0 items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logoSCX.svg" alt="ScripticX" className="h-9 w-9 dark:invert" />
@@ -337,7 +451,7 @@ export function OnboardingExperience({
               <button
                 key={item}
                 type="button"
-                onClick={() => setLocale(item)}
+                onClick={() => chooseLanguage(item)}
                 className={cn(
                   "h-8 min-w-10 rounded-md px-2 text-xs font-semibold uppercase transition",
                   locale === item
@@ -352,7 +466,7 @@ export function OnboardingExperience({
           </div>
         </header>
 
-        <div className="mx-auto mt-4 flex w-full max-w-xl shrink-0 gap-2" aria-label={`Step ${step + 1} of ${totalSteps}`}>
+        <div className="onboarding-reveal onboarding-reveal-progress mx-auto mt-4 flex w-full max-w-xl shrink-0 gap-2" aria-label={`Step ${step + 1} of ${totalSteps}`}>
           {Array.from({ length: totalSteps }).map((_, index) => (
             <div
               key={index}
@@ -364,15 +478,76 @@ export function OnboardingExperience({
           ))}
         </div>
 
-        <main className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 items-center py-4 sm:py-6">
+        <main
+          className="onboarding-reveal onboarding-reveal-content mx-auto flex min-h-0 w-full max-w-5xl flex-1 items-center py-4 sm:py-6"
+          aria-live="polite"
+        >
           <div
             key={step}
-            className="w-full animate-in fade-in slide-in-from-bottom-6 duration-500"
+            className={cn(
+              "w-full will-change-transform transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              transitionPhase === "idle" && "translate-x-0 opacity-100",
+              transitionPhase === "leaving" &&
+                (transitionDirection === 1
+                  ? "-translate-x-3 opacity-0"
+                  : "translate-x-3 opacity-0"),
+              transitionPhase === "entering" &&
+                (transitionDirection === 1
+                  ? "translate-x-3 opacity-0"
+                  : "-translate-x-3 opacity-0")
+            )}
           >
             {step === 0 && (
+              <div className="mx-auto max-w-3xl text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border bg-card shadow-sm">
+                  <Languages className="h-7 w-7 text-foreground" />
+                </div>
+                <h1 className="mt-6 text-3xl font-semibold tracking-normal sm:text-5xl">
+                  {c.languageTitle}
+                </h1>
+                <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+                  {c.languageDescription}
+                </p>
+                <div className="mx-auto mt-8 grid max-w-2xl gap-3 sm:grid-cols-2">
+                  {([
+                    { id: "en", code: "EN", label: c.english, description: c.englishDescription },
+                    { id: "ro", code: "RO", label: c.romanian, description: c.romanianDescription },
+                  ] as const).map((option) => {
+                    const selected = draft.language === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => chooseLanguage(option.id)}
+                        className={cn(
+                          "group relative flex min-h-36 items-center gap-4 rounded-2xl border bg-card p-5 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
+                          selected && "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                        )}
+                        aria-pressed={selected}
+                      >
+                        <span className={cn(
+                          "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border bg-background text-sm font-bold transition-all duration-300",
+                          selected && "border-primary bg-primary text-primary-foreground"
+                        )}>{option.code}</span>
+                        <span className="min-w-0">
+                          <span className="block text-lg font-semibold">{option.label}</span>
+                          <span className="mt-1 block text-sm leading-6 text-muted-foreground">{option.description}</span>
+                        </span>
+                        <span className={cn(
+                          "absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full border transition-all",
+                          selected ? "scale-100 border-primary bg-primary text-primary-foreground" : "scale-90 border-border text-transparent"
+                        )}><Check className="h-3.5 w-3.5" /></span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {step === 1 && (
               <div className="mx-auto max-w-xl text-center">
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-lg border border-sky-500/30 bg-gradient-to-br from-emerald-500/10 via-card to-sky-500/15 shadow-[0_18px_60px_rgba(14,165,233,0.18)] sm:h-20 sm:w-20">
-                  <Code2 className="h-9 w-9 text-sky-600" />
+                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-lg border bg-card shadow-sm sm:h-20 sm:w-20">
+                  <Code2 className="h-9 w-9 text-foreground" />
                 </div>
                 <h1 className="text-4xl font-semibold tracking-normal sm:text-5xl">
                   {c.welcomeTitle}
@@ -383,7 +558,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 1 && (
+            {step === 2 && (
               <div>
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
@@ -416,16 +591,16 @@ export function OnboardingExperience({
                           }))
                         }
                         className={cn(
-                          "group relative flex min-h-44 flex-col rounded-2xl border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-sky-500/50 hover:shadow-lg",
+                          "group relative flex min-h-44 flex-col rounded-2xl border bg-card p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
                           selected &&
-                            "border-sky-500 bg-sky-500/10 shadow-[0_16px_45px_rgba(14,165,233,0.14)] ring-1 ring-sky-500/20"
+                            "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
                         )}
                         aria-pressed={selected}
                       >
                         <span
                           className={cn(
                             "flex h-11 w-11 items-center justify-center rounded-xl border bg-background text-muted-foreground transition-colors",
-                            selected && "border-sky-500/40 bg-sky-500 text-white"
+                            selected && "border-primary bg-primary text-primary-foreground"
                           )}
                         >
                           <Icon className="h-5 w-5" />
@@ -433,7 +608,7 @@ export function OnboardingExperience({
                         <span className="mt-5 flex items-center gap-2 font-semibold">
                           {option.label[language]}
                           {option.badge ? (
-                            <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+                            <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                               {option.badge[language]}
                             </span>
                           ) : null}
@@ -445,7 +620,7 @@ export function OnboardingExperience({
                           className={cn(
                             "absolute right-4 top-4 flex h-5 w-5 items-center justify-center rounded-full border",
                             selected
-                              ? "border-sky-600 bg-sky-600 text-white"
+                              ? "border-primary bg-primary text-primary-foreground"
                               : "border-border"
                           )}
                         >
@@ -458,7 +633,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 2 && (
+            {step === 3 && (
               <div>
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.profileTitle}</h1>
@@ -466,22 +641,24 @@ export function OnboardingExperience({
                 </div>
                 <div className="mx-auto mt-5 max-w-lg space-y-3 sm:mt-7 sm:space-y-4">
                   <div className="flex flex-col items-center gap-3">
-                    <Avatar className="h-20 w-20 border-4 border-background shadow-[0_12px_40px_rgba(37,99,235,0.2)] ring-1 ring-border sm:h-24 sm:w-24">
+                    <Avatar className="h-20 w-20 border-4 border-background shadow-sm ring-1 ring-border sm:h-24 sm:w-24">
                       {draft.avatarPreview ? <AvatarImage src={draft.avatarPreview} /> : null}
-                      <AvatarFallback className="bg-gradient-to-br from-emerald-100 to-sky-100 text-xl font-semibold text-sky-800">
+                      <AvatarFallback className="bg-muted text-xl font-semibold text-foreground">
                         {initials}
                       </AvatarFallback>
                     </Avatar>
-                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-sky-700 hover:text-sky-900">
-                      <ImagePlus className="h-4 w-4" />
-                      {c.uploadAvatar}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        className="sr-only"
-                        onChange={(event) => chooseAvatar(event.target.files?.[0])}
-                      />
-                    </label>
+                    {registration ? null : (
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground hover:text-foreground/70">
+                        <ImagePlus className="h-4 w-4" />
+                        {c.uploadAvatar}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="sr-only"
+                          onChange={(event) => chooseAvatar(event.target.files?.[0])}
+                        />
+                      </label>
+                    )}
                     <p className="text-xs text-muted-foreground">{c.skipAvatar}</p>
                   </div>
                   <label className="block space-y-2 text-sm font-medium">
@@ -512,75 +689,113 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 3 && (
-              <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
-                <section>
-                  <div className="text-center">
-                    <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">{c.experienceTitle}</h1>
-                    <p className="mt-2 text-sm text-muted-foreground sm:text-base">{c.experienceDescription}</p>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-3">
-                    {experienceOptions.map((option) => (
+            {step === 4 && (
+              <div className="mx-auto max-w-2xl">
+                <div className="text-center">
+                  <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
+                    {c.experienceTitle}
+                  </h1>
+                  <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+                    {c.experienceDescription}
+                  </p>
+                </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 sm:mt-8">
+                  {experienceOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() =>
+                        setDraft((current) => ({
+                          ...current,
+                          experience: option.id,
+                        }))
+                      }
+                      className={cn(
+                        "flex min-h-28 items-start gap-3 rounded-xl border bg-card p-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm",
+                        draft.experience === option.id &&
+                          "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/15"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+                          draft.experience === option.id
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border"
+                        )}
+                      >
+                        {draft.experience === option.id ? (
+                          <Check className="size-3" />
+                        ) : null}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-semibold">
+                          {option.label[language]}
+                        </span>
+                        <span className="mt-1.5 block text-sm leading-6 text-muted-foreground">
+                          {option.description[language]}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 5 && (
+              <div className="mx-auto max-w-2xl">
+                <div className="text-center">
+                  <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
+                    {c.goalTitle}
+                  </h1>
+                  <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+                    {c.goalDescription}
+                  </p>
+                </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 sm:mt-8">
+                  {goalOptions.map((option) => {
+                    const Icon = option.icon;
+                    const selected = draft.goal === option.id;
+                    return (
                       <button
                         key={option.id}
                         type="button"
                         onClick={() =>
-                          setDraft((current) => ({ ...current, experience: option.id }))
+                          setDraft((current) => ({
+                            ...current,
+                            goal: option.id,
+                          }))
                         }
                         className={cn(
-                          "flex min-h-24 items-start gap-2.5 rounded-lg border p-3 text-left transition hover:border-sky-500/50 hover:bg-sky-500/10 sm:gap-3 sm:p-4",
-                          draft.experience === option.id &&
-                            "border-sky-500 bg-sky-500/10 shadow-[0_8px_30px_rgba(14,165,233,0.12)]"
+                          "relative flex min-h-24 items-center gap-4 rounded-xl border bg-card p-4 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm",
+                          selected &&
+                            "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/15"
                         )}
+                        aria-pressed={selected}
                       >
-                        <span className={cn(
-                          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                          draft.experience === option.id
-                            ? "border-sky-600 bg-sky-600 text-white"
-                            : "border-border"
-                        )}>
-                          {draft.experience === option.id ? <Check className="h-3 w-3" /> : null}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold sm:text-base">{option.label[language]}</span>
-                          <span className="mt-1 line-clamp-2 block text-xs leading-4 text-muted-foreground sm:text-sm sm:leading-5">{option.description[language]}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section>
-                  <div className="text-center">
-                    <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">{c.goalTitle}</h2>
-                    <p className="mt-2 text-sm text-muted-foreground sm:text-base">{c.goalDescription}</p>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-3">
-                    {goalOptions.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setDraft((current) => ({ ...current, goal: option.id }))}
+                        <span
                           className={cn(
-                            "flex min-h-14 items-center gap-2.5 rounded-lg border px-3 text-left text-xs font-medium transition hover:border-violet-300 sm:gap-3 sm:px-4 sm:text-sm lg:min-h-24",
-                            draft.goal === option.id
-                              ? "border-violet-500 bg-violet-500/10 text-violet-900 dark:text-violet-200"
-                              : "bg-card"
+                            "flex size-10 shrink-0 items-center justify-center rounded-lg border bg-background text-muted-foreground",
+                            selected &&
+                              "border-primary bg-primary text-primary-foreground"
                           )}
                         >
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <span>{option.label[language]}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
+                          <Icon className="size-4" />
+                        </span>
+                        <span className="font-semibold">
+                          {option.label[language]}
+                        </span>
+                        {selected ? (
+                          <Check className="absolute right-4 top-4 size-4" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            {step === 4 && (
+            {step === 6 && (
               <div>
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.interestsTitle}</h1>
@@ -597,14 +812,14 @@ export function OnboardingExperience({
                         className={cn(
                           "flex min-h-12 items-center justify-between gap-2 rounded-lg border bg-card px-3 text-left text-xs font-medium transition sm:h-14 sm:px-4 sm:text-sm",
                           selected
-                            ? "border-emerald-500 bg-emerald-500/10 text-emerald-900 shadow-[0_8px_24px_rgba(16,185,129,0.1)] dark:text-emerald-200"
+                            ? "border-primary bg-primary/5 text-foreground shadow-sm"
                             : "hover:border-foreground/35"
                         )}
                       >
                         {option.label[language]}
                         <span className={cn(
                           "flex h-5 w-5 items-center justify-center rounded-md border",
-                          selected ? "border-emerald-600 bg-emerald-600 text-white" : "border-border"
+                          selected ? "border-primary bg-primary text-primary-foreground" : "border-border"
                         )}>
                           {selected ? <Check className="h-3 w-3" /> : null}
                         </span>
@@ -615,17 +830,17 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 5 && (
+            {step === 7 && (
               <div>
                 <div className="text-center">
-                  <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 via-sky-500 to-violet-500 text-white shadow-[0_16px_45px_rgba(14,165,233,0.22)]">
+                  <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
                     <Sparkles className="h-6 w-6" />
                   </div>
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.readyTitle}</h1>
                   <p className="mt-3 text-muted-foreground">{c.readyDescription}</p>
                 </div>
 
-                <div className="mx-auto mt-6 max-w-xl rounded-lg border border-sky-500/30 bg-gradient-to-r from-emerald-500/10 via-card to-sky-500/10 p-5 shadow-[0_16px_50px_rgba(14,165,233,0.1)] sm:mt-8">
+                <div className="mx-auto mt-6 max-w-xl rounded-lg border bg-card p-5 shadow-sm sm:mt-8">
                   <div className="flex items-center gap-4">
                     <Avatar className="h-12 w-12">
                       {draft.avatarPreview ? <AvatarImage src={draft.avatarPreview} /> : null}
@@ -637,7 +852,7 @@ export function OnboardingExperience({
                         {selectedPersona?.label[language]} · {selectedGoal?.label[language]}
                       </p>
                     </div>
-                    <Sparkles className="h-5 w-5 text-violet-500" />
+                    <Sparkles className="h-5 w-5 text-muted-foreground" />
                   </div>
                 </div>
               </div>
@@ -645,15 +860,15 @@ export function OnboardingExperience({
           </div>
         </main>
 
-        <footer className="mx-auto w-full max-w-xl shrink-0 pb-[env(safe-area-inset-bottom)]">
+        <footer className="onboarding-reveal onboarding-reveal-footer mx-auto w-full max-w-xl shrink-0 pb-[env(safe-area-inset-bottom)]">
           <div className="flex items-center gap-3">
             {step > 0 ? (
               <Button
                 type="button"
                 variant="outline"
                 size="lg"
-                onClick={() => setStep((current) => Math.max(0, current - 1))}
-                disabled={saving}
+                onClick={() => moveToStep(step - 1)}
+                disabled={saving || transitionLocked}
                 className="h-12"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -663,23 +878,29 @@ export function OnboardingExperience({
             <Button
               type="button"
               size="lg"
-              disabled={!canContinue || saving}
+              disabled={
+                !canContinue || saving || transitionLocked
+              }
               onClick={() => {
                 if (step === totalSteps - 1) {
                   void finishOnboarding();
                 } else {
-                  setStep((current) => current + 1);
+                  moveToStep(step + 1);
                 }
               }}
               className="h-12 flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-              {step === totalSteps - 1 ? c.complete : c.continue}
+              {step === totalSteps - 1
+                ? registration
+                  ? c.createAccount
+                  : c.complete
+                : c.continue}
               {!saving ? <ArrowRight className="h-4 w-4" /> : null}
             </Button>
           </div>
           <p className="mt-2 truncate text-center text-xs text-muted-foreground/70 sm:mt-3">
-            {c.emailVerified} {user.email}
+            {registration ? c.registrationEmail : c.emailVerified} {accountEmail}
           </p>
         </footer>
       </div>

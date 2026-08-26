@@ -145,7 +145,9 @@ function draftFromCampaign(campaign: EmailCampaign): Draft {
     senderName: campaign.senderName,
     subject: campaign.subject,
     userIds:
-      campaign.audience.type === "users" ? campaign.audience.userIds.join("\n") : "",
+      campaign.audience.type === "users"
+        ? (campaign.audience.identifiers || campaign.audience.userIds).join("\n")
+        : "",
   };
 }
 
@@ -300,6 +302,7 @@ export function EmailCenter() {
         subject: previewPayload.subject,
       }),
     enabled: Boolean(previewPayload.content.trim()),
+    placeholderData: (previousData) => previousData,
     retry: false,
     staleTime: 30_000,
   });
@@ -567,20 +570,23 @@ export function EmailCenter() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList variant="line" className="h-auto w-full justify-start overflow-x-auto border-b pb-0">
-          <TabsTrigger value="compose" className="min-w-max px-3 py-2.5">
+        <TabsList
+          variant="line"
+          className="h-auto w-full justify-start overflow-x-auto overflow-y-hidden border-b pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <TabsTrigger value="compose" className="min-w-max px-3 py-2.5 after:bottom-0">
             <Mail className="size-4" />
             {t("admin.emailCenter.tabs.compose")}
           </TabsTrigger>
-          <TabsTrigger value="campaigns" className="min-w-max px-3 py-2.5">
+          <TabsTrigger value="campaigns" className="min-w-max px-3 py-2.5 after:bottom-0">
             <FileText className="size-4" />
             {t("admin.emailCenter.tabs.campaigns")}
           </TabsTrigger>
-          <TabsTrigger value="history" className="min-w-max px-3 py-2.5">
+          <TabsTrigger value="history" className="min-w-max px-3 py-2.5 after:bottom-0">
             <Clock3 className="size-4" />
             {t("admin.emailCenter.tabs.history")}
           </TabsTrigger>
-          <TabsTrigger value="settings" className="min-w-max px-3 py-2.5">
+          <TabsTrigger value="settings" className="min-w-max px-3 py-2.5 after:bottom-0">
             <Settings2 className="size-4" />
             {t("admin.emailCenter.tabs.settings")}
           </TabsTrigger>
@@ -755,6 +761,7 @@ export function EmailCenter() {
                 html={previewQuery.data?.html || null}
                 text={previewQuery.data?.text || ""}
                 isLoading={previewQuery.isFetching}
+                errorMessage={previewQuery.error instanceof Error ? previewQuery.error.message : null}
                 labels={{
                   desktop: t("admin.emailCenter.preview.desktop"),
                   mobile: t("admin.emailCenter.preview.mobile"),
@@ -762,7 +769,9 @@ export function EmailCenter() {
                 }}
                 emptyLabel={
                   previewQuery.isError
-                    ? t("admin.emailCenter.preview.error")
+                    ? previewQuery.error instanceof Error
+                      ? previewQuery.error.message
+                      : t("admin.emailCenter.preview.error")
                     : t("admin.emailCenter.preview.empty")
                 }
               />

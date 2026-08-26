@@ -4,7 +4,7 @@ import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Search",
-  description: "Find users and content across the ScripticX community.",
+  description: "Find people and public profiles across the ScripticX community.",
   path: "/search",
   noIndex: true,
 });

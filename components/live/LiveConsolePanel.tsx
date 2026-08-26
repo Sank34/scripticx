@@ -34,7 +34,7 @@ export function LiveConsolePanel({
 }: LiveConsolePanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b bg-muted/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="border-b bg-muted/60 px-3 py-2 text-xs font-medium text-muted-foreground">
         {title}
       </div>
 

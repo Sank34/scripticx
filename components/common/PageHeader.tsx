@@ -17,19 +17,20 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className={className}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">{title}</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
           {subtitle && (
-            <p className="mt-1 text-muted-foreground">{subtitle}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>
           )}
         </div>
 
-        {meta && (
-          <div className="shrink-0 text-sm text-muted-foreground">{meta}</div>
+        {(meta || action) && (
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            {meta && <div className="text-sm text-muted-foreground">{meta}</div>}
+            {action}
+          </div>
         )}
-
-        {action && <div className="shrink-0">{action}</div>}
       </div>
     </div>
   );

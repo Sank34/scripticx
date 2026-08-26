@@ -4,6 +4,10 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  isEmailVerified,
+  storePendingEmailVerification,
+} from "@/lib/email-verification";
 
 export default function RouteGuard({
   children,
@@ -16,12 +20,19 @@ export default function RouteGuard({
 }) {
   const { user, loading, isAdmin, isBanned } = useAuth();
   const router = useRouter();
+  const verified = isEmailVerified(user);
 
   useEffect(() => {
     if (loading) return;
 
     if (isBanned) {
       router.replace("/banned");
+      return;
+    }
+
+    if (requireAuth && user && !verified) {
+      if (user.email) storePendingEmailVerification(user.email, user.id);
+      router.replace("/login?verification=pending");
       return;
     }
 
@@ -34,7 +45,16 @@ export default function RouteGuard({
       router.replace("/");
       return;
     }
-  }, [user, loading, isAdmin, isBanned, requireAuth, requireAdmin, router]);
+  }, [
+    user,
+    loading,
+    isAdmin,
+    isBanned,
+    requireAuth,
+    requireAdmin,
+    router,
+    verified,
+  ]);
 
   if (loading) {
     return (
@@ -49,6 +69,7 @@ export default function RouteGuard({
   if (
     isBanned ||
     (requireAuth && !user) ||
+    (requireAuth && !verified) ||
     (requireAdmin && !isAdmin)
   ) {
     return null;

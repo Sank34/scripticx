@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { parseCampaignPatch } from "@/lib/mail/adminCampaign";
+import { resolveCampaignAudience } from "@/lib/mail/adminAudience";
 import { publicCampaign } from "@/lib/mail/service";
 import type { EmailCampaignRow } from "@/lib/mail/types";
 import { UUID_PATTERN } from "@/lib/mail/validation";
@@ -52,6 +53,9 @@ export async function PATCH(request: Request, context: Context) {
       throw new HttpError(409, "This campaign can no longer be edited");
     }
     const body = jsonObject(await readJsonBody(request, 110_000));
+    if ("audience" in body) {
+      body.audience = await resolveCampaignAudience(admin, body.audience);
+    }
     const patch = parseCampaignPatch(body);
     const nextActionLabel = "action_label" in patch ? patch.action_label : current.action_label;
     const nextActionUrl = "action_url" in patch ? patch.action_url : current.action_url;

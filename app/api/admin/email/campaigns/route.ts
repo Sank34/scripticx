@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { parseCampaignCreate } from "@/lib/mail/adminCampaign";
+import { resolveCampaignAudience } from "@/lib/mail/adminAudience";
 import { getMailConfig, publicCampaign } from "@/lib/mail/service";
 import type { CampaignStatus, EmailCampaignRow } from "@/lib/mail/types";
 import {
@@ -57,7 +58,11 @@ export async function POST(request: Request) {
     await enforceRateLimit({ key: user.id, action: "mail_campaign_create", limit: 30, windowSeconds: 3600 });
     const body = jsonObject(await readJsonBody(request, 110_000));
     const admin = createAdminSupabase();
-    const record = parseCampaignCreate(body, await getMailConfig(admin), user.id);
+    const resolvedBody = {
+      ...body,
+      audience: await resolveCampaignAudience(admin, body.audience),
+    };
+    const record = parseCampaignCreate(resolvedBody, await getMailConfig(admin), user.id);
     const { data, error } = await admin
       .from("email_campaigns")
       .insert(record)
@@ -71,4 +76,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not create email campaign" }, { status: 500 });
   }
 }
-

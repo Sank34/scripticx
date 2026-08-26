@@ -22,6 +22,9 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
     pathname === "/profile" || /^\/u\/[^/]+$/.test(pathname || "");
   const isFullWidth =
     pathname === "/editor" ||
+    pathname?.startsWith("/editor/live/") ||
+    pathname?.startsWith("/docs") ||
+    pathname?.startsWith("/examples") ||
     pathname === "/admin/lessons" ||
     isStudentWorkspaceImmersive ||
     /^\/competitions\/[^/]+$/.test(pathname || "") ||
@@ -69,7 +72,7 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto bg-background pb-16 md:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+      <div className="sx-page">
         {children}
       </div>
     </main>

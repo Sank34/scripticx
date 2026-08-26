@@ -27,8 +27,47 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: "/livecode",
+        destination: "/editor?view=live",
+        permanent: false,
+      },
+      {
+        source: "/live/:roomId",
+        destination: "/editor?live=:roomId&view=live",
+        permanent: false,
+      },
+      {
+        source: "/editor/live/:roomId",
+        destination: "/editor?live=:roomId&view=live",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
+      {
+        source: "/monaco/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value:
+              "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
+          },
+        ],
+      },
+      {
+        source: "/excalidraw/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value:
+              "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
+          },
+        ],
+      },
       {
         source: "/(.*)",
         headers: [

@@ -753,7 +753,7 @@ export function GraphVisualizer() {
 
             <section className="rounded-lg border bg-muted/30 p-3" aria-live="polite">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h2 className="text-xs font-medium text-muted-foreground">
                   {c.validation}
                 </h2>
                 {graph.isValid && (
@@ -789,7 +789,7 @@ export function GraphVisualizer() {
             <section className="border-t pt-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <h2 className="text-xs font-medium text-muted-foreground">
                     {c.savedGraphs}
                   </h2>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -887,8 +887,10 @@ export function GraphVisualizer() {
               </Button>
             </div>
           </div>
-          <div className="relative min-h-[500px] flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.06),transparent_55%)] xl:min-h-0">
-            <div ref={containerRef} className="absolute inset-0" />
+          <div className="relative min-h-[500px] flex-1 overflow-hidden bg-muted/20 xl:min-h-0">
+            {/* Cytoscape forces its host to position: relative. Explicit dimensions
+                prevent the renderer canvases from collapsing to zero height. */}
+            <div ref={containerRef} className="h-full w-full" />
             {!graph.isValid && (
               <div className="absolute inset-0 z-10 flex items-center justify-center p-8 text-center">
                 <div className="max-w-sm rounded-xl border bg-background/90 p-5 shadow-sm backdrop-blur">

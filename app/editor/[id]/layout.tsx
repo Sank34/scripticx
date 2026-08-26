@@ -20,7 +20,7 @@ export async function generateMetadata({
     .eq("id", id)
     .maybeSingle();
 
-  if (!snippet) return createNotFoundMetadata("Snippet");
+  if (!snippet) return createNotFoundMetadata("Project");
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -28,19 +28,19 @@ export async function generateMetadata({
     .eq("id", snippet.user_id)
     .maybeSingle();
 
-  const title = snippet.title?.trim() || "MiniScript+ Project";
+  const title = snippet.title?.trim() || "ScripticX Project";
   const author = profile?.username ? ` by ${profile.username}` : "";
 
   return createPageMetadata({
-    title: `${title} — MiniScript+ Snippet`,
+    title: `${title} — ScripticX Project`,
     description: metadataExcerpt(
       snippet.description,
-      `Explore the “${title}” MiniScript+ project${author} on ScripticX.`
+      `Explore the “${title}” programming project${author} on ScripticX.`
     ),
     path: `/editor/${id}`,
     noIndex: !snippet.is_public,
     type: "article",
-    keywords: ["MiniScript+ snippet", "programming project", title],
+    keywords: ["ScripticX project", "programming project", "code sharing", title],
   });
 }
 

@@ -4,26 +4,22 @@ import {
   Drawer,
   DrawerClose,
   DrawerContent,
+  DrawerDescription,
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
 
 import {
   BookOpen,
-  Code,
   HelpCircle,
   LayoutDashboard,
-  List,
   Mail,
   Medal,
   MessageSquare,
-  Route,
-  School,
   Search,
   Shield,
   ShoppingBag,
   Sparkles,
-  SquareTerminal,
   Trophy,
   UsersRound,
   FileText,
@@ -33,9 +29,12 @@ import {
 import { useLanguage } from "@/components/LanguageProvider";
 import { WorkspaceSwitcher } from "@/components/workspaces/WorkspaceSwitcher";
 import {
+  getTeacherWorkspaceNavigation,
   getStudentStudyNavigation,
   getStudentWorkspaceNavigation,
   isStudentWorkspaceContext,
+  isTeacherWorkspaceContext,
+  sharedStudyNavigationIcons,
 } from "@/components/workspaces/WorkspaceNavigation";
 import {
   formatWorkspaceNoteTime,
@@ -72,20 +71,35 @@ export function MobileDrawer() {
     pathname,
     user?.user_metadata as Record<string, unknown> | undefined
   );
+  const teacherWorkspaceActive = isTeacherWorkspaceContext(
+    pathname,
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
   const recentNotes = useRecentWorkspaceNotes(
     studentWorkspaceActive ? user?.id : null
   );
 
-  if (pathname.startsWith("/live/")) {
+  if (
+    pathname.startsWith("/live/") ||
+    pathname.startsWith("/editor/live/")
+  ) {
     return null;
   }
 
   const isLoggedIn = Boolean(user);
   const studentWorkspaceNavigation = getStudentWorkspaceNavigation(locale);
   const studentStudyNavigation = getStudentStudyNavigation(locale);
+  const teacherWorkspaceNavigation = getTeacherWorkspaceNavigation(locale);
 
   const navItems: Array<{ label: string; items: MobileNavItem[] }> =
-    isLoggedIn && studentWorkspaceActive
+    isLoggedIn && teacherWorkspaceActive
+      ? [
+          {
+            label: locale === "ro" ? "Workspace profesor" : "Teacher workspace",
+            items: teacherWorkspaceNavigation,
+          },
+        ]
+      : isLoggedIn && studentWorkspaceActive
       ? [
           {
             label: locale === "ro" ? "Workspace elev" : "Student workspace",
@@ -119,21 +133,20 @@ export function MobileDrawer() {
         ...(isLoggedIn
           ? [
               { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
-              { href: "/editor", icon: Code, label: t("nav.editor") },
               {
-                href: "/livecode",
-                icon: SquareTerminal,
-                label: t("nav.livecode"),
-                active: (currentPath: string) =>
-                  currentPath.startsWith("/livecode") ||
-                  currentPath.startsWith("/live"),
+                href: "/editor",
+                icon: sharedStudyNavigationIcons.editor,
+                label: t("nav.editor"),
               },
             ]
           : []),
-        { href: "/problems", icon: List, label: t("nav.problems") },
+        {
+          href: "/problems",
+          icon: sharedStudyNavigationIcons.problems,
+          label: t("nav.problems"),
+        },
         ...(isLoggedIn
           ? [
-              { href: "/classes", icon: School, label: t("nav.classes") },
               { href: "/search", icon: Search, label: t("nav.search") },
               ...(isAdmin
                 ? [{ href: "/admin", icon: Shield, label: t("nav.admin") }]
@@ -165,11 +178,11 @@ export function MobileDrawer() {
           ? [
               {
                 href: "/learn",
-                icon: Route,
+                icon: sharedStudyNavigationIcons.learn,
                 label: t("nav.learn"),
                 active: (currentPath: string) =>
                   currentPath === "/learn" ||
-                  currentPath.startsWith("/learn/lesson"),
+                  currentPath.startsWith("/learn/"),
               },
             ]
           : []),
@@ -217,19 +230,24 @@ export function MobileDrawer() {
           <button
             aria-label={t("mobileDrawer.open")}
             data-tour="mobile-menu"
-            className="flex h-7 w-28 items-center justify-center rounded-full border border-border/80 bg-background/80 shadow-[0_10px_30px_rgba(24,24,27,0.14)] backdrop-blur-xl transition-all duration-200 active:scale-95"
+            className="flex h-8 w-24 items-center justify-center rounded-full border border-border bg-background/95 shadow-md backdrop-blur-xl transition-transform duration-150 active:scale-95"
           >
             <span className="h-1.5 w-12 rounded-full bg-muted-foreground/60" />
           </button>
         </DrawerTrigger>
 
-        <DrawerContent className="h-[82vh] rounded-t-[32px] border-border bg-sidebar/95 backdrop-blur-xl">
+        <DrawerContent className="h-[82vh] rounded-t-[var(--sx-radius-shell)] border-border bg-sidebar/98 backdrop-blur-xl">
           <DrawerTitle className="sr-only">
             {t("mobileDrawer.title")}
           </DrawerTitle>
+          <DrawerDescription className="sr-only">
+            {locale === "ro"
+              ? "Navighează între paginile și workspace-urile ScripticX."
+              : "Navigate between ScripticX pages and workspaces."}
+          </DrawerDescription>
 
-          <div className="flex h-full flex-col overflow-hidden px-5 pb-6 pt-5">
-            <div className="mb-5 rounded-2xl border border-sidebar-border/80 bg-background/55 p-1 shadow-sm">
+          <div className="flex h-full flex-col overflow-hidden px-4 pb-6 pt-4">
+            <div className="mb-4 border-b border-sidebar-border pb-3">
               <WorkspaceSwitcher
                 variant="mobile"
                 onNavigate={() => setDrawerOpen(false)}
@@ -249,20 +267,14 @@ export function MobileDrawer() {
                 }
               `}</style>
 
-              <div className="mx-auto flex w-full max-w-sm flex-col gap-6 pb-8">
+              <div className="mx-auto flex w-full max-w-sm flex-col gap-5 pb-8">
                 {navItems.map((section, sectionIndex) => (
                   <div
                     key={section.label}
                     className="flex w-full flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
                     style={{ animationDelay: `${sectionIndex * 45}ms` }}
                   >
-                    <h3
-                      className={`mb-2 px-3 text-[10px] font-semibold uppercase text-muted-foreground/70 ${
-                        studentWorkspaceActive
-                          ? "tracking-normal"
-                          : "tracking-[0.18em]"
-                      }`}
-                    >
+                    <h3 className="mb-1.5 px-3 text-xs font-medium tracking-normal text-muted-foreground">
                       {section.label}
                     </h3>
 
@@ -279,13 +291,13 @@ export function MobileDrawer() {
                               <Link
                                 href={item.href}
                                 aria-current={active ? "page" : undefined}
-                                className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] ${
+                                className={`flex w-full items-center justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring ${
                                   active
-                                    ? "bg-accent text-accent-foreground shadow-sm"
+                                    ? "bg-accent text-accent-foreground"
                                     : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                                 }`}
                               >
-                                <Icon size={22} />
+                                <Icon size={19} strokeWidth={1.8} />
                                 <span className="flex min-w-0 flex-1 items-baseline gap-2">
                                   <span className="min-w-0 flex-1 truncate text-left">
                                     {item.label}
@@ -339,14 +351,14 @@ export function MobileDrawer() {
                       <DrawerClose asChild key={item.href}>
                         <Link
                           href={item.href}
-                          className={`flex w-full items-center justify-start gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all duration-200 active:scale-[0.98] ${
+                          className={`flex w-full items-center justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 ${
                             active
-                              ? "bg-accent text-accent-foreground shadow-sm"
+                              ? "bg-accent text-accent-foreground"
                               : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                           }`}
                         >
                           <span className="relative inline-flex">
-                            <Icon size={22} />
+                            <Icon size={19} strokeWidth={1.8} />
                             {item.unread && (
                               <span className="absolute -right-1 -top-1 flex h-2 w-2">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />

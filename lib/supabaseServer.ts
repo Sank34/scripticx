@@ -2,11 +2,24 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
-export function createServerSupabase() {
+function timeoutFetch(timeoutMs: number): typeof fetch {
+  return (input, init = {}) => {
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, timeoutSignal])
+      : timeoutSignal;
+    return fetch(input, { ...init, signal });
+  };
+}
+
+export function createServerSupabase(options: { fetchTimeoutMs?: number } = {}) {
   return createClient(
     supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      ...(options.fetchTimeoutMs
+        ? { global: { fetch: timeoutFetch(options.fetchTimeoutMs) } }
+        : {}),
       auth: {
         persistSession: false,
         autoRefreshToken: false,

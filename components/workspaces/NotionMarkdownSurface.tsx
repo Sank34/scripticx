@@ -1,5 +1,6 @@
 "use client";
 
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Image from "@tiptap/extension-image";
 import { decodeHtmlEntities, type Editor } from "@tiptap/core";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -11,6 +12,7 @@ import { closeHistory } from "@tiptap/pm/history";
 import { NodeSelection } from "@tiptap/pm/state";
 import {
   EditorContent,
+  NodeViewContent,
   NodeViewWrapper,
   ReactNodeViewRenderer,
   useEditor,
@@ -24,7 +26,9 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Braces,
   CheckSquare2,
+  ChevronDown,
   Code2,
   Eye,
   Heading1,
@@ -47,7 +51,28 @@ import {
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { PromptDialog } from "@/components/ui/prompt-dialog";
+import {
+  DEFAULT_NOTE_CODE_LANGUAGE,
+  findNoteCodeLanguage,
+  getNoteCodeLanguageLabel,
+  noteCodeLanguages,
+} from "@/lib/note-code-languages";
+import { noteCodeLowlight } from "@/lib/note-code-highlight";
 import {
   DEFAULT_NOTE_IMAGE_PRESENTATION,
   normalizeNoteImagePresentation,
@@ -108,6 +133,23 @@ export function NotionMarkdownSurface({
     top: number;
   } | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkValue, setLinkValue] = useState("https://");
+  const codeBlockExtension = useMemo(() => {
+    const CodeBlockNodeView = (props: NodeViewProps) => (
+      <WorkspaceCodeBlockNodeView {...props} ro={ro} />
+    );
+    return CodeBlockLowlight.extend({
+      addNodeView() {
+        return ReactNodeViewRenderer(CodeBlockNodeView);
+      },
+    }).configure({
+      defaultLanguage: DEFAULT_NOTE_CODE_LANGUAGE,
+      enableTabIndentation: true,
+      lowlight: noteCodeLowlight,
+      tabSize: 2,
+    });
+  }, [ro]);
   const imageExtension = useMemo(
     () => {
       const ImageNodeView = (props: NodeViewProps) => (
@@ -189,6 +231,7 @@ export function NotionMarkdownSurface({
     contentType: "markdown",
     extensions: [
       StarterKit.configure({
+        codeBlock: false,
         heading: { levels: [1, 2, 3] },
         link: {
           autolink: true,
@@ -196,6 +239,7 @@ export function NotionMarkdownSurface({
           openOnClick: false,
         },
       }),
+      codeBlockExtension,
       imageExtension,
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -249,7 +293,7 @@ export function NotionMarkdownSurface({
       syncVisualSlash(currentEditor, setSlash, setSlashIndex);
       activeTextCallbackRef.current?.(currentEditor.state.selection.$from.parent.textContent.trim());
     },
-  }, [imageExtension]);
+  }, [codeBlockExtension, imageExtension]);
   const tableActive =
     useEditorState({
       editor,
@@ -430,13 +474,18 @@ export function NotionMarkdownSurface({
 
   const setLink = () => {
     const previous = editor.getAttributes("link").href as string | undefined;
-    const href = window.prompt("URL", previous || "https://");
-    if (href === null) return;
-    if (!href.trim()) {
+    setLinkValue(previous || "https://");
+    setLinkDialogOpen(true);
+  };
+
+  const confirmLink = (value: string) => {
+    const href = value.trim();
+    if (!href) {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
-      return;
+    } else {
+      editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
     }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: href.trim() }).run();
+    setLinkDialogOpen(false);
   };
 
   return (
@@ -456,7 +505,7 @@ export function NotionMarkdownSurface({
 
       <BubbleMenu
         editor={editor}
-        className="flex items-center gap-0.5 rounded-xl border border-border/70 bg-popover/95 p-1 shadow-[0_16px_50px_-18px_rgba(0,0,0,.5)] backdrop-blur-xl"
+        className="sx-elevated flex items-center gap-0.5 rounded-xl border border-border/70 bg-popover/95 p-1 backdrop-blur-xl"
         pluginKey="noteTextBubbleMenu"
         shouldShow={({ editor: current }) => {
           const selection = current.state.selection;
@@ -574,7 +623,7 @@ export function NotionMarkdownSurface({
       {slash && filteredVisualCommands.length ? (
         <div
           aria-label={ro ? "Inserează bloc" : "Insert block"}
-          className="fixed z-50 max-h-80 w-72 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground shadow-[0_18px_60px_-18px_rgba(0,0,0,.5)] backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95"
+          className="sx-elevated fixed z-50 max-h-80 w-72 overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95"
           id={slashMenuId}
           role="listbox"
           style={{
@@ -609,6 +658,20 @@ export function NotionMarkdownSurface({
           })}
         </div>
       ) : null}
+
+      <PromptDialog
+        open={linkDialogOpen}
+        onOpenChange={setLinkDialogOpen}
+        title={ro ? "Adaugă o legătură" : "Add link"}
+        description={ro ? "Introdu adresa către care va trimite textul selectat." : "Enter the destination for the selected text."}
+        label="URL"
+        value={linkValue}
+        onValueChange={setLinkValue}
+        onConfirm={confirmLink}
+        placeholder="https://"
+        cancelLabel={ro ? "Anulează" : "Cancel"}
+        confirmLabel={ro ? "Aplică" : "Apply"}
+      />
     </div>
   );
 }
@@ -617,7 +680,7 @@ function TableBubbleMenu({ editor, ro }: { editor: Editor; ro: boolean }) {
   return (
     <BubbleMenu
       editor={editor}
-      className="flex items-center gap-0.5 rounded-xl border border-border/70 bg-popover/95 p-1 shadow-[0_16px_50px_-18px_rgba(0,0,0,.5)] backdrop-blur-xl"
+      className="sx-elevated flex items-center gap-0.5 rounded-xl border border-border/70 bg-popover/95 p-1 backdrop-blur-xl"
       pluginKey="noteTableBubbleMenu"
       shouldShow={({ editor: current }) =>
         current.isActive("table") && current.state.selection.empty
@@ -697,6 +760,111 @@ function syncVisualSlash(
     to: editor.state.selection.from,
     top: coords.bottom + 8,
   });
+}
+
+function WorkspaceCodeBlockNodeView({
+  editor,
+  node,
+  ro,
+  updateAttributes,
+}: NodeViewProps & { ro: boolean }) {
+  const [open, setOpen] = useState(false);
+  const selectedLanguage = findNoteCodeLanguage(node.attrs.language);
+  const languageLabel = getNoteCodeLanguageLabel(node.attrs.language);
+
+  const selectLanguage = (languageId: string) => {
+    updateAttributes({
+      language:
+        languageId === DEFAULT_NOTE_CODE_LANGUAGE ? null : languageId,
+    });
+    setOpen(false);
+    window.requestAnimationFrame(() => editor.commands.focus());
+  };
+
+  return (
+    <NodeViewWrapper
+      className="group/notecode relative my-6 overflow-hidden rounded-xl border border-border/75 bg-muted/45 transition-colors focus-within:border-border"
+      data-language={String(node.attrs.language || DEFAULT_NOTE_CODE_LANGUAGE)}
+      data-note-code-block
+    >
+      <div
+        className="absolute right-2 top-2 z-10 flex items-center rounded-lg border border-border/60 bg-background/92 p-0.5 text-foreground opacity-100 shadow-sm backdrop-blur-md transition-opacity sm:opacity-0 sm:group-focus-within/notecode:opacity-100 sm:group-hover/notecode:opacity-100"
+        contentEditable={false}
+      >
+        <Popover modal={false} onOpenChange={setOpen} open={open}>
+          <PopoverTrigger asChild>
+            <Button
+              aria-label={
+                ro
+                  ? `Limbajul blocului de cod: ${languageLabel}`
+                  : `Code block language: ${languageLabel}`
+              }
+              className="h-7 max-w-44 gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              <Braces className="size-3.5 shrink-0" />
+              <span className="truncate">{languageLabel}</span>
+              <ChevronDown className="size-3 shrink-0 opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className="w-[min(20rem,calc(100vw-1rem))] gap-0 overflow-hidden p-0"
+            sideOffset={6}
+          >
+            <Command>
+              <CommandInput
+                autoFocus
+                placeholder={
+                  ro ? "Caută un limbaj…" : "Search for a language…"
+                }
+              />
+              <CommandList className="note-scrollbar max-h-72">
+                <CommandEmpty>
+                  {ro ? "Niciun limbaj găsit." : "No language found."}
+                </CommandEmpty>
+                <CommandGroup
+                  heading={ro ? "Limbaje de programare" : "Programming languages"}
+                >
+                  {noteCodeLanguages.map((language) => (
+                    <CommandItem
+                      data-checked={selectedLanguage?.id === language.id}
+                      key={language.id}
+                      onSelect={() => selectLanguage(language.id)}
+                      value={`${language.label} ${language.id} ${
+                        language.aliases?.join(" ") || ""
+                      }`}
+                    >
+                      <span className="truncate">{language.label}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {!node.textContent ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-5 top-11 select-none font-mono text-[13px] leading-6 text-muted-foreground/55 sm:text-sm"
+          contentEditable={false}
+        >
+          {ro ? "Scrie cod…" : "Write code…"}
+        </span>
+      ) : null}
+
+      <NodeViewContent<"code">
+        as="code"
+        className="note-scrollbar block min-h-20 overflow-x-auto whitespace-pre px-5 pb-3 pt-11 font-mono text-[13px] leading-6 text-foreground outline-none sm:text-sm"
+        data-note-code-content
+        spellCheck={false}
+      />
+    </NodeViewWrapper>
+  );
 }
 
 type ResizeCorner = "bottom-left" | "bottom-right" | "top-left" | "top-right";
@@ -969,7 +1137,7 @@ function ImageBubbleMenu({ editor, ro }: { editor: Editor; ro: boolean }) {
   return (
     <BubbleMenu
       editor={editor}
-      className="max-w-[calc(100vw-1rem)] overflow-x-auto rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground shadow-[0_16px_50px_-18px_rgba(0,0,0,.5)] backdrop-blur-xl"
+      className="sx-elevated max-w-[calc(100vw-1rem)] overflow-x-auto rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground backdrop-blur-xl"
       getReferencedVirtualElement={() => {
         const selection = editor.state.selection;
         if (!(selection instanceof NodeSelection) || selection.node.type.name !== "image") {

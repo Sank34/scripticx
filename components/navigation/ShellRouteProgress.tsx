@@ -147,7 +147,7 @@ export function ShellRouteProgress() {
       className="pointer-events-none absolute inset-x-0 bottom-[-1px] z-20 h-[2px] overflow-hidden"
     >
       <div
-        className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-lime-400 to-cyan-400 shadow-[0_0_18px_rgba(16,185,129,0.65)] transition-[width,opacity] duration-300 ease-out"
+        className="h-full rounded-full bg-primary transition-[width,opacity] duration-300 ease-out"
         style={{
           opacity: isVisible ? 1 : 0,
           width: `${progress}%`,

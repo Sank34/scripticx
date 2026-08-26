@@ -226,10 +226,10 @@ function AdminCompetitionsContent() {
   const lockdownEnabled = statusQuery.data?.lockdownEnabled === true;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-2 md:p-4">
+    <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground"><Trophy className="size-4" />Competition control</div>
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Trophy className="size-4" />Competition control</div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">{copy.title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>

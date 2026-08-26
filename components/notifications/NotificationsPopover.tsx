@@ -13,6 +13,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { EmailVerificationNotification } from "@/components/account/EmailVerification";
+import { getDailyChallengeProblemTitle } from "@/lib/daily-challenge-notification";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -104,11 +105,6 @@ function getStringMetadata(
   return typeof value === "string" ? value : null;
 }
 
-function stripNotificationPrefix(value: string | null | undefined) {
-  if (!value) return null;
-  return value.replace(/^(Solve|Rezolvă|Rezolva):\s*/i, "");
-}
-
 function getLocalizedNotification(
   notification: AppNotification,
   locale: string
@@ -120,7 +116,11 @@ function getLocalizedNotification(
     (ro ? "Cineva" : "Someone");
 
   if (notification.type === "daily_challenge") {
-    const problemTitle = stripNotificationPrefix(notification.body);
+    const problemTitle = getDailyChallengeProblemTitle({
+      body: notification.body,
+      locale: ro ? "ro" : "en",
+      metadata: notification.metadata,
+    });
 
     return {
       title: ro
@@ -130,6 +130,46 @@ function getLocalizedNotification(
         ? ro
           ? `Rezolvă: ${problemTitle}`
           : `Solve: ${problemTitle}`
+        : ro
+          ? "Rezolvă provocarea de azi."
+          : "Solve today's coding challenge.",
+    };
+  }
+
+  if (notification.type === "contact_received") {
+    return {
+      title: ro ? "Mesaj primit" : "Message received",
+      body: ro
+        ? "Solicitarea ta a fost înregistrată. Vei primi răspunsul pe email."
+        : "Your request was registered. The reply will be sent by email.",
+    };
+  }
+
+  if (notification.type === "contact_reply") {
+    const topic = getStringMetadata(notification.metadata, "topic");
+    return {
+      title: ro ? "Ai primit un răspuns" : "You received a reply",
+      body: topic
+        ? ro
+          ? `Echipa ScripticX a răspuns solicitării tale despre ${topic}.`
+          : `The ScripticX team replied to your request about ${topic}.`
+        : ro
+          ? "Răspunsul echipei ScripticX a fost trimis pe email."
+          : "The ScripticX team sent its reply by email.",
+    };
+  }
+
+  if (notification.type === "contact_message") {
+    const contactName =
+      getStringMetadata(notification.metadata, "contactName") ||
+      (ro ? "Un utilizator" : "A user");
+    const topic = getStringMetadata(notification.metadata, "topic");
+    return {
+      title: ro ? "Mesaj de contact nou" : "New contact message",
+      body: topic
+        ? ro
+          ? `${contactName} a trimis un mesaj despre ${topic}.`
+          : `${contactName} sent a message about ${topic}.`
         : notification.body,
     };
   }

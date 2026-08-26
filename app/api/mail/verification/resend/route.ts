@@ -45,7 +45,9 @@ export async function POST(request: Request) {
       type: "signup",
       email: user.email,
       options: {
-        emailRedirectTo: absoluteUrl("/auth/callback?next=/dashboard"),
+        emailRedirectTo: absoluteUrl(
+          "/auth/callback?flow=verification&next=/dashboard"
+        ),
       },
     });
     if (error) {

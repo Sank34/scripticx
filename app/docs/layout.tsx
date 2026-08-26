@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
-import LearnLayoutClient from "@/components/learn/LearnLayoutClient";
+import { DocsShell } from "@/components/docs/DocsShell";
 import { createPageMetadata } from "@/lib/metadata";
+import { getDocsNavigation } from "@/lib/server/docs";
 
 export const metadata: Metadata = createPageMetadata({
   title: "MiniScript+ Documentation",
@@ -18,5 +19,14 @@ export const metadata: Metadata = createPageMetadata({
 export default function DocsLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <LearnLayoutClient>{children}</LearnLayoutClient>;
+  return (
+    <DocsShell
+      navigation={{
+        en: getDocsNavigation("en"),
+        ro: getDocsNavigation("ro"),
+      }}
+    >
+      {children}
+    </DocsShell>
+  );
 }

@@ -11,8 +11,9 @@ export function useUnreadUpdates() {
   const { data: latestSlug = null } = useQuery({
     queryKey: ["updates", "latest-slug"],
     queryFn: fetchLatestSlug,
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60 * 12,
+    refetchOnMount: false,
   });
 
   const [hasUnread, setHasUnread] = useState(false);

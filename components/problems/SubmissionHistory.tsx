@@ -43,7 +43,7 @@ export function SubmissionHistory({
 
   if (!items.length) {
     return (
-      <div className="rounded-xl border border-dashed px-5 py-10 text-center">
+      <div className="sx-surface border-dashed px-5 py-10 text-center">
         <Code2 className="mx-auto size-7 text-muted-foreground/50" />
         <p className="mt-3 text-sm text-muted-foreground">{emptyDescription}</p>
       </div>
@@ -60,15 +60,15 @@ export function SubmissionHistory({
               key={item.id}
               type="button"
               onClick={() => setSelectedId(item.id)}
-              className="flex w-full items-center justify-between gap-4 rounded-xl border bg-card px-4 py-3 text-left text-card-foreground transition hover:border-foreground/20 hover:bg-accent/50"
+              className="sx-interactive flex w-full items-center justify-between gap-4 rounded-[var(--sx-radius-card)] border bg-card px-4 py-3 text-left text-card-foreground outline-none hover:border-foreground/20 hover:bg-muted/45 focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
-                      "flex size-7 shrink-0 items-center justify-center rounded-lg",
+                      "flex size-7 shrink-0 items-center justify-center rounded-[var(--sx-radius-control)]",
                       perfect
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                        ? "bg-[var(--sx-success-soft)] text-[var(--sx-success)]"
                         : "bg-muted text-muted-foreground"
                     )}
                   >

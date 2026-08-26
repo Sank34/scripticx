@@ -32,5 +32,17 @@ describe("mail validation", () => {
     });
     expect(() => campaignAudience({ type: "segment", segment: "user" })).toThrow();
   });
-});
 
+  it("keeps the administrator-facing identifiers for specific users", () => {
+    const userId = "550e8400-e29b-41d4-a716-446655440000";
+    expect(campaignAudience({
+      type: "users",
+      userIds: [userId],
+      identifiers: ["sanke"],
+    })).toEqual({
+      type: "users",
+      userIds: [userId],
+      identifiers: ["sanke"],
+    });
+  });
+});

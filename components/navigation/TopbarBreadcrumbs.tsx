@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/hooks/useAuth";
+import { getWorkspaceKindFromMetadata } from "@/lib/workspaces";
 import {
   Breadcrumb,
   BreadcrumbEllipsis,
@@ -42,6 +44,10 @@ export function TopbarBreadcrumbs() {
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || "/";
   const { t, locale } = useLanguage();
+  const { user } = useAuth();
+  const activeWorkspaceKind = getWorkspaceKindFromMetadata(
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
   const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
   const segments = pathname.split("/").filter(Boolean);
 
@@ -55,6 +61,7 @@ export function TopbarBreadcrumbs() {
     competitions: t("nav.competitions"),
     contact: t("nav.contact"),
     dashboard: t("nav.dashboard"),
+    "design-system": locale === "ro" ? "Sistem de design" : "Design system",
     editor: t("nav.editor"),
     email: t("admin.emailCenter.cardTitle"),
     examples: t("nav.examples"),
@@ -81,7 +88,10 @@ export function TopbarBreadcrumbs() {
     notes: locale === "ro" ? "Notițe" : "Notes",
     whiteboard: "Whiteboard",
     graph: locale === "ro" ? "Grafuri" : "Graphs",
-    assignments: "Assignments",
+    assignments: locale === "ro" ? "Teme" : "Assignments",
+    analytics: locale === "ro" ? "Analiză" : "Analytics",
+    calendar: "Calendar",
+    students: locale === "ro" ? "Elevi" : "Students",
     solve: "Solve",
     u: t("user.profile"),
     updates: t("nav.whatsNew"),
@@ -89,7 +99,7 @@ export function TopbarBreadcrumbs() {
 
   const crumbs: Crumb[] = [
     {
-      href: userHomeHref(segments),
+      href: userHomeHref(segments, activeWorkspaceKind),
       label: "ScripticX",
     },
   ];
@@ -199,7 +209,10 @@ export function TopbarBreadcrumbs() {
   );
 }
 
-function userHomeHref(segments: string[]) {
+function userHomeHref(
+  segments: string[],
+  activeWorkspaceKind: "personal" | "student" | "teacher" | null
+) {
   if (segments.length === 0) return undefined;
   if (segments[0] === "workspace" && segments[1] === "student") {
     return "/workspace/student";
@@ -207,6 +220,8 @@ function userHomeHref(segments: string[]) {
   if (segments[0] === "workspace" && segments[1] === "teacher") {
     return "/workspace/teacher";
   }
+  if (activeWorkspaceKind === "student") return "/workspace/student";
+  if (activeWorkspaceKind === "teacher") return "/workspace/teacher";
   return "/dashboard";
 }
 
@@ -215,7 +230,7 @@ function resolveCrumbHref(segments: string[], index: number) {
   const previous = segments[index - 1];
 
   if (segment === "post") return "/feed";
-  if (segment === "live") return "/livecode";
+  if (segment === "live") return "/editor?view=live";
   if (segment === "learn") return "/learn";
   if (segment === "u") return "/search";
 

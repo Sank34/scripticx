@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { isEmailVerified } from "@/lib/email-verification";
 import {
   MailClientError,
@@ -137,7 +137,7 @@ export function useEmailVerification() {
 
     setRefreshing(true);
     try {
-      const { data, error } = await api.auth.refreshSession();
+      const { data, error } = await supabase.auth.refreshSession();
       if (error) throw error;
       await reload();
 

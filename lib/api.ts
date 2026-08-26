@@ -1,13 +1,23 @@
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import {
+  getSupabaseSession,
+  getSupabaseSessionWithTimeout,
+  updateSupabaseSessionSnapshot,
+} from "@/lib/supabase-session";
 import { extractMentionUsernames } from "@/lib/mentions";
 import type { EquippedRewards } from "@/lib/rewards";
+import type { PublicProfileVisibility } from "@/lib/profile-visibility";
+import { getDailyChallengeNotificationContent } from "@/lib/daily-challenge-notification";
+import { GITHUB_AUTH_SCOPES } from "@/lib/github-auth";
 
 export type ProfileSummary = {
   id: string;
   username?: string | null;
   avatar_url?: string | null;
   banner_url?: string | null;
+  pronouns?: string | null;
+  public_profile_visibility?: Partial<PublicProfileVisibility> | null;
   role?: string | null;
   banned?: boolean | null;
   total_score?: number | null;
@@ -287,11 +297,15 @@ class AuthApi {
   constructor(private readonly client: SupabaseClient) {}
 
   getSession() {
-    return this.client.auth.getSession();
+    return this.client === supabase
+      ? getSupabaseSession()
+      : this.client.auth.getSession();
   }
 
   getSessionWithTimeout(timeoutMs: number) {
-    return withTimeout(this.getSession(), timeoutMs);
+    return this.client === supabase
+      ? getSupabaseSessionWithTimeout(timeoutMs)
+      : withTimeout(this.getSession(), timeoutMs);
   }
 
   onAuthStateChange(
@@ -300,6 +314,7 @@ class AuthApi {
     const {
       data: { subscription },
     } = this.client.auth.onAuthStateChange((_event, session) => {
+      if (this.client === supabase) updateSupabaseSessionSnapshot(session);
       callback(session);
     });
 
@@ -316,6 +331,24 @@ class AuthApi {
 
   signInWithPassword(email: string, password: string) {
     return this.client.auth.signInWithPassword({ email, password });
+  }
+
+  signInWithEmailOtp(email: string, emailRedirectTo: string) {
+    return this.client.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo,
+        shouldCreateUser: false,
+      },
+    });
+  }
+
+  verifyEmailOtp(email: string, token: string) {
+    return this.client.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
   }
 
   signUp(
@@ -358,6 +391,16 @@ class AuthApi {
           access_type: "offline",
           prompt: "select_account",
         },
+      },
+    });
+  }
+
+  signInWithGitHub(redirectTo: string) {
+    return this.client.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo,
+        scopes: GITHUB_AUTH_SCOPES,
       },
     });
   }
@@ -432,10 +475,15 @@ class ProfilesApi {
     return data;
   }
 
-  async saveRegistrationProfile(userId: string, username: string) {
+  async saveRegistrationProfile(
+    userId: string,
+    username: string,
+    bio?: string
+  ) {
     const { error } = await this.client.from("profiles").upsert({
       id: userId,
       username: username.trim().toLowerCase(),
+      ...(bio !== undefined ? { bio: bio.trim() || null } : {}),
     });
 
     if (error) throw error;
@@ -901,6 +949,58 @@ class NotificationsApi {
     );
 
     return recipientIds.length;
+  }
+
+  private async createForClassAudience(input: {
+    actorId: string;
+    classId: string;
+    type: "class_announcement" | "class_event";
+    metadata: Record<string, unknown>;
+  }) {
+    const { data: memberRows, error } = await this.client
+      .from("class_members")
+      .select("user_id, role")
+      .eq("class_id", input.classId);
+    if (error) throw error;
+
+    const recipientIds = [...new Set((memberRows || [])
+      .filter((member) => member.user_id !== input.actorId && member.role !== "teacher")
+      .map((member) => member.user_id)
+      .filter((userId): userId is string => Boolean(userId)))];
+    await Promise.all(recipientIds.map((userId) => NotificationsApi.createWithClient(this.client, {
+      userId,
+      actorId: input.actorId,
+      type: input.type,
+      title: input.type,
+      metadata: { ...input.metadata, classId: input.classId },
+    })));
+    return recipientIds.length;
+  }
+
+  async createForClassAnnouncement(input: {
+    actorId: string;
+    announcementId: string;
+    classId: string;
+  }) {
+    return this.createForClassAudience({
+      actorId: input.actorId,
+      classId: input.classId,
+      type: "class_announcement",
+      metadata: { announcementId: input.announcementId },
+    });
+  }
+
+  async createForClassEvent(input: {
+    actorId: string;
+    classId: string;
+    eventId: string;
+  }) {
+    return this.createForClassAudience({
+      actorId: input.actorId,
+      classId: input.classId,
+      type: "class_event",
+      metadata: { eventId: input.eventId },
+    });
   }
 
   async list(userId: string, limit = 30): Promise<AppNotification[]> {
@@ -1515,47 +1615,25 @@ class DailyChallengesApi {
     const challenge = await this.getForDate(today);
 
     if (!challenge?.problem_id) return null;
-
-    const { data: existing, error: existingError } = await this.client
-      .from("notifications")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("type", "daily_challenge")
-      .contains("metadata", { challengeDate: today })
-      .limit(1);
-
-    if (existingError?.code !== "42P01" && existingError?.code !== "PGRST205" && existingError) {
-      throw existingError;
-    }
-
-    if (existing?.length) return challenge;
-
-    const title =
-      locale === "ro"
-        ? "Challenge-ul zilei este disponibil"
-        : "Today's challenge is ready";
-    const problemTitle =
-      challenge.problems?.title_i18n?.[locale] ||
-      challenge.problems?.title_i18n?.en ||
-      challenge.problems?.title_i18n?.ro ||
-      "Daily coding challenge";
+    const supportedLocale = locale === "ro" ? "ro" : "en";
+    const content = getDailyChallengeNotificationContent(
+      challenge.problems?.title_i18n,
+      supportedLocale
+    );
 
     await NotificationsApi.createWithClient(this.client, {
       userId,
       actorId: userId,
       type: "daily_challenge",
-      title,
-      body:
-        locale === "ro"
-          ? `Rezolvă: ${problemTitle}`
-          : `Solve: ${problemTitle}`,
+      title: content.title,
+      body: content.body,
       href: `/problems/${challenge.problem_id}`,
       metadata: {
         challengeId: challenge.id,
         challengeDate: today,
         problemId: challenge.problem_id,
       },
-      locale: locale === "ro" ? "ro" : "en",
+      locale: supportedLocale,
     });
 
     return challenge;
@@ -3013,7 +3091,7 @@ class StudyGroupsApi {
       groupId: input.groupId,
       channelId: input.channelId,
       userId: input.userId,
-      content: `Started a live coding session: /live/${room.id}`,
+      content: `Started a live coding session: /editor/live/${room.id}`,
       kind: "system",
       metadata: { event: "live_session_started", roomId: room.id },
       notify: false,

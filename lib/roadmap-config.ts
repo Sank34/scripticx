@@ -1,4 +1,6 @@
 import {
+  getLessonCompletionRequirement,
+  getLessonRule,
   learnLessons,
   learnSections,
   type LearnLesson,
@@ -31,14 +33,34 @@ export type RoadmapSectionFrame = {
   y: number;
 };
 
+export type LearningPathKind =
+  | "foundation"
+  | "specialization"
+  | "supplemental";
+
+export type LearningPathAvailability =
+  | "draft"
+  | "coming_soon"
+  | "published"
+  | "archived";
+
 export type RoadmapCategory = {
+  accentColor?: string;
+  availability: LearningPathAvailability;
+  databaseId?: string;
   description: {
     en: string;
     ro: string;
   };
+  estimatedHours?: number;
   id: string;
+  icon?: string;
+  kind: LearningPathKind;
+  language: string;
   order: number;
+  prerequisitePathId?: string | null;
   sectionIds: string[];
+  slug: string;
   title: {
     en: string;
     ro: string;
@@ -60,50 +82,168 @@ export const roadmapConfigKey = "scripticx.roadmapConfig.v1";
 export const roadmapConfigEvent = "scripticx:roadmap-config";
 export const roadmapConfigId = "default";
 const roadmapMetadataKey = "__roadmap";
-const defaultCategoryIds = {
-  miniscript: "miniscript-roadmap",
-  complexity: "complexity-analysis",
-} as const;
+const legacyMiniScriptCategoryId = "miniscript-roadmap";
+const foundationPathSlug = "miniscript-plus";
+const staticLessonById = new Map(
+  learnLessons.map((lesson) => [lesson.id, lesson])
+);
 
 export const defaultRoadmapCategories: RoadmapCategory[] = [
   {
-    id: defaultCategoryIds.miniscript,
+    accentColor: "#10b981",
+    availability: "published",
+    estimatedHours: 12,
+    id: foundationPathSlug,
+    icon: "braces",
+    kind: "foundation",
+    language: "msp",
     order: 1,
+    prerequisitePathId: null,
     sectionIds: learnSections
-      .filter((section) => !section.id.startsWith("complexity-"))
+      .filter((section) => section.pathSlug === foundationPathSlug)
       .map((section) => section.id),
     title: { en: "MiniScript+ Roadmap", ro: "Roadmap MiniScript+" },
+    slug: foundationPathSlug,
     description: {
       en: "A guided learning path with short lessons, visual execution and practice after every concept.",
       ro: "Un traseu ghidat cu lecții scurte, execuție vizuală și exerciții după fiecare concept.",
     },
   },
   {
-    id: defaultCategoryIds.complexity,
+    accentColor: "#8b5cf6",
+    availability: "published",
+    estimatedHours: 4,
+    id: "complexity-analysis",
+    icon: "chart",
+    kind: "supplemental",
+    language: "msp",
     order: 2,
+    prerequisitePathId: null,
     sectionIds: learnSections
-      .filter((section) => section.id.startsWith("complexity-"))
+      .filter((section) => section.pathSlug === "complexity-analysis")
       .map((section) => section.id),
     title: { en: "Complexity Analysis", ro: "Analiza complexității" },
+    slug: "complexity-analysis",
     description: {
       en: "Understand Big-O, loop nesting, AST-based estimates and memory usage.",
       ro: "Înțelege Big-O, bucle imbricate, estimări pe AST și memoria folosită.",
     },
   },
+  {
+    accentColor: "#3776ab",
+    availability: "coming_soon",
+    estimatedHours: 24,
+    id: "python",
+    icon: "python",
+    kind: "specialization",
+    language: "python",
+    order: 3,
+    prerequisitePathId: foundationPathSlug,
+    sectionIds: [],
+    slug: "python",
+    title: { en: "Python", ro: "Python" },
+    description: {
+      en: "Turn your algorithmic foundation into practical Python programs.",
+      ro: "Transformă fundația algoritmică în programe practice scrise în Python.",
+    },
+  },
+  {
+    accentColor: "#f7df1e",
+    availability: "coming_soon",
+    estimatedHours: 26,
+    id: "javascript",
+    icon: "javascript",
+    kind: "specialization",
+    language: "javascript",
+    order: 4,
+    prerequisitePathId: foundationPathSlug,
+    sectionIds: [],
+    slug: "javascript",
+    title: { en: "JavaScript", ro: "JavaScript" },
+    description: {
+      en: "Build interactive web experiences with modern JavaScript.",
+      ro: "Construiește experiențe web interactive cu JavaScript modern.",
+    },
+  },
+  {
+    accentColor: "#00599c",
+    availability: "coming_soon",
+    estimatedHours: 30,
+    id: "cpp",
+    icon: "cpp",
+    kind: "specialization",
+    language: "cpp",
+    order: 5,
+    prerequisitePathId: foundationPathSlug,
+    sectionIds: [],
+    slug: "cpp",
+    title: { en: "C++", ro: "C++" },
+    description: {
+      en: "Go deeper into performance, data structures and competitive algorithms.",
+      ro: "Aprofundează performanța, structurile de date și algoritmica de concurs.",
+    },
+  },
 ];
 
-function categoryIdFromPathSlug(slug: string) {
-  return slug === "miniscript-plus" ? defaultCategoryIds.miniscript : slug;
+function normalizeRoadmapCategory(
+  category: Partial<RoadmapCategory> &
+    Pick<RoadmapCategory, "description" | "id" | "order" | "sectionIds" | "title">,
+  index = 0
+): RoadmapCategory {
+  const normalizedId =
+    category.id === legacyMiniScriptCategoryId
+      ? foundationPathSlug
+      : category.id;
+  const fallback = defaultRoadmapCategories.find(
+    (item) => item.id === normalizedId
+  );
+  const slug = category.slug ?? fallback?.slug ?? normalizedId;
+
+  return {
+    accentColor: category.accentColor ?? fallback?.accentColor,
+    availability:
+      category.availability ?? fallback?.availability ?? "published",
+    databaseId: category.databaseId,
+    description: category.description,
+    estimatedHours: category.estimatedHours ?? fallback?.estimatedHours,
+    icon: category.icon ?? fallback?.icon,
+    id: normalizedId,
+    kind: category.kind ?? fallback?.kind ?? "specialization",
+    language: category.language ?? fallback?.language ?? slug,
+    order: category.order ?? index + 1,
+    prerequisitePathId:
+      category.prerequisitePathId === legacyMiniScriptCategoryId
+        ? foundationPathSlug
+        : category.prerequisitePathId ?? fallback?.prerequisitePathId ?? null,
+    sectionIds: category.sectionIds,
+    slug,
+    title: category.title,
+  };
 }
 
-function pathSlugFromCategoryId(id: string) {
-  return id === defaultCategoryIds.miniscript ? "miniscript-plus" : id;
+export function getCategoryForSection(
+  categories: RoadmapCategory[],
+  sectionId: string
+) {
+  return categories.find((category) => category.sectionIds.includes(sectionId));
+}
+
+export function getCategoryForLesson(
+  categories: RoadmapCategory[],
+  sections: LearnSection[],
+  lessonId: string
+) {
+  const section = sections.find((item) => item.lessonIds.includes(lessonId));
+  return section ? getCategoryForSection(categories, section.id) : undefined;
 }
 
 function categoryIdForStaticSection(sectionId: string) {
-  return sectionId.startsWith("complexity-")
-    ? defaultCategoryIds.complexity
-    : defaultCategoryIds.miniscript;
+  const section = learnSections.find((item) => item.id === sectionId);
+  return (
+    defaultRoadmapCategories.find(
+      (category) => category.slug === section?.pathSlug
+    )?.id ?? defaultRoadmapCategories[0].id
+  );
 }
 
 type RemoteRoadmapLayout = {
@@ -119,9 +259,16 @@ type RemotePathDescription = Partial<RoadmapCategory["description"]> & {
 };
 
 type RemoteLearningPathRow = {
+  accent_color: string | null;
+  availability: LearningPathAvailability | null;
   description_i18n: RemotePathDescription | null;
+  estimated_hours: number | null;
   id: string;
+  icon: string | null;
+  kind: LearningPathKind | null;
+  language: string | null;
   order_index: number | null;
+  prerequisite_path_id: string | null;
   slug: string;
   title_i18n: Partial<RoadmapCategory["title"]> | null;
 };
@@ -144,6 +291,7 @@ type RemoteUnitRow = {
 };
 
 type RemoteLessonRow = {
+  completion_requirement: LearnLesson["completionRequirement"] | null;
   content_i18n: Record<string, unknown> | null;
   example_code: string | null;
   id: string;
@@ -151,6 +299,8 @@ type RemoteLessonRow = {
   level: LearnLesson["level"] | null;
   order_index: number | null;
   quiz: LearnLesson["quiz"] | null;
+  required_problem_codes: number[] | null;
+  requires_correct_quiz: boolean | null;
   sample_input: string | null;
   slug: string;
   summary_i18n: Partial<LearnLesson["summary"]> | null;
@@ -168,6 +318,10 @@ type RemoteRoadmapMetadata = {
   recommendedProblems?: LearnLesson["recommendedProblems"];
   theory?: LearnLesson["theory"];
   unlockRule?: LearnLesson["unlockRule"];
+};
+
+type RemoteLessonContent = Record<string, unknown> & {
+  markdown?: Partial<NonNullable<LearnLesson["markdown"]>>;
 };
 
 function getConnectionSides(
@@ -243,10 +397,15 @@ function mergeDefaultCategories(
   remoteSections: LearnSection[],
   deletedCategoryIds: string[] = []
 ) {
-  const remoteCategoryIds = new Set(remoteCategories.map((category) => category.id));
+  const normalizedRemoteCategories = remoteCategories.map((category, index) =>
+    normalizeRoadmapCategory(category, index)
+  );
+  const remoteCategoryIds = new Set(
+    normalizedRemoteCategories.map((category) => category.id)
+  );
   const remoteSectionIds = new Set(remoteSections.map((section) => section.id));
   const deletedCategoryIdSet = new Set(deletedCategoryIds);
-  const merged = [...remoteCategories];
+  const merged = [...normalizedRemoteCategories];
 
   for (const defaultCategory of defaultRoadmapCategories) {
     if (deletedCategoryIdSet.has(defaultCategory.id)) continue;
@@ -289,7 +448,9 @@ export function readRoadmapConfig(): RoadmapConfig | null {
       ...parsed,
       categories:
         parsed.categories?.length
-          ? parsed.categories
+          ? parsed.categories.map((category, index) =>
+              normalizeRoadmapCategory(category, index)
+            )
           : defaultRoadmapCategories.map((category) => ({
               ...category,
               sectionIds: parsed.sections
@@ -317,7 +478,7 @@ export function writeRoadmapConfig(config: RoadmapConfig) {
 export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
   const { data: pathRows, error: pathError } = await supabase
     .from("learning_paths")
-    .select("id, slug, title_i18n, description_i18n, order_index")
+    .select("id, slug, title_i18n, description_i18n, language, kind, prerequisite_path_id, availability, estimated_hours, icon, accent_color, order_index")
     .order("order_index", { ascending: true })
     .returns<RemoteLearningPathRow[]>();
 
@@ -334,7 +495,7 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
         .returns<RemoteUnitRow[]>(),
       supabase
         .from("lessons")
-        .select("id, unit_id, slug, title_i18n, summary_i18n, content_i18n, transcript_i18n, youtube_url, example_code, sample_input, quiz, tags, level, estimated_minutes, order_index, is_published")
+        .select("id, unit_id, slug, title_i18n, summary_i18n, content_i18n, transcript_i18n, youtube_url, example_code, sample_input, quiz, tags, level, estimated_minutes, completion_requirement, requires_correct_quiz, required_problem_codes, order_index, is_published")
         .order("order_index", { ascending: true })
         .returns<(RemoteLessonRow & { estimated_minutes: number | null })[]>(),
     ]);
@@ -343,10 +504,24 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
   if (lessonError) throw lessonError;
   if (!unitRows?.length && !lessonRows?.length) return null;
 
+  const categoryIdByPathId = new Map(
+    pathRows.map((path) => [path.id, path.slug])
+  );
   const categories: RoadmapCategory[] = pathRows.map((path, index) => ({
-    id: categoryIdFromPathSlug(path.slug),
+    accentColor: path.accent_color ?? undefined,
+    availability: path.availability ?? "published",
+    databaseId: path.id,
+    estimatedHours: path.estimated_hours ?? undefined,
+    id: path.slug,
+    icon: path.icon ?? undefined,
+    kind: path.kind ?? "specialization",
+    language: path.language ?? "msp",
     order: path.order_index ?? index + 1,
+    prerequisitePathId: path.prerequisite_path_id
+      ? categoryIdByPathId.get(path.prerequisite_path_id) ?? null
+      : null,
     sectionIds: [],
+    slug: path.slug,
     title: {
       en: path.title_i18n?.en ?? path.slug,
       ro: path.title_i18n?.ro ?? path.title_i18n?.en ?? path.slug,
@@ -378,6 +553,7 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     return {
     id: unit.slug,
     order: unit.order_index ?? index + 1,
+    pathSlug: category?.slug,
     label: {
       en: unit.title_i18n?.en ?? unit.slug,
       ro: unit.title_i18n?.ro ?? unit.title_i18n?.en ?? unit.slug,
@@ -403,7 +579,8 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
   const sectionFrames = savedLayout?.sectionFrames ?? unitSectionFrames;
 
   const hasLessonConnections = (lessonRows ?? []).some((row) => {
-    const metadata = (row.content_i18n?.[roadmapMetadataKey] ??
+    const content = (row.content_i18n ?? {}) as RemoteLessonContent;
+    const metadata = (content[roadmapMetadataKey] ??
       {}) as RemoteRoadmapMetadata;
     return Array.isArray(metadata.connections);
   });
@@ -417,9 +594,34 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
   const remoteConnections = savedLayout?.connections ?? lessonConnections;
 
   const lessons = (lessonRows ?? []).map((row, index) => {
+    const content = (row.content_i18n ?? {}) as RemoteLessonContent;
     const metadata = (row.content_i18n?.[roadmapMetadataKey] ??
       {}) as RemoteRoadmapMetadata;
     const section = row.unit_id ? sectionByUnitId.get(row.unit_id) : undefined;
+    const staticLesson = staticLessonById.get(row.slug);
+    const isLegacySparseLesson = Boolean(
+      staticLesson &&
+        !row.youtube_url &&
+        !row.example_code?.trim() &&
+        !row.sample_input?.trim() &&
+        !(row.quiz?.length ?? 0) &&
+        !row.transcript_i18n?.en?.trim() &&
+        !row.transcript_i18n?.ro?.trim() &&
+        !(metadata.theory?.length ?? 0)
+    );
+    const fallbackLesson = isLegacySparseLesson ? staticLesson : undefined;
+    const fallbackRequiredProblemCodes =
+      fallbackLesson && row.completion_requirement === "capstone"
+        ? fallbackLesson.recommendedProblems
+            .slice(0, 1)
+            .map((problem) => problem.code)
+            .filter((code): code is number => typeof code === "number")
+        : undefined;
+    const fallbackRequiresCorrectQuiz = fallbackLesson
+      ? (row.completion_requirement === "required" ||
+          row.completion_requirement === "capstone") &&
+        fallbackLesson.quiz.length > 0
+      : undefined;
 
     if (section) section.lessonIds.push(row.slug);
 
@@ -428,28 +630,58 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
       order: row.order_index ?? index + 1,
       unit: section?.title ?? { en: "Roadmap", ro: "Roadmap" },
       title: {
-        en: row.title_i18n?.en ?? row.slug,
-        ro: row.title_i18n?.ro ?? row.title_i18n?.en ?? row.slug,
+        en: fallbackLesson?.title.en ?? row.title_i18n?.en ?? row.slug,
+        ro:
+          fallbackLesson?.title.ro ??
+          row.title_i18n?.ro ??
+          row.title_i18n?.en ??
+          row.slug,
       },
       summary: {
-        en: row.summary_i18n?.en ?? "",
-        ro: row.summary_i18n?.ro ?? row.summary_i18n?.en ?? "",
+        en: fallbackLesson?.summary.en ?? row.summary_i18n?.en ?? "",
+        ro:
+          fallbackLesson?.summary.ro ??
+          row.summary_i18n?.ro ??
+          row.summary_i18n?.en ??
+          "",
       },
       transcript: {
-        en: row.transcript_i18n?.en ?? "",
-        ro: row.transcript_i18n?.ro ?? row.transcript_i18n?.en ?? "",
+        en: fallbackLesson?.transcript.en ?? row.transcript_i18n?.en ?? "",
+        ro:
+          fallbackLesson?.transcript.ro ??
+          row.transcript_i18n?.ro ??
+          row.transcript_i18n?.en ??
+          "",
       },
-      videoUrl: row.youtube_url ?? undefined,
-      tags: row.tags ?? [],
-      level: row.level ?? "beginner",
-      minutes: row.estimated_minutes ?? 8,
-      sampleInput: row.sample_input ?? "",
-      code: row.example_code ?? "",
-      quiz: row.quiz ?? [],
-      recommendedProblems: metadata.recommendedProblems ?? [],
-      kind: metadata.kind,
-      theory: metadata.theory,
-      unlockRule: metadata.unlockRule,
+      markdown: content.markdown
+        ? {
+            en: content.markdown.en ?? content.markdown.ro ?? "",
+            ro: content.markdown.ro ?? content.markdown.en ?? "",
+          }
+        : fallbackLesson?.markdown,
+      videoUrl: fallbackLesson?.videoUrl ?? row.youtube_url ?? undefined,
+      tags: fallbackLesson?.tags ?? row.tags ?? [],
+      level: fallbackLesson?.level ?? row.level ?? "beginner",
+      minutes: fallbackLesson?.minutes ?? row.estimated_minutes ?? 8,
+      sampleInput: fallbackLesson?.sampleInput ?? row.sample_input ?? "",
+      code: fallbackLesson?.code ?? row.example_code ?? "",
+      quiz: fallbackLesson?.quiz ?? row.quiz ?? [],
+      recommendedProblems:
+        fallbackLesson?.recommendedProblems ?? metadata.recommendedProblems ?? [],
+      kind: metadata.kind ?? fallbackLesson?.kind,
+      completionRequirement: row.completion_requirement ?? undefined,
+      theory: fallbackLesson?.theory ?? metadata.theory,
+      unlockRule: {
+        ...metadata.unlockRule,
+        requiredProblemCodes:
+          fallbackRequiredProblemCodes ??
+          row.required_problem_codes?.filter((code) => code > 0) ??
+          metadata.unlockRule?.requiredProblemCodes,
+        requiresCorrectQuiz:
+          fallbackRequiresCorrectQuiz ??
+          row.requires_correct_quiz ??
+          metadata.unlockRule?.requiresCorrectQuiz,
+      },
     } satisfies LearnLesson;
   });
 
@@ -541,22 +773,34 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
   if (pathsReadError) throw pathsReadError;
 
   const pathIdByCategoryId = new Map(
-    (existingPaths ?? []).map((path) => [
-      categoryIdFromPathSlug(path.slug),
-      path.id,
-    ])
+    (existingPaths ?? []).map((path) => [path.slug, path.id])
   );
   const existingPathByCategoryId = new Map(
-    (existingPaths ?? []).map((path) => [categoryIdFromPathSlug(path.slug), path])
+    (existingPaths ?? []).map((path) => [path.slug, path])
   );
+  config.categories.forEach((category) => {
+    const existing =
+      (category.databaseId
+        ? (existingPaths ?? []).find((path) => path.id === category.databaseId)
+        : undefined) ?? existingPathByCategoryId.get(category.slug);
+    if (existing) {
+      pathIdByCategoryId.set(category.id, existing.id);
+    }
+    if (!pathIdByCategoryId.has(category.id)) {
+      pathIdByCategoryId.set(category.id, crypto.randomUUID());
+    }
+  });
   const pathRows = config.categories.map((category, index) => {
-    const existing = existingPathByCategoryId.get(category.id);
-    const id = existing?.id ?? crypto.randomUUID();
+    const existing =
+      (category.databaseId
+        ? (existingPaths ?? []).find((path) => path.id === category.databaseId)
+        : undefined) ?? existingPathByCategoryId.get(category.slug);
+    const id = existing?.id ?? pathIdByCategoryId.get(category.id)!;
     pathIdByCategoryId.set(category.id, id);
 
     return {
       id,
-      slug: pathSlugFromCategoryId(category.id),
+      slug: category.slug || category.id,
       title_i18n: category.title,
       description_i18n: {
         ...(existing?.description_i18n ?? {}),
@@ -587,9 +831,19 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
             }
           : {}),
       },
-      language: "msp",
+      language: category.language,
+      kind: category.kind,
+      prerequisite_path_id: category.prerequisitePathId
+        ? pathIdByCategoryId.get(category.prerequisitePathId) ?? null
+        : null,
+      availability: category.availability,
+      estimated_hours: category.estimatedHours ?? null,
+      icon: category.icon ?? null,
+      accent_color: category.accentColor ?? null,
       order_index: category.order ?? index + 1,
-      is_published: true,
+      is_published:
+        category.availability === "published" ||
+        category.availability === "coming_soon",
     };
   });
 
@@ -673,6 +927,7 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
     const existing = existingLessonBySlug.get(lesson.id);
     const section = sectionByLessonId.get(lesson.id) ?? config.sections[0];
     const existingContent = existing?.content_i18n ?? {};
+    const rule = getLessonRule(lesson);
 
     return {
       id: existing?.id ?? crypto.randomUUID(),
@@ -682,6 +937,7 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
       summary_i18n: lesson.summary,
       content_i18n: {
         ...existingContent,
+        markdown: lesson.markdown,
         [roadmapMetadataKey]: {
           connections: config.connections.filter(
             (connection) => connection.sourceId === lesson.id
@@ -700,6 +956,9 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
       quiz: lesson.quiz,
       tags: lesson.tags,
       level: lesson.level,
+      completion_requirement: getLessonCompletionRequirement(lesson),
+      requires_correct_quiz: rule.requiresCorrectQuiz,
+      required_problem_codes: rule.requiredProblemCodes,
       estimated_minutes: lesson.minutes,
       order_index: lesson.order ?? index + 1,
       is_published: true,
@@ -752,21 +1011,19 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
     if (deleteError) throw deleteError;
   }
 
-  const savedCategoryIds = new Set(
-    config.categories.map((category) => category.id)
+  const savedCategorySlugs = new Set(
+    config.categories.map((category) => category.slug)
   );
-  const removableCategoryIds = new Set([
-    ...defaultRoadmapCategories.map((category) => category.id),
-    ...(localConfig?.categories ?? []).map((category) => category.id),
+  const removableCategorySlugs = new Set([
+    ...defaultRoadmapCategories.map((category) => category.slug),
+    ...(localConfig?.categories ?? []).map((category) => category.slug),
   ]);
   const deletedPathIds = (existingPaths ?? [])
-    .filter((path) => {
-      const categoryId = categoryIdFromPathSlug(path.slug);
-      return (
-        removableCategoryIds.has(categoryId) &&
-        !savedCategoryIds.has(categoryId)
-      );
-    })
+    .filter(
+      (path) =>
+        removableCategorySlugs.has(path.slug) &&
+        !savedCategorySlugs.has(path.slug)
+    )
     .map((path) => path.id);
 
   if (deletedPathIds.length > 0) {
@@ -789,7 +1046,9 @@ export function clearRoadmapConfig() {
 export function getRoadmapConfigData(config?: RoadmapConfig | null) {
   return {
     categories: config?.categories?.length
-      ? config.categories
+      ? config.categories.map((category, index) =>
+          normalizeRoadmapCategory(category, index)
+        )
       : defaultRoadmapCategories,
     lessons: config?.lessons?.length ? config.lessons : learnLessons,
     connections:

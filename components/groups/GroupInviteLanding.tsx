@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Hash, Lock, Sparkles, Users } from "lucide-react";
+import { Hash, Lock, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { api, type StudyGroupInvitePreview } from "@/lib/api";
@@ -61,8 +61,8 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
 
   if (inviteQuery.isLoading) {
     return (
-      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,_#d1fae5,_transparent_34%),#fafafa] p-6 dark:bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_transparent_34%),var(--background)]">
-        <div className="w-full max-w-xl rounded-3xl border bg-card/85 p-8 text-card-foreground shadow-2xl shadow-emerald-950/10 backdrop-blur">
+      <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-muted/30 p-6">
+        <div className="w-full max-w-xl rounded-2xl border bg-card p-8 text-card-foreground shadow-sm">
           <Skeleton className="mx-auto size-16 rounded-2xl" />
           <Skeleton className="mx-auto mt-6 h-8 w-2/3" />
           <Skeleton className="mx-auto mt-3 h-4 w-5/6" />
@@ -87,7 +87,7 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
     return (
       <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-muted/60 p-6">
         <EmptyState
-          className="w-full max-w-xl rounded-3xl border bg-card p-10 text-card-foreground shadow-xl"
+          className="w-full max-w-xl rounded-2xl border bg-card p-10 text-card-foreground shadow-sm"
           icon={<Lock className="size-8" />}
           title={title}
           description={description}
@@ -102,10 +102,10 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_45%,#ffffff_100%)] p-6 dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_45%,#09090b_100%)]">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border bg-card/90 text-center text-card-foreground shadow-2xl shadow-emerald-950/10 backdrop-blur">
+    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-muted/30 p-6">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border bg-card text-center text-card-foreground shadow-sm">
         <div
-          className="h-28 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#e7fff5_42%,#eef2ff_100%)] bg-cover bg-center dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_42%,#1e1b4b_100%)]"
+          className="h-28 border-b bg-muted bg-cover bg-center"
           style={
             group.banner_url
               ? {
@@ -114,20 +114,17 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
               : undefined
           }
         />
-        <div className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-emerald-200/50 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -left-20 size-56 rounded-full bg-zinc-200/60 blur-3xl" />
-
-        <div className="relative px-8 pb-8">
-          <Avatar className="mx-auto -mt-10 size-20 border-4 border-background shadow-lg">
+        <div className="px-8 pb-8">
+          <Avatar className="mx-auto -mt-10 size-20 border-4 border-background shadow-sm">
             <AvatarImage src={group.avatar_url || undefined} alt={group.name} />
             <AvatarFallback className="bg-zinc-950 text-2xl font-semibold text-white">
               {groupInitial}
             </AvatarFallback>
           </Avatar>
-          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+          <p className="mt-5 text-sm font-medium text-muted-foreground">
             {t("groups.invitePage.eyebrow")}
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">
             {t("groups.invitePage.title")}
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">
@@ -152,11 +149,11 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
                 </p>
               </div>
               <div className="flex shrink-0 gap-2 text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1">
+                <span className="inline-flex items-center gap-1 border-r pr-2">
                   <Users className="size-4" />
                   {preview?.memberCount || 0} {t("groups.invitePage.members")}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1">
+                <span className="inline-flex items-center gap-1">
                   <Hash className="size-4" />
                   {preview?.channelCount || 0} {t("groups.invitePage.channels")}
                 </span>
@@ -166,7 +163,7 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
 
           <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
             {activeMember ? (
-              <Button asChild size="lg" className="rounded-full px-8">
+              <Button asChild size="lg" className="px-8">
                 <Link href={`/groups/${group.slug}`}>
                   {t("groups.invitePage.open")}
                 </Link>
@@ -176,7 +173,7 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
                 size="lg"
                 onClick={acceptInvite}
                 disabled={joining}
-                className="rounded-full px-8"
+                className="px-8"
               >
                 {joining
                   ? t("groups.invitePage.joining")
@@ -185,13 +182,12 @@ export function GroupInviteLanding({ token }: GroupInviteLandingProps) {
                     : t("groups.invitePage.login")}
               </Button>
             )}
-            <Button asChild size="lg" variant="outline" className="rounded-full px-8">
+            <Button asChild size="lg" variant="outline" className="px-8">
               <Link href="/groups">{t("groups.actions.back")}</Link>
             </Button>
           </div>
 
-          <p className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <Sparkles className="size-3.5 text-emerald-600" />
+          <p className="mt-5 text-xs text-muted-foreground">
             {activeMember
               ? t("groups.invitePage.alreadyMember")
               : t("groups.invitePage.invitedHint")}

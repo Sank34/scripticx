@@ -326,7 +326,7 @@ function LibraryBody({
                               {document.title || c.untitled}
                             </span>
                             {active ? (
-                              <span className="shrink-0 rounded-full bg-sky-500/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                              <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
                                 {c.active}
                               </span>
                             ) : null}

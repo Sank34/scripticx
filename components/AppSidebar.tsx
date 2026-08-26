@@ -22,22 +22,16 @@ import {
 } from "@/components/ui/tooltip";
 
 import {
-  School,
   UsersRound,
-  SquareTerminal,
   MessageSquare,
   Search,
   Trophy,
   Medal,
-  Code,
-  List,
   LayoutDashboard,
   Shield,
   PanelLeft,
   BookOpen,
-  ChevronDown,
   HelpCircle,
-  Route,
   Sparkles,
   ShoppingBag,
   Mail,
@@ -52,9 +46,12 @@ import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
 import { useAuth } from "@/hooks/useAuth";
 import { WorkspaceSwitcher } from "@/components/workspaces/WorkspaceSwitcher";
 import {
+  getTeacherWorkspaceNavigation,
   getStudentStudyNavigation,
   getStudentWorkspaceNavigation,
   isStudentWorkspaceContext,
+  isTeacherWorkspaceContext,
+  sharedStudyNavigationIcons,
 } from "@/components/workspaces/WorkspaceNavigation";
 import {
   formatWorkspaceNoteTime,
@@ -92,9 +89,9 @@ function NavItem({
     <Button
       asChild
       variant={active ? "secondary" : "ghost"}
-      className={`h-10 w-full gap-2 rounded-xl text-[13px] font-medium transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
+      className={`h-9 w-full gap-2 rounded-lg text-[13px] font-medium transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
         active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-muted-foreground"
       } ${
         collapsed
@@ -116,7 +113,7 @@ function NavItem({
         }
       >
         <span className="relative inline-flex shrink-0">
-          <Icon size={18} />
+          <Icon size={17} strokeWidth={1.8} />
           {collapsed && hasBadge && (
             <span className="absolute -right-2 -top-2 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[var(--sidebar)]">
               {badgeCount > 9 ? "9+" : badgeCount}
@@ -160,9 +157,9 @@ function SubItem({ href, label }: SubItemProps) {
       asChild
       variant={active ? "secondary" : "ghost"}
       size="sm"
-      className={`h-9 w-full justify-start rounded-lg pl-8 text-sm transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-[0.98] ${
+      className={`h-8 w-full justify-start rounded-md pl-8 text-[13px] transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
         active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-muted-foreground"
       }`}
     >
@@ -192,14 +189,14 @@ function RecentNoteItem({
     <Button
       asChild
       variant={active ? "secondary" : "ghost"}
-      className={`group/note h-10 w-full rounded-xl px-2 transition-all duration-200 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:scale-[0.98] ${
+      className={`group/note h-9 w-full rounded-lg px-2 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
         active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-muted-foreground"
       } ${collapsed ? "justify-center" : "justify-start"}`}
     >
       <Link href={href} aria-current={active ? "page" : undefined}>
-        <FileText className="size-4 shrink-0 transition-transform duration-200 group-hover/note:translate-x-0.5" />
+        <FileText className="size-4 shrink-0" strokeWidth={1.8} />
         {!collapsed && (
           <span className="flex min-w-0 flex-1 items-baseline gap-2">
             <span className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-foreground/85">
@@ -245,19 +242,25 @@ export function AppSidebar() {
     pathname,
     user?.user_metadata as Record<string, unknown> | undefined
   );
+  const teacherWorkspaceActive = isTeacherWorkspaceContext(
+    pathname,
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
+  const workspaceSpecificActive =
+    studentWorkspaceActive || teacherWorkspaceActive;
   const studentWorkspaceNavigation = getStudentWorkspaceNavigation(locale);
   const studentStudyNavigation = getStudentStudyNavigation(locale);
+  const teacherWorkspaceNavigation = getTeacherWorkspaceNavigation(locale);
   const recentNotes = useRecentWorkspaceNotes(
     studentWorkspaceActive ? user?.id : null
   );
 
-  const [docsOpenOverride, setDocsOpenOverride] = useState<boolean | null>(null);
-  const [examplesOpenOverride, setExamplesOpenOverride] = useState<boolean | null>(null);
   const docsActive = pathname.startsWith("/docs");
+  const examplesActive = pathname.startsWith("/examples");
   const roadmapActive =
-    pathname === "/learn" || pathname.startsWith("/learn/lesson");
-  const openDocs = docsOpenOverride ?? docsActive;
-  const openExamples = examplesOpenOverride ?? pathname.startsWith("/examples");
+    pathname === "/learn" || pathname.startsWith("/learn/");
+  const openDocs = docsActive;
+  const openExamples = examplesActive;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
@@ -327,7 +330,7 @@ export function AppSidebar() {
               : "justify-between gap-1 px-2 py-2"
           } ${
             canScrollUp
-              ? "border-b border-sidebar-border shadow-[0_5px_14px_rgba(0,0,0,0.06)] dark:shadow-[0_6px_18px_rgba(0,0,0,0.32)]"
+              ? "border-b border-sidebar-border"
               : "border-transparent"
           }`}
         >
@@ -338,7 +341,7 @@ export function AppSidebar() {
             size="icon"
             onClick={toggleSidebar}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="size-10 shrink-0 rounded-xl"
+            className="size-9 shrink-0 rounded-lg"
           >
             <PanelLeft
               size={18}
@@ -366,7 +369,7 @@ export function AppSidebar() {
         {user && studentWorkspaceActive && (
           <SidebarGroup className="py-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
             {!collapsed && (
-              <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/70">
+              <SidebarGroupLabel className="h-8 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                 {locale === "ro" ? "Workspace elev" : "Student workspace"}
               </SidebarGroupLabel>
             )}
@@ -385,10 +388,31 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
+        {user && teacherWorkspaceActive && (
+          <SidebarGroup className="py-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
+            {!collapsed && (
+              <SidebarGroupLabel className="h-8 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">
+                {locale === "ro" ? "Workspace profesor" : "Teacher workspace"}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent className="space-y-1">
+              {teacherWorkspaceNavigation.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  active={item.active(pathname)}
+                />
+              ))}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         {user && studentWorkspaceActive && recentNotes.length > 0 && (
           <SidebarGroup className="py-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
             {!collapsed && (
-              <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/70">
+              <SidebarGroupLabel className="h-8 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                 {locale === "ro" ? "Notițe recente" : "Recent notes"}
               </SidebarGroupLabel>
             )}
@@ -403,7 +427,7 @@ export function AppSidebar() {
         {user && studentWorkspaceActive && (
           <SidebarGroup className="py-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
             {!collapsed && (
-              <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground/70">
+              <SidebarGroupLabel className="h-8 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">
                 {locale === "ro" ? "Învățare" : "Study"}
               </SidebarGroupLabel>
             )}
@@ -421,23 +445,17 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {!studentWorkspaceActive && <SidebarGroup className="py-1.5">
-          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.platform")}</SidebarGroupLabel>}
+        {!workspaceSpecificActive && <SidebarGroup className="py-1.5">
+          {!collapsed && <SidebarGroupLabel className="h-8 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">{t("sidebar.platform")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             {user && (
               <NavItem href="/dashboard" icon={LayoutDashboard} label={t("nav.dashboard")} active={pathname.startsWith("/dashboard")} />
             )}
             { user && (
-              <NavItem href="/editor" icon={Code} label={t("nav.editor")} active={pathname.startsWith("/editor")} />
+              <NavItem href="/editor" icon={sharedStudyNavigationIcons.editor} label={t("nav.editor")} active={pathname.startsWith("/editor")} />
             )}
-            {user && (
-              <NavItem href="/livecode" icon={SquareTerminal} label={t("nav.livecode")} active={pathname.startsWith("/livecode") || pathname.startsWith("/live") } />
-            )}
-            <NavItem href="/problems" icon={List} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
-            {user && (
-              <NavItem href="/classes" icon={School} label={t("nav.classes")} active={pathname.startsWith("/classes")} />
-            )}
+            <NavItem href="/problems" icon={sharedStudyNavigationIcons.problems} label={t("nav.problems")} active={pathname.startsWith("/problems")} />
             {user && (
               <NavItem href="/search" icon={Search} label={t("nav.search")} active={pathname.startsWith("/search")} />
             )}
@@ -447,8 +465,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>}
 
-        {!studentWorkspaceActive && <SidebarGroup className="py-1.5">
-          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.community")}</SidebarGroupLabel>}
+        {!workspaceSpecificActive && <SidebarGroup className="py-1.5">
+          {!collapsed && <SidebarGroupLabel className="h-8 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">{t("sidebar.community")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             {user && (
@@ -474,15 +492,15 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>}
 
-        {!studentWorkspaceActive && <SidebarGroup className="py-1.5">
-          {!collapsed && <SidebarGroupLabel className="h-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">{t("sidebar.learn")}</SidebarGroupLabel>}
+        {!workspaceSpecificActive && <SidebarGroup className="py-1.5">
+          {!collapsed && <SidebarGroupLabel className="h-8 px-3 text-xs font-medium normal-case tracking-normal text-muted-foreground">{t("sidebar.learn")}</SidebarGroupLabel>}
 
           <SidebarGroupContent className="space-y-1">
             
             {user && (
               <NavItem
               href="/learn"
-              icon={Route}
+              icon={sharedStudyNavigationIcons.learn}
               label={t("nav.learn")}
               active={roadmapActive}
             />
@@ -490,30 +508,12 @@ export function AppSidebar() {
             
 
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <NavItem
-                  href="/docs/basics"
-                  icon={BookOpen}
-                  label={t("nav.docs")}
-                  active={docsActive}
-                />
-
-                {!collapsed && (
-                  <button
-                    onClick={() => {
-                      setDocsOpenOverride(!openDocs);
-                    }}
-                    className="mr-2 p-1 hover:bg-muted rounded"
-                  >
-                    <ChevronDown
-                      size={16}
-                      className={`transition-transform ${
-                        openDocs ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                )}
-              </div>
+              <NavItem
+                href="/docs/basics"
+                icon={BookOpen}
+                label={t("nav.docs")}
+                active={docsActive}
+              />
 
               {!collapsed && (
                 <div
@@ -533,30 +533,12 @@ export function AppSidebar() {
             </div>
 
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <NavItem
-                  href="/examples"
-                  icon={BookOpen}
-                  label={t("nav.examples")}
-                  active={pathname.startsWith("/examples")}
-                />
-
-                {!collapsed && (
-                  <button
-                    onClick={() => {
-                      setExamplesOpenOverride(!openExamples);
-                    }}
-                    className="mr-2 p-1 hover:bg-muted rounded"
-                  >
-                    <ChevronDown
-                      size={16}
-                      className={`transition-transform ${
-                        openExamples ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                )}
-              </div>
+              <NavItem
+                href="/examples"
+                icon={BookOpen}
+                label={t("nav.examples")}
+                active={examplesActive}
+              />
 
               {!collapsed && (
                 <div
@@ -583,7 +565,7 @@ export function AppSidebar() {
       {!studentWorkspaceActive && <div
         className={`sticky bottom-0 z-20 mt-auto bg-sidebar px-2 py-3 transition-all duration-200 ${
           canScrollDown
-            ? "border-t border-sidebar-border shadow-[0_-6px_16px_rgba(0,0,0,0.07)] dark:shadow-[0_-7px_20px_rgba(0,0,0,0.34)]"
+            ? "border-t border-sidebar-border"
             : "border-transparent shadow-none"
         }`}
       >
@@ -592,9 +574,9 @@ export function AppSidebar() {
           <Button
             asChild
             variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
+            className={`h-9 w-full rounded-lg text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
               collapsed ? "justify-center px-2" : "justify-start px-3"
-            } ${pathname.startsWith("/updates") ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : ""}`}
+            } ${pathname.startsWith("/updates") ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}`}
           >
             <Link
               href={latestUpdateSlug ? `/updates/${latestUpdateSlug}` : "/updates"}
@@ -616,9 +598,9 @@ export function AppSidebar() {
           <Button
             asChild
             variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
+            className={`h-9 w-full rounded-lg text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
               collapsed ? "justify-center px-2" : "justify-start px-3"
-            } ${pathname.startsWith("/help") ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : ""}`}
+            } ${pathname.startsWith("/help") ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}`}
           >
             <Link href="/help">
               <HelpCircle size={17} />
@@ -629,9 +611,9 @@ export function AppSidebar() {
           <Button
             asChild
             variant="ghost"
-            className={`h-10 w-full rounded-xl text-[13px] font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-sm active:scale-[0.98] ${
+            className={`h-9 w-full rounded-lg text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
               collapsed ? "justify-center px-2" : "justify-start px-3"
-            } ${pathname.startsWith("/contact") ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" : ""}`}
+            } ${pathname.startsWith("/contact") ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}`}
           >
             <Link href="/contact">
               <Mail size={17} />

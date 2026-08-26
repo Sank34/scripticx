@@ -11,10 +11,13 @@ import {
   CircleCheck,
   FileText,
   GitBranch,
+  GraduationCap,
   Inbox,
+  Languages,
   Mail,
   Mails,
   Megaphone,
+  Palette,
   RefreshCw,
   Send,
   ShoppingBag,
@@ -23,6 +26,7 @@ import {
   TrendingUp,
   Trophy,
   Users,
+  UserRoundCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,6 +41,7 @@ import { AdminStatTile } from "@/components/admin/AdminStatTile";
 import { ProblemPopularityChart } from "@/components/admin/ProblemPopularityChart";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import {
@@ -55,6 +60,8 @@ import {
   type CountResult,
 } from "@/lib/adminOverview";
 import { fetchAdminCounts, fetchAdminOverview } from "@/lib/adminOverviewData";
+import { fetchOnboardingStats } from "@/lib/onboarding-stats-data";
+import type { ChoiceDistribution } from "@/lib/onboarding-stats";
 import { cn } from "@/lib/utils";
 
 const ACTIVITY_ICON = {
@@ -75,7 +82,7 @@ function UpToDateToast({
   title: string;
 }) {
   return (
-    <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 shadow-2xl shadow-emerald-950/10 dark:border-emerald-800/70 dark:bg-emerald-950 dark:text-emerald-50">
+    <div className="sx-overlay pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-800/70 dark:bg-emerald-950 dark:text-emerald-50">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
         <CircleCheck className="h-4 w-4" />
       </span>
@@ -172,6 +179,51 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   );
 }
 
+function ChoiceBreakdown({
+  denominator,
+  distribution,
+  labels,
+  title,
+}: {
+  denominator?: number;
+  distribution: ChoiceDistribution;
+  labels: Record<string, string>;
+  title: string;
+}) {
+  const entries = Object.entries(distribution).sort((a, b) => b[1] - a[1]);
+  const total = denominator ?? entries.reduce((sum, [, count]) => sum + count, 0);
+
+  return (
+    <div className="rounded-xl border bg-card/60 p-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <Badge variant="secondary" className="tabular-nums">
+          {total.toLocaleString()}
+        </Badge>
+      </div>
+      <div className="space-y-3">
+        {entries.length ? entries.map(([key, count]) => {
+          const percentage = total ? Math.min(100, Math.round((count / total) * 100)) : 0;
+          return (
+            <div key={key} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="truncate font-medium">{labels[key] ?? key}</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">{count} · {percentage}%</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-700"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          );
+        }) : <p className="py-4 text-center text-xs text-muted-foreground">—</p>}
+      </div>
+    </div>
+  );
+}
+
 function AdminContent() {
   const { locale, t } = useLanguage();
   const { profile } = useAuth();
@@ -187,6 +239,12 @@ function AdminContent() {
     queryFn: fetchAdminOverview,
   });
 
+  const onboardingQuery = useQuery({
+    queryKey: ["admin", "onboarding-stats"],
+    queryFn: fetchOnboardingStats,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [days, setDays] = useState<AnalyticsRange>(30);
 
   const analyticsQuery = useQuery({
@@ -197,6 +255,7 @@ function AdminContent() {
   const counts = countsQuery.data;
   const overview = overviewQuery.data;
   const analytics = analyticsQuery.data;
+  const onboarding = onboardingQuery.data;
 
   const activityItems = useMemo(
     () => buildActivityFeed(overview, locale),
@@ -224,7 +283,7 @@ function AdminContent() {
   );
 
   const isFetching =
-    countsQuery.isFetching || overviewQuery.isFetching || analyticsQuery.isFetching;
+    countsQuery.isFetching || overviewQuery.isFetching || analyticsQuery.isFetching || onboardingQuery.isFetching;
   const bannedCount = positive(counts?.bannedUsers);
   const newMessageCount = positive(counts?.contactNew);
 
@@ -244,6 +303,7 @@ function AdminContent() {
       queryClient.getQueryData(["admin", "overview"]) ?? null,
       queryClient.getQueryData(["admin", "analytics", days]) ?? null,
       queryClient.getQueryData(["admin", "tasks"]) ?? null,
+      queryClient.getQueryData(["admin", "onboarding-stats"]) ?? null,
     ]);
   }
 
@@ -255,6 +315,7 @@ function AdminContent() {
         countsQuery.refetch({ throwOnError: true }),
         overviewQuery.refetch({ throwOnError: true }),
         analyticsQuery.refetch({ throwOnError: true }),
+        onboardingQuery.refetch({ throwOnError: true }),
         queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] }),
       ]);
     } catch {
@@ -384,6 +445,100 @@ function AdminContent() {
       </DashboardSection>
 
       <DashboardSection
+        title={locale === "ro" ? "Alegeri din onboarding" : "Onboarding choices"}
+        description={locale === "ro"
+          ? "Statistici agregate despre limba, workspace-ul și obiectivele alese de utilizatori."
+          : "Aggregated statistics for users’ language, workspace, experience and learning choices."}
+      >
+        {onboardingQuery.isError ? (
+          <EmptyState
+            className="py-8"
+            icon={<UserRoundCheck className="h-8 w-8" />}
+            title={locale === "ro" ? "Statisticile nu sunt disponibile" : "Statistics are unavailable"}
+            description={locale === "ro" ? "Încearcă din nou după refresh." : "Try again after refreshing."}
+          />
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <AdminStatTile
+                pending={onboardingQuery.isPending}
+                icon={<Users className="h-4 w-4 text-sky-500" />}
+                label={locale === "ro" ? "Utilizatori" : "Users"}
+                value={(onboarding?.totalUsers ?? 0).toLocaleString()}
+                footer={locale === "ro" ? "Conturi incluse în agregare" : "Accounts included in the aggregate"}
+              />
+              <AdminStatTile
+                pending={onboardingQuery.isPending}
+                icon={<UserRoundCheck className="h-4 w-4 text-emerald-500" />}
+                label={locale === "ro" ? "Au răspuns" : "Responded"}
+                value={(onboarding?.respondents ?? 0).toLocaleString()}
+                footer={locale === "ro" ? "Au cel puțin o alegere salvată" : "Have at least one saved choice"}
+              />
+              <AdminStatTile
+                pending={onboardingQuery.isPending}
+                icon={<GraduationCap className="h-4 w-4 text-violet-500" />}
+                label={locale === "ro" ? "Onboarding finalizat" : "Completed onboarding"}
+                value={(onboarding?.completedUsers ?? 0).toLocaleString()}
+                footer={onboarding?.totalUsers
+                  ? `${Math.round((onboarding.completedUsers / onboarding.totalUsers) * 100)}% ${locale === "ro" ? "din utilizatori" : "of users"}`
+                  : "—"}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <ChoiceBreakdown
+                title={locale === "ro" ? "Limbă implicită" : "Default language"}
+                distribution={onboarding?.languages ?? {}}
+                labels={{ en: "English", ro: "Română" }}
+              />
+              <ChoiceBreakdown
+                title={locale === "ro" ? "Tip workspace" : "Workspace type"}
+                distribution={onboarding?.personas ?? {}}
+                labels={locale === "ro"
+                  ? { learner: "Învățare programare", student: "Elev", teacher: "Profesor" }
+                  : { learner: "Programming learner", student: "Student", teacher: "Teacher" }}
+              />
+              <ChoiceBreakdown
+                title={locale === "ro" ? "Nivel de experiență" : "Experience level"}
+                distribution={onboarding?.experiences ?? {}}
+                labels={locale === "ro"
+                  ? { "first-steps": "Primii pași", beginner: "Începător", intermediate: "Intermediar", advanced: "Avansat" }
+                  : { "first-steps": "First steps", beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" }}
+              />
+              <ChoiceBreakdown
+                title={locale === "ro" ? "Obiectiv principal" : "Primary goal"}
+                distribution={onboarding?.goals ?? {}}
+                labels={locale === "ro"
+                  ? { "learn-programming": "Învăț programare", "practice-algorithms": "Exersez algoritmi", "prepare-interviews": "Pregătire interviuri", "teach-with-scripticx": "Predau cu ScripticX" }
+                  : { "learn-programming": "Learn programming", "practice-algorithms": "Practice algorithms", "prepare-interviews": "Prepare for interviews", "teach-with-scripticx": "Teach with ScripticX" }}
+              />
+              <ChoiceBreakdown
+                title={locale === "ro" ? "Interese" : "Interests"}
+                denominator={onboarding?.respondents}
+                distribution={onboarding?.interests ?? {}}
+                labels={locale === "ro"
+                  ? { fundamentals: "Fundamente", algorithms: "Algoritmi", debugging: "Debugging", "visual-execution": "Execuție vizuală", complexity: "Complexitate", collaboration: "Colaborare" }
+                  : { fundamentals: "Fundamentals", algorithms: "Algorithms", debugging: "Debugging", "visual-execution": "Visual execution", complexity: "Complexity", collaboration: "Collaboration" }}
+              />
+              <div className="flex min-h-48 flex-col justify-between rounded-xl border bg-muted/45 p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border bg-background shadow-sm">
+                  <Languages className="h-5 w-5 text-sky-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{locale === "ro" ? "Preferințe data-driven" : "Data-driven preferences"}</p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    {locale === "ro"
+                      ? "Doar valori agregate sunt afișate; răspunsurile individuale nu părăsesc endpoint-ul protejat de admin."
+                      : "Only aggregates are displayed; individual answers never leave the admin-protected endpoint."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </DashboardSection>
+
+      <DashboardSection
         title={t("admin.overview.tools.title")}
         description={t("admin.overview.tools.description")}
       >
@@ -507,6 +662,17 @@ function AdminContent() {
               ringClassName="ring-violet-500/50"
               title={t("admin.lessons.title")}
               description={t("admin.lessons.description")}
+              count={null}
+            />
+          </div>
+
+          <div className="min-w-0">
+            <AdminNavCard
+              href="/admin/design-system"
+              icon={<Palette className="h-5 w-5 text-foreground" />}
+              ringClassName="ring-foreground/20"
+              title={t("admin.designSystem.cardTitle")}
+              description={t("admin.designSystem.cardDescription")}
               count={null}
             />
           </div>

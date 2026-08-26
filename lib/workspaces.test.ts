@@ -8,7 +8,11 @@ import {
   getDefaultWorkspaceId,
   getDefaultWorkspaceKind,
   getDefaultWorkspaceRoute,
+  getAvailableWorkspaceKinds,
   getProvisionedWorkspaceKinds,
+  canAccessWorkspace,
+  canAccessWorkspaceForAccount,
+  canAccessClassesForAccount,
   getWorkspaceKindFromMetadata,
   getWorkspaceLandingRoute,
   getWorkspacePersonaFromMetadata,
@@ -42,6 +46,39 @@ describe("workspace identity", () => {
       "personal",
       "student",
     ]);
+    expect(getProvisionedWorkspaceKinds("teacher")).toEqual(["teacher"]);
+    expect(canAccessWorkspace("student", "personal")).toBe(true);
+    expect(canAccessWorkspace("student", "teacher")).toBe(false);
+    expect(canAccessWorkspace("teacher", "personal")).toBe(false);
+    expect(canAccessWorkspace("learner", "student")).toBe(false);
+  });
+
+  it("lets platform administrators open every workspace", () => {
+    expect(getAvailableWorkspaceKinds("learner", true)).toEqual([
+      "personal",
+      "student",
+      "teacher",
+    ]);
+    expect(canAccessWorkspaceForAccount("learner", "student", true)).toBe(
+      true
+    );
+    expect(canAccessWorkspaceForAccount("student", "teacher", true)).toBe(
+      true
+    );
+    expect(canAccessWorkspaceForAccount("teacher", "personal", true)).toBe(
+      true
+    );
+  });
+
+  it("keeps persona access restrictions for regular accounts", () => {
+    expect(getAvailableWorkspaceKinds("teacher", false)).toEqual(["teacher"]);
+    expect(canAccessWorkspaceForAccount("teacher", "personal", false)).toBe(
+      false
+    );
+    expect(canAccessClassesForAccount("learner")).toBe(false);
+    expect(canAccessClassesForAccount("student")).toBe(true);
+    expect(canAccessClassesForAccount("teacher")).toBe(true);
+    expect(canAccessClassesForAccount("learner", true)).toBe(true);
   });
 });
 

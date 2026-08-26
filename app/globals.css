@@ -30,6 +30,9 @@ nextjs-portal {
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--sx-success);
+  --color-warning: var(--sx-warning);
+  --color-info: var(--sx-info);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -86,6 +89,44 @@ nextjs-portal {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.9 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ScripticX design-system primitives. Keep product UI on these tokens. */
+  --sx-success: oklch(0.58 0.15 160);
+  --sx-success-soft: oklch(0.96 0.035 160);
+  --sx-warning: oklch(0.68 0.15 75);
+  --sx-warning-soft: oklch(0.97 0.04 85);
+  --sx-info: oklch(0.58 0.15 250);
+  --sx-info-soft: oklch(0.96 0.03 250);
+
+  --sx-space-1: 0.25rem;
+  --sx-space-2: 0.5rem;
+  --sx-space-3: 0.75rem;
+  --sx-space-4: 1rem;
+  --sx-space-5: 1.25rem;
+  --sx-space-6: 1.5rem;
+  --sx-space-8: 2rem;
+  --sx-space-10: 2.5rem;
+  --sx-space-12: 3rem;
+  --sx-space-16: 4rem;
+
+  --sx-radius-control: 0.625rem;
+  --sx-radius-card: 0.875rem;
+  --sx-radius-panel: 1.25rem;
+  --sx-radius-shell: 1.5rem;
+
+  --sx-shadow-subtle: 0 1px 2px oklch(0.145 0 0 / 0.06);
+  --sx-shadow-raised: 0 12px 32px -18px oklch(0.145 0 0 / 0.24);
+  --sx-shadow-overlay: 0 24px 64px -24px oklch(0.145 0 0 / 0.34);
+
+  --sx-motion-fast: 120ms;
+  --sx-motion-standard: 200ms;
+  --sx-motion-slow: 280ms;
+  --sx-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --sx-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --sx-content-max: 80rem;
+  --sx-reading-max: 48rem;
+  --sx-control-height: 2rem;
 }
 
 .dark {
@@ -122,6 +163,92 @@ nextjs-portal {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --sx-success: oklch(0.72 0.15 160);
+  --sx-success-soft: oklch(0.25 0.04 160);
+  --sx-warning: oklch(0.78 0.14 80);
+  --sx-warning-soft: oklch(0.27 0.035 80);
+  --sx-info: oklch(0.74 0.14 250);
+  --sx-info-soft: oklch(0.25 0.04 250);
+
+  --sx-shadow-subtle: 0 1px 2px oklch(0 0 0 / 0.26);
+  --sx-shadow-raised: 0 14px 36px -18px oklch(0 0 0 / 0.58);
+  --sx-shadow-overlay: 0 26px 72px -24px oklch(0 0 0 / 0.72);
+}
+
+/* Small, composable contracts used by new and migrated product screens. */
+.sx-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--sx-content-max);
+  padding: var(--sx-space-6);
+}
+
+.sx-reading-width {
+  width: 100%;
+  max-width: var(--sx-reading-max);
+}
+
+.sx-surface {
+  border: 1px solid var(--border);
+  border-radius: var(--sx-radius-card);
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: var(--sx-shadow-subtle);
+}
+
+.sx-elevated {
+  box-shadow: var(--sx-shadow-raised);
+}
+
+.sx-overlay {
+  box-shadow: var(--sx-shadow-overlay);
+}
+
+/* Functional patterns: transparency and canvas grids are tools, not decoration. */
+.sx-transparency-grid {
+  background-color: var(--background);
+  background-image:
+    linear-gradient(45deg, var(--muted) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--muted) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--muted) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--muted) 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.sx-dot-grid {
+  background-color: var(--background);
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+.sx-section-label {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.sx-interactive {
+  transition-duration: var(--sx-motion-standard);
+  transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+  transition-timing-function: var(--sx-ease-standard);
+}
+
+@media (max-width: 40rem) {
+  .sx-page {
+    padding: var(--sx-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-interactive {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+  }
 }
 
 /* Theme changes use one compositor crossfade instead of animating every node. */
@@ -351,6 +478,94 @@ html.theme-transition::view-transition-new(root) {
 .notion-note-prose code { border-radius: 0.35rem; background: var(--muted); padding: 0.14em 0.34em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
 .notion-note-prose pre { margin: 1.3rem 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 0.8rem; background: color-mix(in srgb, var(--muted) 72%, transparent); padding: 1rem 1.1rem; }
 .notion-note-prose pre code { background: transparent; padding: 0; }
+.notion-note-prose [data-note-code-block] { margin-block: 1.5rem; }
+.notion-note-prose [data-note-code-content] {
+  display: block;
+  min-height: 5rem;
+  overflow-x: auto;
+  border-radius: 0;
+  background: transparent;
+  padding: 2.75rem 1.25rem 0.75rem;
+  white-space: pre;
+}
+.notion-note-prose [data-note-code-block].is-empty::before,
+.notion-note-prose [data-note-code-block] .is-empty::before {
+  content: none;
+}
+.notion-note-prose [data-note-code-content] .hljs-comment,
+.notion-note-prose [data-note-code-content] .hljs-quote {
+  color: #667085;
+  font-style: italic;
+}
+.notion-note-prose [data-note-code-content] .hljs-keyword,
+.notion-note-prose [data-note-code-content] .hljs-selector-tag,
+.notion-note-prose [data-note-code-content] .hljs-subst {
+  color: #6d28d9;
+  font-weight: 600;
+}
+.notion-note-prose [data-note-code-content] .hljs-built_in,
+.notion-note-prose [data-note-code-content] .hljs-type,
+.notion-note-prose [data-note-code-content] .hljs-title.class_ {
+  color: #0369a1;
+}
+.notion-note-prose [data-note-code-content] .hljs-title,
+.notion-note-prose [data-note-code-content] .hljs-title.function_,
+.notion-note-prose [data-note-code-content] .hljs-section {
+  color: #9f1239;
+}
+.notion-note-prose [data-note-code-content] .hljs-string,
+.notion-note-prose [data-note-code-content] .hljs-regexp,
+.notion-note-prose [data-note-code-content] .hljs-addition,
+.notion-note-prose [data-note-code-content] .hljs-attribute {
+  color: #047857;
+}
+.notion-note-prose [data-note-code-content] .hljs-number,
+.notion-note-prose [data-note-code-content] .hljs-literal,
+.notion-note-prose [data-note-code-content] .hljs-symbol,
+.notion-note-prose [data-note-code-content] .hljs-bullet {
+  color: #b45309;
+}
+.notion-note-prose [data-note-code-content] .hljs-variable,
+.notion-note-prose [data-note-code-content] .hljs-template-variable,
+.notion-note-prose [data-note-code-content] .hljs-params,
+.notion-note-prose [data-note-code-content] .hljs-attr {
+  color: #1d4ed8;
+}
+.notion-note-prose [data-note-code-content] .hljs-meta,
+.notion-note-prose [data-note-code-content] .hljs-selector-id,
+.notion-note-prose [data-note-code-content] .hljs-selector-class {
+  color: #a21caf;
+}
+.notion-note-prose [data-note-code-content] .hljs-deletion {
+  color: #b91c1c;
+}
+.dark .notion-note-prose [data-note-code-content] .hljs-comment,
+.dark .notion-note-prose [data-note-code-content] .hljs-quote { color: #94a3b8; }
+.dark .notion-note-prose [data-note-code-content] .hljs-keyword,
+.dark .notion-note-prose [data-note-code-content] .hljs-selector-tag,
+.dark .notion-note-prose [data-note-code-content] .hljs-subst { color: #c4b5fd; }
+.dark .notion-note-prose [data-note-code-content] .hljs-built_in,
+.dark .notion-note-prose [data-note-code-content] .hljs-type,
+.dark .notion-note-prose [data-note-code-content] .hljs-title.class_ { color: #7dd3fc; }
+.dark .notion-note-prose [data-note-code-content] .hljs-title,
+.dark .notion-note-prose [data-note-code-content] .hljs-title.function_,
+.dark .notion-note-prose [data-note-code-content] .hljs-section { color: #fda4af; }
+.dark .notion-note-prose [data-note-code-content] .hljs-string,
+.dark .notion-note-prose [data-note-code-content] .hljs-regexp,
+.dark .notion-note-prose [data-note-code-content] .hljs-addition,
+.dark .notion-note-prose [data-note-code-content] .hljs-attribute { color: #6ee7b7; }
+.dark .notion-note-prose [data-note-code-content] .hljs-number,
+.dark .notion-note-prose [data-note-code-content] .hljs-literal,
+.dark .notion-note-prose [data-note-code-content] .hljs-symbol,
+.dark .notion-note-prose [data-note-code-content] .hljs-bullet { color: #fdba74; }
+.dark .notion-note-prose [data-note-code-content] .hljs-variable,
+.dark .notion-note-prose [data-note-code-content] .hljs-template-variable,
+.dark .notion-note-prose [data-note-code-content] .hljs-params,
+.dark .notion-note-prose [data-note-code-content] .hljs-attr { color: #93c5fd; }
+.dark .notion-note-prose [data-note-code-content] .hljs-meta,
+.dark .notion-note-prose [data-note-code-content] .hljs-selector-id,
+.dark .notion-note-prose [data-note-code-content] .hljs-selector-class { color: #f0abfc; }
+.dark .notion-note-prose [data-note-code-content] .hljs-deletion { color: #fca5a5; }
 .notion-note-prose hr { margin: 2rem 0; border: 0; border-top: 1px solid var(--border); }
 .notion-note-prose .is-editor-empty:first-child::before,
 .notion-note-prose .is-empty::before { color: color-mix(in srgb, var(--muted-foreground) 70%, transparent); content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
@@ -465,6 +680,139 @@ html.theme-transition::view-transition-new(root) {
   pointer-events: auto;
 }
 
+@keyframes login-brand-message-cycle {
+  0% {
+    filter: blur(4px);
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+  14%,
+  78% {
+    filter: blur(0);
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    filter: blur(2px);
+    opacity: 0;
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes login-brand-sparkle-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) rotate(0deg) scale(0.25);
+  }
+  22% {
+    opacity: 0.82;
+    transform: translate3d(0, 0, 0) rotate(36deg) scale(1);
+  }
+  58% {
+    opacity: 0.5;
+    transform: translate3d(var(--sparkle-dx), var(--sparkle-dy), 0)
+      rotate(78deg) scale(0.72);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--sparkle-dx), var(--sparkle-dy), 0)
+      rotate(132deg) scale(0.2);
+  }
+}
+
+@keyframes login-brand-mascot-enter {
+  0% {
+    opacity: 0;
+    transform: translate3d(36px, 72px, 0) rotate(4deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(-2px, -5px, 0) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+}
+
+@keyframes login-brand-mascot-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0) rotate(-0.8deg);
+  }
+}
+
+.login-brand-message {
+  animation: login-brand-message-cycle 4.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: filter, opacity, transform;
+}
+
+.login-brand-keyword {
+  text-shadow: 0 0 28px color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.login-brand-mascot {
+  animation: login-brand-mascot-enter 1.1s cubic-bezier(0.22, 1, 0.36, 1)
+    280ms both;
+  transform-origin: bottom right;
+  will-change: opacity, transform;
+}
+
+.login-brand-mascot-tracker {
+  transform: translate3d(
+      var(--mascot-follow-x, 0),
+      var(--mascot-follow-y, 0),
+      0
+    )
+    rotate(var(--mascot-follow-rotation, 0deg));
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.login-brand-mascot-image {
+  animation: login-brand-mascot-float 6s ease-in-out 1.4s infinite;
+  filter: drop-shadow(0 18px 28px rgb(0 0 0 / 0.16));
+  transform-origin: bottom center;
+  will-change: transform;
+}
+
+.login-brand-sparkle-particle {
+  animation: login-brand-sparkle-drift var(--sparkle-duration) ease-in-out
+    var(--sparkle-delay) infinite;
+  color: color-mix(in srgb, currentColor 78%, transparent);
+  height: var(--sparkle-size);
+  left: var(--sparkle-x);
+  position: absolute;
+  top: var(--sparkle-y);
+  width: var(--sparkle-size);
+  will-change: opacity, transform;
+}
+
+.login-brand-sparkle-particle::before,
+.login-brand-sparkle-particle::after {
+  background: currentColor;
+  border-radius: 999px;
+  box-shadow: 0 0 8px color-mix(in srgb, currentColor 58%, transparent);
+  content: "";
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.login-brand-sparkle-particle::before {
+  height: 100%;
+  width: 1px;
+}
+
+.login-brand-sparkle-particle::after {
+  height: 1px;
+  width: 100%;
+}
+
 @keyframes onboarding-blob-drift {
   0% {
     border-radius: 46% 54% 58% 42%;
@@ -489,6 +837,70 @@ html.theme-transition::view-transition-new(root) {
   to { width: 100%; }
 }
 
+@keyframes onboarding-screen-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.onboarding-screen-enter {
+  animation: onboarding-screen-enter 850ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes login-screen-leave {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.992);
+  }
+}
+
+.login-screen-leave {
+  animation: login-screen-leave 520ms cubic-bezier(0.4, 0, 0.6, 1) both;
+  pointer-events: none;
+  transform-origin: center;
+  will-change: opacity, transform;
+}
+
+@keyframes onboarding-content-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.onboarding-screen-enter .onboarding-reveal {
+  animation: onboarding-content-reveal 900ms cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+  will-change: opacity, transform;
+}
+
+.onboarding-screen-enter .onboarding-reveal-header {
+  animation-delay: 180ms;
+}
+
+.onboarding-screen-enter .onboarding-reveal-progress {
+  animation-delay: 260ms;
+}
+
+.onboarding-screen-enter .onboarding-reveal-content {
+  animation-delay: 340ms;
+}
+
+.onboarding-screen-enter .onboarding-reveal-footer {
+  animation-delay: 420ms;
+}
+
 .onboarding-preparing-blob {
   animation: onboarding-blob-drift 6.5s ease-in-out infinite;
   will-change: border-radius, transform;
@@ -511,5 +923,24 @@ html.theme-transition::view-transition-new(root) {
   .onboarding-preparing-progress {
     animation: none;
     width: 100%;
+  }
+
+  .onboarding-screen-enter,
+  .onboarding-screen-enter .onboarding-reveal,
+  .login-screen-leave {
+    animation: none;
+  }
+
+  .login-brand-message,
+  .login-brand-sparkle-particle,
+  .login-brand-mascot,
+  .login-brand-mascot-tracker,
+  .login-brand-mascot-image {
+    animation: none;
+    transition: none;
+  }
+
+  .login-brand-sparkle-particle {
+    display: none;
   }
 }

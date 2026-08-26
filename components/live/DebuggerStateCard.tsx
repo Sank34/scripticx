@@ -15,7 +15,7 @@ export function DebuggerStateCard({
 }: DebuggerStateCardProps) {
   return (
     <section className="rounded-xl border bg-card text-card-foreground">
-      <div className="flex items-center gap-2 border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
         <CheckCircle2 size={14} />
         {title}
       </div>

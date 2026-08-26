@@ -1,19 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 
-import { api } from "@/lib/api";
-import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 import { ShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { TopbarBreadcrumbs } from "@/components/navigation/TopbarBreadcrumbs";
-import { NotificationsPopover } from "@/components/notifications/NotificationsPopover";
-import { AttentionPopover } from "@/components/admin/AttentionPopover";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
+import { useSavedAccounts } from "@/hooks/useSavedAccounts";
+import {
+  removeSavedAccount,
+  saveAccountSession,
+  type SavedScripticXAccount,
+} from "@/lib/account-switcher";
+import { supabase } from "@/lib/supabase";
+import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 
 import { Button } from "@/components/ui/button";
 
@@ -28,19 +34,55 @@ import {
 
 import {
   Globe,
+  LoaderCircle,
   LogOut,
   Monitor,
   Moon,
   Settings,
   Sun,
   User,
+  UserPlus,
 } from "lucide-react";
+
+const AddAccountDialog = dynamic(
+  () =>
+    import("@/components/account/AddAccountDialog").then(
+      (module) => module.AddAccountDialog
+    ),
+  { ssr: false }
+);
+const PlatformCommandMenu = dynamic(
+  () =>
+    import("@/components/command/PlatformCommandMenu").then(
+      (module) => module.PlatformCommandMenu
+    ),
+  { ssr: false }
+);
+const NotificationsPopover = dynamic(
+  () =>
+    import("@/components/notifications/NotificationsPopover").then(
+      (module) => module.NotificationsPopover
+    ),
+  { ssr: false }
+);
+const AttentionPopover = dynamic(
+  () =>
+    import("@/components/admin/AttentionPopover").then(
+      (module) => module.AttentionPopover
+    ),
+  { ssr: false }
+);
 
 export function Topbar() {
   const router = useRouter();
   const { t, locale, setLocale } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { profile, user } = useAuth();
+  const { accounts } = useSavedAccounts();
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
+    null
+  );
   const [themeMounted, setThemeMounted] = useState(false);
   const themeTransitionId = useRef(0);
   const requestedTheme = useRef<string | undefined>(theme);
@@ -56,6 +98,18 @@ export function Topbar() {
   useEffect(() => {
     requestedTheme.current = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!data.session || data.session.user.id !== user.id) return;
+      saveAccountSession(data.session, {
+        avatarUrl: profile?.avatar_url || null,
+        username: profile?.username || null,
+      });
+    });
+  }, [profile?.avatar_url, profile?.username, user]);
 
   function changeTheme(nextTheme: "light" | "dark" | "system") {
     if (requestedTheme.current === nextTheme) return;
@@ -111,9 +165,60 @@ export function Topbar() {
   }
 
   async function logout() {
-    await api.auth.signOut();
+    if (user) removeSavedAccount(user.id);
+    await supabase.auth.signOut();
     router.replace("/login");
   }
+
+  async function switchAccount(account: SavedScripticXAccount) {
+    if (!user || account.userId === user.id || switchingAccountId) return;
+    setSwitchingAccountId(account.userId);
+
+    try {
+      const { data: current } = await supabase.auth.getSession();
+      if (current.session) {
+        saveAccountSession(current.session, {
+          avatarUrl: profile?.avatar_url || null,
+          username: profile?.username || null,
+        });
+      }
+
+      const { data, error } = await supabase.auth.setSession({
+        access_token: account.accessToken,
+        refresh_token: account.refreshToken,
+      });
+      if (error) throw error;
+      if (!data.session) throw new Error("Session unavailable");
+
+      saveAccountSession(data.session, {
+        avatarUrl: account.avatarUrl,
+        nickname: account.nickname,
+        username: account.username,
+      });
+
+      toast.success(
+        locale === "ro"
+          ? `Ai trecut pe contul ${account.nickname}.`
+          : `Switched to ${account.nickname}.`
+      );
+      router.replace(getWorkspaceLandingRoute(data.session.user.user_metadata));
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        locale === "ro" ? "Contul nu a putut fi activat." : "Could not switch accounts.",
+        {
+          description: error instanceof Error ? error.message : String(error),
+        }
+      );
+    } finally {
+      setSwitchingAccountId(null);
+    }
+  }
+
+  const currentSavedAccount = accounts.find(
+    (account) => account.userId === user?.id
+  );
+  const otherAccounts = accounts.filter((account) => account.userId !== user?.id);
 
   return (
     <header className="relative grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-border/70 bg-background px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
@@ -170,7 +275,7 @@ export function Topbar() {
 
                 <div className="flex flex-col leading-tight">
                   <span className="font-medium">
-                    {profile?.username || "User"}
+                    {currentSavedAccount?.nickname || profile?.username || "User"}
                   </span>
 
                   <span className="max-w-[160px] truncate text-xs text-muted-foreground">
@@ -179,6 +284,51 @@ export function Topbar() {
                 </div>
 
               </DropdownMenuLabel>
+
+              <DropdownMenuSeparator />
+
+              {otherAccounts.length ? (
+                <>
+                  <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    {locale === "ro" ? "Alte conturi" : "Other accounts"}
+                  </DropdownMenuLabel>
+                  {otherAccounts.map((account) => (
+                    <DropdownMenuItem
+                      key={account.userId}
+                      onSelect={() => void switchAccount(account)}
+                      disabled={switchingAccountId !== null}
+                      className="gap-3 py-2"
+                    >
+                      <UserAvatar
+                        avatarUrl={account.avatarUrl}
+                        username={account.username}
+                        email={account.email}
+                        className="size-8"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {account.nickname}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {account.email}
+                        </span>
+                      </span>
+                      {switchingAccountId === account.userId ? (
+                        <LoaderCircle className="size-4 animate-spin" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
+
+              <DropdownMenuItem
+                onSelect={() => setAddAccountOpen(true)}
+                className="gap-2"
+              >
+                <UserPlus size={16} />
+                {locale === "ro" ? "Adaugă alt cont" : "Add another account"}
+              </DropdownMenuItem>
 
               <DropdownMenuSeparator />
 
@@ -292,6 +442,13 @@ export function Topbar() {
             </DropdownMenuContent>
 
             </DropdownMenu>
+
+            {addAccountOpen ? (
+              <AddAccountDialog
+                open={addAccountOpen}
+                onOpenChange={setAddAccountOpen}
+              />
+            ) : null}
           </>
         ) : (
           <Link href="/login">

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import type { User } from "@supabase/supabase-js";
 import { LoaderCircle } from "lucide-react";
 
@@ -12,10 +13,29 @@ import {
   needsOnboarding,
   productTourStorageKey,
 } from "@/lib/onboarding";
-import { OnboardingExperience } from "@/components/onboarding/OnboardingExperience";
-import { OnboardingPreparing } from "@/components/onboarding/OnboardingPreparing";
-import { ProductTour } from "@/components/onboarding/ProductTour";
 import { getWorkspaceLandingRoute } from "@/lib/workspaces";
+
+const OnboardingExperience = dynamic(
+  () =>
+    import("@/components/onboarding/OnboardingExperience").then(
+      (module) => module.OnboardingExperience
+    ),
+  { ssr: false }
+);
+const OnboardingPreparing = dynamic(
+  () =>
+    import("@/components/onboarding/OnboardingPreparing").then(
+      (module) => module.OnboardingPreparing
+    ),
+  { ssr: false }
+);
+const ProductTour = dynamic(
+  () =>
+    import("@/components/onboarding/ProductTour").then(
+      (module) => module.ProductTour
+    ),
+  { ssr: false }
+);
 
 export function OnboardingManager() {
   const router = useRouter();

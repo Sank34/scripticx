@@ -7,9 +7,11 @@ export const dynamic = "force-dynamic";
 
 export default async function UpdatesIndex() {
   const supabase = createServerSupabase();
+  const today = new Date().toISOString().slice(0, 10);
   const { data } = await supabase
     .from("updates")
     .select("slug")
+    .lte("date", today)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(1)

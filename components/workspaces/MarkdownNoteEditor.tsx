@@ -1335,7 +1335,7 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
         <div
           ref={floatingToolbarRef}
           aria-label={ro ? "Formatare text selectat" : "Selected text formatting"}
-          className="absolute z-30 flex items-center gap-0.5 rounded-lg border border-border/70 bg-popover/95 p-1 text-popover-foreground shadow-[0_12px_40px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150"
+          className="sx-elevated absolute z-30 flex items-center gap-0.5 rounded-lg border border-border/70 bg-popover/95 p-1 text-popover-foreground backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150"
           onKeyDown={(event) => {
             if (event.key !== "Escape") return;
             event.preventDefault();
@@ -1380,7 +1380,7 @@ export function MarkdownNoteEditor({ noteId }: { noteId: string }) {
           ref={slashMenuRef}
           aria-label={ro ? "Blocuri Markdown" : "Markdown blocks"}
           id="note-slash-menu"
-          className="absolute z-20 max-h-[min(23rem,calc(100%-1rem))] w-[min(20rem,calc(100%-1rem))] overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground shadow-[0_18px_60px_-18px_rgba(0,0,0,0.4)] backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-150"
+          className="sx-elevated absolute z-20 max-h-[min(23rem,calc(100%-1rem))] w-[min(20rem,calc(100%-1rem))] overflow-y-auto rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-150"
           role="listbox"
           style={{ left: slashPosition.left, top: slashPosition.top }}
         >

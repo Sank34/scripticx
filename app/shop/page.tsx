@@ -349,7 +349,7 @@ function ShopContent() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border bg-muted/40 p-6 sm:p-8">
+      <section className="rounded-[var(--sx-radius-panel)] border bg-muted/40 p-6 sm:p-8">
         <div className="grid gap-7 lg:grid-cols-[1fr_310px] lg:items-end">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -367,7 +367,7 @@ function ShopContent() {
           </div>
 
           <div className="rounded-xl border bg-card p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{copy.balance}</p>
+            <p className="text-xs font-medium text-muted-foreground">{copy.balance}</p>
             <p className="mt-1 flex items-center gap-2 text-3xl font-semibold">
               <Coins className="size-6 text-amber-500" />
               {data.balance.toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}

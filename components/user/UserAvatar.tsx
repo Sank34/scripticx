@@ -69,7 +69,7 @@ export function UserAvatar({
       {frame?.id === "orbit-frame" && (
         <span
           aria-hidden
-          className="pointer-events-none absolute -inset-1 rounded-full border-2 border-indigo-500 shadow-[0_0_0_2px_rgba(99,102,241,0.12)]"
+          className="pointer-events-none absolute -inset-1 rounded-full border-2 border-indigo-500 ring-2 ring-indigo-500/10"
         >
           <span className="absolute -right-0.5 top-0 size-2 rounded-full border border-white bg-indigo-500" />
         </span>

@@ -220,7 +220,7 @@ export async function queueNotificationEmail(input: {
   if (!category) return false;
   const admin = createAdminSupabase();
   const config = await getMailConfig(admin);
-  if (!config.transactional_enabled) return false;
+  if (!config.transactional_enabled || !config.contact_notifications_enabled) return false;
   const { data, error } = await admin.rpc("get_email_recipient", {
     p_user_id: input.recipientId,
     p_category: category,
@@ -300,4 +300,54 @@ export async function queueContactAdminEmails(input: {
     })
   );
   return recipients.length;
+}
+
+export async function queueContactAcknowledgementEmail(input: {
+  contactId: string;
+  name: string;
+  email: string;
+  topic: string;
+  locale: "ro" | "en";
+}) {
+  const admin = createAdminSupabase();
+  const config = await getMailConfig(admin);
+  if (!config.transactional_enabled) return false;
+
+  const ro = input.locale === "ro";
+  const reference = input.contactId.slice(0, 8).toUpperCase();
+  const firstName = input.name.trim().split(/\s+/)[0] || null;
+
+  await queueEmail(
+    {
+      recipient: input.email,
+      // Contact confirmations also support guests. Keep delivery bound to the
+      // submitted address; the associated account is used only for in-app
+      // notifications because the contact category originally targeted admins.
+      recipientUserId: null,
+      recipientFirstName: firstName,
+      recipientUsername: firstName,
+      locale: input.locale,
+      kind: "transactional",
+      category: "contact",
+      subject: ro
+        ? "Am primit mesajul tău"
+        : "We received your message",
+      preheader: ro
+        ? `Solicitarea ${reference} a fost înregistrată.`
+        : `Request ${reference} has been registered.`,
+      content: ro
+        ? `Salut, ${firstName || input.name}!\n\nMesajul tău despre „${input.topic}” a ajuns la echipa ScripticX. Îți vom răspunde la această adresă de email.\n\nReferință: ${reference}\n\nEchipa ScripticX`
+        : `Hi, ${firstName || input.name}!\n\nYour message about “${input.topic}” reached the ScripticX team. We will reply to this email address.\n\nReference: ${reference}\n\nThe ScripticX team`,
+      mode: config.default_mode,
+      actionLabel: ro ? "Deschide ScripticX" : "Open ScripticX",
+      actionUrl: "/contact",
+      senderName: "ScripticX Support",
+      senderLocalPart: "support",
+      replyTo: config.reply_to || `support@${SCRIPTICX_MAIL_DOMAIN}`,
+      dedupeKey: `contact:${input.contactId}:acknowledgement`,
+    },
+    admin
+  );
+
+  return true;
 }

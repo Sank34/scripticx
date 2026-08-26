@@ -30,10 +30,16 @@ import {
   Trophy,
   Play,
   Video,
+  Columns2,
+  FileText,
+  PencilLine,
+  X,
 } from "lucide-react";
 
 import RouteGuard from "@/components/RouteGuard";
+import { Markdown } from "@/components/Markdown";
 import { useLanguage } from "@/components/LanguageProvider";
+import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 import { useUndoHistory } from "@/hooks/useUndoHistory";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -90,6 +96,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  getLessonCompletionRequirement,
   getLessonKind,
   getLessonRule,
   learnLessons,
@@ -97,9 +104,11 @@ import {
   text,
   type LearnLesson,
   type LearnSection,
+  type LessonCompletionRequirement,
   type LessonRuleKind,
   type LessonLocale,
 } from "@/lib/learn-lessons";
+import { getLessonMarkdown } from "@/lib/lesson-markdown";
 import {
   buildDefaultRoadmapConnections,
   clearRoadmapConfig,
@@ -114,6 +123,8 @@ import {
   type RoadmapConfigConnection,
   type RoadmapConnectionSide,
   type RoadmapSectionFrame,
+  type LearningPathAvailability,
+  type LearningPathKind,
 } from "@/lib/roadmap-config";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -176,26 +187,30 @@ type DragState =
 
 type ConnectionDraft = Extract<NonNullable<DragState>, { type: "connection" }>;
 
+type LocalizedDraftText = Record<LessonLocale, string>;
+
 type QuizDraft = {
   answerIndex: number;
-  options: string[];
-  question: string;
+  options: LocalizedDraftText[];
+  question: LocalizedDraftText;
 };
 
 type LessonDraft = {
   code: string;
+  completionRequirement: LessonCompletionRequirement;
   kind: NonNullable<LearnLesson["kind"]>;
   level: LearnLesson["level"];
   locked: boolean;
+  markdown: LocalizedDraftText;
   minutes: number;
   quiz: QuizDraft[];
   requiredProblemCodes: string;
   requiresCorrectQuiz: boolean;
   sampleInput: string;
-  summary: string;
+  summary: LocalizedDraftText;
   tags: string;
-  title: string;
-  transcript: string;
+  title: LocalizedDraftText;
+  transcript: LocalizedDraftText;
   videoUrl: string;
 };
 
@@ -231,6 +246,7 @@ const SECTION_GAP = 480;
 const SECTION_FRAME_GAP = 260;
 const MIN_ZOOM = 55;
 const MAX_ZOOM = 125;
+const CANVAS_SURFACE_OVERSCAN = 160;
 const MIN_SECTION_WIDTH = 300;
 const MIN_SECTION_HEIGHT = 170;
 const MIN_INSPECTOR_WIDTH = 320;
@@ -335,6 +351,15 @@ const copy = {
     categoryDescription: "Category description",
     categoryNamePrompt: "Category name",
     categoryTitle: "Category title",
+    pathKind: "Path type",
+    programmingLanguage: "Programming language",
+    availability: "Availability",
+    prerequisite: "Prerequisite path",
+    noPrerequisite: "No prerequisite",
+    estimatedHours: "Estimated hours",
+    accentColor: "Accent color",
+    pathIcon: "Icon key",
+    completionRequirement: "Completion requirement",
     cancel: "Cancel",
     create: "Create",
     level: "Level",
@@ -360,6 +385,11 @@ const copy = {
     locked: "Locked",
     saveSuccess: "Roadmap changes saved",
     saveError: "Could not save roadmap changes",
+    invalidPathSlug: "Every path needs a valid slug using lowercase letters, numbers, and hyphens.",
+    duplicatePathSlug: "Each learning path must have a unique slug.",
+    missingFoundation: "The roadmap needs exactly one foundation path.",
+    invalidPrerequisite: "A prerequisite path is missing or points to the same path.",
+    cyclicPrerequisite: "Prerequisite paths cannot form a cycle.",
     localFallback: "Loaded local roadmap draft. Supabase could not be reached.",
     addedLesson: "Lesson added",
     deletedLesson: "Lesson deleted",
@@ -377,6 +407,16 @@ const copy = {
     keepCategory: "Keep category",
     keepSection: "Keep section",
     resetDone: "Roadmap reset",
+    markdown: "Lesson Markdown",
+    openStudio: "Open full-screen studio",
+    markdownHint: "Write the lesson here. Headings automatically become the learner table of contents.",
+    edit: "Edit",
+    split: "Split",
+    closeStudio: "Exit full screen",
+    studioDraft: "Changes are part of this roadmap draft. Save the roadmap to publish them.",
+    contentLanguage: "Content language",
+    english: "English",
+    romanian: "Romanian",
   },
   ro: {
     title: "Configurator Roadmap Lecții",
@@ -432,6 +472,15 @@ const copy = {
     categoryDescription: "Descriere categorie",
     categoryNamePrompt: "Nume categorie",
     categoryTitle: "Titlu categorie",
+    pathKind: "Tip traseu",
+    programmingLanguage: "Limbaj de programare",
+    availability: "Disponibilitate",
+    prerequisite: "Traseu necesar înainte",
+    noPrerequisite: "Fără prerequisite",
+    estimatedHours: "Ore estimate",
+    accentColor: "Culoare accent",
+    pathIcon: "Cheie icon",
+    completionRequirement: "Cerință pentru absolvire",
     cancel: "Anulează",
     create: "Creează",
     level: "Nivel",
@@ -457,6 +506,11 @@ const copy = {
     locked: "Blocat",
     saveSuccess: "Modificările roadmap-ului au fost salvate",
     saveError: "Nu am putut salva modificările roadmap-ului",
+    invalidPathSlug: "Fiecare traseu trebuie să aibă un slug valid, cu litere mici, cifre și cratime.",
+    duplicatePathSlug: "Fiecare traseu de învățare trebuie să aibă un slug unic.",
+    missingFoundation: "Roadmap-ul trebuie să conțină exact un traseu de fundație.",
+    invalidPrerequisite: "Un prerequisite lipsește sau indică spre același traseu.",
+    cyclicPrerequisite: "Traseele prerequisite nu pot forma un ciclu.",
     localFallback: "Am încărcat draft-ul local. Supabase nu a putut fi accesat.",
     addedLesson: "Lecție adăugată",
     deletedLesson: "Lecție ștearsă",
@@ -474,6 +528,16 @@ const copy = {
     keepCategory: "Păstrează categoria",
     keepSection: "Păstrează secțiunea",
     resetDone: "Roadmap resetat",
+    markdown: "Markdown lecție",
+    openStudio: "Deschide studioul full-screen",
+    markdownHint: "Scrie lecția aici. Heading-urile devin automat cuprinsul elevului.",
+    edit: "Editează",
+    split: "Split",
+    closeStudio: "Ieși din full screen",
+    studioDraft: "Modificările fac parte din draft. Salvează roadmap-ul pentru a le publica.",
+    contentLanguage: "Limba conținutului",
+    english: "Engleză",
+    romanian: "Română",
   },
 } as const;
 
@@ -570,8 +634,18 @@ function buildInitialSectionFrames(
   });
 }
 
+function toLocalizedDraftText(en: string, ro: string): LocalizedDraftText {
+  return {
+    en: en || ro,
+    ro: ro || en,
+  };
+}
+
+function draftText(value: LocalizedDraftText, locale: LessonLocale) {
+  return value[locale] || value.en || value.ro || "";
+}
+
 function buildInitialDrafts(
-  locale: LessonLocale,
   lessons: LearnLesson[] = learnLessons
 ): Record<string, LessonDraft> {
   return Object.fromEntries(
@@ -581,33 +655,52 @@ function buildInitialDrafts(
       return [
         lesson.id,
         {
-        code: lesson.code,
-        kind: getLessonKind(lesson),
-        level: lesson.level,
-        locked:
-          lesson.unlockRule?.locked ??
-          (rule.requiresCorrectQuiz || rule.requiredProblemCodes.length > 0),
-        minutes: lesson.minutes,
-        quiz: lesson.quiz.map((question) => ({
-          answerIndex: question.answerIndex,
-          options: question.options.map((option) => text(option, locale)),
-          question: text(question.question, locale),
-        })),
-        requiredProblemCodes: rule.requiredProblemCodes.join(", "),
-        requiresCorrectQuiz: rule.requiresCorrectQuiz,
-        sampleInput: lesson.sampleInput,
-        summary: text(lesson.summary, locale),
-        tags: lesson.tags.join(", "),
-        title: text(lesson.title, locale),
-        transcript: text(lesson.transcript, locale),
-        videoUrl: lesson.videoUrl ?? "",
+          code: lesson.code,
+          completionRequirement: getLessonCompletionRequirement(lesson),
+          kind: getLessonKind(lesson),
+          level: lesson.level,
+          locked:
+            lesson.unlockRule?.locked ??
+            (rule.requiresCorrectQuiz || rule.requiredProblemCodes.length > 0),
+          markdown: toLocalizedDraftText(
+            getLessonMarkdown(lesson, "en"),
+            getLessonMarkdown(lesson, "ro")
+          ),
+          minutes: lesson.minutes,
+          quiz: lesson.quiz.map((question) => ({
+            answerIndex: question.answerIndex,
+            options: question.options.map((option) =>
+              toLocalizedDraftText(text(option, "en"), text(option, "ro"))
+            ),
+            question: toLocalizedDraftText(
+              text(question.question, "en"),
+              text(question.question, "ro")
+            ),
+          })),
+          requiredProblemCodes: rule.requiredProblemCodes.join(", "),
+          requiresCorrectQuiz: rule.requiresCorrectQuiz,
+          sampleInput: lesson.sampleInput,
+          summary: toLocalizedDraftText(
+            text(lesson.summary, "en"),
+            text(lesson.summary, "ro")
+          ),
+          tags: lesson.tags.join(", "),
+          title: toLocalizedDraftText(
+            text(lesson.title, "en"),
+            text(lesson.title, "ro")
+          ),
+          transcript: toLocalizedDraftText(
+            text(lesson.transcript, "en"),
+            text(lesson.transcript, "ro")
+          ),
+          videoUrl: lesson.videoUrl ?? "",
         },
       ];
     })
   );
 }
 
-function buildAdminState(locale: LessonLocale) {
+function buildAdminState() {
   const config = readRoadmapConfig();
   const { lessons, sections } = getRoadmapConfigData(config);
   const savedNodes = config?.nodes
@@ -633,7 +726,7 @@ function buildAdminState(locale: LessonLocale) {
       : buildInitialCategories(),
     connections:
       config?.connections ?? buildDefaultRoadmapConnections(nodes, sections),
-    drafts: buildInitialDrafts(locale, lessons),
+    drafts: buildInitialDrafts(lessons),
     nodes,
     sectionFrames: buildInitialSectionFrames(
       nodes,
@@ -656,21 +749,20 @@ function getDraftRuleKind(lesson: LearnLesson, draft?: LessonDraft) {
 function createLessonShell(
   id: string,
   kind: NonNullable<LearnLesson["kind"]>,
-  order: number,
-  locale: LessonLocale
+  order: number
 ): LearnLesson {
   const titles = {
-    interactive: locale === "ro" ? "Lecție interactivă nouă" : "New interactive lesson",
-    theory: locale === "ro" ? "Lecție de teorie nouă" : "New theory lesson",
-    video: locale === "ro" ? "Lecție video nouă" : "New video lesson",
-    challenge: locale === "ro" ? "Challenge nou" : "New code challenge",
-    assessment: locale === "ro" ? "Quiz de evaluare nou" : "New evaluation quiz",
-  } satisfies Record<NonNullable<LearnLesson["kind"]>, string>;
+    interactive: { en: "New interactive lesson", ro: "Lecție interactivă nouă" },
+    theory: { en: "New theory lesson", ro: "Lecție de teorie nouă" },
+    video: { en: "New video lesson", ro: "Lecție video nouă" },
+    challenge: { en: "New code challenge", ro: "Challenge nou" },
+    assessment: { en: "New evaluation quiz", ro: "Quiz de evaluare nou" },
+  } satisfies Record<NonNullable<LearnLesson["kind"]>, LocalizedDraftText>;
   const title = titles[kind];
-  const summary =
-    locale === "ro"
-      ? "Configurează obiectivul, conținutul și quiz-ul acestei lecții."
-      : "Configure the goal, content, and quiz for this lesson.";
+  const summary = {
+    en: "Configure the goal, content, and quiz for this lesson.",
+    ro: "Configurează obiectivul, conținutul și quiz-ul acestei lecții.",
+  } satisfies LocalizedDraftText;
   const hasCode = kind === "challenge" || kind === "interactive";
   const hasQuiz = kind !== "theory";
 
@@ -678,8 +770,8 @@ function createLessonShell(
     id,
     order,
     unit: { en: "Draft", ro: "Draft" },
-    title: { en: title, ro: title },
-    summary: { en: summary, ro: summary },
+    title,
+    summary,
     transcript: { en: "", ro: "" },
     videoUrl: kind === "video" ? "https://youtube.com/..." : undefined,
     tags: [kind],
@@ -690,6 +782,10 @@ function createLessonShell(
           ? "beginner"
           : "practice",
     minutes: 8,
+    markdown: {
+      en: `## ${title.en}\n\n${summary.en}`,
+      ro: `## ${title.ro}\n\n${summary.ro}`,
+    },
     sampleInput: "",
     code: hasCode ? "INPUT N\nPRINT N" : "",
     quiz: hasQuiz
@@ -707,12 +803,14 @@ function createLessonShell(
       : [],
     recommendedProblems: [],
     kind,
+    completionRequirement:
+      kind === "challenge" || kind === "assessment" ? "capstone" : "required",
     theory:
       kind === "theory"
         ? [
             {
-              heading: { en: title, ro: title },
-              body: { en: summary, ro: summary },
+              heading: title,
+              body: summary,
             },
           ]
         : undefined,
@@ -731,10 +829,14 @@ function materializeLesson(
     .filter(Boolean);
   const requiredProblemCodes = draft.requiredProblemCodes
     .split(",")
-    .map((code) => Number(code.trim()))
-    .filter((code) => Number.isFinite(code));
+    .map((code) => code.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter((code) => Number.isInteger(code) && code > 0);
   const ruleKind: LessonRuleKind =
-    draft.kind === "challenge" || draft.kind === "assessment"
+    draft.completionRequirement === "bonus"
+      ? "bonus"
+      : draft.kind === "challenge" || draft.kind === "assessment"
       ? "challenge"
       : draft.kind === "theory"
         ? "required"
@@ -743,8 +845,10 @@ function materializeLesson(
   return {
     ...node.lesson,
     code: draft.code,
+    completionRequirement: draft.completionRequirement,
     kind: draft.kind,
     level: draft.level,
+    markdown: draft.markdown,
     minutes: draft.minutes,
     order,
     quiz: draft.quiz.map((question) => ({
@@ -752,25 +856,28 @@ function materializeLesson(
         Math.max(question.answerIndex, 0),
         Math.max(question.options.length - 1, 0)
       ),
-      options: question.options.map((option) => ({ en: option, ro: option })),
-      question: { en: question.question, ro: question.question },
+      options: question.options,
+      question: question.question,
     })),
     recommendedProblems: node.lesson.recommendedProblems ?? [],
     sampleInput: draft.sampleInput,
-    summary: { en: draft.summary, ro: draft.summary },
+    summary: draft.summary,
     tags,
     theory:
       draft.kind === "theory"
         ? [
             {
-              heading: { en: draft.title, ro: draft.title },
-              body: { en: draft.transcript || draft.summary, ro: draft.transcript || draft.summary },
+              heading: draft.title,
+              body: {
+                en: draft.transcript.en || draft.summary.en,
+                ro: draft.transcript.ro || draft.summary.ro,
+              },
               bullets: tags.map((tag) => ({ en: tag, ro: tag })),
             },
           ]
         : node.lesson.theory,
-    title: { en: draft.title, ro: draft.title },
-    transcript: { en: draft.transcript, ro: draft.transcript },
+    title: draft.title,
+    transcript: draft.transcript,
     unit: section?.title ?? node.lesson.unit,
     unlockRule: {
       kind: ruleKind,
@@ -877,23 +984,24 @@ function LessonsAdminContent() {
   const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
   const c = copy[lessonLocale];
   const [categories, setCategories] = useState<RoadmapCategory[]>(() =>
-    buildAdminState(lessonLocale).categories
+    buildAdminState().categories
   );
   const [sections, setSections] = useState<LearnSection[]>(() =>
-    buildAdminState(lessonLocale).sections
+    buildAdminState().sections
   );
   const [nodes, setNodes] = useState<CanvasNode[]>(() =>
-    buildAdminState(lessonLocale).nodes
+    buildAdminState().nodes
   );
   const [sectionFrames, setSectionFrames] = useState<RoadmapSectionFrame[]>(() =>
-    buildAdminState(lessonLocale).sectionFrames
+    buildAdminState().sectionFrames
   );
   const [connections, setConnections] = useState<RoadmapConfigConnection[]>(() =>
-    buildAdminState(lessonLocale).connections
+    buildAdminState().connections
   );
   const [drafts, setDrafts] = useState<Record<string, LessonDraft>>(() =>
-    buildAdminState(lessonLocale).drafts
+    buildAdminState().drafts
   );
+  const [contentLocale, setContentLocale] = useState<LessonLocale>(lessonLocale);
   const [selectedId, setSelectedId] = useState(nodes[0]?.id ?? "");
   const [selectedIds, setSelectedIds] = useState<string[]>(
     nodes[0]?.id ? [nodes[0].id] : []
@@ -918,6 +1026,8 @@ function LessonsAdminContent() {
   const [spacePressed, setSpacePressed] = useState(false);
   const [widgetsHidden, setWidgetsHidden] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [markdownStudioLessonId, setMarkdownStudioLessonId] = useState<string | null>(null);
+  const [markdownStudioMode, setMarkdownStudioMode] = useState<"edit" | "split" | "preview">("split");
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
   const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState("");
@@ -995,6 +1105,12 @@ function LessonsAdminContent() {
   );
   const selectedLesson = selectedNode?.lesson;
   const selectedDraft = selectedLesson ? drafts[selectedLesson.id] : null;
+  const markdownStudioLesson = markdownStudioLessonId
+    ? nodes.find((node) => node.id === markdownStudioLessonId)?.lesson ?? null
+    : null;
+  const markdownStudioDraft = markdownStudioLessonId
+    ? drafts[markdownStudioLessonId] ?? null
+    : null;
   const selectedSection = selectedNode
     ? sections.find((section) => section.id === selectedNode.sectionId)
     : null;
@@ -1039,6 +1155,25 @@ function LessonsAdminContent() {
       }),
     [categories, sectionFrames]
   );
+  const canvasSurfaceSize = useMemo(() => {
+    const contentRight = Math.max(
+      1,
+      ...nodes.map((node) => node.x + NODE_WIDTH),
+      ...sectionFrames.map((frame) => frame.x + frame.width),
+      ...categoryLabelPositions.map(({ x }) => x + 340)
+    );
+    const contentBottom = Math.max(
+      1,
+      ...nodes.map((node) => node.y + NODE_HEIGHT),
+      ...sectionFrames.map((frame) => frame.y + frame.height),
+      ...categoryLabelPositions.map(({ y }) => y + 48)
+    );
+
+    return {
+      height: Math.ceil(contentBottom + CANVAS_SURFACE_OVERSCAN),
+      width: Math.ceil(contentRight + CANVAS_SURFACE_OVERSCAN),
+    };
+  }, [categoryLabelPositions, nodes, sectionFrames]);
 
   const categoryIsExplicitlySelected = Boolean(
     !selectedConnection &&
@@ -1086,7 +1221,7 @@ function LessonsAdminContent() {
       sections,
       remoteConfig.sectionFrames
     );
-    const remoteDrafts = buildInitialDrafts(lessonLocale, lessons);
+    const remoteDrafts = buildInitialDrafts(lessons);
     const remoteSelectedId = remoteNodes[0]?.id ?? "";
     const remoteSelectedIds = remoteSelectedId ? [remoteSelectedId] : [];
     const remoteSelectedSectionId =
@@ -1242,7 +1377,10 @@ function LessonsAdminContent() {
     if (!normalized) return nodes;
 
     return nodes.filter((node) => {
-      const title = (drafts[node.id]?.title ?? text(node.lesson.title, lessonLocale)).toLowerCase();
+      const draft = drafts[node.id];
+      const title = draft
+        ? `${draft.title.en} ${draft.title.ro}`.toLowerCase()
+        : text(node.lesson.title, lessonLocale).toLowerCase();
       const unit = text(node.lesson.unit, lessonLocale).toLowerCase();
       return title.includes(normalized) || unit.includes(normalized) || node.id.includes(normalized);
     });
@@ -1260,7 +1398,7 @@ function LessonsAdminContent() {
     setNodes(initialNodes);
     setConnections(initialConnections);
     setSectionFrames(initialSectionFrames);
-    setDrafts(buildInitialDrafts(lessonLocale));
+    setDrafts(buildInitialDrafts());
     setSelectedId(initialNodes[0]?.id ?? "");
     setSelectedIds(initialNodes[0]?.id ? [initialNodes[0].id] : []);
     setSelectedSectionId(initialNodes[0]?.sectionId ?? initialSections[0]?.id ?? "");
@@ -1274,11 +1412,57 @@ function LessonsAdminContent() {
   }
 
   async function saveRoadmapConfig() {
+    const categoryIds = new Set(categories.map((category) => category.id));
+    const categorySlugs = categories.map((category) => category.slug.trim());
+    const invalidSlug = categorySlugs.some(
+      (slug) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    );
+    const duplicateSlug = new Set(categorySlugs).size !== categorySlugs.length;
+    const invalidPrerequisite = categories.some(
+      (category) =>
+        category.prerequisitePathId === category.id ||
+        (category.prerequisitePathId &&
+          !categoryIds.has(category.prerequisitePathId))
+    );
+    const cyclicPrerequisite = categories.some((category) => {
+      const visited = new Set<string>([category.id]);
+      let nextId = category.prerequisitePathId;
+
+      while (nextId) {
+        if (visited.has(nextId)) return true;
+        visited.add(nextId);
+        nextId = categories.find((item) => item.id === nextId)
+          ?.prerequisitePathId;
+      }
+
+      return false;
+    });
+    const validationError = invalidSlug
+      ? c.invalidPathSlug
+      : duplicateSlug
+        ? c.duplicatePathSlug
+        : categories.filter((category) => category.kind === "foundation")
+              .length !== 1
+          ? c.missingFoundation
+          : invalidPrerequisite
+            ? c.invalidPrerequisite
+            : cyclicPrerequisite
+              ? c.cyclicPrerequisite
+              : null;
+
+    if (validationError) {
+      toast.error(c.saveError, { description: validationError });
+      return;
+    }
+
     setIsSaving(true);
 
     const orderedNodes = [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
     const nextSections = sections.map((section, sectionIndex) => ({
       ...section,
+      pathSlug:
+        categories.find((category) => category.sectionIds.includes(section.id))
+          ?.slug ?? section.pathSlug,
       lessonIds: orderedNodes
         .filter((node) => node.sectionId === section.id)
         .sort((a, b) => a.x - b.x || a.y - b.y)
@@ -1365,6 +1549,13 @@ function LessonsAdminContent() {
     );
   }
 
+  function normalizeSlugInput(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+/, "");
+  }
+
   function openCreateDialog(type: "category" | "section") {
     setCreateDialogType(type);
     setCreateName("");
@@ -1381,9 +1572,18 @@ function LessonsAdminContent() {
     setCategories((current) => [
       ...current,
       {
+        accentColor: "#10b981",
+        availability: "draft",
+        estimatedHours: 12,
         id,
+        icon: "code",
+        kind: "specialization",
+        language: "python",
         order: current.length + 1,
+        prerequisitePathId:
+          current.find((category) => category.kind === "foundation")?.id ?? null,
         sectionIds: [],
+        slug: slugify(title),
         title: { en: title, ro: title },
         description: {
           en: "Configure this category from the inspector.",
@@ -1412,6 +1612,11 @@ function LessonsAdminContent() {
       {
         id,
         order: current.length + 1,
+        pathSlug:
+          categories.find(
+            (category) =>
+              category.id === (selectedCategoryId || categories[0]?.id)
+          )?.slug ?? categories[0]?.slug,
         label: { en: `Section ${current.length + 1}`, ro: `Secțiunea ${current.length + 1}` },
         title: { en: title, ro: title },
         description: {
@@ -1473,10 +1678,34 @@ function LessonsAdminContent() {
     }));
   }
 
+  function updateLocalizedDraft(
+    id: string,
+    field: "markdown" | "summary" | "title" | "transcript",
+    value: string
+  ) {
+    const draft = drafts[id];
+    if (!draft) return;
+
+    updateDraft(id, {
+      [field]: {
+        ...draft[field],
+        [contentLocale]: value,
+      },
+    });
+  }
+
   function updateSection(id: string, patch: Partial<LearnSection>) {
     setSections((current) =>
       current.map((section) =>
         section.id === id ? { ...section, ...patch } : section
+      )
+    );
+  }
+
+  function updateCategory(id: string, patch: Partial<RoadmapCategory>) {
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === id ? { ...category, ...patch } : category
       )
     );
   }
@@ -1492,19 +1721,24 @@ function LessonsAdminContent() {
     setCategories((current) =>
       current
         .filter((category) => category.id !== selectedCategoryDetails.id)
-        .map((category) =>
-          category.id === fallbackCategory.id
-            ? {
-                ...category,
+        .map((category) => {
+          const nextCategory =
+            category.id === fallbackCategory.id
+              ? {
+                  ...category,
                 sectionIds: Array.from(
                   new Set([
                     ...category.sectionIds,
                     ...selectedCategoryDetails.sectionIds,
                   ])
                 ),
-              }
-            : category
-        )
+                }
+              : category;
+
+          return nextCategory.prerequisitePathId === selectedCategoryDetails.id
+            ? { ...nextCategory, prerequisitePathId: null }
+            : nextCategory;
+        })
     );
     setSelectedCategoryId(fallbackCategory.id);
     setSelectedSectionId("");
@@ -1579,7 +1813,9 @@ function LessonsAdminContent() {
 
     updateQuizQuestion(questionIndex, {
       options: selectedDraft.quiz[questionIndex].options.map((option, index) =>
-        index === optionIndex ? value : option
+        index === optionIndex
+          ? { ...option, [contentLocale]: value }
+          : option
       ),
     });
   }
@@ -1592,14 +1828,15 @@ function LessonsAdminContent() {
         ...selectedDraft.quiz,
         {
           answerIndex: 0,
-          options:
-            lessonLocale === "ro"
-              ? ["Prima opțiune", "A doua opțiune", "A treia opțiune"]
-              : ["First option", "Second option", "Third option"],
-          question:
-            lessonLocale === "ro"
-              ? "Întrebare nouă pentru quiz"
-              : "New quiz question",
+          options: [
+            { en: "First option", ro: "Prima opțiune" },
+            { en: "Second option", ro: "A doua opțiune" },
+            { en: "Third option", ro: "A treia opțiune" },
+          ],
+          question: {
+            en: "New quiz question",
+            ro: "Întrebare nouă pentru quiz",
+          },
         },
       ],
     });
@@ -1607,7 +1844,7 @@ function LessonsAdminContent() {
 
   function addLesson(kind: NonNullable<LearnLesson["kind"]>) {
     const id = `draft-${kind}-${Date.now().toString(36)}`;
-    const lesson = createLessonShell(id, kind, nodes.length + 1, lessonLocale);
+    const lesson = createLessonShell(id, kind, nodes.length + 1);
     const viewport = viewportRef.current;
     const centerX = viewport ? viewport.clientWidth / 2 : 520;
     const centerY = viewport ? viewport.clientHeight / 2 : 320;
@@ -1627,24 +1864,43 @@ function LessonsAdminContent() {
     ]);
     setDrafts((current) => ({
       ...current,
-      [id]: buildInitialDrafts(lessonLocale)[id] ?? {
+      [id]: buildInitialDrafts([lesson])[id] ?? {
         code: lesson.code,
+        completionRequirement: getLessonCompletionRequirement(lesson),
         kind,
         level: lesson.level,
         locked: kind !== "theory",
+        markdown: toLocalizedDraftText(
+          getLessonMarkdown(lesson, "en"),
+          getLessonMarkdown(lesson, "ro")
+        ),
         minutes: lesson.minutes,
         quiz: lesson.quiz.map((question) => ({
           answerIndex: question.answerIndex,
-          options: question.options.map((option) => text(option, lessonLocale)),
-          question: text(question.question, lessonLocale),
+          options: question.options.map((option) =>
+            toLocalizedDraftText(text(option, "en"), text(option, "ro"))
+          ),
+          question: toLocalizedDraftText(
+            text(question.question, "en"),
+            text(question.question, "ro")
+          ),
         })),
         requiredProblemCodes: "",
         requiresCorrectQuiz: kind !== "theory",
         sampleInput: lesson.sampleInput,
-        summary: text(lesson.summary, lessonLocale),
+        summary: toLocalizedDraftText(
+          text(lesson.summary, "en"),
+          text(lesson.summary, "ro")
+        ),
         tags: lesson.tags.join(", "),
-        title: text(lesson.title, lessonLocale),
-        transcript: text(lesson.transcript, lessonLocale),
+        title: toLocalizedDraftText(
+          text(lesson.title, "en"),
+          text(lesson.title, "ro")
+        ),
+        transcript: toLocalizedDraftText(
+          text(lesson.transcript, "en"),
+          text(lesson.transcript, "ro")
+        ),
         videoUrl: lesson.videoUrl ?? "",
       },
     }));
@@ -1664,8 +1920,8 @@ function LessonsAdminContent() {
       id,
       order: nodes.length + 1,
       title: {
-        en: `${selectedDraft.title} copy`,
-        ro: `${selectedDraft.title} copie`,
+        en: `${selectedDraft.title.en} copy`,
+        ro: `${selectedDraft.title.ro} copie`,
       },
     };
 
@@ -1683,7 +1939,10 @@ function LessonsAdminContent() {
       ...current,
       [id]: {
         ...selectedDraft,
-        title: `${selectedDraft.title} copy`,
+        title: {
+          en: `${selectedDraft.title.en} copy`,
+          ro: `${selectedDraft.title.ro} copie`,
+        },
       },
     }));
     setSelectedId(id);
@@ -1812,9 +2071,14 @@ function LessonsAdminContent() {
   function cloneDraft(draft: LessonDraft): LessonDraft {
     return {
       ...draft,
+      markdown: { ...draft.markdown },
+      summary: { ...draft.summary },
+      title: { ...draft.title },
+      transcript: { ...draft.transcript },
       quiz: draft.quiz.map((question) => ({
         ...question,
-        options: [...question.options],
+        options: question.options.map((option) => ({ ...option })),
+        question: { ...question.question },
       })),
     };
   }
@@ -1857,7 +2121,10 @@ function LessonsAdminContent() {
       const id = `${item.node.id}-copy-${Date.now().toString(36)}-${index + 1}`;
       const draft = {
         ...cloneDraft(item.draft),
-        title: `${item.draft.title} copy`,
+        title: {
+          en: `${item.draft.title.en} copy`,
+          ro: `${item.draft.title.ro} copie`,
+        },
       };
       const lesson: LearnLesson = {
         ...item.node.lesson,
@@ -1866,10 +2133,7 @@ function LessonsAdminContent() {
         level: draft.level,
         minutes: draft.minutes,
         order: nodes.length + index + 1,
-        title: {
-          en: draft.title,
-          ro: draft.title,
-        },
+        title: draft.title,
       };
 
       pastedIds.push(id);
@@ -2361,6 +2625,123 @@ function LessonsAdminContent() {
 
   return (
     <TooltipProvider>
+      {markdownStudioLesson && markdownStudioDraft && (
+        <div className="fixed inset-0 z-[140] flex min-h-0 flex-col bg-background text-foreground">
+          <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border/70 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-muted/45">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {draftText(markdownStudioDraft.title, contentLocale)}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">{c.studioDraft}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Select
+                value={contentLocale}
+                onValueChange={(value) => setContentLocale(value as LessonLocale)}
+              >
+                <SelectTrigger
+                  className="h-9 w-[128px]"
+                  aria-label={c.contentLanguage}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">{c.english}</SelectItem>
+                  <SelectItem value="ro">{c.romanian}</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="hidden items-center rounded-lg border bg-muted/35 p-1 sm:flex">
+                {([
+                  ["edit", PencilLine, c.edit],
+                  ["split", Columns2, c.split],
+                  ["preview", Eye, c.preview],
+                ] as const).map(([mode, Icon, label]) => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    variant={markdownStudioMode === mode ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setMarkdownStudioMode(mode)}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <Button type="button" size="sm" onClick={saveRoadmapConfig} disabled={isSaving}>
+                <Save className="h-4 w-4" />
+                {isSaving ? c.saving : c.save}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={c.closeStudio}
+                onClick={() => setMarkdownStudioLessonId(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </header>
+
+          <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: markdownStudioMode === "split" ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)" }}>
+            {markdownStudioMode !== "preview" && (
+              <div className="min-h-0 border-r border-border/70 bg-zinc-950">
+                <MiniScriptMonacoEditor
+                  value={draftText(markdownStudioDraft.markdown, contentLocale)}
+                  onChange={(value) =>
+                    updateLocalizedDraft(markdownStudioLesson.id, "markdown", value)
+                  }
+                  language="markdown"
+                  path={`lesson-${markdownStudioLesson.id}-${contentLocale}.md`}
+                  theme="dark"
+                  height="100%"
+                  options={{
+                    automaticLayout: true,
+                    folding: true,
+                    glyphMargin: false,
+                    lineDecorationsWidth: 10,
+                    lineNumbers: "on",
+                    lineNumbersMinChars: 3,
+                    minimap: { enabled: false },
+                    padding: { top: 28, bottom: 32 },
+                    quickSuggestions: false,
+                    renderWhitespace: "selection",
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                    wrappingIndent: "same",
+                  }}
+                />
+              </div>
+            )}
+            {markdownStudioMode !== "edit" && (
+              <div className="note-scrollbar min-h-0 overflow-y-auto bg-background">
+                <article className="mx-auto w-full max-w-4xl px-6 py-12 sm:px-12 lg:py-16">
+                  <div className="mb-10 border-b pb-8">
+                    <p className="text-sm font-medium text-muted-foreground">{c.preview}</p>
+                    <h1 className="mt-3 text-4xl font-semibold tracking-tight">
+                      {draftText(markdownStudioDraft.title, contentLocale)}
+                    </h1>
+                    <p className="mt-3 max-w-2xl text-muted-foreground">
+                      {draftText(markdownStudioDraft.summary, contentLocale)}
+                    </p>
+                  </div>
+                  <Markdown headingAnchors className="text-[16px] leading-8 [&_h2]:pt-3 [&_pre]:rounded-lg">
+                    {draftText(markdownStudioDraft.markdown, contentLocale)}
+                  </Markdown>
+                </article>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <Dialog
         open={Boolean(createDialogType)}
         onOpenChange={(open) => {
@@ -2441,7 +2822,7 @@ function LessonsAdminContent() {
           <div
             ref={viewportRef}
             className={cn(
-              "relative h-full min-h-0 w-full touch-none overflow-hidden bg-[radial-gradient(circle_at_1px_1px,hsl(var(--muted-foreground)/0.18)_1px,transparent_0)] bg-[length:22px_22px]",
+              "sx-dot-grid isolate relative h-full min-h-0 w-full touch-none overflow-hidden [contain:paint]",
               spacePressed ? "cursor-grab active:cursor-grabbing" : "cursor-default"
             )}
             onPointerDown={beginCanvasDrag}
@@ -2627,9 +3008,15 @@ function LessonsAdminContent() {
             </div>
 
             <div
-              className="absolute left-0 top-0 h-px w-px origin-top-left overflow-visible transition-transform duration-75"
+              data-roadmap-surface
+              className="absolute left-0 top-0 origin-top-left overflow-visible"
               style={{
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+                backfaceVisibility: "hidden",
+                height: canvasSurfaceSize.height,
+                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${scale})`,
+                transformOrigin: "0 0",
+                width: canvasSurfaceSize.width,
+                willChange: "transform",
               }}
             >
               {sectionFrames.map((frame) => {
@@ -2644,7 +3031,7 @@ function LessonsAdminContent() {
                     className={cn(
                       "pointer-events-none absolute rounded-lg border bg-background/25 transition-colors",
                       active
-                        ? "z-[4] border-blue-500 bg-blue-50/35 shadow-[0_0_0_1px_rgba(59,130,246,0.18)] dark:bg-blue-950/35"
+                        ? "z-[4] border-blue-500 bg-blue-50/35 ring-1 ring-blue-500/20 dark:bg-blue-950/35"
                         : "z-[3] border-dashed border-border"
                     )}
                     style={{
@@ -2824,7 +3211,7 @@ function LessonsAdminContent() {
                     key={category.id}
                     type="button"
                     className={cn(
-                      "absolute z-[2] max-w-[320px] truncate rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-zinc-800",
+                      "absolute z-[2] max-w-[320px] truncate rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-zinc-800",
                       selectedCategoryId === category.id &&
                         !selectedLesson &&
                         !selectedSectionDetails &&
@@ -2910,7 +3297,9 @@ function LessonsAdminContent() {
                         </span>
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold">
-                            {nodeDraft?.title ?? text(node.lesson.title, lessonLocale)}
+                            {nodeDraft
+                              ? draftText(nodeDraft.title, lessonLocale)
+                              : text(node.lesson.title, lessonLocale)}
                           </span>
                           <span className="block truncate text-xs text-muted-foreground">
                             {nodeSection
@@ -3085,19 +3474,12 @@ function LessonsAdminContent() {
                   <Input
                     value={text(selectedCategoryDetails.title, lessonLocale)}
                     onChange={(event) =>
-                      setCategories((current) =>
-                        current.map((category) =>
-                          category.id === selectedCategoryDetails.id
-                            ? {
-                                ...category,
-                                title: {
-                                  en: event.target.value,
-                                  ro: event.target.value,
-                                },
-                              }
-                            : category
-                        )
-                      )
+                      updateCategory(selectedCategoryDetails.id, {
+                        title: {
+                          en: event.target.value,
+                          ro: event.target.value,
+                        },
+                      })
                     }
                   />
                 </label>
@@ -3106,23 +3488,154 @@ function LessonsAdminContent() {
                   <Textarea
                     value={text(selectedCategoryDetails.description, lessonLocale)}
                     onChange={(event) =>
-                      setCategories((current) =>
-                        current.map((category) =>
-                          category.id === selectedCategoryDetails.id
-                            ? {
-                                ...category,
-                                description: {
-                                  en: event.target.value,
-                                  ro: event.target.value,
-                                },
-                              }
-                            : category
-                        )
-                      )
+                      updateCategory(selectedCategoryDetails.id, {
+                        description: {
+                          en: event.target.value,
+                          ro: event.target.value,
+                        },
+                      })
                     }
                     className="min-h-24"
                   />
                 </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-2 text-sm font-medium">
+                    {c.pathKind}
+                    <Select
+                      value={selectedCategoryDetails.kind}
+                      onValueChange={(value) =>
+                        updateCategory(selectedCategoryDetails.id, {
+                          kind: value as LearningPathKind,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="foundation">foundation</SelectItem>
+                        <SelectItem value="specialization">specialization</SelectItem>
+                        <SelectItem value="supplemental">supplemental</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    {c.availability}
+                    <Select
+                      value={selectedCategoryDetails.availability}
+                      onValueChange={(value) =>
+                        updateCategory(selectedCategoryDetails.id, {
+                          availability: value as LearningPathAvailability,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">draft</SelectItem>
+                        <SelectItem value="coming_soon">coming soon</SelectItem>
+                        <SelectItem value="published">published</SelectItem>
+                        <SelectItem value="archived">archived</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-2 text-sm font-medium">
+                    {c.programmingLanguage}
+                    <Input
+                      value={selectedCategoryDetails.language}
+                      onChange={(event) =>
+                        updateCategory(selectedCategoryDetails.id, {
+                          language: event.target.value
+                            .toLowerCase()
+                            .replace(/\s+/g, "-"),
+                        })
+                      }
+                      placeholder="python"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    Slug
+                    <Input
+                      value={selectedCategoryDetails.slug}
+                      onChange={(event) =>
+                        updateCategory(selectedCategoryDetails.id, {
+                          slug: normalizeSlugInput(event.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+                <label className="space-y-2 text-sm font-medium">
+                  {c.prerequisite}
+                  <Select
+                    value={selectedCategoryDetails.prerequisitePathId ?? "none"}
+                    onValueChange={(value) =>
+                      updateCategory(selectedCategoryDetails.id, {
+                        prerequisitePathId: value === "none" ? null : value,
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{c.noPrerequisite}</SelectItem>
+                      {categories
+                        .filter(
+                          (category) => category.id !== selectedCategoryDetails.id
+                        )
+                        .map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {text(category.title, lessonLocale)}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <label className="space-y-2 text-sm font-medium">
+                    {c.estimatedHours}
+                    <Input
+                      type="number"
+                      min={1}
+                      value={selectedCategoryDetails.estimatedHours ?? ""}
+                      onChange={(event) =>
+                        updateCategory(selectedCategoryDetails.id, {
+                          estimatedHours: event.target.value
+                            ? Math.max(1, Number(event.target.value))
+                            : undefined,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    {c.pathIcon}
+                    <Input
+                      value={selectedCategoryDetails.icon ?? ""}
+                      onChange={(event) =>
+                        updateCategory(selectedCategoryDetails.id, {
+                          icon: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    {c.accentColor}
+                    <Input
+                      type="color"
+                      value={selectedCategoryDetails.accentColor ?? "#10b981"}
+                      onChange={(event) =>
+                        updateCategory(selectedCategoryDetails.id, {
+                          accentColor: event.target.value,
+                        })
+                      }
+                      className="h-10 p-1"
+                    />
+                  </label>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -3184,6 +3697,11 @@ function LessonsAdminContent() {
                                 ),
                         }))
                       );
+                      updateSection(selectedSectionDetails.id, {
+                        pathSlug: categories.find(
+                          (category) => category.id === value
+                        )?.slug,
+                      });
                       setSelectedCategoryId(value);
                     }}
                   >
@@ -3240,15 +3758,32 @@ function LessonsAdminContent() {
                       <CardTitle>{c.selected}</CardTitle>
                       <CardDescription>{selectedLesson.id}</CardDescription>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "rounded-full",
-                        ruleStyles[getDraftRuleKind(selectedLesson, selectedDraft)].badge
-                      )}
-                    >
-                      {getDraftRuleKind(selectedLesson, selectedDraft)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={contentLocale}
+                        onValueChange={(value) => setContentLocale(value as LessonLocale)}
+                      >
+                        <SelectTrigger
+                          className="h-8 w-[126px]"
+                          aria-label={c.contentLanguage}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en">{c.english}</SelectItem>
+                          <SelectItem value="ro">{c.romanian}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "rounded-full",
+                          ruleStyles[getDraftRuleKind(selectedLesson, selectedDraft)].badge
+                        )}
+                      >
+                        {getDraftRuleKind(selectedLesson, selectedDraft)}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -3296,18 +3831,18 @@ function LessonsAdminContent() {
                       <label className="space-y-2 text-sm font-medium">
                         {c.titleLabel}
                         <Input
-                          value={selectedDraft.title}
+                          value={draftText(selectedDraft.title, contentLocale)}
                           onChange={(event) =>
-                            updateDraft(selectedLesson.id, { title: event.target.value })
+                            updateLocalizedDraft(selectedLesson.id, "title", event.target.value)
                           }
                         />
                       </label>
                       <label className="space-y-2 text-sm font-medium">
                         {c.summary}
                         <Textarea
-                          value={selectedDraft.summary}
+                          value={draftText(selectedDraft.summary, contentLocale)}
                           onChange={(event) =>
-                            updateDraft(selectedLesson.id, { summary: event.target.value })
+                            updateLocalizedDraft(selectedLesson.id, "summary", event.target.value)
                           }
                           className="min-h-20"
                         />
@@ -3406,6 +3941,28 @@ function LessonsAdminContent() {
                             </SelectContent>
                           </Select>
                         </label>
+                        <label className="col-span-2 space-y-2 text-sm font-medium">
+                          {c.completionRequirement}
+                          <Select
+                            value={selectedDraft.completionRequirement}
+                            onValueChange={(value) =>
+                              updateDraft(selectedLesson.id, {
+                                completionRequirement:
+                                  value as LessonCompletionRequirement,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="required">required</SelectItem>
+                              <SelectItem value="capstone">capstone</SelectItem>
+                              <SelectItem value="optional">optional</SelectItem>
+                              <SelectItem value="bonus">bonus</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </label>
                       </div>
                       <label className="space-y-2 text-sm font-medium">
                         {c.minutes}
@@ -3456,14 +4013,69 @@ function LessonsAdminContent() {
                 <TabsContent value="content" className="mt-3 space-y-3">
                   <Card>
                     <CardContent className="space-y-4 p-5">
+                      <div className="rounded-xl border bg-muted/45 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm">
+                            <FileText className="h-4 w-4 text-emerald-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold">{c.markdown}</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{c.markdownHint}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 h-64 overflow-hidden rounded-lg border bg-zinc-950">
+                          <MiniScriptMonacoEditor
+                            value={draftText(selectedDraft.markdown, contentLocale)}
+                            onChange={(value) =>
+                              updateLocalizedDraft(selectedLesson.id, "markdown", value)
+                            }
+                            language="markdown"
+                            path={`lesson-${selectedLesson.id}-${contentLocale}-inline.md`}
+                            theme="dark"
+                            height="100%"
+                            options={{
+                              automaticLayout: true,
+                              folding: true,
+                              glyphMargin: false,
+                              lineDecorationsWidth: 8,
+                              lineNumbers: "on",
+                              lineNumbersMinChars: 3,
+                              minimap: { enabled: false },
+                              padding: { top: 16, bottom: 18 },
+                              quickSuggestions: false,
+                              renderWhitespace: "selection",
+                              scrollBeyondLastLine: false,
+                              wordWrap: "on",
+                            }}
+                          />
+                        </div>
+                        <div className="mt-4 max-h-32 overflow-hidden rounded-lg border bg-background/80 p-3 [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                          <Markdown className="text-xs leading-5">
+                            {draftText(selectedDraft.markdown, contentLocale) || "—"}
+                          </Markdown>
+                        </div>
+                        <Button
+                          type="button"
+                          className="mt-4 w-full"
+                          onClick={() => {
+                            setMarkdownStudioMode("split");
+                            setMarkdownStudioLessonId(selectedLesson.id);
+                          }}
+                        >
+                          <Maximize2 className="h-4 w-4" />
+                          {c.openStudio}
+                        </Button>
+                      </div>
                       <label className="space-y-2 text-sm font-medium">
                         {c.transcript}
                         <Textarea
-                          value={selectedDraft.transcript}
+                          value={draftText(selectedDraft.transcript, contentLocale)}
                           onChange={(event) =>
-                            updateDraft(selectedLesson.id, {
-                              transcript: event.target.value,
-                            })
+                            updateLocalizedDraft(
+                              selectedLesson.id,
+                              "transcript",
+                              event.target.value
+                            )
                           }
                           className="min-h-28"
                         />
@@ -3524,10 +4136,13 @@ function LessonsAdminContent() {
                           <label className="space-y-2 text-sm font-medium">
                             {c.question}
                             <Textarea
-                              value={question.question}
+                              value={draftText(question.question, contentLocale)}
                               onChange={(event) =>
                                 updateQuizQuestion(questionIndex, {
-                                  question: event.target.value,
+                                  question: {
+                                    ...question.question,
+                                    [contentLocale]: event.target.value,
+                                  },
                                 })
                               }
                               className="min-h-16"
@@ -3553,7 +4168,7 @@ function LessonsAdminContent() {
                                   {optionIndex + 1}
                                 </button>
                                 <Input
-                                  value={option}
+                                  value={draftText(option, contentLocale)}
                                   onChange={(event) =>
                                     updateQuizOption(
                                       questionIndex,

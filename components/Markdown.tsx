@@ -15,18 +15,23 @@ import {
   parseWorkspaceImageId,
 } from "@/lib/workspace-assets";
 import { cn } from "@/lib/utils";
+import { slugifyLessonHeading } from "@/lib/lesson-markdown";
 
 export function Markdown({
   children,
+  className,
   eagerImages = false,
+  headingAnchors = false,
   workspaceImageUserId,
 }: {
   children: string;
+  className?: string;
   eagerImages?: boolean;
+  headingAnchors?: boolean;
   workspaceImageUserId?: string;
 }) {
   return (
-    <div className="space-y-4 text-[15px] leading-7 text-foreground/80">
+    <div className={cn("space-y-4 text-[15px] leading-7 text-foreground/80", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={(url, key, node) => {
@@ -47,12 +52,18 @@ export function Markdown({
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="mt-8 text-2xl font-semibold tracking-tight text-foreground">
+            <h2
+              id={headingAnchors ? slugifyLessonHeading(String(children)) : undefined}
+              className="scroll-mt-24 mt-8 text-2xl font-semibold tracking-tight text-foreground"
+            >
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="mt-6 text-lg font-semibold text-foreground">
+            <h3
+              id={headingAnchors ? slugifyLessonHeading(String(children)) : undefined}
+              className="scroll-mt-24 mt-6 text-lg font-semibold text-foreground"
+            >
               {children}
             </h3>
           ),

@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { ArrowRight, CheckCircle2, FileText, HelpCircle, Send } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/common/PageHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,15 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-import { CheckCircle2, Send } from "lucide-react";
-
-import { useLanguage } from "@/components/LanguageProvider";
-import { supabase } from "@/lib/supabase";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
-import { Footer } from "@/components/Footer";
+import { supabase } from "@/lib/supabase";
 
 type Topic = "bug" | "feature" | "account" | "feedback" | "other";
+
+const MAX_MESSAGE_LENGTH = 5_000;
 
 export default function ContactPage() {
   const { locale } = useLanguage();
@@ -31,7 +32,10 @@ export default function ContactPage() {
   const copy = locale === "ro"
     ? {
         title: "Contact",
-        subtitle: "Spune-ne despre problema ta și revenim cât putem de repede.",
+        subtitle: "Trimite o solicitare echipei ScripticX și urmărește răspunsul prin email.",
+        formTitle: "Trimite un mesaj",
+        formDescription: "Include detaliile necesare pentru ca solicitarea să poată fi verificată și rezolvată.",
+        signedInAs: "Solicitarea va fi asociată contului",
         name: "Nume",
         namePlaceholder: "Numele tău",
         email: "Email",
@@ -46,25 +50,40 @@ export default function ContactPage() {
           other: "Altceva",
         } as Record<Topic, string>,
         description: "Descriere",
-        descriptionPlaceholder: "Descrie problema sau întrebarea ta…",
+        descriptionHint: "Nu include parole, token-uri sau alte date confidențiale.",
+        descriptionPlaceholder: "Descrie ce s-a întâmplat, ce rezultat așteptai și pașii prin care problema poate fi reprodusă…",
+        characters: "caractere",
         submit: "Trimite mesajul",
         submitting: "Se trimite…",
-        successTitle: "Mesaj trimis!",
-        successText: "Mulțumim. Vom reveni cu un răspuns la adresa ta de email.",
+        successTitle: "Mesaj înregistrat",
+        successText: "Confirmarea a fost adăugată în coada de email. Răspunsul echipei va ajunge la aceeași adresă.",
+        successFallback: "Mesajul a fost înregistrat. Răspunsul echipei va ajunge la adresa ta de email.",
+        reference: "Referință",
         successAgain: "Trimite alt mesaj",
-        errorRequired: "Te rugăm să completezi toate câmpurile.",
-        errorEmail: "Te rugăm să introduci o adresă de email validă.",
-        errorGeneric: "Ceva nu a funcționat. Încearcă din nou.",
+        errorRequired: "Completează toate câmpurile obligatorii.",
+        errorEmail: "Introdu o adresă de email validă.",
+        errorGeneric: "Mesajul nu a putut fi trimis. Încearcă din nou.",
+        resourcesTitle: "Găsește mai repede un răspuns",
+        resourcesDescription: "Pentru întrebările uzuale, aceste resurse sunt disponibile imediat.",
+        helpTitle: "Centru de ajutor",
+        helpText: "Răspunsuri la întrebări frecvente.",
+        docsTitle: "Documentație",
+        docsText: "Ghiduri pentru editor și MiniScript+.",
+        updatesTitle: "Noutăți",
+        updatesText: "Schimbări și remedieri recente.",
       }
     : {
         title: "Contact",
-        subtitle: "Tell us what's going on and we'll get back to you soon.",
+        subtitle: "Submit a request to the ScripticX team and receive the response by email.",
+        formTitle: "Send a message",
+        formDescription: "Include the details required to review and resolve your request.",
+        signedInAs: "This request will be linked to",
         name: "Name",
         namePlaceholder: "Your name",
         email: "Email",
         emailPlaceholder: "you@example.com",
         topic: "Topic",
-        topicPlaceholder: "Pick a topic",
+        topicPlaceholder: "Select a topic",
         topics: {
           bug: "Report a bug",
           feature: "Feature suggestion",
@@ -73,25 +92,43 @@ export default function ContactPage() {
           other: "Something else",
         } as Record<Topic, string>,
         description: "Description",
-        descriptionPlaceholder: "Describe your issue or question…",
+        descriptionHint: "Do not include passwords, access tokens, or other confidential data.",
+        descriptionPlaceholder: "Describe what happened, what you expected, and the steps required to reproduce the issue…",
+        characters: "characters",
         submit: "Send message",
         submitting: "Sending…",
-        successTitle: "Message sent!",
-        successText: "Thanks. We'll get back to you at the email you provided.",
+        successTitle: "Message received",
+        successText: "The confirmation was added to the email queue. The team response will arrive at the same address.",
+        successFallback: "Your message was recorded. The team response will arrive at your email address.",
+        reference: "Reference",
         successAgain: "Send another message",
-        errorRequired: "Please fill in every field.",
-        errorEmail: "Please enter a valid email address.",
-        errorGeneric: "Something went wrong. Please try again.",
+        errorRequired: "Complete all required fields.",
+        errorEmail: "Enter a valid email address.",
+        errorGeneric: "The message could not be sent. Please try again.",
+        resourcesTitle: "Find an answer sooner",
+        resourcesDescription: "These resources are available immediately for common questions.",
+        helpTitle: "Help center",
+        helpText: "Answers to frequently asked questions.",
+        docsTitle: "Documentation",
+        docsText: "Guides for the editor and MiniScript+.",
+        updatesTitle: "What's new",
+        updatesText: "Recent changes and resolved issues.",
       };
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [topic, setTopic] = useState<Topic | "">("");
   const [description, setDescription] = useState("");
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+  const [confirmationQueued, setConfirmationQueued] = useState(false);
+
+  const accountName = profile?.username
+    || user?.user_metadata?.full_name
+    || user?.email?.split("@")[0]
+    || "";
 
   function reset() {
     setName("");
@@ -100,13 +137,15 @@ export default function ContactPage() {
     setDescription("");
     setError(null);
     setDone(false);
+    setReference(null);
+    setConfirmationQueued(false);
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
 
-    const finalName = isLoggedIn ? (profile?.username ?? "") : name.trim();
+    const finalName = isLoggedIn ? accountName : name.trim();
     const finalEmail = isLoggedIn ? (user?.email ?? "") : email.trim();
 
     if (!finalName || !finalEmail || !topic || !description.trim()) {
@@ -120,147 +159,168 @@ export default function ContactPage() {
     }
 
     setSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ name: finalName, email: finalEmail, topic, description, locale }),
+      });
+      const result = (await response.json()) as {
+        confirmationQueued?: boolean;
+        error?: string;
+        reference?: string;
+      };
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const response = await fetch("/api/contact", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : {}),
-      },
-      body: JSON.stringify({
-        name: finalName,
-        email: finalEmail,
-        topic,
-        description,
-      }),
-    });
-    const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setError(result.error || copy.errorGeneric);
+        return;
+      }
 
-    setSubmitting(false);
-
-    if (!response.ok) {
-      setError(result.error || copy.errorGeneric);
-      return;
+      setReference(result.reference || null);
+      setConfirmationQueued(result.confirmationQueued === true);
+      setDone(true);
+    } catch {
+      setError(copy.errorGeneric);
+    } finally {
+      setSubmitting(false);
     }
-
-    setDone(true);
   }
 
+  const resources = [
+    { href: "/help", icon: HelpCircle, title: copy.helpTitle, text: copy.helpText },
+    { href: "/docs/basics", icon: FileText, title: copy.docsTitle, text: copy.docsText },
+    { href: "/updates", icon: CheckCircle2, title: copy.updatesTitle, text: copy.updatesText },
+  ];
+
   return (
-    <div className="flex flex-col">
+    <PageContainer variant="wide" className="space-y-8 pb-8">
+      <PageHeader className="border-b border-border/70 pb-6" title={copy.title} subtitle={copy.subtitle} />
 
-      <div className="p-6 max-w-2xl w-full mx-auto space-y-8">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="sx-surface overflow-hidden" aria-labelledby="contact-form-title">
+          <div className="border-b border-border px-5 py-5 sm:px-7">
+            <h2 id="contact-form-title" className="text-lg font-semibold text-foreground">{copy.formTitle}</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{copy.formDescription}</p>
+          </div>
 
-        <div>
-          <h1 className="text-3xl font-bold">{copy.title}</h1>
-          <p className="text-muted-foreground">{copy.subtitle}</p>
-        </div>
-
-        <Card>
-          <CardContent className="p-6">
-
+          <div className="p-5 sm:p-7">
             {done ? (
-              <div className="flex flex-col items-center text-center gap-3 py-6">
-                <div className="rounded-full bg-emerald-100 p-3 dark:bg-emerald-950/50">
-                  <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
+              <div className="flex min-h-[390px] flex-col items-center justify-center text-center">
+                <div className="grid size-10 place-items-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="size-5" aria-hidden="true" />
                 </div>
-                <h2 className="text-lg font-semibold">{copy.successTitle}</h2>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  {copy.successText}
+                <h2 className="mt-4 text-xl font-semibold text-foreground">{copy.successTitle}</h2>
+                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                  {confirmationQueued ? copy.successText : copy.successFallback}
                 </p>
-                <Button
-                  variant="outline"
-                  onClick={reset}
-                  className="mt-2 rounded-xl"
-                >
-                  {copy.successAgain}
-                </Button>
+                {reference && (
+                  <p className="mt-4 rounded-[var(--sx-radius-control)] border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-muted-foreground">
+                    {copy.reference}: {reference}
+                  </p>
+                )}
+                <Button variant="outline" onClick={reset} className="mt-6">{copy.successAgain}</Button>
               </div>
             ) : (
-              <form onSubmit={submit} className="space-y-5">
-
-                {!isLoggedIn && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">{copy.name}</label>
-                      <Input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder={copy.namePlaceholder}
-                      />
+              <form onSubmit={submit} className="space-y-6">
+                {isLoggedIn ? (
+                  <div className="rounded-[var(--sx-radius-control)] border border-border bg-muted/30 px-4 py-3">
+                    <p className="text-xs font-medium text-muted-foreground">{copy.signedInAs}</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">
+                      {accountName} <span className="font-normal text-muted-foreground">· {user?.email}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label htmlFor="contact-name" className="text-sm font-medium text-foreground">{copy.name}</label>
+                      <Input id="contact-name" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder={copy.namePlaceholder} />
                     </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">{copy.email}</label>
-                      <Input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder={copy.emailPlaceholder}
-                      />
+                    <div className="space-y-2">
+                      <label htmlFor="contact-email" className="text-sm font-medium text-foreground">{copy.email}</label>
+                      <Input id="contact-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder={copy.emailPlaceholder} />
                     </div>
                   </div>
                 )}
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">{copy.topic}</label>
-                  <Select
-                    value={topic}
-                    onValueChange={(v) => setTopic(v as Topic)}
-                  >
-                    <SelectTrigger className="w-full">
+                <div className="space-y-2">
+                  <label htmlFor="contact-topic" className="text-sm font-medium text-foreground">{copy.topic}</label>
+                  <Select value={topic} onValueChange={(value) => setTopic(value as Topic)}>
+                    <SelectTrigger id="contact-topic" className="w-full">
                       <SelectValue placeholder={copy.topicPlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
                       {(Object.keys(copy.topics) as Topic[]).map((key) => (
-                        <SelectItem key={key} value={key}>
-                          {copy.topics[key]}
-                        </SelectItem>
+                        <SelectItem key={key} value={key}>{copy.topics[key]}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    {copy.description}
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <label htmlFor="contact-description" className="text-sm font-medium text-foreground">{copy.description}</label>
+                      <p id="contact-description-hint" className="mt-1 text-xs text-muted-foreground">{copy.descriptionHint}</p>
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {description.length}/{MAX_MESSAGE_LENGTH} {copy.characters}
+                    </span>
+                  </div>
                   <Textarea
+                    id="contact-description"
+                    aria-describedby="contact-description-hint"
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(event) => setDescription(event.target.value)}
                     placeholder={copy.descriptionPlaceholder}
-                    rows={6}
+                    maxLength={MAX_MESSAGE_LENGTH}
+                    rows={9}
+                    className="min-h-48 resize-y"
                   />
                 </div>
 
                 {error && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  <p role="alert" className="rounded-[var(--sx-radius-control)] border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</p>
                 )}
 
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full rounded-xl"
-                >
-                  <Send size={16} />
-                  {submitting ? copy.submitting : copy.submit}
-                </Button>
-
+                <div className="flex justify-end border-t border-border pt-5">
+                  <Button type="submit" disabled={submitting} size="lg">
+                    <Send aria-hidden="true" />
+                    {submitting ? copy.submitting : copy.submit}
+                  </Button>
+                </div>
               </form>
             )}
+          </div>
+        </section>
 
-          </CardContent>
-        </Card>
+        <aside className="space-y-5 lg:sticky lg:top-6">
+          <section className="sx-surface overflow-hidden" aria-labelledby="contact-resources-title">
+            <div className="border-b border-border px-5 py-5">
+              <h2 id="contact-resources-title" className="font-semibold text-foreground">{copy.resourcesTitle}</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.resourcesDescription}</p>
+            </div>
+            <nav className="divide-y divide-border" aria-label={copy.resourcesTitle}>
+              {resources.map((resource) => (
+                <Link key={resource.href} href={resource.href} className="sx-interactive group flex items-center gap-3 px-5 py-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-[var(--sx-radius-control)] border border-border bg-background text-muted-foreground">
+                    <resource.icon className="size-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-foreground">{resource.title}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{resource.text}</span>
+                  </span>
+                  <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </Link>
+              ))}
+            </nav>
+          </section>
 
+        </aside>
       </div>
-
-      <Footer />
-
-    </div>
+    </PageContainer>
   );
 }

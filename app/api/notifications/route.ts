@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { queueNotificationEmail } from "@/lib/mail/service";
+import { getDailyChallengeNotificationContent } from "@/lib/daily-challenge-notification";
 import { createAdminSupabase } from "@/lib/supabaseServer";
 import {
   enforceRateLimit,
@@ -149,23 +150,82 @@ export async function POST(request: Request) {
         };
         break;
       }
+      case "class_announcement": {
+        const announcementId = metadataId(metadata, "announcementId");
+        const classId = metadataId(metadata, "classId");
+        const [{ data: announcement }, { data: classRow }, { data: member }] = await Promise.all([
+          admin.from("class_announcements").select("title, body, author_id, class_id").eq("id", announcementId).eq("class_id", classId).maybeSingle<{ title: string; body: string; author_id: string; class_id: string }>(),
+          admin.from("classes").select("name, teacher_id").eq("id", classId).maybeSingle<{ name: string; teacher_id: string }>(),
+          admin.from("class_members").select("role").eq("class_id", classId).eq("user_id", recipientId).maybeSingle<{ role: string }>(),
+        ]);
+        if (!announcement || announcement.author_id !== user.id || !classRow || !member || member.role === "teacher") {
+          throw new HttpError(403, "Notification event is not valid");
+        }
+        draft = {
+          title: locale === "ro" ? `Anunț nou în ${classRow.name}` : `New announcement in ${classRow.name}`,
+          body: announcement.title,
+          href: `/classes/${classId}`,
+          metadata: { announcementId, classId, className: classRow.name },
+          eventId: `${announcementId}:${recipientId}`,
+        };
+        break;
+      }
+      case "class_event": {
+        const eventId = metadataId(metadata, "eventId");
+        const classId = metadataId(metadata, "classId");
+        const [{ data: classEvent }, { data: classRow }, { data: member }] = await Promise.all([
+          admin.from("class_events").select("title, starts_at, created_by, class_id").eq("id", eventId).eq("class_id", classId).maybeSingle<{ title: string; starts_at: string; created_by: string; class_id: string }>(),
+          admin.from("classes").select("name").eq("id", classId).maybeSingle<{ name: string }>(),
+          admin.from("class_members").select("role").eq("class_id", classId).eq("user_id", recipientId).maybeSingle<{ role: string }>(),
+        ]);
+        if (!classEvent || classEvent.created_by !== user.id || !classRow || !member || member.role === "teacher") {
+          throw new HttpError(403, "Notification event is not valid");
+        }
+        draft = {
+          title: locale === "ro" ? `Eveniment nou în ${classRow.name}` : `New event in ${classRow.name}`,
+          body: `${classEvent.title} · ${new Date(classEvent.starts_at).toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}`,
+          href: `/classes/${classId}`,
+          metadata: { eventId, classId, className: classRow.name },
+          eventId: `${eventId}:${recipientId}`,
+        };
+        break;
+      }
       case "daily_challenge": {
         if (recipientId !== user.id) throw new HttpError(403, "Notification event is not valid");
         const challengeId = metadataId(metadata, "challengeId");
         const today = new Date().toISOString().slice(0, 10);
         const { data: challenge } = await admin
           .from("daily_challenges")
-          .select("problem_id, challenge_date")
+          .select("problem_id, challenge_date, problems(title_i18n)")
           .eq("id", challengeId)
           .eq("challenge_date", today)
           .eq("is_active", true)
-          .maybeSingle<{ problem_id: string; challenge_date: string }>();
+          .maybeSingle<{
+            problem_id: string;
+            challenge_date: string;
+            problems:
+              | { title_i18n: Record<string, string> | null }
+              | Array<{ title_i18n: Record<string, string> | null }>
+              | null;
+          }>();
         if (!challenge) throw new HttpError(403, "Notification event is not valid");
+        const problem = Array.isArray(challenge.problems)
+          ? challenge.problems[0]
+          : challenge.problems;
+        const content = getDailyChallengeNotificationContent(
+          problem?.title_i18n,
+          locale
+        );
         draft = {
-          title: locale === "ro" ? "Challenge-ul zilei este disponibil" : "Today's challenge is ready",
-          body: locale === "ro" ? "Rezolvă provocarea de azi." : "Solve today's coding challenge.",
+          title: content.title,
+          body: content.body,
           href: `/problems/${challenge.problem_id}`,
-          metadata: { challengeId, challengeDate: today, problemId: challenge.problem_id },
+          metadata: {
+            challengeId,
+            challengeDate: today,
+            problemId: challenge.problem_id,
+            problemTitleI18n: content.problemTitleI18n,
+          },
           eventId: `${today}:${recipientId}`,
         };
         break;
@@ -217,7 +277,7 @@ export async function POST(request: Request) {
         draft = {
           title: locale === "ro" ? `${actorName} te-a invitat la o sesiune live` : `${actorName} invited you to a live session`,
           body: room.name || "ScripticX live",
-          href: `/live/${roomId}`,
+          href: `/editor?live=${encodeURIComponent(roomId)}&view=live`,
           metadata: { roomId, roomName: room.name },
           eventId: `${roomId}:${recipientId}`,
         };
@@ -239,7 +299,10 @@ export async function POST(request: Request) {
         metadata: draft.metadata,
         dedupe_key: dedupeKey,
       },
-      { onConflict: "dedupe_key", ignoreDuplicates: true }
+      {
+        onConflict: "dedupe_key",
+        ignoreDuplicates: type !== "daily_challenge",
+      }
     );
     if (error) throw error;
 

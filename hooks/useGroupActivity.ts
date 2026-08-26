@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, type StudyGroupActivitySummary } from "@/lib/api";
+import type { StudyGroupActivitySummary } from "@/lib/api";
+import { listStudyGroupActivity } from "@/lib/group-activity-client";
 import { supabase } from "@/lib/supabase";
 
 const GROUP_ACTIVITY_EVENT = "scripticx:group-activity-seen";
@@ -59,18 +60,35 @@ export function markStudyGroupChannelSeen(
   writeTimestamp(getChannelSeenKey(userId, groupId, channelId), timestamp);
 }
 
-export function useGroupActivity(userId?: string | null) {
+export function useGroupActivity(
+  userId?: string | null,
+  options: { eager?: boolean } = {}
+) {
   const [seenVersion, setSeenVersion] = useState(0);
+  const [ready, setReady] = useState(options.eager === true);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (options.eager) {
+      setReady(true);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setReady(true), 650);
+    return () => window.clearTimeout(timeout);
+  }, [options.eager]);
 
   const query = useQuery<StudyGroupActivitySummary[]>({
     queryKey: ["groups", "activity", userId],
-    queryFn: () => (userId ? api.groups.listActivity(userId) : Promise.resolve([])),
-    enabled: Boolean(userId),
+    queryFn: () =>
+      userId ? listStudyGroupActivity(userId) : Promise.resolve([]),
+    enabled: Boolean(userId) && ready,
+    staleTime: 1000 * 60 * 5,
+    refetchOnMount: false,
   });
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !ready) return;
 
     const invalidate = () => {
       void queryClient.invalidateQueries({
@@ -90,21 +108,12 @@ export function useGroupActivity(userId?: string | null) {
         },
         invalidate
       )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "study_group_messages",
-        },
-        invalidate
-      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [queryClient, userId]);
+  }, [queryClient, ready, userId]);
 
   const summaries = useMemo(() => query.data || [], [query.data]);
 

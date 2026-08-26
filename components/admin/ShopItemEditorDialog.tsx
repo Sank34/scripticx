@@ -115,7 +115,7 @@ function AssetGuide({
 
   return (
     <div className="grid gap-4 rounded-xl border bg-muted/60 p-4 sm:grid-cols-[150px_1fr] sm:items-center">
-      <div className="relative mx-auto aspect-square w-[140px] rounded-xl border-2 border-dashed bg-[linear-gradient(45deg,var(--muted)_25%,transparent_25%),linear-gradient(-45deg,var(--muted)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,var(--muted)_75%),linear-gradient(-45deg,transparent_75%,var(--muted)_75%)] bg-[length:16px_16px] bg-[position:0_0,0_8px,8px_-8px,-8px_0px]">
+      <div className="sx-transparency-grid relative mx-auto aspect-square w-[140px] rounded-xl border-2 border-dashed">
         <div
           className={cn(
             "absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-dashed bg-card/90 text-center text-[10px] leading-tight text-muted-foreground",

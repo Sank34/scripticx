@@ -32,7 +32,7 @@ const SIDEBAR_WIDTH_DEFAULT = 256
 const SIDEBAR_WIDTH_MIN = 220
 const SIDEBAR_WIDTH_MAX = 380
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH_ICON = "3.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
@@ -439,7 +439,7 @@ function SidebarResizeHandle({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerEnd}
       className={cn(
-        "absolute right-0 top-1/2 z-50 hidden h-24 w-3 -translate-y-1/2 translate-x-1/2 touch-none cursor-col-resize outline-none after:pointer-events-none after:absolute after:left-1/2 after:top-1/2 after:h-14 after:w-1 after:-translate-x-1/2 after:-translate-y-1/2 after:scale-y-75 after:rounded-full after:bg-muted-foreground/50 after:opacity-0 after:shadow-sm after:transition-[opacity,transform,background-color] after:duration-150 hover:after:scale-y-100 hover:after:opacity-100 focus-visible:after:scale-y-100 focus-visible:after:bg-foreground/65 focus-visible:after:opacity-100 data-[resizing=true]:after:scale-y-100 data-[resizing=true]:after:bg-foreground/70 data-[resizing=true]:after:opacity-100 md:block",
+        "absolute right-0 top-1/2 z-50 hidden h-24 w-3 -translate-y-1/2 translate-x-1/2 touch-none cursor-col-resize outline-none after:pointer-events-none after:absolute after:left-1/2 after:top-1/2 after:h-14 after:w-1 after:-translate-x-1/2 after:-translate-y-1/2 after:scale-y-75 after:rounded-full after:bg-muted-foreground/50 after:opacity-30 after:shadow-sm after:transition-[opacity,transform,background-color] after:duration-150 hover:after:scale-y-100 hover:after:opacity-100 focus-visible:after:scale-y-100 focus-visible:after:bg-foreground/65 focus-visible:after:opacity-100 data-[resizing=true]:after:scale-y-100 data-[resizing=true]:after:bg-foreground/70 data-[resizing=true]:after:opacity-100 md:block",
         state === "collapsed" && "pointer-events-none opacity-0",
         className
       )}
@@ -618,7 +618,7 @@ const sidebarMenuButtonVariants = cva(
       variant: {
         default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         outline:
-          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+          "border border-sidebar-border bg-background hover:border-sidebar-accent hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       },
       size: {
         default: "h-8 text-sm",

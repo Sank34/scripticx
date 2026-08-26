@@ -6,6 +6,7 @@ import {
   Check,
   ChevronsUpDown,
   GraduationCap,
+  Info,
   Presentation,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,10 +21,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
-import { api } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import { isStudentWorkspaceContext } from "@/components/workspaces/WorkspaceNavigation";
 import {
+  isStudentWorkspaceContext,
+  isTeacherWorkspaceContext,
+} from "@/components/workspaces/WorkspaceNavigation";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  getAvailableWorkspaceKinds,
   getWorkspaceKindFromMetadata,
   getWorkspacePersonaFromMetadata,
   workspaceMetadataKeys,
@@ -52,6 +63,7 @@ export function getActiveWorkspace(
 ): WorkspaceKind {
   if (pathname.startsWith(workspaceDefinitions.student.route)) return "student";
   if (pathname.startsWith(workspaceDefinitions.teacher.route)) return "teacher";
+  if (isTeacherWorkspaceContext(pathname, metadata)) return "teacher";
   if (isStudentWorkspaceContext(pathname, metadata)) return "student";
   return "personal";
 }
@@ -83,7 +95,7 @@ function getRecommendedWorkspace(
 function WorkspaceMark({ kind }: { kind: WorkspaceKind }) {
   if (kind === "student") {
     return (
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/12 text-sky-700 ring-1 ring-sky-500/20 dark:text-sky-300">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground ring-1 ring-border">
         <GraduationCap className="size-4.5" />
       </span>
     );
@@ -91,14 +103,14 @@ function WorkspaceMark({ kind }: { kind: WorkspaceKind }) {
 
   if (kind === "teacher") {
     return (
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-700 ring-1 ring-violet-500/20 dark:text-violet-300">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground ring-1 ring-border">
         <Presentation className="size-4.5" />
       </span>
     );
   }
 
   return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-background ring-1 ring-border shadow-sm">
+    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background ring-1 ring-border">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logoSCX.svg"
@@ -116,34 +128,54 @@ export function WorkspaceSwitcher({
 }: WorkspaceSwitcherProps) {
   const pathname = usePathname() || "/";
   const { locale } = useLanguage();
-  const { user } = useAuth();
+  const { isAdmin, profile, user } = useAuth();
   const ro = locale === "ro";
   const metadata = user?.user_metadata as Record<string, unknown> | undefined;
+  const metadataUsername = [metadata?.username, metadata?.user_name].find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0
+  );
+  const workspaceOwner =
+    profile?.username?.trim() ||
+    metadataUsername?.trim() ||
+    user?.email?.split("@")[0] ||
+    (ro ? "utilizator" : "User");
   const activeKind = getActiveWorkspace(pathname, metadata);
   const recommendedKind = getRecommendedWorkspace(
     metadata
   );
+  const persona = getWorkspacePersonaFromMetadata(metadata) || "learner";
+  const availableKinds = getAvailableWorkspaceKinds(persona, isAdmin);
   const storedActiveKind = getWorkspaceKindFromMetadata(metadata);
-  const workspaces: WorkspaceOption[] = [
+  const workspaces: WorkspaceOption[] = ([
     {
       kind: "personal",
       href: workspaceDefinitions.personal.route,
-      label: ro ? "Spațiu personal" : "Personal space",
-      description: ro ? "Învață și exersează programare" : "Learn and practise programming",
+      label: ro
+        ? `Workspace-ul lui ${workspaceOwner}`
+        : `${workspaceOwner}’s Workspace`,
+      description: ro
+        ? "Învățare, practică și comunitate"
+        : "Learning, practice and community",
     },
     {
       kind: "student",
       href: workspaceDefinitions.student.route,
       label: ro ? "Workspace elev" : "Student workspace",
-      description: ro ? "Notițe, whiteboard și grafuri" : "Notes, whiteboard and graphs",
+      description: ro
+        ? "Planner, notițe, whiteboard și parcurs"
+        : "Planner, notes, whiteboard and learning path",
     },
     {
       kind: "teacher",
       href: workspaceDefinitions.teacher.route,
       label: ro ? "Workspace profesor" : "Teacher workspace",
-      description: ro ? "Instrumente pentru predare" : "Tools for teaching",
+      description: ro
+        ? "Clase, elevi, teme și progres"
+        : "Classes, students, assignments and progress",
     },
-  ];
+  ] satisfies WorkspaceOption[]).filter((workspace) =>
+    availableKinds.includes(workspace.kind)
+  );
   const activeWorkspace =
     workspaces.find((workspace) => workspace.kind === activeKind) ?? workspaces[0];
   const compact = collapsed && variant === "desktop";
@@ -152,10 +184,10 @@ export function WorkspaceSwitcher({
     onNavigate?.();
     if (!user || kind === storedActiveKind) return;
 
-    void api.auth
-      .updateUserMetadata({
+    void supabase.auth
+      .updateUser({ data: {
         [workspaceMetadataKeys.activeWorkspaceKind]: kind,
-      })
+      } })
       .then(({ error }) => {
         if (!error) return;
         toast.error(
@@ -203,6 +235,7 @@ export function WorkspaceSwitcher({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-tour="workspace-switcher"
           title={compact ? activeWorkspace.label : undefined}
           aria-label={`${ro ? "Schimbă workspace-ul" : "Switch workspace"}: ${activeWorkspace.label}`}
           className={cn(
@@ -235,17 +268,52 @@ export function WorkspaceSwitcher({
         align="start"
         side={compact ? "right" : "bottom"}
         sideOffset={compact ? 10 : 6}
-        className="z-[80] w-72 rounded-2xl p-1.5"
+        className="z-[80] w-72 rounded-[var(--sx-radius-card)] p-1.5"
       >
-        <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {ro ? "Workspace-uri" : "Workspaces"}
+        <DropdownMenuLabel className="flex items-center justify-between gap-3 px-2 py-1.5 text-xs font-medium tracking-normal text-muted-foreground">
+          <span>{ro ? "Workspace-uri" : "Workspaces"}</span>
+          <TooltipProvider delayDuration={400}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="flex size-6 items-center justify-center rounded-md outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={ro ? "Despre workspace-uri" : "About workspaces"}
+                >
+                  <Info className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                align="end"
+                sideOffset={8}
+                collisionPadding={12}
+                className="z-[100] max-w-[220px] whitespace-normal px-2.5 py-2 text-left text-[11px] leading-4 normal-case tracking-normal shadow-lg"
+              >
+                {isAdmin
+                  ? ro
+                    ? "Administratorii pot deschide toate workspace-urile pentru configurare, suport și verificare."
+                    : "Administrators can open every workspace for configuration, support and verification."
+                  : persona === "student"
+                  ? ro
+                    ? "Ca elev ai spațiul personal pentru practică și workspace-ul de elev pentru școală."
+                    : "Students get a personal practice space and a school workspace."
+                  : persona === "teacher"
+                    ? ro
+                      ? "Contul de profesor este concentrat pe administrarea claselor, elevilor și temelor."
+                      : "Teacher accounts focus on managing classes, students and assignments."
+                    : ro
+                      ? "Modul personal păstrează platforma concentrată pe învățarea programării."
+                      : "Personal mode keeps ScripticX focused on learning programming."}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
         {workspaces.map((workspace) => {
           const active = workspace.kind === activeKind;
           const recommended = workspace.kind === recommendedKind;
-          const teacher = workspace.kind === "teacher";
 
           return (
             <DropdownMenuItem
@@ -264,13 +332,8 @@ export function WorkspaceSwitcher({
                     <span className="truncate text-sm font-medium">
                       {workspace.label}
                     </span>
-                    {teacher && (
-                      <span className="rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
-                        {ro ? "în curând" : "preview"}
-                      </span>
-                    )}
                     {recommended && !active && (
-                      <span className="rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-medium text-sky-700 dark:text-sky-300">
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                         {ro ? "recomandat" : "recommended"}
                       </span>
                     )}

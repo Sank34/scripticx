@@ -16,7 +16,7 @@ import RouteGuard from "@/components/RouteGuard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { RouteLoadingSkeleton } from "@/components/loading/RouteLoadingSkeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 import { competitionApiFetch } from "@/lib/competitionClient";
 import type { CompetitionSummary } from "@/lib/competitionTypes";
@@ -40,33 +40,6 @@ const phaseLabels = {
   },
 };
 
-function CompetitionCardSkeleton() {
-  return (
-    <Card aria-hidden className="gap-0 overflow-hidden py-0">
-      <CardContent className="flex h-56 flex-col p-5">
-        <div className="flex items-start justify-between gap-4">
-          <Skeleton className="size-11 shrink-0 rounded-xl" />
-          <div className="flex gap-2">
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-5 w-14 rounded-full" />
-          </div>
-        </div>
-        <Skeleton className="mt-5 h-6 w-2/3" />
-        <div className="mt-3 space-y-2">
-          <Skeleton className="h-3.5 w-full" />
-          <Skeleton className="h-3.5 w-4/5" />
-        </div>
-        <div className="mt-auto grid grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-3.5 w-full" />
-          ))}
-        </div>
-        <Skeleton className="mt-5 h-9 w-full rounded-md" />
-      </CardContent>
-    </Card>
-  );
-}
-
 function CompetitionsContent() {
   const { locale } = useLanguage();
   const language = locale === "ro" ? "ro" : "en";
@@ -83,18 +56,22 @@ function CompetitionsContent() {
   const upcoming = competitions.filter((competition) => competition.phase === "upcoming");
   const finished = competitions.filter((competition) => competition.phase === "finished");
 
+  if (query.isPending) {
+    return <RouteLoadingSkeleton variant="competitions" />;
+  }
+
   return (
-    <div className="mx-auto max-w-6xl space-y-8 py-2">
-      <header className="rounded-2xl border border-zinc-200 bg-zinc-950 px-6 py-7 text-white dark:border-zinc-800 md:px-8">
+    <div className="mx-auto max-w-6xl space-y-8">
+      <header className="rounded-[var(--sx-radius-panel)] border border-foreground/10 bg-foreground px-6 py-7 text-background md:px-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+            <div className="flex items-center gap-2 text-sm font-medium text-background/65">
               <Trophy className="size-4" /> ScripticX arena
             </div>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
               {language === "ro" ? "Competiții de programare" : "Programming competitions"}
             </h1>
-            <p className="mt-3 text-sm leading-6 text-zinc-300">
+            <p className="mt-3 text-sm leading-6 text-background/75">
               {language === "ro"
                 ? "Rezolvă probleme contra cronometru, urmărește clasamentul și păstrează fiecare soluție trimisă."
                 : "Solve timed problems, follow the ranking and keep every submitted solution."}
@@ -106,26 +83,16 @@ function CompetitionsContent() {
               [upcoming.length, language === "ro" ? "viitoare" : "upcoming"],
               [finished.length, language === "ro" ? "încheiate" : "finished"],
             ].map(([value, label]) => (
-              <div key={String(label)} className="rounded-xl border border-zinc-800 px-4 py-3">
-                {query.isPending ? (
-                  <Skeleton className="mx-auto mb-1 h-6 w-8 bg-zinc-700" />
-                ) : (
-                  <p className="text-xl font-semibold">{value}</p>
-                )}
-                <p className="text-[11px] text-zinc-400">{label}</p>
+              <div key={String(label)} className="rounded-xl border border-background/15 px-4 py-3">
+                <p className="text-xl font-semibold">{value}</p>
+                <p className="text-xs text-background/60">{label}</p>
               </div>
             ))}
           </div>
         </div>
       </header>
 
-      {query.isPending ? (
-        <div aria-busy="true" aria-label="Loading competitions" className="grid gap-4 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <CompetitionCardSkeleton key={index} />
-          ))}
-        </div>
-      ) : query.isError ? (
+      {query.isError ? (
         <Card><CardContent className="p-8 text-center text-sm text-red-600 dark:text-red-400">{language === "ro" ? "Nu am putut încărca competițiile." : "Could not load competitions."}</CardContent></Card>
       ) : !competitions.length ? (
         <Card>

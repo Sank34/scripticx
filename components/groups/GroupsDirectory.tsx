@@ -4,13 +4,10 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
-  Bell,
   Compass,
   MailPlus,
   Plus,
   Search,
-  Sparkles,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { RouteLoadingSkeleton } from "@/components/loading/RouteLoadingSkeleton";
 
 type GroupsDirectoryProps = {
   initialData?: StudyGroupsData;
@@ -46,6 +44,8 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
     queryKey: ["groups"],
     queryFn: () => api.groups.getGroupsData(),
     initialData,
+    staleTime: 1000 * 60 * 2,
+    placeholderData: (previousData) => previousData,
   });
 
   const userId = data?.userId || null;
@@ -56,7 +56,7 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
   const publicWithoutMine = publicGroups.filter(
     (group) => !myGroups.some((mine) => mine.id === group.id)
   );
-  const groupActivity = useGroupActivity(userId);
+  const groupActivity = useGroupActivity(userId, { eager: true });
   const unreadMentions = Array.from(
     groupActivity.mentionCountsByGroup.values()
   ).reduce((total, count) => total + count, 0);
@@ -160,12 +160,15 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
     activityLabel: t("groups.activity.newActivity"),
   };
 
+  if (isLoading && !data) {
+    return <RouteLoadingSkeleton variant="groups" />;
+  }
+
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
-      <div className="overflow-hidden rounded-[2rem] border bg-background shadow-sm">
-        <div className="relative border-b bg-[linear-gradient(135deg,#fafafa_0%,#ecfdf5_52%,#f4f4f5_100%)] p-6 sm:p-8 dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_52%,#27272a_100%)]">
-          <div className="absolute right-8 top-8 hidden size-32 rounded-full bg-emerald-200/40 blur-3xl md:block" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <div className="overflow-hidden rounded-[var(--sx-radius-panel)] border bg-card text-card-foreground">
+        <div className="border-b p-6 sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <PageHeader
               title={t("groups.title")}
               subtitle={t("groups.subtitle")}
@@ -180,7 +183,7 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
               ) : null}
               <Button
                 variant="outline"
-                className="gap-2 bg-background/80"
+                className="gap-2"
                 onClick={() => {
                   document
                     .getElementById("groups-discover")
@@ -196,44 +199,30 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
 
         <div className="grid divide-y md:grid-cols-4 md:divide-x md:divide-y-0">
           <div className="p-5">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="size-4" />
-              {t("groups.stats.mine")}
-            </div>
-            <p className="mt-3 text-3xl font-semibold">{activeGroups.length}</p>
+            <p className="text-sm text-muted-foreground">{t("groups.stats.mine")}</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums">{activeGroups.length}</p>
           </div>
           <div className="p-5">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MailPlus className="size-4" />
-              {t("groups.stats.invites")}
-            </div>
-            <p className="mt-3 text-3xl font-semibold">{invitedGroups.length}</p>
+            <p className="text-sm text-muted-foreground">{t("groups.stats.invites")}</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums">{invitedGroups.length}</p>
           </div>
           <div className="p-5">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Bell className="size-4" />
-              {t("groups.stats.pings")}
-            </div>
-            <p className="mt-3 text-3xl font-semibold">{unreadMentions}</p>
+            <p className="text-sm text-muted-foreground">{t("groups.stats.pings")}</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums">{unreadMentions}</p>
           </div>
           <div className="p-5">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Sparkles className="size-4" />
-              {t("groups.stats.activity")}
-            </div>
-            <p className="mt-3 text-3xl font-semibold">{activeWithActivity}</p>
+            <p className="text-sm text-muted-foreground">{t("groups.stats.activity")}</p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums">{activeWithActivity}</p>
           </div>
         </div>
       </div>
 
       <section className="space-y-3">
         {invitedGroups.length ? (
-          <div className="rounded-3xl border border-emerald-500/30 bg-emerald-50/60 p-4 sm:p-5 dark:bg-emerald-950/25">
+          <div className="rounded-[var(--sx-radius-panel)] border bg-card p-4 text-card-foreground sm:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
-                <MailPlus className="size-4" />
-                </div>
+              <div className="flex items-start gap-3">
+                <MailPlus className="mt-1 size-4 text-muted-foreground" />
                 <div>
                   <h2 className="text-lg font-semibold">
                     {t("groups.sections.invites")}
@@ -243,7 +232,7 @@ export function GroupsDirectory({ initialData }: GroupsDirectoryProps) {
                   </p>
                 </div>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-background px-3 py-1 text-xs font-medium text-emerald-700 shadow-sm dark:text-emerald-300">
+              <div className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 {invitedGroups.length} {t("groups.sections.pendingInvites")}
                 <ArrowRight className="size-3.5" />
               </div>

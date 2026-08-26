@@ -12,7 +12,7 @@ export type EmailCampaignStatus =
 export type EmailAudience =
   | { type: "subscribers" }
   | { type: "segment"; segment: "students" | "teachers" | "admins" }
-  | { type: "users"; userIds: string[] };
+  | { type: "users"; userIds: string[]; identifiers?: string[] };
 
 export type EmailConfig = {
   senderName: string;

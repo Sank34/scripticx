@@ -23,9 +23,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
+  getLessonCompletionRequirement,
   getLessonRule,
   getLessonKind,
-  learnLessons,
   text,
   type LearnLesson,
   type LessonLocale,
@@ -34,6 +34,9 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { useRoadmapConfig } from "@/hooks/useRoadmapConfig";
 import { useAuth } from "@/hooks/useAuth";
+import { useLearningPaths } from "@/hooks/useLearningPaths";
+import { refreshLearningPathCompletion } from "@/lib/learning-paths";
+import { getCategoryForSection } from "@/lib/roadmap-config";
 
 type StoredProgress = Record<
   string,
@@ -45,16 +48,6 @@ type StoredProgress = Record<
 >;
 
 const progressKey = "scripticx.lessonProgress.v1";
-
-const roadmapCategoryIds = {
-  miniscript: "miniscript-roadmap",
-  complexity: "complexity-analysis",
-} as const;
-
-const getSectionCategoryId = (sectionId: string) =>
-  sectionId.startsWith("complexity-")
-    ? roadmapCategoryIds.complexity
-    : roadmapCategoryIds.miniscript;
 
 type LessonRow = {
   id: string;
@@ -81,15 +74,12 @@ type ProblemCodeRow = {
 
 const copy = {
   en: {
-    title: "MiniScript+ Roadmap",
-    subtitle:
-      "A guided learning path with short lessons, visual execution and practice after every concept.",
-    section: "Category 1",
-    complexityCategory: "Category 2",
-    complexityTitle: "Complexity Analysis",
-    complexitySubtitle:
-      "A second path for understanding Big-O, loop nesting, AST-based estimates and memory usage.",
-    complexityStart: "Start complexity path",
+    foundation: "Foundation",
+    specialization: "Specialization",
+    supplemental: "Extra path",
+    choosePath: "Choose your next language",
+    comingSoon: "Content coming soon",
+    startPath: "Open path",
     unitTitle: "Algorithmic thinking",
     unitText:
       "Follow the path, unlock lessons and practice directly in the MiniScript+ editor.",
@@ -120,15 +110,12 @@ const copy = {
     ],
   },
   ro: {
-    title: "Roadmap MiniScript+",
-    subtitle:
-      "Un traseu ghidat cu lecții scurte, execuție vizuală și exerciții după fiecare concept.",
-    section: "Categoria 1",
-    complexityCategory: "Categoria 2",
-    complexityTitle: "Analiza complexității",
-    complexitySubtitle:
-      "Un al doilea traseu pentru Big-O, bucle imbricate, estimări pe AST și memorie folosită.",
-    complexityStart: "Începe traseul",
+    foundation: "Fundație",
+    specialization: "Specializare",
+    supplemental: "Traseu extra",
+    choosePath: "Alege următorul limbaj",
+    comingSoon: "Conținut în curând",
+    startPath: "Deschide traseul",
     unitTitle: "Gândire algoritmică",
     unitText:
       "Parcurge lecțiile, deblochează concepte și exersează direct în editorul MiniScript+.",
@@ -255,15 +242,26 @@ export default function LearnRoadmapPage() {
   const [progress, setProgress] = useState<StoredProgress>({});
   const [solvedProblemCodes, setSolvedProblemCodes] = useState<number[]>([]);
   const roadmapData = useRoadmapConfig();
+  const { enrollments } = useLearningPaths();
   const lessons = roadmapData.lessons;
   const sections = roadmapData.sections;
   const categories = roadmapData.categories;
 
   const { data: progressData } = useQuery({
-    queryKey: ["roadmap", "progress", user?.id || "anonymous"],
+    queryKey: [
+      "roadmap",
+      "progress",
+      user?.id || "anonymous",
+      lessons.map((lesson) => lesson.id).join(","),
+    ],
     queryFn: async () => {
       const localProgress = readProgress();
       if (!user) {
+        return { progress: localProgress, solvedProblemCodes: [] as number[] };
+      }
+
+      const configuredLessonSlugs = lessons.map((lesson) => lesson.id);
+      if (configuredLessonSlugs.length === 0) {
         return { progress: localProgress, solvedProblemCodes: [] as number[] };
       }
 
@@ -277,7 +275,7 @@ export default function LearnRoadmapPage() {
         supabase
           .from("lessons")
           .select("id, slug")
-          .in("slug", learnLessons.map((lesson) => lesson.id))
+          .in("slug", configuredLessonSlugs)
           .returns<LessonRow[]>(),
       ]);
       if (submissionResult.error) throw submissionResult.error;
@@ -383,10 +381,21 @@ export default function LearnRoadmapPage() {
     () => new Map(lessons.map((lesson) => [lesson.id, lesson])),
     [lessons]
   );
+  const categoryIdBySectionId = useMemo(
+    () =>
+      new Map(
+        sections.map((section) => [
+          section.id,
+          getCategoryForSection(categories, section.id)?.id,
+        ])
+      ),
+    [categories, sections]
+  );
   const configuredLessonIdsByCategory = useMemo(
     () =>
       sections.reduce((map, section) => {
-        const categoryId = getSectionCategoryId(section.id);
+        const categoryId = categoryIdBySectionId.get(section.id);
+        if (!categoryId) return map;
         const lessonIds = map.get(categoryId) ?? [];
 
         lessonIds.push(...section.lessonIds);
@@ -394,22 +403,24 @@ export default function LearnRoadmapPage() {
 
         return map;
       }, new Map<string, string[]>()),
-    [sections]
+    [categoryIdBySectionId, sections]
   );
   const configuredCategoryIdByLessonId = useMemo(() => {
     const map = new Map<string, string>();
 
     sections.forEach((section) => {
-      const categoryId = getSectionCategoryId(section.id);
+      const categoryId = categoryIdBySectionId.get(section.id);
+      if (!categoryId) return;
       section.lessonIds.forEach((lessonId) => map.set(lessonId, categoryId));
     });
 
     return map;
-  }, [sections]);
+  }, [categoryIdBySectionId, sections]);
   const getConfiguredLessonCategoryIds = (lesson: LearnLesson) =>
     configuredLessonIdsByCategory.get(
       configuredCategoryIdByLessonId.get(lesson.id) ??
-        roadmapCategoryIds.miniscript
+        categories[0]?.id ??
+        ""
     ) ?? lessons.map((item) => item.id);
   const getConfiguredLessonCategoryIndex = (lesson: LearnLesson) => {
     const index = getConfiguredLessonCategoryIds(lesson).indexOf(lesson.id);
@@ -439,11 +450,12 @@ export default function LearnRoadmapPage() {
   const getRequiredLessonIdsBefore = (lesson: LearnLesson) => {
     const categoryId =
       configuredCategoryIdByLessonId.get(lesson.id) ??
-      roadmapCategoryIds.miniscript;
+      categories[0]?.id ??
+      "";
     const requiredLessonIds: string[] = [];
 
     for (const section of sections) {
-      if (getSectionCategoryId(section.id) !== categoryId) continue;
+      if (categoryIdBySectionId.get(section.id) !== categoryId) continue;
 
       for (const lessonId of section.lessonIds) {
         if (lessonId === lesson.id) return requiredLessonIds;
@@ -451,8 +463,14 @@ export default function LearnRoadmapPage() {
         const previousLesson = configuredLessonById.get(lessonId);
         if (!previousLesson) continue;
 
-        const rule = getLessonRule(previousLesson);
-        if (rule.kind === "bonus" || rule.kind === "challenge") continue;
+        const completionRequirement =
+          getLessonCompletionRequirement(previousLesson);
+        if (
+          completionRequirement === "bonus" ||
+          completionRequirement === "optional"
+        ) {
+          continue;
+        }
 
         requiredLessonIds.push(lessonId);
       }
@@ -491,66 +509,126 @@ export default function LearnRoadmapPage() {
       categoryLessons[categoryLessons.length - 1]
     );
   };
-  const completedCount = lessons.filter(
+  const foundationCategory =
+    categories.find((category) => category.kind === "foundation") ??
+    categories.find((category) => category.sectionIds.length > 0) ??
+    categories[0];
+  const foundationLessonIds = new Set(
+    foundationCategory
+      ? configuredLessonIdsByCategory.get(foundationCategory.id) ?? []
+      : []
+  );
+  const foundationLessons = lessons.filter((lesson) =>
+    foundationLessonIds.has(lesson.id)
+  );
+  const progressLessons = foundationLessons.length ? foundationLessons : lessons;
+  const requiredFoundationLessons = foundationLessons.filter((lesson) => {
+    const requirement = getLessonCompletionRequirement(lesson);
+    return requirement === "required" || requirement === "capstone";
+  });
+  const completedCount = progressLessons.filter(
     (lesson) => progress[lesson.id]?.completed
   ).length;
-  const clearedCount = lessons.filter((lesson) => isLessonCleared(lesson)).length;
+  const clearedCount = progressLessons.filter((lesson) =>
+    isLessonCleared(lesson)
+  ).length;
   const currentLesson =
-    getCurrentLessonForCategory(roadmapCategoryIds.miniscript) ??
-    getCurrentLessonForCategory(roadmapCategoryIds.complexity) ??
+    (foundationCategory
+      ? getCurrentLessonForCategory(foundationCategory.id)
+      : undefined) ??
+    categories
+      .map((category) => getCurrentLessonForCategory(category.id))
+      .find(Boolean) ??
     lessons[lessons.length - 1];
-  const percent = lessons.length
-    ? Math.round((clearedCount / lessons.length) * 100)
+  const percent = progressLessons.length
+    ? Math.round((clearedCount / progressLessons.length) * 100)
     : 0;
-  const xp = useMemo(
-    () => completedCount * 80 + lessons.length * 5,
-    [completedCount, lessons.length]
-  );
+  const xp = completedCount * 80 + progressLessons.length * 5;
   const lessonStreak = useMemo(() => calculateLessonStreak(progress), [progress]);
-  const contentGroups = categories.map((category, index) => ({
-    id: category.id,
-    label:
-      category.id === roadmapCategoryIds.complexity
-        ? c.complexityCategory
-        : `${c.section} ${index + 1}`,
-    title: text(category.title, lessonLocale),
-    description: text(category.description, lessonLocale),
-    sections: category.sectionIds
-      .map((sectionId) => sections.find((section) => section.id === sectionId))
-      .filter((section): section is (typeof sections)[number] => Boolean(section)),
-  }));
+  const enrollmentByPathId = new Map(
+    enrollments.map((enrollment) => [enrollment.pathId, enrollment])
+  );
+  const foundationCompleted = Boolean(
+    (foundationCategory?.databaseId &&
+      enrollmentByPathId.get(foundationCategory.databaseId)?.completedAt) ||
+      (requiredFoundationLessons.length > 0 &&
+        requiredFoundationLessons.every((lesson) => isLessonCleared(lesson)))
+  );
+  const contentGroups = categories
+    .filter(
+      (category) =>
+        category.availability !== "draft" && category.availability !== "archived"
+        &&
+        (category.kind !== "specialization" ||
+          Boolean(
+            category.databaseId &&
+              enrollmentByPathId.get(category.databaseId)?.isPrimary
+          ))
+    )
+    .map((category) => ({
+      category,
+      id: category.id,
+      label:
+        category.kind === "foundation"
+          ? c.foundation
+          : category.kind === "specialization"
+            ? c.specialization
+            : c.supplemental,
+      title: text(category.title, lessonLocale),
+      description: text(category.description, lessonLocale),
+      sections: category.sectionIds
+        .map((sectionId) => sections.find((section) => section.id === sectionId))
+        .filter((section): section is (typeof sections)[number] => Boolean(section)),
+    }));
+
+  useEffect(() => {
+    if (!user || !progressData || !foundationCategory?.databaseId) return;
+
+    void refreshLearningPathCompletion({
+      pathId: foundationCategory.databaseId,
+    }).catch((error) =>
+      console.error("Could not refresh foundation completion:", error)
+    );
+  }, [foundationCategory?.databaseId, progressData, user]);
 
   return (
-    <div className="scroll-smooth bg-background px-4 py-6 md:px-8">
-      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_320px]">
+    <div className="scroll-smooth">
+      <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-6">
           <div
-            id="miniscript-roadmap"
+            id={foundationCategory?.id ?? "learning-foundation"}
             data-tour="roadmap-workspace"
-            className="scroll-mt-24 rounded-[28px] border border-zinc-200 bg-gradient-to-br from-emerald-500 to-lime-500 p-6 text-white shadow-sm dark:border-emerald-800"
+            className="sx-surface sx-elevated scroll-mt-24 p-6 md:p-8"
           >
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase text-white/80">
-                  {c.section}
+                <p className="sx-section-label">
+                  {c.foundation}
                 </p>
                 <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-5xl">
-                  {c.title}
+                  {foundationCategory
+                    ? text(foundationCategory.title, lessonLocale)
+                    : c.unitTitle}
                 </h1>
-                <p className="mt-3 max-w-2xl text-sm text-white/85 md:text-base">
-                  {c.subtitle}
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+                  {foundationCategory
+                    ? text(foundationCategory.description, lessonLocale)
+                    : c.unitText}
                 </p>
               </div>
 
-              <Button
-                asChild
-                className="rounded-full !bg-white !text-black transition-transform hover:scale-[1.03] hover:!bg-white hover:!text-black focus-visible:!text-black active:scale-[0.98]"
-              >
-                <Link href={`/learn/lesson/${currentLesson.id}`}>
-                  {completedCount === 0 ? c.start : c.continue}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+              {currentLesson && (
+                <Button
+                  asChild
+                  size="lg"
+                  className="w-fit"
+                >
+                  <Link href={`/learn/lesson/${currentLesson.id}`}>
+                    {completedCount === 0 ? c.start : c.continue}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -560,17 +638,17 @@ export default function LearnRoadmapPage() {
                 {groupIndex > 0 && (
                   <div
                     id={group.id}
-                    className="scroll-mt-24 rounded-[28px] border border-zinc-800 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950 p-6 text-white shadow-sm md:p-8"
+                    className="sx-surface sx-elevated scroll-mt-24 p-6 md:p-8"
                   >
                     <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                       <div>
-                        <p className="text-xs font-semibold uppercase text-emerald-300">
+                        <p className="sx-section-label">
                           {group.label}
                         </p>
                         <h2 className="mt-2 text-3xl font-bold tracking-tight md:text-5xl">
                           {group.title}
                         </h2>
-                        <p className="mt-3 max-w-2xl text-sm text-zinc-300 md:text-base">
+                        <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
                           {group.description}
                         </p>
                       </div>
@@ -578,17 +656,18 @@ export default function LearnRoadmapPage() {
                       {group.sections.some((section) => section.lessonIds.length > 0) && (
                         <Button
                           asChild
-                          className="w-fit rounded-full !bg-white !text-black transition-transform hover:scale-[1.03] hover:!bg-white hover:!text-black focus-visible:!text-black active:scale-[0.98]"
+                          size="lg"
+                          className="w-fit"
                         >
                           <Link
                             href={`/learn/lesson/${
                               group.sections
                                 .flatMap((section) => section.lessonIds)
                                 .find((lessonId) => configuredLessonById.has(lessonId)) ??
-                              currentLesson.id
+                              currentLesson?.id ?? ""
                             }`}
                           >
-                            {c.complexityStart}
+                            {c.startPath}
                             <ArrowRight className="ml-2 h-4 w-4" />
                           </Link>
                         </Button>
@@ -598,9 +677,21 @@ export default function LearnRoadmapPage() {
                 )}
 
                 {group.sections.length === 0 && (
-                  <Card className="scroll-mt-24 rounded-[24px] border-dashed border-border">
-                    <CardContent className="p-5">
-                      <p className="text-sm text-muted-foreground">{group.description}</p>
+                  <Card className="scroll-mt-24 gap-0 rounded-[var(--sx-radius-panel)] border-dashed border-border py-0">
+                    <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-medium">{group.title}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {group.category.availability === "coming_soon"
+                            ? c.comingSoon
+                            : group.description}
+                        </p>
+                      </div>
+                      {group.category.kind === "specialization" && (
+                        <Button asChild variant="outline" className="rounded-full">
+                          <Link href="/learn/paths">{c.choosePath}</Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -614,12 +705,12 @@ export default function LearnRoadmapPage() {
                   <Card
                     id={section.id}
                     key={section.id}
-                    className="scroll-mt-24 overflow-hidden rounded-[24px] border-border"
+                    className="scroll-mt-24 gap-0 overflow-hidden rounded-[var(--sx-radius-panel)] border-border py-0"
                   >
                     <CardContent className="p-0">
-                      <div className="flex items-center justify-between border-b border-border bg-muted/50 px-5 py-4">
+                      <div className="flex items-center justify-between border-b border-border bg-muted/35 px-5 py-4">
                         <div>
-                          <p className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">
+                          <p className="text-sm font-medium text-primary">
                             {text(section.label, lessonLocale)}
                           </p>
                           <h2 className="mt-1 text-lg font-semibold">
@@ -675,7 +766,7 @@ export default function LearnRoadmapPage() {
                               >
                                 <div
                                   className={cn(
-                                    "rounded-[22px] border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+                                    "rounded-[var(--sx-radius-card)] border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
                                     cleared && "border-emerald-200 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-950/30",
                                     isCurrent &&
                                       !cleared &&
@@ -750,7 +841,7 @@ export default function LearnRoadmapPage() {
                                           {text(lesson.title, lessonLocale)}
                                         </h2>
                                         {isCurrent && !cleared && !locked && (
-                                          <Badge className="rounded-full bg-black text-white hover:bg-black">
+                                          <Badge className="rounded-full bg-foreground text-background hover:bg-foreground">
                                             {c.nextRecommended}
                                           </Badge>
                                         )}
@@ -867,51 +958,77 @@ export default function LearnRoadmapPage() {
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <div className="-m-1 space-y-4 p-1 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <Card className="rounded-[24px] border-border bg-zinc-950 text-white">
-              <CardContent className="space-y-5 p-5">
+            <Card className="sx-surface gap-0 rounded-[var(--sx-radius-panel)] py-0 ring-0">
+              <CardContent className="space-y-5 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-white/60">{c.progress}</p>
+                    <p className="text-sm text-muted-foreground">{c.progress}</p>
                     <p className="text-4xl font-bold">{percent}%</p>
                   </div>
-                  <Trophy className="h-10 w-10 text-lime-300" />
+                  <Trophy className="h-9 w-9 text-[var(--sx-success)]" />
                 </div>
-                <Progress value={percent} className="h-2" />
-                <div className="grid grid-cols-3 gap-2 text-center text-xs text-white/70">
-                  <div className="rounded-2xl bg-white/10 p-3">
-                    <Flame className="mx-auto mb-1 h-4 w-4 text-orange-300" />
-                    <strong className="block text-base text-white">{lessonStreak}</strong>
+                <Progress
+                  value={percent}
+                  className="h-2 [&_[data-slot=progress-indicator]]:bg-[var(--sx-success)]"
+                />
+                <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
+                  <div className="rounded-[var(--sx-radius-card)] bg-muted/60 p-3">
+                    <Flame className="mx-auto mb-1 h-4 w-4 text-[var(--sx-warning)]" />
+                    <strong className="block text-base text-foreground">{lessonStreak}</strong>
                     {c.stats[0]}
                   </div>
-                  <div className="rounded-2xl bg-white/10 p-3">
-                    <Gem className="mx-auto mb-1 h-4 w-4 text-sky-300" />
-                    <strong className="block text-base text-white">{xp}</strong>
+                  <div className="rounded-[var(--sx-radius-card)] bg-muted/60 p-3">
+                    <Gem className="mx-auto mb-1 h-4 w-4 text-[var(--sx-info)]" />
+                    <strong className="block text-base text-foreground">{xp}</strong>
                     {c.stats[1]}
                   </div>
-                  <div className="rounded-2xl bg-white/10 p-3">
-                    <Sparkles className="mx-auto mb-1 h-4 w-4 text-lime-300" />
-                    <strong className="block text-base text-white">{lessons.length}</strong>
+                  <div className="rounded-[var(--sx-radius-card)] bg-muted/60 p-3">
+                    <Sparkles className="mx-auto mb-1 h-4 w-4 text-[var(--sx-success)]" />
+                    <strong className="block text-base text-foreground">{progressLessons.length}</strong>
                     {c.stats[2]}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="rounded-[24px] border-border">
-              <CardContent className="p-5">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    <BookOpen className="h-4 w-4" />
+            {foundationCompleted && (
+              <Card className="gap-0 overflow-hidden rounded-[var(--sx-radius-panel)] border-emerald-200 bg-emerald-50/70 py-0 dark:border-emerald-900 dark:bg-emerald-950/25">
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white">
+                      <Check className="size-4" />
+                    </div>
+                    <div>
+                      <h2 className="font-semibold">{c.choosePath}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {foundationCategory
+                          ? text(foundationCategory.title, lessonLocale)
+                          : "MiniScript+"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="font-semibold">{c.contents}</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {c.contentsText}
-                    </p>
-                  </div>
+                  <Button asChild className="mt-4 w-full rounded-full">
+                    <Link href="/learn/paths">
+                      {c.choosePath}
+                      <ArrowRight className="ml-2 size-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="sx-surface gap-0 rounded-[var(--sx-radius-panel)] py-0 ring-0">
+              <CardContent className="p-6">
+                <div>
+                  <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
+                    {c.contents}
+                  </h2>
+                  <p className="mt-2 text-base leading-6 text-muted-foreground">
+                    {c.contentsText}
+                  </p>
                 </div>
 
-                <nav className="mt-4 space-y-3">
+                <nav className="mt-6 space-y-3">
                   {contentGroups.map((group) => {
                     const groupLessons = group.sections.flatMap((section) =>
                       section.lessonIds
@@ -927,14 +1044,14 @@ export default function LearnRoadmapPage() {
                     return (
                       <div
                         key={group.id}
-                        className="rounded-3xl border border-border bg-muted/40 p-2"
+                        className="rounded-[var(--sx-radius-panel)] border border-border bg-muted/40 p-2"
                       >
                         <a
                           href={`#${group.id}`}
                           className="group flex items-center justify-between rounded-2xl px-3 py-3 text-sm transition hover:bg-accent"
                         >
                           <span className="min-w-0">
-                            <span className="block text-[10px] font-semibold uppercase text-emerald-700 dark:text-emerald-400">
+                            <span className="block text-xs font-medium text-primary">
                               {group.label}
                             </span>
                             <span className="mt-0.5 block truncate font-semibold">

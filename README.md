@@ -183,7 +183,12 @@ Inima proiectului — un **interpretor** scris în TypeScript, care execută cod
 - **Evaluator** — execută AST-ul cu suport pentru variabile, condiții (`IF/ELSE`), bucle (`WHILE`), intrare/ieșire (`INPUT/PRINT`), operatori aritmetici (inclusiv `%`) și tipuri de date (numere, șiruri, boolean)
 - **Mesaje de eroare** prietenoase, localizate
 
-Codul utilizatorului rulează **exclusiv în browser** — nu ajunge niciodată pe vreun server, ceea ce garantează atât viteză, cât și confidențialitate.
+Codul MiniScript+ rulează **exclusiv în browser** — nu ajunge niciodată pe vreun server, ceea ce garantează atât viteză, cât și confidențialitate.
+
+Această regulă se aplică runtime-ului MiniScript+. Proiectele Python, C/C++, JavaScript,
+TypeScript, Java, C#, Go, Rust și Bash sunt executate separat, într-un serviciu izolat;
+aplicația Next.js nu pornește procese din codul utilizatorului. Configurarea și limitele
+sunt documentate în [`docs/code-execution.md`](docs/code-execution.md).
 
 #### Sistemul de traduceri (`lib/i18n.ts`)
 

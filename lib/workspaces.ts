@@ -11,7 +11,7 @@ export const workspaceKinds = ["personal", "student", "teacher"] as const;
 
 export type WorkspaceKind = (typeof workspaceKinds)[number];
 
-export const WORKSPACE_SETUP_VERSION = 1;
+export const WORKSPACE_SETUP_VERSION = 2;
 
 /**
  * These auth metadata keys are a non-authoritative UI cache. Database settings
@@ -108,10 +108,48 @@ export function getDefaultWorkspaceId(
 export function getProvisionedWorkspaceKinds(
   persona: WorkspacePersona
 ): readonly WorkspaceKind[] {
-  const defaultKind = getDefaultWorkspaceKind(persona);
-  return defaultKind === "personal"
-    ? ["personal"]
-    : ["personal", defaultKind];
+  if (persona === "student") return ["personal", "student"];
+  if (persona === "teacher") return ["teacher"];
+  return ["personal"];
+}
+
+export function canAccessWorkspace(
+  persona: WorkspacePersona,
+  kind: WorkspaceKind
+) {
+  return getProvisionedWorkspaceKinds(persona).includes(kind);
+}
+
+/**
+ * Platform administrators can inspect every workspace surface regardless of
+ * their onboarding persona. This is intentionally a UI-routing rule only;
+ * database authorization continues to be enforced by RLS and contextual
+ * membership checks.
+ */
+export function getAvailableWorkspaceKinds(
+  persona: WorkspacePersona,
+  isAdmin = false
+): readonly WorkspaceKind[] {
+  return isAdmin ? workspaceKinds : getProvisionedWorkspaceKinds(persona);
+}
+
+export function canAccessWorkspaceForAccount(
+  persona: WorkspacePersona,
+  kind: WorkspaceKind,
+  isAdmin = false
+) {
+  return isAdmin || canAccessWorkspace(persona, kind);
+}
+
+/**
+ * Class surfaces belong to the school workspaces. Personal-only accounts do
+ * not receive class navigation or direct route access.
+ */
+export function canAccessClassesForAccount(
+  persona: WorkspacePersona,
+  isAdmin = false
+) {
+  return isAdmin || persona === "student" || persona === "teacher";
 }
 
 export function getWorkspaceKindFromMetadata(

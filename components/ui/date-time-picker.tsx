@@ -39,6 +39,7 @@ export function DateTimePicker({
   locale = "en",
   onChange,
   placeholder,
+  showTime = true,
   timeLabel,
   value,
 }: {
@@ -47,6 +48,7 @@ export function DateTimePicker({
   locale?: "en" | "ro";
   onChange: (value: string) => void;
   placeholder: string;
+  showTime?: boolean;
   timeLabel?: string;
   value: string;
 }) {
@@ -72,7 +74,15 @@ export function DateTimePicker({
   }
 
   return (
-    <div className={cn("grid min-w-0 grid-cols-[minmax(0,1fr)_104px_auto] gap-2", className)}>
+    <div
+      className={cn(
+        "grid min-w-0 gap-2",
+        showTime
+          ? "grid-cols-[minmax(0,1fr)_104px_auto]"
+          : "grid-cols-[minmax(0,1fr)_auto]",
+        className
+      )}
+    >
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -101,13 +111,15 @@ export function DateTimePicker({
         </PopoverContent>
       </Popover>
 
-      <Input
-        type="time"
-        value={timeValue}
-        aria-label={timeLabel || (locale === "ro" ? "Ora" : "Time")}
-        onChange={(event) => selectTime(event.target.value)}
-        className="px-2"
-      />
+      {showTime && (
+        <Input
+          type="time"
+          value={timeValue}
+          aria-label={timeLabel || (locale === "ro" ? "Ora" : "Time")}
+          onChange={(event) => selectTime(event.target.value)}
+          className="px-2"
+        />
+      )}
 
       {allowClear ? (
         <Button

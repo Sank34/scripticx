@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, Monitor, Smartphone } from "lucide-react";
+import { CircleAlert, LoaderCircle, Monitor, Smartphone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ export function EmailPreview({
   contentMode,
   device,
   emptyLabel,
+  errorMessage,
   html,
   isLoading,
   labels,
@@ -23,6 +24,7 @@ export function EmailPreview({
   contentMode: EmailContentMode;
   device: EmailPreviewMode;
   emptyLabel: string;
+  errorMessage?: string | null;
   html: string | null;
   isLoading?: boolean;
   labels: { desktop: string; mobile: string; preview: string };
@@ -34,10 +36,20 @@ export function EmailPreview({
   return (
     <div className={cn("flex min-h-0 flex-col overflow-hidden bg-muted/25", className)}>
       <div className="flex h-12 shrink-0 items-center justify-between border-b bg-background px-3">
-        <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          {labels.preview}
-          {isLoading && <LoaderCircle className="size-3 animate-spin" />}
-        </span>
+        <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+          <span>{labels.preview}</span>
+          {isLoading && <LoaderCircle className="size-3 shrink-0 animate-spin" />}
+          {errorMessage && (
+            <span
+              className="flex min-w-0 items-center gap-1 text-destructive"
+              title={errorMessage}
+              role="status"
+            >
+              <CircleAlert className="size-3 shrink-0" />
+              <span className="hidden max-w-72 truncate lg:inline">{errorMessage}</span>
+            </span>
+          )}
+        </div>
         <div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
           <Button
             type="button"

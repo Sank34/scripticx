@@ -7,19 +7,29 @@ import {
   BookOpen,
   Code,
   Command as CommandIcon,
+  Eye,
+  FilePlus2,
+  FolderGit2,
+  FolderOpen,
+  GitBranch,
   LayoutDashboard,
   List,
+  LockKeyhole,
+  Mail,
   MessageSquare,
   Medal,
   Route,
+  RadioTower,
   Search,
   Settings,
+  SlidersHorizontal,
   Shield,
   ShoppingBag,
   Sparkles,
   SquareTerminal,
   Trophy,
   User,
+  UserRoundCog,
   Users,
   UsersRound,
   type LucideIcon,
@@ -41,6 +51,10 @@ import {
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { startShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { api, type LiveCodeData } from "@/lib/api";
+import {
+  canAccessClassesForAccount,
+  getWorkspacePersonaFromMetadata,
+} from "@/lib/workspaces";
 
 type PlatformCommandMenuProps = {
   isAdmin: boolean;
@@ -181,7 +195,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         keywords: ["miniscript", "snippet", "code"],
       },
       {
-        href: "/livecode",
+        href: "/editor?view=live",
         icon: SquareTerminal,
         label: t("nav.livecode"),
         shortcut: "⌘ V",
@@ -207,12 +221,6 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         keywords: ["users", "find"],
       },
       {
-        href: "/classes",
-        icon: Users,
-        label: t("nav.classes"),
-        keywords: ["school", "assignments"],
-      },
-      {
         href: "/profile",
         icon: User,
         label: t("user.profile"),
@@ -227,6 +235,18 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         shortcutKey: "s",
       }
     );
+
+    const persona = getWorkspacePersonaFromMetadata(
+      user.user_metadata as Record<string, unknown>
+    ) || "learner";
+    if (canAccessClassesForAccount(persona, isAdmin)) {
+      commands.push({
+        href: "/classes",
+        icon: Users,
+        label: t("nav.classes"),
+        keywords: ["school", "assignments"],
+      });
+    }
 
     if (isAdmin) {
       commands.push({
@@ -246,7 +266,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     const rooms = liveCodeData?.rooms || [];
 
     return rooms.slice(0, 8).map((room) => ({
-      href: `/live/${room.id}`,
+      href: `/editor?live=${encodeURIComponent(room.id)}&view=live`,
       icon: SquareTerminal,
       label: room.name || t("command.untitledSession"),
       breadcrumb: [t("nav.livecode")],
@@ -258,7 +278,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     if (!liveCodeData?.participantsByRoom) return [];
 
     return liveSessionCommands.flatMap((session) => {
-      const roomId = session.href.split("/").pop();
+      const roomId = new URL(session.href, "https://scripticx.local").searchParams.get("live");
       if (!roomId) return [];
 
       const roomParticipants = liveCodeData.participantsByRoom[roomId] || [];
@@ -272,6 +292,102 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
       }));
     });
   }, [liveCodeData, liveSessionCommands, t]);
+
+  const quickActionCommands = useMemo<CommandEntry[]>(() => {
+    if (!user) return [];
+    return [
+      {
+        href: "/editor?action=new-project",
+        icon: FilePlus2,
+        label: t("command.actions.newProject"),
+        keywords: ["create", "project", "miniscript", "python", "cpp"],
+      },
+      {
+        href: "/editor?action=clone-github",
+        icon: FolderGit2,
+        label: t("command.actions.cloneGitHub"),
+        keywords: ["github", "repository", "repo", "import", "clone"],
+      },
+      {
+        href: "/editor?view=projects",
+        icon: FolderOpen,
+        label: t("command.actions.openAccountProjects"),
+        keywords: ["saved", "projects", "account", "library"],
+      },
+      {
+        href: "/editor?action=start-live-share&view=live",
+        icon: RadioTower,
+        label: t("command.actions.startLiveShare"),
+        keywords: ["live", "share", "collaboration", "session"],
+      },
+    ];
+  }, [t, user]);
+
+  const editorActionCommands = useMemo<CommandEntry[]>(() => {
+    if (!user) return [];
+    return [
+      {
+        href: "/editor?action=new-file",
+        icon: FilePlus2,
+        label: t("command.actions.newFile"),
+        keywords: ["file", "source", "create"],
+      },
+      {
+        href: "/editor?view=source-control",
+        icon: GitBranch,
+        label: t("command.actions.sourceControl"),
+        keywords: ["github", "git", "commit", "push", "pull", "branch"],
+      },
+      {
+        href: "/editor?view=settings",
+        icon: SlidersHorizontal,
+        label: t("command.actions.editorSettings"),
+        keywords: ["autocomplete", "font", "minimap", "editor", "settings"],
+      },
+      {
+        href: "/editor?action=open-terminal",
+        icon: SquareTerminal,
+        label: t("command.actions.openTerminal"),
+        keywords: ["terminal", "run", "python", "cpp", "javascript", "console"],
+      },
+    ];
+  }, [t, user]);
+
+  const settingsCommands = useMemo<CommandEntry[]>(() => {
+    if (!user) return [];
+    return [
+      {
+        href: "/settings#profile-settings",
+        icon: UserRoundCog,
+        label: t("command.actions.editProfile"),
+        keywords: ["username", "bio", "avatar", "banner", "social"],
+      },
+      {
+        href: "/settings#profile-pronouns",
+        icon: User,
+        label: t("command.actions.editPronouns"),
+        keywords: ["pronouns", "identity", "profile"],
+      },
+      {
+        href: "/settings#public-profile-settings",
+        icon: Eye,
+        label: t("command.actions.profileVisibility"),
+        keywords: ["public", "widgets", "visibility", "privacy"],
+      },
+      {
+        href: "/settings#email-preferences",
+        icon: Mail,
+        label: t("command.actions.emailPreferences"),
+        keywords: ["email", "newsletter", "notifications", "marketing"],
+      },
+      {
+        href: "/settings#account-security",
+        icon: LockKeyhole,
+        label: t("command.actions.accountSecurity"),
+        keywords: ["password", "security", "account"],
+      },
+    ];
+  }, [t, user]);
 
   const runCommand = useCallback((href: string) => {
     setOpen(false);
@@ -312,6 +428,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     <>
       <button
         type="button"
+        data-tour="command-menu"
         onClick={() => setOpen(true)}
         className="hidden h-9 w-full max-w-md items-center justify-between gap-3 rounded-xl border bg-muted/60 px-3 text-sm text-muted-foreground shadow-inner transition hover:border-foreground/20 hover:bg-accent sm:flex"
       >
@@ -356,6 +473,51 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
                 />
               ))}
             </CommandGroup>
+
+            {user && quickActionCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.quickActions")}>
+                  {quickActionCommands.map((command) => (
+                    <CommandMenuItem
+                      key={command.href}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
+            {user && editorActionCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.editor")}>
+                  {editorActionCommands.map((command) => (
+                    <CommandMenuItem
+                      key={command.href}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
+            {user && settingsCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.settings")}>
+                  {settingsCommands.map((command) => (
+                    <CommandMenuItem
+                      key={command.href}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
 
             {user && liveSessionCommands.length > 0 && (
               <>

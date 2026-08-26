@@ -30,7 +30,6 @@ import {
   Send,
   SmilePlus,
   Settings,
-  Sparkles,
   Trash2,
   UserPlus,
   Users,
@@ -50,6 +49,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { EmptyState } from "@/components/common/EmptyState";
+import { InvitePeoplePicker } from "@/components/collaboration/InvitePeoplePicker";
 import {
   markStudyGroupChannelSeen,
   markStudyGroupSeen,
@@ -288,13 +288,13 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
   const initial = username.slice(0, 1).toUpperCase();
 
   return (
-    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-64 -translate-x-1/2 overflow-hidden rounded-2xl border bg-popover text-left text-popover-foreground shadow-xl group-hover/mention:block">
+    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-64 -translate-x-1/2 overflow-hidden rounded-xl border bg-popover text-left text-popover-foreground shadow-lg group-hover/mention:block">
       <span
-        className="block h-14 bg-gradient-to-br from-zinc-900 via-zinc-700 to-emerald-400 bg-cover bg-center"
+        className="block h-14 bg-muted bg-cover bg-center"
         style={
           profile.banner_url
             ? {
-                backgroundImage: `linear-gradient(120deg, rgba(9,9,11,0.34), rgba(16,185,129,0.08)), url("${profile.banner_url}")`,
+                backgroundImage: `url("${profile.banner_url}")`,
               }
             : undefined
         }
@@ -328,7 +328,7 @@ function renderMessageContent(
   profilesByUsername: Map<string, ProfileSummary>,
   stickersByToken: Map<string, StudyGroupSticker>
 ) {
-  const pattern = /(\/live\/[a-f0-9-]+|@[a-zA-Z0-9_-]+|:sticker-[a-f0-9-]+:)/gi;
+  const pattern = /(\/editor\/live\/[a-f0-9-]+|\/live\/[a-f0-9-]+|@[a-zA-Z0-9_-]+|:sticker-[a-f0-9-]+:)/gi;
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
 
@@ -340,11 +340,13 @@ function renderMessageContent(
       nodes.push(content.slice(lastIndex, index));
     }
 
-    if (token.startsWith("/live/")) {
+    if (token.startsWith("/live/") || token.startsWith("/editor/live/")) {
+      const roomId = token.split("/").filter(Boolean).at(-1) || "";
+      const href = `/editor?live=${encodeURIComponent(roomId)}&view=live`;
       nodes.push(
         <Link
           key={`${token}-${index}`}
-          href={token}
+          href={href}
           className="font-medium text-emerald-600 underline-offset-4 hover:underline"
         >
           {token}
@@ -472,13 +474,13 @@ function StudyGroupMemberPreview({
         side="left"
         align="start"
         sideOffset={12}
-        className="w-80 overflow-hidden rounded-3xl border-border bg-popover p-0 text-popover-foreground shadow-2xl"
+        className="w-80 overflow-hidden rounded-xl border-border bg-popover p-0 text-popover-foreground shadow-lg"
       >
         <div
           className={
             profile?.banner_url
               ? "h-24 bg-cover bg-center"
-              : "h-24 bg-gradient-to-br from-zinc-800 via-zinc-700 to-emerald-500"
+              : "h-24 bg-muted"
           }
           style={
             profile?.banner_url
@@ -509,16 +511,16 @@ function StudyGroupMemberPreview({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border bg-muted/60 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="rounded-xl border bg-muted/40 px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground">
                 {t("groups.memberPreview.role")}
               </p>
               <p className="mt-1 truncate text-sm font-semibold text-foreground">
                 {roleLabel}
               </p>
             </div>
-            <div className="rounded-2xl border bg-muted/60 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="rounded-xl border bg-muted/40 px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground">
                 {t("groups.memberPreview.score")}
               </p>
               <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-foreground">
@@ -646,7 +648,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     settingsAvatarPreviewUrl || group?.avatar_url || null;
   const settingsBannerPreview =
     settingsBannerPreviewUrl || group?.banner_url || null;
-  const groupActivity = useGroupActivity(userId);
+  const groupActivity = useGroupActivity(userId, { eager: true });
   const currentMember = useMemo(
     () => members.find((member) => member.user_id === userId) || null,
     [members, userId]
@@ -1665,7 +1667,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       await queryClient.invalidateQueries({
         queryKey: ["groups", slug, "messages", activeChannel.id],
       });
-      window.open(`/live/${room.id}`, "_self");
+      window.open(`/editor?live=${encodeURIComponent(room.id)}&view=live`, "_self");
     } catch (error) {
       console.error("Could not start live session:", error);
       toast.error(t("groups.toasts.liveFailed"));
@@ -1752,7 +1754,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           </p>
         </div>
 
-        <div className="flex items-center justify-between px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="flex items-center justify-between px-4 py-3 text-xs font-medium text-muted-foreground">
           <span>{t("groups.workspace.channels")}</span>
           {canManageChannels && (
             <button
@@ -1978,7 +1980,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                         className="py-1 text-xs"
                       >
                         <MarkerIcon>
-                          <Sparkles className="size-3.5" />
+                          <MessageSquare className="size-3.5" />
                         </MarkerIcon>
                         <MarkerContent>
                           <span>
@@ -2156,7 +2158,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                       </PopoverTrigger>
                                       <PopoverContent
                                         align={isMine ? "end" : "start"}
-                                        className="w-72 gap-3 rounded-2xl border-border bg-popover p-3 text-popover-foreground shadow-xl"
+                                        className="w-72 gap-3 rounded-xl border-border bg-popover p-3 text-popover-foreground shadow-lg"
                                       >
                                         <div className="flex items-center justify-between gap-3">
                                           <div className="text-sm font-semibold text-foreground">
@@ -2257,7 +2259,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                 align={isMine ? "end" : "start"}
                                 side="top"
                                 sideOffset={10}
-                                className="w-72 gap-2 rounded-2xl border-border bg-popover p-2 text-popover-foreground shadow-xl"
+                                className="w-72 gap-2 rounded-xl border-border bg-popover p-2 text-popover-foreground shadow-lg"
                               >
                                 {emojiPickerMessageId === item.id ? (
                                   <>
@@ -2440,7 +2442,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         <div className="border-t p-3">
           <div className="relative flex items-end gap-2">
             {mentionOpen ? (
-              <div className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-xl">
+              <div className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
                 <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
                   {t("groups.workspace.mentions")}
                 </div>
@@ -2592,7 +2594,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             key={sticker.id}
                             type="button"
                             onClick={() => insertComposerSticker(sticker)}
-                            className="group flex min-h-24 flex-col items-center justify-center rounded-2xl border bg-card p-2 text-center text-card-foreground shadow-sm ring-1 ring-foreground/5 transition hover:-translate-y-0.5 hover:border-emerald-500/40 hover:shadow-md disabled:translate-y-0 disabled:opacity-50"
+                            className="group flex min-h-24 flex-col items-center justify-center rounded-xl border bg-card p-2 text-center text-card-foreground transition-colors hover:bg-muted/30 disabled:opacity-50"
                           >
                             <img
                               src={sticker.image_url}
@@ -2721,65 +2723,21 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               </div>
             ) : null}
           </div>
-          <Input
-            value={inviteQuery}
-            onChange={(event) => setInviteQuery(event.target.value)}
+          <InvitePeoplePicker
+            query={inviteQuery}
+            onQueryChange={setInviteQuery}
+            candidates={inviteCandidates}
+            loading={inviteCandidatesQuery.isLoading}
+            invitingId={invitingId}
+            onInvite={inviteMember}
             placeholder={t("groups.dialog.inviteSearch")}
+            inviteLabel={t("groups.actions.invite")}
+            invitingLabel={t("groups.actions.inviting")}
+            followingLabel={t("groups.dialog.following")}
+            userLabel={t("groups.dialog.scripticxUser")}
+            emptyTitle={t("groups.empty.inviteTitle")}
+            emptyDescription={t("groups.empty.inviteDescription")}
           />
-          <ScrollArea className="h-72 rounded-xl border">
-            <div className="space-y-1 p-2">
-              {inviteCandidatesQuery.isLoading ? (
-                <>
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </>
-              ) : inviteCandidates.length ? (
-                inviteCandidates.map((candidate) => (
-                  <div
-                    key={candidate.id}
-                    className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 hover:bg-accent/70"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <UserAvatar
-                        avatarUrl={candidate.avatar_url}
-                        username={candidate.username}
-                        equippedRewards={candidate.equipped_rewards}
-                        className="size-8"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {candidate.username}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {candidate.isFollowing
-                            ? t("groups.dialog.following")
-                            : t("groups.dialog.scripticxUser")}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => inviteMember(candidate)}
-                      disabled={invitingId === candidate.id}
-                    >
-                      {invitingId === candidate.id
-                        ? t("groups.actions.inviting")
-                        : t("groups.actions.invite")}
-                    </Button>
-                  </div>
-                ))
-              ) : (
-                <EmptyState
-                  className="py-10"
-                  icon={<Users className="size-7" />}
-                  title={t("groups.empty.inviteTitle")}
-                  description={t("groups.empty.inviteDescription")}
-                />
-              )}
-            </div>
-          </ScrollArea>
         </DialogContent>
       </Dialog>
 
@@ -2815,7 +2773,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               }
               render={() => (
                 <>
-          <div className="border-b bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),linear-gradient(180deg,#ffffff,#fafafa)] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.18),transparent_32%),linear-gradient(180deg,#27272a,#18181b)] sm:px-7">
+          <div className="border-b bg-muted/30 px-5 py-5 sm:px-7">
             <DialogHeader>
               <DialogTitle className="text-2xl">
                 {t("groups.dialog.settingsTitle")}
@@ -2826,7 +2784,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             </DialogHeader>
             <div className="mt-5 overflow-hidden rounded-2xl border bg-card/90 text-card-foreground shadow-sm">
               <div
-                className="h-24 border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_48%,#1e1b4b_100%)] sm:h-32"
+                className="h-24 border-b bg-muted bg-cover bg-center sm:h-32"
                 style={
                   settingsBannerPreview
                     ? { backgroundImage: `url("${settingsBannerPreview}")` }
@@ -2845,7 +2803,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-600">
+                    <p className="text-xs font-medium text-muted-foreground">
                       {t("groups.dialog.serverPreview")}
                     </p>
                     <h3 className="mt-1 truncate text-xl font-bold text-foreground">
@@ -3061,9 +3019,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             stickers.map((sticker) => (
                               <div
                                 key={sticker.id}
-                                className="group relative rounded-2xl border bg-card p-2 text-card-foreground shadow-sm ring-1 ring-foreground/5 transition hover:border-emerald-500/40 hover:shadow-md"
+                                className="group relative rounded-xl border bg-card p-2 text-card-foreground shadow-none transition-colors hover:bg-muted/30"
                               >
-                                <div className="flex min-h-20 items-center justify-center rounded-xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_55%),linear-gradient(180deg,#ffffff,#fafafa)] dark:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.14),transparent_55%),linear-gradient(180deg,#27272a,#18181b)]">
+                                <div className="flex min-h-20 items-center justify-center rounded-lg bg-muted/40">
                                   <img
                                     src={sticker.image_url}
                                     alt={sticker.name}

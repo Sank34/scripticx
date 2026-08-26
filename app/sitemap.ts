@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { absoluteUrl } from "@/lib/metadata";
+import { getDocsPages, getExamplesPages } from "@/lib/server/docs";
 import { createServerSupabase } from "@/lib/supabaseServer";
 
 const publicRoutes = [
@@ -8,29 +9,30 @@ const publicRoutes = [
   "/problems",
   "/leaderboard",
   "/community",
-  "/docs/basics",
-  "/docs/variables",
-  "/docs/loops",
-  "/docs/input-output",
-  "/examples",
-  "/examples/basics",
-  "/examples/loops",
-  "/examples/conditions",
-  "/examples/algorithms",
   "/help",
   "/contact",
   "/updates",
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticEntries: MetadataRoute.Sitemap = publicRoutes.map((route) => ({
+  const docsRoutes = [...new Set(getDocsPages("en").map((page) => page.href))];
+  const exampleRoutes = [
+    ...new Set(getExamplesPages("en").map((page) => page.href)),
+  ];
+  const staticEntries: MetadataRoute.Sitemap = [
+    ...publicRoutes,
+    ...docsRoutes,
+    ...exampleRoutes,
+  ].map((route) => ({
     url: absoluteUrl(route),
     changeFrequency: route === "/updates" ? "weekly" : "monthly",
     priority: route === "/" ? 1 : route === "/problems" ? 0.9 : 0.7,
   }));
 
   try {
-    const supabase = createServerSupabase();
+    // Dynamic entries are an enhancement. A database outage must not block a
+    // production build or prevent the static sitemap from being generated.
+    const supabase = createServerSupabase({ fetchTimeoutMs: 4_000 });
     const [problemsResult, updatesResult, profilesResult, postsResult] =
       await Promise.all([
         supabase.from("problems").select("id").limit(500),

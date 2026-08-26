@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Code2,
-  Compass,
   ImagePlus,
   MessageCircle,
   PenLine,
@@ -42,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/common/PageHeader";
 
 function FeedContent() {
   const { user, profile, isAdmin } = useAuth();
@@ -180,27 +180,17 @@ function FeedContent() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
-      <header className="flex flex-col gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            <Compass className="size-4" />
-            {t("feed.communityLabel")}
+      <PageHeader
+        className="border-b border-border/70 pb-5"
+        title={t("feed.title")}
+        subtitle={t("feed.subtitle")}
+        meta={
+          <div className="w-fit rounded-full border border-border bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">{posts.length}</span>{" "}
+            {t("feed.posts")}
           </div>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              {t("feed.title")}
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              {t("feed.subtitle")}
-            </p>
-          </div>
-        </div>
-
-        <div className="w-fit rounded-full border border-border bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{posts.length}</span>{" "}
-          {t("feed.posts")}
-        </div>
-      </header>
+        }
+      />
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className="min-w-0 space-y-5" aria-label={t("feed.latest")}>

@@ -24,13 +24,15 @@ export function useRoadmapConfig() {
           writeRoadmapConfig(remoteConfig);
           return getRoadmapConfigData(remoteConfig);
         }
-      } catch {
+      } catch (error) {
+        console.error("Could not load the remote roadmap configuration:", error);
         // The locally saved roadmap remains available while offline.
       }
 
       return getRoadmapConfigData(readRoadmapConfig());
     },
     initialData: () => getRoadmapConfigData(readRoadmapConfig()),
+    initialDataUpdatedAt: 0,
     staleTime: 5 * 60 * 1000,
   });
 

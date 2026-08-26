@@ -5,32 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ if eq .Data.locale "ro" }}Resetează parola ScripticX{{ else }}Reset your ScripticX password{{ end }}</title>
   </head>
-  <body style="margin:0;background:#f6f7fb;color:#0f172a;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:#f6f7fb;padding:32px 12px;">
-      <tr><td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:620px;">
-          <tr><td style="padding:0 8px 20px;"><img src="https://platform.scripticx.org/scripticx-logo-lung.png" width="150" alt="ScripticX" style="display:block;height:auto;border:0;" /></td></tr>
-          <tr><td style="overflow:hidden;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;box-shadow:0 10px 30px rgba(15,23,42,.06);">
-            <div style="height:5px;background:#6366f1;"></div>
-            <div style="padding:38px 38px 34px;">
-              {{ if eq .Data.locale "ro" }}
-              <p style="margin:0 0 10px;color:#6366f1;font-size:13px;font-weight:700;">Securitatea contului</p>
-              <h1 style="margin:0 0 20px;color:#0f172a;font-size:29px;line-height:1.2;">Resetează parola</h1>
-              <p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">Am primit o cerere de resetare a parolei contului tău ScripticX. Folosește butonul de mai jos pentru a alege o parolă nouă.</p>
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0 20px;"><tr><td style="border-radius:10px;background:#111827;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">Alege o parolă nouă</a></td></tr></table>
-              <p style="margin:0;color:#64748b;font-size:13px;line-height:1.65;">Dacă nu ai solicitat schimbarea, ignoră mesajul și verifică securitatea contului.</p>
-              {{ else }}
-              <p style="margin:0 0 10px;color:#6366f1;font-size:13px;font-weight:700;">Account security</p>
-              <h1 style="margin:0 0 20px;color:#0f172a;font-size:29px;line-height:1.2;">Reset your password</h1>
-              <p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">We received a request to reset your ScripticX password. Use the button below to choose a new one.</p>
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0 20px;"><tr><td style="border-radius:10px;background:#111827;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">Choose a new password</a></td></tr></table>
-              <p style="margin:0;color:#64748b;font-size:13px;line-height:1.65;">If you did not request this change, ignore the message and review your account security.</p>
-              {{ end }}
-            </div>
-          </td></tr>
-          <tr><td style="padding:20px 10px;text-align:center;color:#94a3b8;font-size:12px;line-height:1.6;">© 2026 ScripticX · {{ if eq .Data.locale "ro" }}Mesaj automat de securitate.{{ else }}Automated security message.{{ end }}</td></tr>
-        </table>
-      </td></tr>
+  <body style="margin:0;background:#f5f5f5;color:#111111;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      {{ if eq .Data.locale "ro" }}Alege o parolă nouă pentru contul tău ScripticX.{{ else }}Choose a new password for your ScripticX account.{{ end }}
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:#f5f5f5;padding:40px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;">
+            <tr>
+              <td style="padding:0 4px 22px;">
+                <img src="https://platform.scripticx.org/scripticx-logo-lung.png" width="142" alt="ScripticX" style="display:block;height:auto;border:0;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #e4e4e7;border-radius:16px;background:#ffffff;box-shadow:0 12px 32px rgba(0,0,0,.05);">
+                <div style="padding:42px 40px 38px;">
+                  {{ if eq .Data.locale "ro" }}
+                    <p style="margin:0 0 14px;color:#71717a;font-size:13px;font-weight:600;line-height:1.5;">Securitatea contului</p>
+                    <h1 style="margin:0;color:#111111;font-size:30px;font-weight:700;line-height:1.2;">Resetează parola</h1>
+                    <p style="margin:22px 0 0;color:#3f3f46;font-size:16px;line-height:1.7;">Am primit o cerere de resetare pentru contul tău ScripticX. Continuă pentru a alege o parolă nouă.</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:30px 0 24px;">
+                      <tr><td style="border-radius:10px;background:#111111;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 22px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;line-height:1.2;">Alege o parolă nouă</a></td></tr>
+                    </table>
+                    <p style="margin:0;color:#71717a;font-size:13px;line-height:1.65;">Dacă nu ai solicitat resetarea, ignoră mesajul și verifică securitatea contului.</p>
+                  {{ else }}
+                    <p style="margin:0 0 14px;color:#71717a;font-size:13px;font-weight:600;line-height:1.5;">Account security</p>
+                    <h1 style="margin:0;color:#111111;font-size:30px;font-weight:700;line-height:1.2;">Reset your password</h1>
+                    <p style="margin:22px 0 0;color:#3f3f46;font-size:16px;line-height:1.7;">We received a password reset request for your ScripticX account. Continue to choose a new password.</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:30px 0 24px;">
+                      <tr><td style="border-radius:10px;background:#111111;"><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 22px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;line-height:1.2;">Choose a new password</a></td></tr>
+                    </table>
+                    <p style="margin:0;color:#71717a;font-size:13px;line-height:1.65;">If you did not request this reset, ignore the message and review your account security.</p>
+                  {{ end }}
+                </div>
+                <div style="border-top:1px solid #e4e4e7;padding:20px 40px;color:#a1a1aa;font-size:12px;line-height:1.6;">
+                  {{ if eq .Data.locale "ro" }}Mesaj automat pentru securitatea contului.{{ else }}Automated account security message.{{ end }}
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 8px 0;text-align:center;color:#a1a1aa;font-size:12px;line-height:1.6;">© 2026 ScripticX</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
     </table>
   </body>
 </html>

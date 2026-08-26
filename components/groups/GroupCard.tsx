@@ -61,16 +61,16 @@ export function GroupCard({
     : undefined;
 
   return (
-    <Card className="gap-0 overflow-hidden py-0 transition hover:-translate-y-0.5 hover:shadow-sm">
+    <Card className="gap-0 overflow-hidden py-0 shadow-none transition-colors hover:bg-muted/20">
       <CardContent className="flex h-full flex-col gap-4 p-0">
         <div
-          className="h-20 w-full border-b bg-[linear-gradient(135deg,#f8fafc_0%,#ecfdf5_48%,#eef2ff_100%)] bg-cover bg-center dark:bg-[linear-gradient(135deg,#18181b_0%,#12332b_48%,#1e1b4b_100%)]"
+          className="h-20 w-full border-b bg-muted bg-cover bg-center"
           style={bannerStyle}
         />
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar className="-mt-9 size-16 border-4 border-background shadow-md">
+              <Avatar className="-mt-9 size-16 border-4 border-background shadow-sm">
                 <AvatarImage
                   src={group.avatar_url || undefined}
                   alt={group.name}
@@ -138,7 +138,7 @@ export function GroupCard({
           ) : isMember ? (
             <Badge className="bg-emerald-600 text-white">{memberLabel}</Badge>
           ) : isInvited ? (
-            <Badge className="bg-blue-600 text-white">{invitedLabel}</Badge>
+            <Badge variant="secondary">{invitedLabel}</Badge>
           ) : (
             <Button
               size="sm"

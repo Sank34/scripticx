@@ -6,12 +6,11 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
   BookOpenCheck,
+  CalendarDays,
   FilePlus2,
   FileText,
-  GraduationCap,
   Network,
   PenTool,
-  Sparkles,
 } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -28,9 +27,17 @@ import {
 
 const quickActions = [
   {
+    href: "/workspace/student/calendar",
+    icon: CalendarDays,
+    title: { en: "Planner", ro: "Planner" },
+    description: {
+      en: "See assignments and plan your own events and projects.",
+      ro: "Vezi temele și planifică-ți propriile evenimente și proiecte.",
+    },
+  },
+  {
     href: "/workspace/student/notes",
     icon: FileText,
-    tone: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
     title: { en: "Notes", ro: "Notițe" },
     description: {
       en: "Write in Markdown and keep every lesson organized.",
@@ -40,7 +47,6 @@ const quickActions = [
   {
     href: "/workspace/student/whiteboard",
     icon: PenTool,
-    tone: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
     title: { en: "Whiteboard", ro: "Whiteboard" },
     description: {
       en: "Sketch ideas, algorithms and visual explanations.",
@@ -50,7 +56,6 @@ const quickActions = [
   {
     href: "/workspace/student/graph",
     icon: Network,
-    tone: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
     title: { en: "Graph lab", ro: "Laborator de grafuri" },
     description: {
       en: "Turn an edge list into an interactive graph.",
@@ -90,20 +95,21 @@ export function StudentWorkspaceHome() {
   const firstName = profile?.username || user?.email?.split("@")[0] || "";
 
   return (
-    <div className="space-y-7 pb-6">
-      <section className="relative overflow-hidden rounded-3xl border border-sky-500/15 bg-zinc-950 px-6 py-8 text-white shadow-sm sm:px-9 sm:py-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_12%,rgba(14,165,233,0.3),transparent_30%),radial-gradient(circle_at_88%_18%,rgba(139,92,246,0.24),transparent_28%)]" />
-        <div className="relative flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-7 pb-6" data-tour="student-dashboard">
+      <section
+        className="rounded-[var(--sx-radius-panel)] border border-border bg-card px-6 py-8 sm:px-8 sm:py-9"
+        data-tour="student-overview"
+      >
+        <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs font-medium text-white/80">
-              <GraduationCap className="size-3.5" />
+            <p className="mb-3 text-sm font-medium text-muted-foreground">
               {language === "ro" ? "Workspace elev" : "Student workspace"}
-            </div>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
+            </p>
+            <h1 className="text-3xl font-semibold sm:text-4xl">
               {language === "ro" ? "Bine ai revenit" : "Welcome back"}
               {firstName ? `, ${firstName}` : ""}.
             </h1>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-white/65 sm:text-base">
+            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
               {language === "ro"
                 ? "Notițele, desenele și grafurile tale stau acum lângă editorul de cod, într-un singur spațiu pentru școală."
                 : "Your notes, sketches and graphs now live beside the code editor in one focused school space."}
@@ -113,7 +119,7 @@ export function StudentWorkspaceHome() {
             type="button"
             size="lg"
             onClick={startNote}
-            className="h-12 shrink-0 bg-white text-zinc-950 hover:bg-white/90"
+            className="h-11 shrink-0"
           >
             <FilePlus2 className="size-4" />
             {language === "ro" ? "Notiță nouă" : "New note"}
@@ -121,26 +127,23 @@ export function StudentWorkspaceHome() {
         </div>
       </section>
 
-      <section>
+      <section data-tour="student-tools">
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {language === "ro" ? "Instrumente" : "Tools"}
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+            <h2 className="text-xl font-semibold">
               {language === "ro" ? "Continuă de unde ai rămas" : "Continue where you left off"}
             </h2>
           </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {quickActions.map((action) => {
             const Icon = action.icon;
             return (
               <Link key={action.href} href={action.href} className="group block">
-                <Card className="h-full border-border/80 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-foreground/15 group-hover:shadow-md">
+                <Card className="h-full border-border bg-card shadow-none transition-colors duration-150 group-hover:bg-muted/30">
                   <CardContent className="p-5">
-                    <span className={`flex size-10 items-center justify-center rounded-xl ${action.tone}`}>
-                      <Icon className="size-5" />
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">
+                      <Icon className="size-4.5" strokeWidth={1.8} />
                     </span>
                     <div className="mt-5 flex items-center justify-between gap-3">
                       <h3 className="font-semibold">{action.title[language]}</h3>
@@ -163,7 +166,7 @@ export function StudentWorkspaceHome() {
             <div>
               <h2 className="font-semibold">{language === "ro" ? "Notițe recente" : "Recent notes"}</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {language === "ro" ? "Salvate automat în browser" : "Saved automatically in this browser"}
+                {language === "ro" ? "Sincronizate cu contul tău" : "Synced with your account"}
               </p>
             </div>
             <Button asChild variant="ghost" size="sm">
@@ -181,7 +184,9 @@ export function StudentWorkspaceHome() {
                   href={`/workspace/student/notes/${note.id}`}
                   className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-muted/60"
                 >
-                  <span className="text-xl" aria-hidden="true">{note.icon || "📝"}</span>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                    <FileText className="size-4" strokeWidth={1.8} />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{note.title}</span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -208,13 +213,10 @@ export function StudentWorkspaceHome() {
           </div>
         </Card>
 
-        <Card className="border-violet-500/15 bg-gradient-to-br from-violet-500/8 via-card to-sky-500/8">
+        <Card className="border-border bg-card shadow-none">
           <CardContent className="flex h-full min-h-52 flex-col justify-between p-5">
             <div>
-              <span className="flex size-10 items-center justify-center rounded-xl bg-violet-500 text-white shadow-sm">
-                <Sparkles className="size-5" />
-              </span>
-              <h2 className="mt-5 text-lg font-semibold">
+              <h2 className="text-lg font-semibold">
                 {language === "ro" ? "Biblioteca ta" : "Your library"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -223,8 +225,15 @@ export function StudentWorkspaceHome() {
                   : `${notes.length} recent notes and ${graphCount} saved graphs in this workspace.`}
               </p>
             </div>
-            <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-violet-500 to-sky-500" />
+            <div className="mt-6 grid grid-cols-2 divide-x overflow-hidden rounded-lg border border-border">
+              <div className="p-3">
+                <p className="text-xs text-muted-foreground">{language === "ro" ? "Notițe" : "Notes"}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">{notes.length}</p>
+              </div>
+              <div className="p-3">
+                <p className="text-xs text-muted-foreground">{language === "ro" ? "Grafuri" : "Graphs"}</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">{graphCount}</p>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -59,7 +59,7 @@ export default async function FollowingPage({
     .eq("follower_id", profile.id);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
 
       <h1 className="text-2xl font-bold">
         {t("social.following.title")}

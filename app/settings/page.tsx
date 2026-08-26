@@ -6,16 +6,38 @@ import RouteGuard from "@/components/RouteGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ImagePlus } from "lucide-react";
+import {
+  ImagePlus,
+  Link2,
+  LoaderCircle,
+  LockKeyhole,
+  Save,
+  UserRound,
+} from "lucide-react";
 
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
 import type { EquippedRewards } from "@/lib/rewards";
+import {
+  MAX_PROFILE_PRONOUNS_LENGTH,
+  normalizeProfilePronouns,
+} from "@/lib/profile-pronouns";
+import {
+  DEFAULT_PUBLIC_PROFILE_VISIBILITY,
+  PUBLIC_PROFILE_WIDGET_KEYS,
+  normalizePublicProfileVisibility,
+  type PublicProfileVisibility,
+  type PublicProfileWidgetKey,
+} from "@/lib/profile-visibility";
+import { Switch } from "@/components/ui/switch";
+import { PageHeader } from "@/components/common/PageHeader";
 
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -38,6 +60,39 @@ function normalizeUrl(url: string) {
     return "https://" + url;
   }
   return url;
+}
+
+function PublicProfileVisibilityRow({
+  widgetKey,
+  checked,
+  title,
+  description,
+  onCheckedChange,
+}: {
+  widgetKey: PublicProfileWidgetKey;
+  checked: boolean;
+  title: string;
+  description: string;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  const id = `public-profile-${widgetKey}`;
+
+  return (
+    <div className="flex items-center gap-4 py-4">
+      <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
+        <span className="block text-sm font-medium">{title}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+          {description}
+        </span>
+      </label>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        aria-label={title}
+      />
+    </div>
+  );
 }
 
 function SettingsContent() {
@@ -66,14 +121,19 @@ function SettingsContent() {
   const [equippedRewards, setEquippedRewards] = useState<EquippedRewards>({});
 
   const [bio, setBio] = useState("");
+  const [pronouns, setPronouns] = useState("");
   const [github, setGithub] = useState("");
   const [twitter, setTwitter] = useState("");
   const [website, setWebsite] = useState("");
+  const [publicProfileVisibility, setPublicProfileVisibility] =
+    useState<PublicProfileVisibility>(DEFAULT_PUBLIC_PROFILE_VISIBILITY);
 
   const [fileName, setFileName] = useState("");
   const [bannerFileName, setBannerFileName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const [cropOpen, setCropOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -88,16 +148,22 @@ function SettingsContent() {
     if (!user || !profile || hydratedUserId.current === user.id) return;
     const data = profile as typeof profile & {
       bio?: string | null;
+      pronouns?: string | null;
       github?: string | null;
       twitter?: string | null;
       website?: string | null;
+      public_profile_visibility?: unknown;
     };
 
       if (data.username) setUsername(data.username);
       if (data.bio) setBio(data.bio);
+      setPronouns(data.pronouns || "");
       if (data.github) setGithub(data.github);
       if (data.twitter) setTwitter(data.twitter);
       if (data.website) setWebsite(data.website);
+      setPublicProfileVisibility(
+        normalizePublicProfileVisibility(data.public_profile_visibility)
+      );
 
       const validAvatar =
         data.avatar_url && data.avatar_url.startsWith("http");
@@ -337,32 +403,49 @@ function SettingsContent() {
   }
 
   async function updateProfile() {
-    if (!user) return;
+    if (!user || savingProfile) return;
+
+    setSavingProfile(true);
 
     const { error } = await supabase
       .from("profiles")
       .update({
         username,
         bio,
+        pronouns: normalizeProfilePronouns(pronouns),
         github: normalizeUrl(github),
         twitter: normalizeUrl(twitter),
         website: normalizeUrl(website),
+        public_profile_visibility: publicProfileVisibility,
       })
       .eq("id", user.id);
 
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      setSavingProfile(false);
+      return;
+    }
 
     window.dispatchEvent(new Event("profile-updated"));
     toast.success(t("settings.toast.profileUpdated"));
+    setSavingProfile(false);
   }
 
   async function updatePassword() {
+    if (!password || savingPassword) return;
+
+    setSavingPassword(true);
     const { error } = await supabase.auth.updateUser({ password });
 
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      setSavingPassword(false);
+      return;
+    }
 
     toast.success(t("settings.toast.passwordUpdated"));
     setPassword("");
+    setSavingPassword(false);
   }
 
   if (!user) return null;
@@ -370,18 +453,32 @@ function SettingsContent() {
   const initial = (username || user.email || "U")[0]?.toUpperCase();
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="mx-auto w-full max-w-5xl">
+      <PageHeader
+        className="mb-8 border-b border-border/70 pb-5"
+        title={t("settings.title")}
+        subtitle={
+          locale === "ro"
+            ? "Personalizează profilul, notificările și securitatea contului tău."
+            : "Personalize your profile, notifications, and account security."
+        }
+      />
 
-      <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
-
-      <Card>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <main className="min-w-0 space-y-6">
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>{t("settings.profile")}</CardTitle>
+          <CardDescription>
+            {locale === "ro"
+              ? "Alege imaginea și coperta care te reprezintă."
+              : "Choose the avatar and cover that represent you."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="overflow-hidden rounded-2xl border bg-muted/40">
             <div
-              className="relative h-36 bg-gradient-to-br from-zinc-950 via-zinc-800 to-emerald-400 bg-cover bg-center"
+              className="relative h-36 bg-zinc-950 bg-cover bg-center"
               style={
                 banner
                   ? {
@@ -391,7 +488,7 @@ function SettingsContent() {
               }
             >
               {!banner && (
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,rgba(255,255,255,0.28),transparent_28%)]" />
+                <div className="absolute inset-0 bg-black/10" />
               )}
               <div className={banner ? "sr-only" : "absolute bottom-4 left-4 text-white"}>
                 <p className="text-sm font-semibold">
@@ -435,7 +532,7 @@ function SettingsContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
             <UserAvatar
               avatarUrl={avatar}
               username={username || initial}
@@ -465,42 +562,229 @@ function SettingsContent() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="profile-settings" className="scroll-mt-24">
         <CardHeader>
+          <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <UserRound className="size-4" />
+          </div>
           <CardTitle>{t("settings.account")}</CardTitle>
+          <CardDescription>
+            {locale === "ro"
+              ? "Informațiile principale afișate în contul și profilul tău."
+              : "The main information shown on your account and profile."}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <Input value={user.email} disabled />
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("settings.username")} />
-          <Input value={bio} onChange={(e) => setBio(e.target.value)} placeholder={t("settings.bio")} />
+        <CardContent className="space-y-7">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="profile-email" className="text-sm font-medium">
+                {t("settings.email")}
+              </label>
+              <Input id="profile-email" value={user.email || ""} disabled />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="profile-username" className="text-sm font-medium">
+                {t("settings.username")}
+              </label>
+              <Input
+                id="profile-username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder={t("settings.username")}
+                autoComplete="username"
+              />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <label htmlFor="profile-bio" className="text-sm font-medium">
+                {t("settings.bio")}
+              </label>
+              <Textarea
+                id="profile-bio"
+                value={bio}
+                onChange={(event) => setBio(event.target.value)}
+                placeholder={t("settings.bio")}
+                className="min-h-24 resize-y"
+              />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+            <label htmlFor="profile-pronouns" className="text-sm font-medium">
+              {t("settings.pronouns")}
+            </label>
+            <Input
+              id="profile-pronouns"
+              value={pronouns}
+              onChange={(event) => setPronouns(event.target.value)}
+              placeholder={t("settings.pronounsPlaceholder")}
+              maxLength={MAX_PROFILE_PRONOUNS_LENGTH}
+              autoComplete="off"
+              className="scroll-mt-24"
+              aria-describedby="profile-pronouns-hint"
+            />
+            <div
+              id="profile-pronouns-hint"
+              className="flex items-start justify-between gap-4 text-xs text-muted-foreground"
+            >
+              <span>{t("settings.pronounsHint")}</span>
+              <span className="shrink-0 tabular-nums">
+                {Array.from(pronouns).length}/{MAX_PROFILE_PRONOUNS_LENGTH}
+              </span>
+            </div>
+            </div>
+          </div>
+
+          <section aria-labelledby="social-links-title" className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Link2 className="size-4 text-muted-foreground" />
+              <h2 id="social-links-title" className="text-sm font-semibold">
+                {t("settings.social")}
+              </h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="profile-github" className="text-sm font-medium">
+                  {t("settings.github")}
+                </label>
+                <Input
+                  id="profile-github"
+                  type="url"
+                  value={github}
+                  onChange={(event) => setGithub(event.target.value)}
+                  placeholder="github.com/username"
+                  autoComplete="url"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="profile-twitter" className="text-sm font-medium">
+                  {t("settings.twitter")}
+                </label>
+                <Input
+                  id="profile-twitter"
+                  type="url"
+                  value={twitter}
+                  onChange={(event) => setTwitter(event.target.value)}
+                  placeholder="x.com/username"
+                  autoComplete="url"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <label htmlFor="profile-website" className="text-sm font-medium">
+                  {t("settings.website")}
+                </label>
+                <Input
+                  id="profile-website"
+                  type="url"
+                  value={website}
+                  onChange={(event) => setWebsite(event.target.value)}
+                  placeholder="https://example.com"
+                  autoComplete="url"
+                />
+              </div>
+            </div>
+          </section>
+
+          <hr className="border-border/70" />
+
+          <section
+            id="public-profile-settings"
+            aria-labelledby="public-profile-title"
+            className="scroll-mt-24"
+          >
+            <div className="mb-1">
+              <h2 id="public-profile-title" className="font-semibold">
+                {t("settings.publicProfile.title")}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {t("settings.publicProfile.description")}
+              </p>
+            </div>
+            <div className="divide-y">
+              {PUBLIC_PROFILE_WIDGET_KEYS.map((key) => (
+                <PublicProfileVisibilityRow
+                  key={key}
+                  widgetKey={key}
+                  checked={publicProfileVisibility[key]}
+                  title={t(`settings.publicProfile.items.${key}.title`)}
+                  description={t(`settings.publicProfile.items.${key}.description`)}
+                  onCheckedChange={(checked) =>
+                    setPublicProfileVisibility((current) => ({
+                      ...current,
+                      [key]: checked,
+                    }))
+                  }
+                />
+              ))}
+            </div>
+          </section>
+
+          <div className="flex justify-end border-t pt-5">
+            <Button onClick={updateProfile} disabled={savingProfile}>
+              {savingProfile ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              {savingProfile
+                ? locale === "ro"
+                  ? "Se salvează..."
+                  : "Saving..."
+                : t("settings.saveProfile")}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("settings.social")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Input value={github} onChange={(e) => setGithub(e.target.value)} placeholder={t("settings.github")} />
-          <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder={t("settings.twitter")}/>
-          <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder={t("settings.website")} autoComplete="off"/>
-          
-        </CardContent>
-      </Card>
-      <Button onClick={updateProfile}>{t("settings.saveProfile")}</Button>
+      <div id="email-preferences" className="scroll-mt-24">
+        <EmailPreferencesCard />
+      </div>
+        </main>
 
-      <EmailPreferencesCard />
-
-      <Card>
+        <aside className="lg:sticky lg:top-24">
+      <Card id="account-security" className="scroll-mt-24">
         <CardHeader>
+          <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <LockKeyhole className="size-4" />
+          </div>
           <CardTitle>{t("settings.security")}</CardTitle>
+          <CardDescription>
+            {locale === "ro"
+              ? "Folosește o parolă unică, pe care nu o utilizezi în altă parte."
+              : "Use a unique password that you do not use anywhere else."}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {/* TODO: Set the translation for the placeholder */}
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="New password" />
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="new-password" className="text-sm font-medium">
+              {locale === "ro" ? "Parolă nouă" : "New password"}
+            </label>
+            <Input
+              id="new-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={locale === "ro" ? "Parolă nouă" : "New password"}
+              autoComplete="new-password"
+              minLength={8}
+            />
+          </div>
+          <Button
+            onClick={updatePassword}
+            disabled={!password || savingPassword}
+            className="w-full"
+          >
+            {savingPassword && <LoaderCircle className="size-4 animate-spin" />}
+            {savingPassword
+              ? locale === "ro"
+                ? "Se actualizează..."
+                : "Updating..."
+              : t("settings.updatePassword")}
+          </Button>
         </CardContent>
       </Card>
-      <Button onClick={updatePassword}>{t("settings.updatePassword")}</Button>
+        </aside>
+      </div>
 
       <Dialog open={cropOpen} onOpenChange={setCropOpen}>
         <DialogContent>

@@ -92,7 +92,24 @@ export function campaignAudience(value: unknown): CampaignAudience {
     if (!userIds.length || userIds.some((id) => typeof id !== "string" || !UUID_PATTERN.test(id))) {
       throw new HttpError(400, "Invalid campaign users");
     }
-    return { type: "users", userIds };
+    const identifiers = audience.identifiers === undefined
+      ? null
+      : Array.isArray(audience.identifiers) &&
+          audience.identifiers.length > 0 &&
+          audience.identifiers.length <= 500 &&
+          audience.identifiers.every(
+            (identifier) => typeof identifier === "string" && identifier.length > 0 && identifier.length <= 80
+          )
+        ? [...new Set(audience.identifiers)] as string[]
+        : null;
+    if (audience.identifiers !== undefined && !identifiers) {
+      throw new HttpError(400, "Invalid campaign user identifiers");
+    }
+    return {
+      type: "users",
+      userIds,
+      ...(identifiers ? { identifiers } : {}),
+    };
   }
   throw new HttpError(400, "Invalid campaign audience");
 }

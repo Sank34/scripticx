@@ -25,7 +25,12 @@ export async function GET() {
         enabledAt: data?.lockdown_enabled_at || null,
         updatedAt: data?.updated_at || null,
       },
-      { headers: { "Cache-Control": "public, max-age=0, must-revalidate" } }
+      {
+        headers: {
+          "Cache-Control":
+            "public, max-age=15, s-maxage=60, stale-while-revalidate=300",
+        },
+      }
     );
   } catch (error) {
     console.error("Could not read platform status:", error);

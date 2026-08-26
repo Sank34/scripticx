@@ -20,11 +20,26 @@ export async function POST(request: Request) {
   try {
     await requireAdmin(request);
     const body = jsonObject(await readJsonBody(request, 110_000));
-    const subjectSource = mailSubject(body.subject);
+    const locale = body.locale === "ro" ? "ro" : "en";
+    const subjectSource = mailSubject(
+      typeof body.subject === "string" && body.subject.trim()
+        ? body.subject
+        : locale === "ro"
+          ? "Previzualizare ScripticX"
+          : "ScripticX preview"
+    );
     const preheaderSource = optionalText(body.preheader, 240);
     const contentSource = mailContent(body.content);
     const actionLabel = optionalText(body.actionLabel ?? body.buttonLabel, 80);
-    const actionUrl = safeActionUrl(body.actionUrl ?? body.buttonUrl);
+    let actionUrl: string | null = null;
+    try {
+      actionUrl = safeActionUrl(body.actionUrl ?? body.buttonUrl);
+    } catch (error) {
+      // The preview is requested while the administrator is still typing. An
+      // incomplete URL should hide the CTA for that frame, not break the
+      // entire live preview. Saving and sending keep the strict validation.
+      if (!(error instanceof HttpError) || error.status !== 400) throw error;
+    }
     assertSupportedMailVariables(subjectSource, preheaderSource, contentSource, actionLabel, actionUrl);
     const variables = {
       first_name: "Andrei",
@@ -47,7 +62,7 @@ export async function POST(request: Request) {
       preheader: preheaderSource ? interpolateMailVariables(preheaderSource, variables) : null,
       content: interpolateMailVariables(contentSource, variables),
       mode: mailMode(body.mode),
-      locale: body.locale === "ro" ? "ro" : "en",
+      locale,
       senderName: body.senderName === undefined ? "ScripticX" : senderName(body.senderName),
       actionLabel: actionLabel ? interpolateMailVariables(actionLabel, variables) : null,
       actionUrl: variables.action_url || null,

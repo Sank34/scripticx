@@ -7,13 +7,12 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Topbar } from "@/components/Topbar";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import { MobileDrawer } from "@/components/MobileDrawer";
 import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
-import { NetworkStatus } from "@/components/NetworkStatus";
-import { OnboardingManager } from "@/components/onboarding/OnboardingManager";
+import { DeferredShellFeatures } from "@/components/DeferredShellFeatures";
 import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
 import { EmailVerificationBanner } from "@/components/account/EmailVerification";
+import { EmailVerificationAccessGate } from "@/components/account/EmailVerificationAccessGate";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
@@ -141,6 +140,7 @@ export default function RootLayout({
         <ThemeProvider>
           <Providers>
             <LanguageProvider>
+              <EmailVerificationAccessGate />
               <GlobalContextMenu>
                 <SidebarProvider>
                   <div
@@ -149,14 +149,14 @@ export default function RootLayout({
                   >
                     <div
                       data-shell-frame
-                      className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-sidebar"
+                      className="flex h-full w-full gap-2 overflow-hidden rounded-[var(--sx-radius-shell)] bg-sidebar"
                     >
 
                       <AppSidebar />
 
                       <div
                         data-shell-surface
-                        className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-border/70 bg-background shadow-sm"
+                        className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--sx-radius-shell)] border border-border/70 bg-background shadow-sm"
                       >
 
                         <Topbar />
@@ -169,9 +169,7 @@ export default function RootLayout({
                     </div>
                   </div>
                 </SidebarProvider>
-                <MobileDrawer />
-                <NetworkStatus />
-                <OnboardingManager />
+                <DeferredShellFeatures />
               </GlobalContextMenu>
             </LanguageProvider>
           </Providers>

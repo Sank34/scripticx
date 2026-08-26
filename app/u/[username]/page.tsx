@@ -15,7 +15,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 
-import { Award, Flame, Globe } from "lucide-react";
+import { Award, Flame, Globe, Trophy } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 
 import { getLocalized } from "@/lib/getLocalized";
@@ -41,6 +41,8 @@ import {
   buildSubmissionActivityHeatmapFromDailyRows,
   type SubmissionActivityAggregateRow,
 } from "@/lib/submissionActivity";
+import { normalizeProfilePronouns } from "@/lib/profile-pronouns";
+import { normalizePublicProfileVisibility } from "@/lib/profile-visibility";
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -218,10 +220,17 @@ export default async function PublicProfile({
     equippedRewards["profile-background"] || equippedRewards["profile-banner"];
   const titleReward = resolveEquippedReward(equippedRewards["profile-title"]);
   const equippedTitle = titleReward?.name?.[locale];
+  const pronouns = normalizeProfilePronouns(profile.pronouns);
+  const visibility = normalizePublicProfileVisibility(
+    profile.public_profile_visibility
+  );
+  const points = Number(profile.total_score) || 0;
   const profileUrl = absoluteUrl(
     `/u/${encodeURIComponent(profile.username)}`
   );
-  const sameAs = [profile.github, profile.twitter, profile.website]
+  const sameAs = (visibility.socialLinks
+    ? [profile.github, profile.twitter, profile.website]
+    : [])
     .filter((value): value is string => Boolean(value))
     .map(normalizeUrl);
   const profileJsonLd = {
@@ -261,7 +270,7 @@ export default async function PublicProfile({
   return (
     <div className="relative isolate min-h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
       {backgroundReward && <ProfileBackground reward={backgroundReward} />}
-      <div className="relative z-[1] mx-auto max-w-5xl space-y-6 p-6">
+      <div className="relative z-[1] mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -269,7 +278,7 @@ export default async function PublicProfile({
         }}
       />
 
-      <div className="overflow-hidden rounded-3xl border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
+      <div className="overflow-hidden rounded-[var(--sx-radius-panel)] border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
         <div
           className="relative h-44 bg-muted bg-cover bg-center sm:h-52"
           style={
@@ -298,9 +307,16 @@ export default async function PublicProfile({
               />
 
               <div className="min-w-0 pb-1">
-                <h1 className="truncate text-3xl font-bold">
-                  {profile.username}
-                </h1>
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <h1 className="truncate text-3xl font-bold">
+                    {profile.username}
+                  </h1>
+                  {pronouns && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {pronouns}
+                    </span>
+                  )}
+                </div>
                 {equippedTitle && (
                   <Badge variant="outline" className="mt-1.5 bg-background">
                     {equippedTitle}
@@ -320,59 +336,80 @@ export default async function PublicProfile({
             </p>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            {profile.github && (
-              <a href={normalizeUrl(profile.github)} target="_blank" rel="noopener noreferrer">
-                <span className="flex items-center gap-1">
-                  <BrandIcon icon={siGithub} />
-                  GitHub
-                </span>
-              </a>
-            )}
+          {visibility.socialLinks && (
+            <div className="mt-4 flex flex-wrap gap-4 text-sm">
+              {profile.github && (
+                <a href={normalizeUrl(profile.github)} target="_blank" rel="noopener noreferrer">
+                  <span className="flex items-center gap-1">
+                    <BrandIcon icon={siGithub} />
+                    GitHub
+                  </span>
+                </a>
+              )}
 
-            {profile.twitter && (
-              <a href={normalizeUrl(profile.twitter)} target="_blank" rel="noopener noreferrer">
-                <span className="flex items-center gap-1">
-                  <BrandIcon icon={siX} />
-                  X
-                </span>
-              </a>
-            )}
+              {profile.twitter && (
+                <a href={normalizeUrl(profile.twitter)} target="_blank" rel="noopener noreferrer">
+                  <span className="flex items-center gap-1">
+                    <BrandIcon icon={siX} />
+                    X
+                  </span>
+                </a>
+              )}
 
-            {profile.website && (
-              <a href={normalizeUrl(profile.website)} target="_blank" rel="noopener noreferrer">
-                <span className="flex items-center gap-1">
-                  <Globe size={16} />
-                  Website
-                </span>
-              </a>
-            )}
-          </div>
+              {profile.website && (
+                <a href={normalizeUrl(profile.website)} target="_blank" rel="noopener noreferrer">
+                  <span className="flex items-center gap-1">
+                    <Globe size={16} />
+                    Website
+                  </span>
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <ContributionHeatmap data={activity} locale={locale} />
+      {visibility.activity && (
+        <ContributionHeatmap data={activity} locale={locale} />
+      )}
 
-      <div className="grid grid-cols-3 gap-4">
+      {(visibility.points || visibility.stats) && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-        <StatCard
-          title={t("publicProfile.stats.solved")}
-          value={solved}
-        />
+        {visibility.points && (
+          <StatCard
+            icon={<Trophy className="size-5 text-amber-500" />}
+            title={t("publicProfile.points")}
+            value={points.toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}
+          />
+        )}
 
-        <StatCard
-          title={t("publicProfile.stats.average")}
-          value={`${average}%`}
-        />
+          {visibility.stats && (
+            <StatCard
+              title={t("publicProfile.stats.solved")}
+              value={solved}
+            />
+          )}
 
-        <StatCard
-          icon={<Flame className="w-5 h-5 text-orange-500" />}
-          title={t("publicProfile.stats.streak")}
-          value={streak}
-        />
+          {visibility.stats && (
+            <StatCard
+              title={t("publicProfile.stats.average")}
+              value={`${average}%`}
+            />
+          )}
 
-      </div>
+          {visibility.stats && (
+            <StatCard
+              icon={<Flame className="w-5 h-5 text-orange-500" />}
+              title={t("publicProfile.stats.streak")}
+              value={streak}
+            />
+          )}
 
+        </div>
+      )}
+
+      {visibility.achievements && (
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle>{t("publicProfile.achievements")}</CardTitle>
@@ -410,7 +447,9 @@ export default async function PublicProfile({
           )}
         </CardContent>
       </Card>
+      )}
 
+      {visibility.posts && (
       <Card>
         <CardHeader>
           <CardTitle>{t("publicProfile.posts.title")}</CardTitle>
@@ -446,7 +485,9 @@ export default async function PublicProfile({
           ))}
         </CardContent>
       </Card>
+      )}
 
+      {visibility.submissions && (
       <Card>
         <CardHeader>
           <CardTitle>{t("publicProfile.submissions.title")}</CardTitle>
@@ -469,6 +510,7 @@ export default async function PublicProfile({
           ))}
         </CardContent>
       </Card>
+      )}
 
     </div>
     </div>

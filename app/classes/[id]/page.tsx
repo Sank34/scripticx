@@ -1,575 +1,157 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, formatDistanceToNow } from "date-fns";
+import { ro } from "date-fns/locale";
+import {
+  Archive,
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  ClipboardList,
+  Copy,
+  ExternalLink,
+  Link,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
+
+import { PageHeader } from "@/components/common/PageHeader";
+import { useLanguage } from "@/components/LanguageProvider";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/useAuth";
+import { loadClassHub, type AssignmentStatus, type ClassAssignment, type ClassEvent } from "@/lib/class-hub";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/api";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandInput, CommandList, CommandItem, CommandEmpty } from "@/components/ui/command";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+const copy = {
+  en: {
+    back: "All classes", overview: "Overview", assignments: "Assignments", resources: "Resources", people: "People", calendar: "Calendar", analytics: "Analytics", settings: "Settings",
+    students: "Students", progress: "Completion", upcoming: "Open assignments", activity: "Recent activity", announcements: "Announcements", noAnnouncements: "No announcements have been published.",
+    newAnnouncement: "New announcement", announcementTitle: "Announcement title", announcementBody: "Write the announcement", publish: "Publish",
+    nextAssignment: "Next assignment", noAssignments: "No assignments yet.", newAssignment: "New assignment", open: "Open", noDeadline: "No deadline", overdue: "Overdue",
+    resourceLibrary: "Class resources", noResources: "No resources have been added.", addResource: "Add resource", resourceTitle: "Resource title", resourceUrl: "https://…", add: "Add",
+    classCalendar: "Class calendar", addEvent: "Add event", noEvents: "No events for this date.", eventTitle: "Event title", time: "Time",
+    studentProgress: "Student progress", assigned: "Assigned", completed: "Completed", lastActivity: "Last activity", never: "No activity yet",
+    classSettings: "Class settings", className: "Class name", description: "Description", subject: "Subject", schoolYear: "School year", save: "Save changes",
+    invitation: "Invitation code", invitationHelp: "Share this code with students who should join the class.", regenerate: "Generate new code", archive: "Archive class",
+    problemSearch: "Search problems", selected: "selected", title: "Title", details: "Instructions", deadline: "Deadline", availability: "Availability", published: "Published", draft: "Draft", scheduled: "Scheduled", closed: "Closed",
+    allowLate: "Allow submissions after the deadline", maxAttempts: "Maximum attempts", unlimited: "Unlimited", points: "Points", create: "Create assignment",
+    configurationNeeded: "Run the Class Hub migration to enable this feature.", copied: "Invitation code copied.", saved: "Changes saved.", memberRemoved: "Student removed from the class.",
+  },
+  ro: {
+    back: "Toate clasele", overview: "Prezentare", assignments: "Teme", resources: "Resurse", people: "Persoane", calendar: "Calendar", analytics: "Analiză", settings: "Setări",
+    students: "Elevi", progress: "Finalizare", upcoming: "Teme deschise", activity: "Activitate recentă", announcements: "Anunțuri", noAnnouncements: "Nu a fost publicat niciun anunț.",
+    newAnnouncement: "Anunț nou", announcementTitle: "Titlul anunțului", announcementBody: "Scrie anunțul", publish: "Publică",
+    nextAssignment: "Următoarea temă", noAssignments: "Nu există teme încă.", newAssignment: "Temă nouă", open: "Deschide", noDeadline: "Fără termen", overdue: "Întârziată",
+    resourceLibrary: "Resursele clasei", noResources: "Nu a fost adăugată nicio resursă.", addResource: "Adaugă resursă", resourceTitle: "Titlul resursei", resourceUrl: "https://…", add: "Adaugă",
+    classCalendar: "Calendarul clasei", addEvent: "Adaugă eveniment", noEvents: "Niciun eveniment pentru această zi.", eventTitle: "Titlul evenimentului", time: "Ora",
+    studentProgress: "Progresul elevilor", assigned: "Alocate", completed: "Finalizate", lastActivity: "Ultima activitate", never: "Nicio activitate",
+    classSettings: "Setările clasei", className: "Numele clasei", description: "Descriere", subject: "Materie", schoolYear: "An școlar", save: "Salvează",
+    invitation: "Cod de invitație", invitationHelp: "Trimite codul elevilor care trebuie să intre în clasă.", regenerate: "Generează alt cod", archive: "Arhivează clasa",
+    problemSearch: "Caută probleme", selected: "selectate", title: "Titlu", details: "Instrucțiuni", deadline: "Termen", availability: "Disponibilitate", published: "Publicată", draft: "Ciornă", scheduled: "Programată", closed: "Închisă",
+    allowLate: "Permite trimiteri după termen", maxAttempts: "Număr maxim de încercări", unlimited: "Nelimitat", points: "Puncte", create: "Creează tema",
+    configurationNeeded: "Rulează migrarea Class Hub pentru a activa această funcție.", copied: "Codul de invitație a fost copiat.", saved: "Modificările au fost salvate.", memberRemoved: "Elevul a fost eliminat din clasă.",
+  },
+} as const;
 
-import { Users, Plus, Link as LinkIcon } from "lucide-react";
+type Locale = keyof typeof copy;
+type ProblemOption = { id: string; title: string };
 
-import { useLanguage } from "@/components/LanguageProvider";
-import { translations } from "@/lib/i18n";
-import { UserAvatar } from "@/components/user/UserAvatar";
-import { useAuth } from "@/hooks/useAuth";
+function StatCard({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof Users }) {
+  return <Card size="sm"><CardContent className="flex items-center justify-between"><div><p className="text-2xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-xs text-muted-foreground">{label}</p></div><Icon className="size-4 text-muted-foreground" aria-hidden="true" /></CardContent></Card>;
+}
 
-type ClassPageData = {
-  cls: any;
-  members: any[];
-  assignments: any[];
-  authorized: boolean;
-};
+function AssignmentCard({ assignment, locale, classId }: { assignment: ClassAssignment; locale: Locale; classId: string }) {
+  const router = useRouter(); const c = copy[locale];
+  const timingLabel = assignment.timing === "overdue" ? c.overdue : assignment.timing === "draft" ? c.draft : assignment.timing === "scheduled" ? c.scheduled : assignment.timing === "closed" ? c.closed : assignment.deadline ? format(new Date(assignment.deadline), "PPP") : c.noDeadline;
+  return <Card size="sm"><CardContent className="space-y-3"><div className="flex items-start justify-between gap-4"><div><p className="font-medium">{assignment.title}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{assignment.description || `${assignment.problemCount} ${locale === "ro" ? "probleme" : "problems"}`}</p></div><Badge variant={assignment.timing === "overdue" ? "destructive" : "outline"}>{timingLabel}</Badge></div><div><div className="mb-2 flex justify-between text-xs text-muted-foreground"><span>{c.progress}</span><span>{assignment.completionRate}%</span></div><Progress value={assignment.completionRate} /></div><Button variant="outline" size="sm" onClick={() => router.push(`/classes/${classId}/assignments/${assignment.id}`)}>{c.open}</Button></CardContent></Card>;
+}
+
+function AssignmentDialog({ classId, className, userId, locale, onCreated }: { classId: string; className: string; userId: string; locale: Locale; onCreated: () => Promise<unknown> }) {
+  const c = copy[locale];
+  const [open, setOpen] = useState(false); const [title, setTitle] = useState(""); const [description, setDescription] = useState(""); const [deadline, setDeadline] = useState(""); const [status, setStatus] = useState<AssignmentStatus>("published"); const [allowLate, setAllowLate] = useState(true); const [maxAttempts, setMaxAttempts] = useState(""); const [points, setPoints] = useState("100"); const [problemQuery, setProblemQuery] = useState(""); const [selected, setSelected] = useState<ProblemOption[]>([]); const [submitting, setSubmitting] = useState(false);
+  const catalogQuery = useQuery({ queryKey: ["problems", "class-assignment-picker"], queryFn: async () => { const { data, error } = await supabase.from("problems").select("id,title_i18n"); if (error) throw error; return (data || []).map((problem) => ({ id: problem.id as string, title: (problem.title_i18n as { en?: string; ro?: string } | null)?.[locale] || (problem.title_i18n as { en?: string } | null)?.en || "Untitled" })); }, enabled: open, staleTime: 300_000 });
+  const visibleProblems = useMemo(() => { const needle = problemQuery.trim().toLowerCase(); return (catalogQuery.data || []).filter((problem) => !selected.some((item) => item.id === problem.id)).filter((problem) => !needle || problem.title.toLowerCase().includes(needle)).slice(0, 8); }, [catalogQuery.data, problemQuery, selected]);
+  async function submit() {
+    if (!title.trim() || !selected.length) return;
+    setSubmitting(true);
+    const payload = { class_id: classId, title: title.trim(), description: description.trim() || null, deadline: deadline ? new Date(deadline).toISOString() : null, problem_ids: selected.map((problem) => problem.id), status, allow_late: allowLate, max_attempts: maxAttempts ? Number(maxAttempts) : null, points: Number(points) || 0 };
+    let result = await supabase.from("assignments").insert(payload).select("*").single();
+    if (["42703", "PGRST204"].includes(result.error?.code || "")) {
+      const fallback = { class_id: classId, title: title.trim(), description: description.trim() || null, deadline: payload.deadline, problem_ids: payload.problem_ids };
+      result = await supabase.from("assignments").insert(fallback).select("*").single();
+      if (["42703", "PGRST204"].includes(result.error?.code || "")) {
+        result = await supabase.from("assignments").insert({ class_id: classId, title: title.trim(), description: description.trim() || null, deadline: payload.deadline, problem_id: selected[0].id }).select("*").single();
+      }
+    }
+    setSubmitting(false); if (result.error) return toast.error(result.error.message);
+    try { await api.notifications.createForNewAssignment({ actorId: userId, assignmentId: result.data.id, assignmentTitle: title.trim(), classId, className }); } catch { /* Assignment creation remains successful. */ }
+    setOpen(false); setTitle(""); setDescription(""); setDeadline(""); setSelected([]); await onCreated();
+  }
+  return <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button><Plus className="size-4" />{c.newAssignment}</Button></DialogTrigger><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{c.newAssignment}</DialogTitle><DialogDescription>{locale === "ro" ? "Configurează conținutul, termenul și regulile de trimitere." : "Configure content, timing, and submission rules."}</DialogDescription></DialogHeader><div className="grid gap-4 sm:grid-cols-2"><label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">{c.title}</span><Input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">{c.details}</span><Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label><label className="space-y-1.5"><span className="text-sm font-medium">{c.deadline}</span><Input type="datetime-local" value={deadline} onChange={(event) => setDeadline(event.target.value)} /></label><label className="space-y-1.5"><span className="text-sm font-medium">{c.availability}</span><Select value={status} onValueChange={(value) => setStatus(value as AssignmentStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="published">{c.published}</SelectItem><SelectItem value="draft">{c.draft}</SelectItem><SelectItem value="scheduled">{c.scheduled}</SelectItem></SelectContent></Select></label><label className="space-y-1.5"><span className="text-sm font-medium">{c.maxAttempts}</span><Input type="number" min="1" value={maxAttempts} placeholder={c.unlimited} onChange={(event) => setMaxAttempts(event.target.value)} /></label><label className="space-y-1.5"><span className="text-sm font-medium">{c.points}</span><Input type="number" min="0" value={points} onChange={(event) => setPoints(event.target.value)} /></label><div className="flex items-center justify-between rounded-[var(--sx-radius-control)] border p-3 sm:col-span-2"><span className="text-sm">{c.allowLate}</span><Switch checked={allowLate} onCheckedChange={setAllowLate} /></div><div className="space-y-2 sm:col-span-2"><span className="text-sm font-medium">{c.problemSearch}</span><Input value={problemQuery} onChange={(event) => setProblemQuery(event.target.value)} placeholder={c.problemSearch} /><div className="max-h-44 space-y-1 overflow-y-auto rounded-[var(--sx-radius-control)] border p-1">{visibleProblems.map((problem) => <button type="button" key={problem.id} onClick={() => setSelected((current) => [...current, problem])} className="sx-interactive flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-muted"><span>{problem.title}</span><Plus className="size-3.5" /></button>)}</div>{selected.length > 0 && <div className="flex flex-wrap gap-1.5">{selected.map((problem) => <Badge key={problem.id} variant="secondary" className="gap-1">{problem.title}<button type="button" aria-label={`Remove ${problem.title}`} onClick={() => setSelected((current) => current.filter((item) => item.id !== problem.id))}>×</button></Badge>)}</div>}</div></div><DialogFooter><Button disabled={submitting || !title.trim() || !selected.length} onClick={submit}>{c.create}</Button></DialogFooter></DialogContent></Dialog>;
+}
 
 export default function ClassPage() {
-  const router = useRouter();
-  const params = useParams();
-  const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const { user, loading: authLoading } = useAuth();
-  const queryClient = useQueryClient();
+  const params = useParams<{ id: string }>(); const router = useRouter(); const queryClient = useQueryClient(); const { user, isAdmin, loading: authLoading } = useAuth(); const { locale: activeLocale } = useLanguage(); const locale: Locale = activeLocale === "ro" ? "ro" : "en"; const c = copy[locale]; const classId = params.id;
+  const hubQuery = useQuery({ queryKey: ["classes", "hub", classId, user?.id, isAdmin], queryFn: () => loadClassHub(supabase, { classId, userId: user!.id, isAdmin }), enabled: Boolean(classId && user?.id) && !authLoading, staleTime: 60_000 });
+  const hub = hubQuery.data; const refresh = () => queryClient.invalidateQueries({ queryKey: ["classes", "hub", classId] });
+  const [announcementOpen, setAnnouncementOpen] = useState(false); const [announcementTitle, setAnnouncementTitle] = useState(""); const [announcementBody, setAnnouncementBody] = useState("");
+  const [resourceOpen, setResourceOpen] = useState(false); const [resourceTitle, setResourceTitle] = useState(""); const [resourceUrl, setResourceUrl] = useState("");
+  const [eventOpen, setEventOpen] = useState(false); const [eventTitle, setEventTitle] = useState(""); const [eventDate, setEventDate] = useState<Date | undefined>(new Date()); const [eventTime, setEventTime] = useState("09:00");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date()); const [assignmentFilter, setAssignmentFilter] = useState("all"); const [settingsName, setSettingsName] = useState(""); const [settingsDescription, setSettingsDescription] = useState(""); const [settingsSubject, setSettingsSubject] = useState(""); const [settingsYear, setSettingsYear] = useState("");
 
-  const [openAssignment, setOpenAssignment] = useState(false);
-  const [assignmentTitle, setAssignmentTitle] = useState("");
-  const [assignmentDescription, setAssignmentDescription] = useState("");
-  const [assignmentDeadline, setAssignmentDeadline] = useState("");
-  const [selectedProblems, setSelectedProblems] = useState<any[]>([]);
-  const [problemQuery, setProblemQuery] = useState("");
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [problemOpen, setProblemOpen] = useState(false);
-  const userId = user?.id || null;
+  function featureError(error: { code?: string; message: string } | null) { if (!error) return false; toast.error(["42P01", "42703", "PGRST204", "PGRST205", "PGRST202"].includes(error.code || "") ? c.configurationNeeded : error.message); return true; }
+  async function createAnnouncement() { if (!hub || !user || !announcementTitle.trim()) return; const { data, error } = await supabase.from("class_announcements").insert({ class_id: hub.classInfo.id, author_id: user.id, title: announcementTitle.trim(), body: announcementBody.trim(), status: "published", published_at: new Date().toISOString() }).select("id").single(); if (featureError(error)) return; if (data) { try { await api.notifications.createForClassAnnouncement({ actorId: user.id, announcementId: data.id, classId: hub.classInfo.id }); } catch { /* The announcement remains published. */ } } setAnnouncementOpen(false); setAnnouncementTitle(""); setAnnouncementBody(""); await refresh(); }
+  async function createResource() { if (!hub || !user || !resourceTitle.trim()) return; const { error } = await supabase.from("class_resources").insert({ class_id: hub.classInfo.id, created_by: user.id, title: resourceTitle.trim(), url: resourceUrl.trim() || null, resource_type: "link" }); if (featureError(error)) return; setResourceOpen(false); setResourceTitle(""); setResourceUrl(""); await refresh(); }
+  async function createEvent() { if (!hub || !user || !eventTitle.trim() || !eventDate) return; const [hours, minutes] = eventTime.split(":").map(Number); const startsAt = new Date(eventDate); startsAt.setHours(hours || 0, minutes || 0, 0, 0); const { data, error } = await supabase.from("class_events").insert({ class_id: hub.classInfo.id, created_by: user.id, title: eventTitle.trim(), starts_at: startsAt.toISOString(), event_type: "event" }).select("id").single(); if (featureError(error)) return; if (data) { try { await api.notifications.createForClassEvent({ actorId: user.id, classId: hub.classInfo.id, eventId: data.id }); } catch { /* The calendar event remains created. */ } } setEventOpen(false); setEventTitle(""); await refresh(); }
+  async function removeMember(memberId: string) { if (!hub) return; const { error } = await supabase.rpc("manage_class_member", { p_class_id: hub.classInfo.id, p_user_id: memberId, p_action: "remove", p_role: "student" }); if (featureError(error)) return; toast.success(c.memberRemoved); await refresh(); }
+  async function copyInvite() { if (!hub?.classInfo.invite_code) return; await navigator.clipboard.writeText(hub.classInfo.invite_code); toast.success(c.copied); }
+  async function regenerateInvite() { if (!hub) return; const { error } = await supabase.rpc("regenerate_class_invite", { p_class_id: hub.classInfo.id }); if (featureError(error)) return; await refresh(); }
+  async function saveSettings() { if (!hub) return; const payload = { name: settingsName.trim() || hub.classInfo.name, description: settingsDescription.trim() || null, subject: settingsSubject.trim() || null, school_year: settingsYear.trim() || null }; let { error } = await supabase.rpc("update_class_details", { p_class_id: hub.classInfo.id, p_name: payload.name, p_description: payload.description, p_subject: payload.subject, p_school_year: payload.school_year, p_archive: false }); if (["42883", "PGRST202"].includes(error?.code || "")) ({ error } = await supabase.from("classes").update(payload).eq("id", hub.classInfo.id)); if (featureError(error)) return; toast.success(c.saved); await refresh(); }
+  function initializeSettings() { if (!hub) return; setSettingsName(hub.classInfo.name); setSettingsDescription(hub.classInfo.description || ""); setSettingsSubject(hub.classInfo.subject || ""); setSettingsYear(hub.classInfo.school_year || ""); }
+  async function archiveClass() { if (!hub) return; let { error } = await supabase.rpc("update_class_details", { p_class_id: hub.classInfo.id, p_name: hub.classInfo.name, p_description: hub.classInfo.description, p_subject: hub.classInfo.subject, p_school_year: hub.classInfo.school_year, p_archive: true }); if (["42883", "PGRST202"].includes(error?.code || "")) ({ error } = await supabase.from("classes").update({ archived_at: new Date().toISOString() }).eq("id", hub.classInfo.id)); if (featureError(error)) return; router.push("/classes"); }
 
-  const { locale } = useLanguage();
+  if (hubQuery.isPending) return <PageContainer variant="wide" className="sx-page space-y-4"><Skeleton className="h-8 w-56" /><Skeleton className="h-32 w-full rounded-[var(--sx-radius-card)]" /><Skeleton className="h-[32rem] w-full rounded-[var(--sx-radius-card)]" /></PageContainer>;
+  if (hubQuery.isError || !hub) return <PageContainer className="sx-page"><Card><CardContent className="py-12 text-center"><p className="font-medium">{hubQuery.error instanceof Error ? hubQuery.error.message : "Class not found."}</p><Button variant="outline" className="mt-4" onClick={() => router.push("/classes")}>{c.back}</Button></CardContent></Card></PageContainer>;
 
-  const t = (key: string) => {
-    const keys = key.split(".");
-    let value: any = translations[locale];
-    for (const k of keys) value = value?.[k];
-    return value || key;
-  };
+  const nextAssignment = hub.assignments.filter((assignment) => assignment.timing === "active" || assignment.timing === "scheduled").sort((left, right) => Date.parse(left.deadline || "9999-12-31") - Date.parse(right.deadline || "9999-12-31"))[0];
+  const filteredAssignments = hub.assignments.filter((assignment) => assignmentFilter === "all" || assignment.timing === assignmentFilter);
+  const studentMembers = hub.members.filter((member) => member.role === "student");
+  const dateEvents = hub.events.filter((event) => selectedDate && new Date(event.starts_at).toDateString() === selectedDate.toDateString());
 
-  const classQueryKey = ["classes", "detail", id, userId] as const;
-  const { data: classPage, isPending: loading } = useQuery({
-    queryKey: classQueryKey,
-    queryFn: async (): Promise<ClassPageData> => {
-      if (!id || !userId) {
-        return { cls: null, members: [], assignments: [], authorized: false };
-      }
-
-      const lookupColumn = /^[0-9a-fA-F-]{36}$/.test(id) ? "id" : "invite_code";
-      const { data: classData, error: classError } = await supabase
-        .from("classes")
-        .select("*")
-        .eq(lookupColumn, id)
-        .maybeSingle();
-      if (classError) throw classError;
-      if (!classData) {
-        return { cls: null, members: [], assignments: [], authorized: true };
-      }
-
-      const isTeacher = userId === classData.teacher_id;
-      if (!isTeacher) {
-        const { data: memberCheck, error: memberError } = await supabase
-          .from("class_members")
-          .select("user_id")
-          .eq("class_id", classData.id)
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (memberError) throw memberError;
-        if (!memberCheck) {
-          return { cls: classData, members: [], assignments: [], authorized: false };
-        }
-      }
-
-      const [memberResult, assignmentResult] = await Promise.all([
-        supabase
-          .from("class_members")
-          .select("user_id, role")
-          .eq("class_id", classData.id),
-        supabase
-          .from("assignments")
-          .select("*")
-          .eq("class_id", classData.id)
-          .order("created_at", { ascending: false }),
-      ]);
-      if (memberResult.error) throw memberResult.error;
-      if (assignmentResult.error) throw assignmentResult.error;
-
-      const memberRows = memberResult.data || [];
-      const userIds = memberRows.map((member) => member.user_id);
-      const { data: profiles, error: profileError } = userIds.length
-        ? await supabase
-            .from("profiles")
-            .select("id, username, avatar_url, equipped_rewards")
-            .in("id", userIds)
-        : { data: [], error: null };
-      if (profileError) throw profileError;
-
-      const profileMap = new Map(
-        (profiles || []).map((profile) => [profile.id, profile])
-      );
-      const members = memberRows.map((member) => ({
-        ...(profileMap.get(member.user_id) || {
-          id: member.user_id,
-          username: "User",
-          avatar_url: null,
-        }),
-        role: member.role,
-      }));
-
-      return {
-        cls: classData,
-        members,
-        assignments: assignmentResult.data || [],
-        authorized: true,
-      };
-    },
-    enabled: Boolean(id) && !authLoading,
-    staleTime: 2 * 60 * 1000,
-  });
-  const cls = classPage?.cls || null;
-  const members = classPage?.members || [];
-  const assignments = classPage?.assignments || [];
-
-  useEffect(() => {
-    if (classPage && !classPage.authorized) router.replace("/classes");
-  }, [classPage, router]);
-
-  const { data: problemCatalog = [] } = useQuery({
-    queryKey: ["problems", "assignment-picker"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("problems")
-        .select("id, title_i18n");
-      if (error) throw error;
-      return (data || []).map((problem) => ({
-        ...problem,
-        title: problem.title_i18n?.en || "Untitled",
-      }));
-    },
-    enabled: problemOpen,
-    staleTime: 5 * 60 * 1000,
-  });
-  const problems = useMemo(() => {
-    const query = problemQuery.trim().toLowerCase();
-    if (!query) return [];
-    return problemCatalog
-      .filter((problem) => problem.title.toLowerCase().includes(query))
-      .slice(0, 5);
-  }, [problemCatalog, problemQuery]);
-
-  async function createAssignment() {
-    if (!assignmentTitle.trim() || selectedProblems.length === 0) return;
-
-    const payload: any = {
-      class_id: cls?.id,
-      title: assignmentTitle,
-      description: assignmentDescription,
-      deadline: assignmentDeadline || null,
-    };
-
-    payload.problem_ids = selectedProblems.map((p) => p.id);
-
-    let { data, error } = await supabase
-      .from("assignments")
-      .insert(payload)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Assignment insert error (multi):", error);
-
-      const fallbackPayload = {
-        ...payload,
-        problem_id: selectedProblems[0]?.id || null,
-      };
-
-      delete fallbackPayload.problem_ids;
-
-      const res = await supabase
-        .from("assignments")
-        .insert(fallbackPayload)
-        .select()
-        .single();
-
-      data = res.data;
-      error = res.error;
-
-      if (error) {
-        console.error("Assignment insert error (fallback):", error);
-        toast.error(
-          locale === "ro"
-            ? "Tema nu a putut fi creată."
-            : "The assignment could not be created.",
-          { description: error.message }
-        );
-        return;
-      }
-    }
-
-    if (data) {
-      queryClient.setQueryData<ClassPageData>(classQueryKey, (current) =>
-        current
-          ? { ...current, assignments: [data, ...current.assignments] }
-          : current
-      );
-
-      if (userId && cls?.id) {
-        try {
-          await api.notifications.createForNewAssignment({
-            actorId: userId,
-            assignmentId: data.id,
-            assignmentTitle,
-            classId: cls.id,
-            className: cls.name,
-          });
-        } catch (notificationError) {
-          console.warn(
-            "Assignment created, but participant notifications failed.",
-            notificationError
-          );
-        }
-      }
-
-      setAssignmentTitle("");
-      setAssignmentDescription("");
-      setAssignmentDeadline("");
-      setOpenAssignment(false);
-      setSelectedProblems([]);
-    }
-  }
-
-  const teacherName =
-    members.find((m) => m.role === "teacher")?.username || t("classes.roles.teacher");
-
-  if (loading || (classPage && !classPage.authorized)) {
-    return (
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <Skeleton className="h-40 w-full rounded-2xl" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-5 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="border rounded p-3 flex justify-between items-center">
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-40" />
-                      <Skeleton className="h-3 w-28" />
-                    </div>
-                    <Skeleton className="h-8 w-20" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-5 w-32" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Skeleton className="w-6 h-6 rounded-full" />
-                      <Skeleton className="h-4 w-24" />
-                    </div>
-                    <Skeleton className="h-3 w-12" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-5 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-10 w-full" />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-
-      <div className="relative rounded-2xl overflow-hidden border bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 text-white p-6 flex items-end justify-between">
-        <div className="space-y-2">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            {cls ? cls.name : t("classes.roles.teacher")}
-          </h1>
-          <p className="text-sm text-white/70">
-            {t("classes.detail.teacherLabel")} {teacherName}
-          </p>
-          <p className="text-xs text-white/50">
-            {t("classes.detail.inviteCodeLabel")}
-          </p>
-          <div className="inline-block px-3 py-1 rounded-md bg-white/10 backdrop-blur text-sm font-mono">
-            {cls?.invite_code || "—"}
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          {userId && cls?.teacher_id === userId && (
-            <Button
-              onClick={() => setOpenAssignment(true)}
-              className="bg-white text-black hover:bg-white/90 dark:!bg-white dark:!text-black dark:hover:!bg-white/90"
-            >
-              <Plus size={16} />
-              {t("classes.detail.newAssignment")}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        <div className="lg:col-span-2 space-y-4">
-
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {userId && cls?.teacher_id === userId
-                  ? t("classes.detail.assignments.titleTeacher")
-                  : t("classes.detail.assignments.titleStudent")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-80 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {assignments.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {userId && cls?.teacher_id === userId
-                    ? t("classes.detail.assignments.emptyTeacher")
-                    : t("classes.detail.assignments.emptyStudent")}
-                </p>
-              )}
-
-              {assignments.map((a) => (
-                <div key={a.id} className="border rounded p-3 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{a.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {a.deadline ? new Date(a.deadline).toLocaleString() : t("classes.detail.assignments.noDeadline")}
-                    </p>
-                  </div>
-
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      router.push(`/classes/${cls?.id}/assignments/${a.id}`)
-                    }
-                  >
-                    {t("classes.detail.assignments.open")}
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users size={16} /> {t("classes.detail.members")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-80 overflow-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {members.map((m) => (
-                <div key={m.id} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <UserAvatar
-                      avatarUrl={m.avatar_url}
-                      username={m.username}
-                      equippedRewards={m.equipped_rewards}
-                      className="w-6 h-6"
-                    />
-                    <span>{m.username}</span>
-                  </div>
-
-                  <span className="text-xs text-muted-foreground">{m.role}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <LinkIcon size={16} /> {t("classes.detail.invite.title")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {t("classes.detail.invite.shareText")}
-              </p>
-              <div className="mt-2 font-mono text-sm bg-muted p-2 rounded">
-                {cls?.invite_code || "—"}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-      </div>
-
-      <Dialog open={openAssignment} onOpenChange={setOpenAssignment}>
-        <DialogContent className="overflow-visible">
-          <DialogHeader>
-            <DialogTitle>{t("classes.detail.createAssignment.title")}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <Popover open={problemOpen} onOpenChange={setProblemOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between rounded-lg h-11 text-sm font-medium"
-                >
-                  {selectedProblems.length > 0 ? (
-                    <span className="truncate">
-                      {selectedProblems.length}{" "}
-                      {selectedProblems.length > 1
-                        ? t("classes.detail.createAssignment.problemsSelected")
-                        : t("classes.detail.createAssignment.problemSelected")}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">
-                      {t("classes.detail.createAssignment.selectProblem")}
-                    </span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-lg shadow-lg border">
-                <Command className="pt-1" loop>
-                  <CommandInput
-                    placeholder={t("classes.detail.createAssignment.searchProblem")}
-                    value={problemQuery}
-                    className="h-10 text-sm"
-                    onValueChange={(value) => {
-                      setProblemQuery(value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && problems.length > 0) {
-                        const p = problems[0];
-                        setSelectedProblems((prev) => {
-                          if (prev.find((x) => x.id === p.id)) return prev;
-                          return [...prev, p];
-                        });
-                        setProblemQuery("");
-                        setProblemOpen(false);
-                        setAssignmentTitle(p.title);
-                      }
-                    }}
-                  />
-
-                  <CommandList className="mt-1">
-                    <CommandEmpty>{t("classes.detail.createAssignment.noProblemsFound")}</CommandEmpty>
-
-                    {problems.map((p) => (
-                      <CommandItem
-                        key={p.id}
-                        value={p.title}
-                        className="text-sm cursor-pointer aria-selected:bg-muted"
-                        onSelect={() => {
-                          setSelectedProblems((prev) => {
-                            if (prev.find((x) => x.id === p.id)) return prev;
-                            return [...prev, p];
-                          });
-                          setProblemQuery("");
-                          setProblemOpen(false);
-                          setAssignmentTitle(p.title);
-                        }}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{p.title}</span>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
-            {selectedProblems.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {selectedProblems.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm border"
-                  >
-                    <span className="truncate max-w-[140px]">{p.title}</span>
-                    <button
-                      className="text-xs opacity-70 hover:opacity-100"
-                      onClick={() =>
-                        setSelectedProblems((prev) => prev.filter((x) => x.id !== p.id))
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Input
-              placeholder={t("classes.detail.createAssignment.titlePlaceholder")}
-              value={assignmentTitle}
-              onChange={(e) => setAssignmentTitle(e.target.value)}
-            />
-
-            <Input
-              placeholder={t("classes.detail.createAssignment.descriptionPlaceholder")}
-              value={assignmentDescription}
-              onChange={(e) => setAssignmentDescription(e.target.value)}
-            />
-
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full justify-start text-left font-normal">
-                  {assignmentDeadline
-                    ? format(new Date(assignmentDeadline), "PPP")
-                    : t("classes.detail.createAssignment.pickDeadline")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={assignmentDeadline ? new Date(assignmentDeadline) : undefined}
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                  onSelect={(date) => {
-                    if (date) {
-                      setAssignmentDeadline(date.toISOString());
-                      setCalendarOpen(false);
-                    }
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <DialogFooter>
-            <Button onClick={createAssignment}>{t("classes.detail.createAssignment.create")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-    </div>
-  );
+  return <PageContainer variant="wide" className="sx-page space-y-6">
+    <Button variant="ghost" size="sm" onClick={() => router.push("/classes")}><ArrowLeft className="size-4" />{c.back}</Button>
+    <PageHeader title={hub.classInfo.name} subtitle={hub.classInfo.description || (locale === "ro" ? `Administrată de ${hub.members.find((member) => member.role === "teacher")?.username || "profesor"}.` : `Managed by ${hub.members.find((member) => member.role === "teacher")?.username || "the teacher"}.`)} meta={<Badge variant="outline">{hub.role === "student" ? c.students.slice(0, -1) : hub.role === "admin" ? "Admin" : locale === "ro" ? "Profesor" : "Teacher"}</Badge>} action={hub.canManage && user ? <AssignmentDialog classId={hub.classInfo.id} className={hub.classInfo.name} userId={user.id} locale={locale} onCreated={refresh} /> : undefined} />
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><StatCard icon={Users} label={c.students} value={hub.totals.students} /><StatCard icon={ClipboardList} label={c.assignments} value={hub.totals.assignments} /><StatCard icon={CalendarDays} label={c.upcoming} value={hub.totals.upcomingAssignments} /><StatCard icon={Check} label={c.progress} value={`${hub.totals.completionRate}%`} /></section>
+    <Tabs defaultValue="overview" className="gap-5"><div className="overflow-x-auto border-b"><TabsList variant="line" className="min-w-max"><TabsTrigger value="overview">{c.overview}</TabsTrigger><TabsTrigger value="assignments">{c.assignments}</TabsTrigger><TabsTrigger value="resources">{c.resources}</TabsTrigger><TabsTrigger value="people">{c.people}</TabsTrigger><TabsTrigger value="calendar">{c.calendar}</TabsTrigger>{hub.canManage && <TabsTrigger value="analytics">{c.analytics}</TabsTrigger>}{hub.canManage && <TabsTrigger value="settings" onClick={initializeSettings}>{c.settings}</TabsTrigger>}</TabsList></div>
+      <TabsContent value="overview" className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]"><div className="space-y-4"><Card><CardHeader><CardTitle>{c.nextAssignment}</CardTitle></CardHeader><CardContent>{nextAssignment ? <AssignmentCard assignment={nextAssignment} locale={locale} classId={hub.classInfo.id} /> : <p className="py-8 text-center text-sm text-muted-foreground">{c.noAssignments}</p>}</CardContent></Card><Card><CardHeader><div className="flex items-center justify-between"><CardTitle>{c.announcements}</CardTitle>{hub.canManage && <Dialog open={announcementOpen} onOpenChange={setAnnouncementOpen}><DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="size-4" />{c.newAnnouncement}</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>{c.newAnnouncement}</DialogTitle></DialogHeader><Input value={announcementTitle} onChange={(event) => setAnnouncementTitle(event.target.value)} placeholder={c.announcementTitle} /><Textarea value={announcementBody} onChange={(event) => setAnnouncementBody(event.target.value)} placeholder={c.announcementBody} /><DialogFooter><Button onClick={createAnnouncement}>{c.publish}</Button></DialogFooter></DialogContent></Dialog>}</div></CardHeader><CardContent className="space-y-3">{hub.announcements.length ? hub.announcements.map((item) => <article key={item.id} className="rounded-[var(--sx-radius-control)] border p-4"><div className="flex items-center gap-2"><p className="font-medium">{item.title}</p>{item.pinned && <Badge variant="secondary">Pinned</Badge>}</div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{item.body}</p><p className="mt-3 text-xs text-muted-foreground">{formatDistanceToNow(new Date(item.published_at || item.created_at), { addSuffix: true, locale: locale === "ro" ? ro : undefined })}</p></article>) : <p className="py-8 text-center text-sm text-muted-foreground">{c.noAnnouncements}</p>}</CardContent></Card></div><div className="space-y-4"><Card><CardHeader><CardTitle>{c.activity}</CardTitle></CardHeader><CardContent className="space-y-3">{studentMembers.filter((member) => member.lastActivityAt).slice(0, 6).map((member) => <div key={member.id} className="flex items-center gap-3"><UserAvatar avatarUrl={member.avatar_url} username={member.username || "Student"} equippedRewards={member.equipped_rewards as never} className="size-8" /><div className="min-w-0"><p className="truncate text-sm font-medium">{member.username}</p><p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(member.lastActivityAt!), { addSuffix: true, locale: locale === "ro" ? ro : undefined })}</p></div></div>)}</CardContent></Card><Card><CardHeader><CardTitle>{c.progress}</CardTitle></CardHeader><CardContent><div className="mb-2 flex justify-between text-sm"><span className="text-muted-foreground">{hub.totals.completionRate}%</span><span>{hub.assignments.reduce((sum, item) => sum + item.completedProblems, 0)} / {hub.assignments.reduce((sum, item) => sum + item.expectedProblems, 0)}</span></div><Progress value={hub.totals.completionRate} /></CardContent></Card></div></TabsContent>
+      <TabsContent value="assignments" className="space-y-4"><div className="flex justify-end"><Select value={assignmentFilter} onValueChange={setAssignmentFilter}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{locale === "ro" ? "Toate temele" : "All assignments"}</SelectItem><SelectItem value="active">{c.published}</SelectItem><SelectItem value="scheduled">{c.scheduled}</SelectItem><SelectItem value="overdue">{c.overdue}</SelectItem><SelectItem value="draft">{c.draft}</SelectItem></SelectContent></Select></div><div className="grid gap-3 lg:grid-cols-2">{filteredAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} locale={locale} classId={hub.classInfo.id} />)}{!filteredAssignments.length && <Card className="border-dashed lg:col-span-2"><CardContent className="py-14 text-center text-muted-foreground">{c.noAssignments}</CardContent></Card>}</div></TabsContent>
+      <TabsContent value="resources"><Card><CardHeader><div className="flex items-center justify-between"><CardTitle>{c.resourceLibrary}</CardTitle>{hub.canManage && <Dialog open={resourceOpen} onOpenChange={setResourceOpen}><DialogTrigger asChild><Button size="sm"><Plus className="size-4" />{c.addResource}</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>{c.addResource}</DialogTitle></DialogHeader><Input value={resourceTitle} onChange={(event) => setResourceTitle(event.target.value)} placeholder={c.resourceTitle} /><Input type="url" value={resourceUrl} onChange={(event) => setResourceUrl(event.target.value)} placeholder={c.resourceUrl} /><DialogFooter><Button onClick={createResource}>{c.add}</Button></DialogFooter></DialogContent></Dialog>}</div></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">{hub.resources.map((resource) => <a key={resource.id} href={resource.url || "#"} target={resource.url ? "_blank" : undefined} rel="noreferrer" className="sx-interactive flex items-center gap-3 rounded-[var(--sx-radius-control)] border p-4 hover:bg-muted/50"><div className="flex size-9 items-center justify-center rounded-md bg-muted"><Link className="size-4" /></div><div className="min-w-0 flex-1"><p className="truncate font-medium">{resource.title}</p><p className="text-xs text-muted-foreground">{resource.resource_type}</p></div>{resource.url && <ExternalLink className="size-4 text-muted-foreground" />}</a>)}{!hub.resources.length && <p className="py-12 text-center text-sm text-muted-foreground md:col-span-2">{c.noResources}</p>}</CardContent></Card></TabsContent>
+      <TabsContent value="people"><Card><CardHeader><CardTitle>{c.studentProgress}</CardTitle></CardHeader><CardContent className="divide-y">{studentMembers.map((member) => <div key={member.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto] sm:items-center"><div className="flex items-center gap-3"><UserAvatar avatarUrl={member.avatar_url} username={member.username || "Student"} equippedRewards={member.equipped_rewards as never} className="size-9" /><div><p className="font-medium">{member.username}</p><p className="text-xs text-muted-foreground">{member.lastActivityAt ? `${c.lastActivity} ${formatDistanceToNow(new Date(member.lastActivityAt), { addSuffix: true, locale: locale === "ro" ? ro : undefined })}` : c.never}</p></div></div><div><Progress value={member.progress} /><p className="mt-1 text-xs text-muted-foreground">{member.progress}%</p></div><p className="text-sm tabular-nums">{member.completedProblems} / {member.assignedProblems}</p>{hub.canManage && <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon-sm" variant="ghost" aria-label="Member actions"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem variant="destructive" onClick={() => removeMember(member.id)}><Trash2 />{locale === "ro" ? "Elimină elevul" : "Remove student"}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}</div>)}</CardContent></Card></TabsContent>
+      <TabsContent value="calendar" className="grid gap-4 lg:grid-cols-[auto_1fr]"><Card><CardContent className="p-2"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} modifiers={{ hasEvent: hub.events.map((event) => new Date(event.starts_at)) }} modifiersClassNames={{ hasEvent: "font-semibold underline decoration-primary decoration-2 underline-offset-4" }} /></CardContent></Card><Card><CardHeader><div className="flex items-center justify-between"><CardTitle>{c.classCalendar}</CardTitle>{hub.canManage && <Dialog open={eventOpen} onOpenChange={setEventOpen}><DialogTrigger asChild><Button size="sm"><Plus className="size-4" />{c.addEvent}</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>{c.addEvent}</DialogTitle></DialogHeader><Input value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} placeholder={c.eventTitle} /><Calendar mode="single" selected={eventDate} onSelect={setEventDate} /><label className="space-y-1"><span className="text-sm font-medium">{c.time}</span><Input type="time" value={eventTime} onChange={(event) => setEventTime(event.target.value)} /></label><DialogFooter><Button onClick={createEvent}>{c.add}</Button></DialogFooter></DialogContent></Dialog>}</div></CardHeader><CardContent className="space-y-2">{dateEvents.map((event: ClassEvent) => <div key={event.id} className="rounded-[var(--sx-radius-control)] border p-4"><p className="font-medium">{event.title}</p><p className="mt-1 text-xs text-muted-foreground">{format(new Date(event.starts_at), "PPp")}</p></div>)}{!dateEvents.length && <p className="py-10 text-center text-sm text-muted-foreground">{c.noEvents}</p>}</CardContent></Card></TabsContent>
+      {hub.canManage && <TabsContent value="analytics" className="grid gap-4 lg:grid-cols-2"><Card><CardHeader><CardTitle>{c.studentProgress}</CardTitle></CardHeader><CardContent className="space-y-4">{studentMembers.slice(0, 8).map((member) => <div key={member.id}><div className="mb-1.5 flex justify-between text-sm"><span>{member.username}</span><span>{member.progress}%</span></div><Progress value={member.progress} /></div>)}</CardContent></Card><Card><CardHeader><CardTitle>{c.assignments}</CardTitle></CardHeader><CardContent className="space-y-4">{hub.assignments.slice(0, 8).map((assignment) => <div key={assignment.id}><div className="mb-1.5 flex justify-between text-sm"><span className="truncate">{assignment.title}</span><span>{assignment.completionRate}%</span></div><Progress value={assignment.completionRate} /></div>)}</CardContent></Card></TabsContent>}
+      {hub.canManage && <TabsContent value="settings"><div className="grid gap-4 lg:grid-cols-[1fr_22rem]"><Card><CardHeader><CardTitle>{c.classSettings}</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">{c.className}</span><Input value={settingsName} onChange={(event) => setSettingsName(event.target.value)} /></label><label className="space-y-1.5 sm:col-span-2"><span className="text-sm font-medium">{c.description}</span><Textarea value={settingsDescription} onChange={(event) => setSettingsDescription(event.target.value)} /></label><label className="space-y-1.5"><span className="text-sm font-medium">{c.subject}</span><Input value={settingsSubject} onChange={(event) => setSettingsSubject(event.target.value)} /></label><label className="space-y-1.5"><span className="text-sm font-medium">{c.schoolYear}</span><Input value={settingsYear} onChange={(event) => setSettingsYear(event.target.value)} /></label><div className="sm:col-span-2"><Button onClick={saveSettings}>{c.save}</Button></div></CardContent></Card><div className="space-y-4"><Card><CardHeader><CardTitle>{c.invitation}</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">{c.invitationHelp}</p><div className="flex gap-2"><Input readOnly value={hub.classInfo.invite_code || "—"} className="font-mono" /><Button size="icon" variant="outline" onClick={copyInvite} aria-label="Copy invitation code"><Copy /></Button></div><Button variant="outline" className="w-full" onClick={regenerateInvite}><RefreshCw className="size-4" />{c.regenerate}</Button></CardContent></Card><Card><CardContent><Button variant="destructive" className="w-full" onClick={archiveClass}><Archive className="size-4" />{c.archive}</Button></CardContent></Card></div></div></TabsContent>}
+    </Tabs>
+  </PageContainer>;
 }

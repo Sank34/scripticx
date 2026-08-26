@@ -3,6 +3,7 @@ export const onboardingMetadataKeys = {
   experience: "scripticx_experience_level",
   goal: "scripticx_learning_goal",
   interests: "scripticx_learning_interests",
+  language: "scripticx_default_language",
   persona: "scripticx_workspace_persona",
   required: "scripticx_onboarding_required",
   tourCompletedAt: "scripticx_product_tour_completed_at",
@@ -31,6 +32,7 @@ export type OnboardingDraft = {
   experience: OnboardingExperienceLevel;
   goal: OnboardingGoal;
   interests: string[];
+  language: "en" | "ro";
   persona: OnboardingPersona;
   username: string;
 };

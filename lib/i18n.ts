@@ -37,15 +37,33 @@ export const translations = {
 
     command: {
       title: "Command menu",
-      description: "Search pages, live sessions and profiles.",
+      description: "Search pages and run platform actions.",
       placeholder: "Type a command or search...",
       open: "Open command menu",
       empty: "No results found.",
       untitledSession: "Untitled session",
       groups: {
         navigation: "Navigation",
+        quickActions: "Quick actions",
+        editor: "Editor",
+        settings: "Settings",
         liveSessions: "Live sessions",
         participants: "Session participants",
+      },
+      actions: {
+        newProject: "Create a new project",
+        cloneGitHub: "Clone a project from GitHub",
+        openAccountProjects: "Open account projects",
+        newFile: "Create a project file",
+        sourceControl: "Open source control",
+        editorSettings: "Open editor settings",
+        openTerminal: "Open editor terminal",
+        startLiveShare: "Start Live Share",
+        editProfile: "Edit profile",
+        editPronouns: "Edit pronouns",
+        profileVisibility: "Configure public profile",
+        emailPreferences: "Configure email preferences",
+        accountSecurity: "Open account security",
       },
     },
 
@@ -324,6 +342,10 @@ export const translations = {
     network: {
       offlineTitle: "No network available",
       reconnecting: "Trying to reconnect in {seconds}s...",
+      retryNow: "Try now",
+      checking: "Checking...",
+      onlineTitle: "Back online",
+      onlineBody: "Refreshing your open data now.",
     },
 
     learn: {
@@ -363,7 +385,7 @@ export const translations = {
         },
         platform: {
           title: "What ScripticX adds around the language",
-          text: "The language is only one part of the learning flow. ScripticX also gives students a modern workspace where they can test code, save multi-file snippet projects, solve problems and collaborate live.",
+          text: "The language is only one part of the learning flow. ScripticX also gives students a modern workspace where they can test code, save multi-file projects, solve problems and collaborate live.",
           bullets: [
             "Automatic tests with per-case feedback",
             "Daily code challenges with bonus points",
@@ -518,36 +540,36 @@ export const translations = {
     },
 
     editor: {
-      title: "MiniScript+ Editor",
-      placeholderTitle: "Title",
-      placeholderDescription: "Description",
+      title: "ScripticX Editor",
+      placeholderTitle: "Project name",
+      placeholderDescription: "Project description",
 
       actions: {
-        newSnippet: "New snippet",
+        newSnippet: "New project",
         compile: "Compile code",
         step: "Step execution",
         run: "Run program",
-        download: "Download .msp",
-        save: "Save snippet",
-        update: "Update snippet",
-        share: "Share snippet",
+        download: "Download file",
+        save: "Save project",
+        update: "Update project",
+        share: "Share project",
       },
 
       githubImport: {
         action: "Import from GitHub",
-        title: "Import .msp files from GitHub",
-        description: "Paste a public GitHub repository link and ScripticX will add only the MiniScript+ files to the current project.",
+        title: "Import a project from GitHub",
+        description: "Paste a public GitHub repository link and ScripticX will preserve its supported source files and folders.",
         label: "GitHub repository link",
         placeholder: "https://github.com/user/repository",
-        hint: "Public repositories are supported in this quick version. Up to 30 .msp files are imported.",
+        hint: "Up to 30 files will be imported.",
         import: "Import files",
         importing: "Importing...",
         cancel: "Cancel",
         toast: {
           invalidUrl: "Paste a valid GitHub repository link.",
-          noFiles: "No .msp files were found in this repository.",
+          noFiles: "No supported source files were found in this repository.",
           failed: "Could not import files from GitHub.",
-          imported: "Imported {count} .msp file(s) from GitHub.",
+          imported: "Imported {count} file(s) from GitHub.",
         },
       },
 
@@ -595,39 +617,51 @@ export const translations = {
       },
 
       snippets: {
-        title: "My Snippets",
-        empty: "No snippets yet",
-        untitled: "Untitled",
-        edit: "Edit snippet",
-        delete: "Delete snippet",
+        title: "My projects",
+        empty: "No saved projects yet",
+        untitled: "Untitled project",
+        edit: "Open project",
+        delete: "Delete project",
       },
 
       toast: {
         savedFile: "Saved file!",
         saveError: "Failed to save file",
-        snippetSaved: "Snippet saved",
-        snippetSaveError: "Failed to save snippet",
+        snippetSaved: "Project saved",
+        snippetSaveError: "Failed to save project",
         copied: "Link copied!",
-        deleteError: "Failed to delete snippet",
-        deleted: "Snippet deleted",
+        deleteError: "Failed to delete project",
+        deleted: "Project deleted",
       }
     },
 
     snippetPage: {
-      notFound: "Snippet not found",
-      untitled: "Untitled",
+      notFound: "Project not found",
+      notFoundDescription: "This project may be private, unavailable, or no longer shared.",
+      untitled: "Untitled project",
       unknownUser: "Unknown",
-      shared: "Shared a snippet",
+      shared: "Shared a project",
       public: "Public",
 
       actions: {
+        backToProjects: "Back to projects",
         copy: "Copy",
+        copied: "Copied",
         share: "Share",
         openEditor: "Open Editor",
       },
 
+      meta: {
+        file: "file",
+        files: "files",
+        sharedBy: "Shared by",
+      },
+
       code: {
-        title: "Code",
+        title: "Source files",
+        empty: "Empty file",
+        fallbackFile: "main.msp",
+        fileNavigation: "Project files",
       },
 
       toast: {
@@ -640,26 +674,85 @@ export const translations = {
 
     problems: {
       title: "Problems",
+      subtitle: "Build confidence through focused practice and track your best result for every problem.",
       searchPlaceholder: "Search problems...",
 
+      actions: {
+        continue: "Continue practice",
+      },
+
+      stats: {
+        label: "Problem progress",
+        total: "Available",
+        solved: "Solved",
+        inProgress: "In progress",
+        completion: "Completion",
+      },
+
+      daily: {
+        title: "Daily challenge",
+        points: "pts",
+        open: "Open challenge",
+      },
+
+      library: {
+        title: "Problem library",
+        description: "Filter by difficulty or progress, then continue from your best score.",
+        result: "problem",
+        results: "problems",
+      },
+
       filters: {
+        label: "Filter by difficulty",
         all: "All",
         easy: "Easy",
         medium: "Medium",
         hard: "Hard",
       },
 
+      progressFilter: {
+        label: "Filter by progress",
+        all: "All progress",
+        notStarted: "Not started",
+        inProgress: "In progress",
+        solved: "Solved",
+      },
+
+      sort: {
+        label: "Sort problems",
+        code: "Sort by number",
+        difficulty: "Sort by difficulty",
+        progress: "Sort by progress",
+      },
+
       status: {
         solved: "Solved",
+        inProgress: "In progress",
         notStarted: "Not started",
+      },
+
+      empty: {
+        title: "No matching problems",
+        description: "Try a different search or reset the active filters.",
+        reset: "Reset filters",
+      },
+
+      error: {
+        title: "Problems are unavailable",
+        description: "The library could not be loaded. Check your connection and try again.",
+        retry: "Try again",
       }
     },
 
     problemPage: {
       notFound: "Problem not found",
+      panelNavigation: "Problem workspace panels",
+      resizePanel: "Resize problem panel",
 
       actions: {
+        back: "Back to problems",
         submit: "Submit",
+        submitting: "Submitting",
       },
 
       result: {
@@ -683,12 +776,26 @@ export const translations = {
       tabs: {
         description: "Problem",
         solution: "My solution",
+        submissions: "Submissions",
       },
 
       solution: {
         points: "points",
         successMessage: "Congratulations! Your code passed all tests.",
         encouragement: "Your code got partial credit. Review the examples, try to fix your solution, and submit again.",
+        emptyTitle: "No evaluation yet",
+        emptyDescription: "Submit your solution to run it against the problem test cases.",
+      },
+
+      submissions: {
+        title: "Submission history",
+        description: "Open an attempt to inspect and copy its submitted code.",
+        empty: "You have not submitted a solution yet.",
+        error: "Submission history could not be loaded.",
+      },
+
+      editor: {
+        label: "Problem code editor",
       },
 
       evaluation: {
@@ -877,12 +984,32 @@ export const translations = {
       recent: "Recent searches",
       noResults: "No users found",
       points: "pts",
+      title: "Search ScripticX",
+      subtitle: "Find people by username and open their public profiles.",
+      submit: "Search",
+      clearSearch: "Clear search",
+      suggested: "Profiles to explore",
+      suggestedDescription: "Active profiles from across the ScripticX community.",
+      recentDescription: "Continue from a previous search.",
+      clearRecent: "Clear history",
+      noRecent: "No recent searches",
+      noRecentDescription: "Your latest searches will appear here on this device.",
+      results: "Search results",
+      resultsDescription: "Profiles matching your current query.",
+      result: "profile",
+      resultsCount: "profiles",
+      noResultsDescription: "Try another username or check the spelling.",
+      loadError: "Profiles could not be loaded",
+      loadErrorDescription: "Check your connection and try this section again.",
+      retry: "Try again",
+      refreshing: "Updating results",
     },
 
     profile: {
       followers: "followers",
       following: "following",
       shareCopied: "Profile link copied!",
+      points: "Platform points",
 
       stats: {
         title: "Stats",
@@ -921,6 +1048,7 @@ export const translations = {
 
     publicProfile: {
       notFound: "User not found",
+      points: "Points",
 
       stats: {
         solved: "Solved",
@@ -995,10 +1123,17 @@ export const translations = {
       send: "Send",
 
       inviteTitle: "Invite Users",
+      inviteDescription: "Add ScripticX users to the current Live Share session.",
+      inviteLinkDescription: "Share the session link or invite people directly.",
+      copyInviteLink: "Copy link",
       searchPlaceholder: "Search users...",
       noInviteUsers: "No users found",
+      noInviteUsersDescription: "Try another username or follow people first.",
       inSession: "In session",
       inviteButton: "Invite",
+      inviting: "Inviting...",
+      following: "Following",
+      scripticxUser: "ScripticX user",
 
       toast: {
         userInSession: "User already in session",
@@ -1537,6 +1672,14 @@ export const translations = {
         title: "Lesson configurator",
         description: "Edit the roadmap, lesson nodes, and quizzes.",
       },
+      designSystem: {
+        cardTitle: "Design system",
+        cardDescription: "Review ScripticX interface tokens, components, and product rules.",
+        page: {
+          title: "design system",
+          description: "Welcome to the core of ScripticX’s design system: every component and typography rule, explained. :)",
+        },
+      },
       badgeManager: {
         title: "Badges",
         description: "Create achievement and event badges with custom icons.",
@@ -1679,8 +1822,8 @@ export const translations = {
             segment: "Audience segment",
             segmentHint: "Verified, opted-in users in the {segment} segment.",
             users: "Specific users",
-            usersHint: "{count} selected user IDs, filtered by verification and marketing consent.",
-            usersPlaceholder: "Paste user IDs separated by commas or new lines",
+            usersHint: "{count} selected usernames or user IDs, filtered by verification and marketing consent.",
+            usersPlaceholder: "Enter usernames or user IDs, separated by commas or new lines",
           },
           content: {
             subject: "Subject",
@@ -1831,6 +1974,27 @@ export const translations = {
 
     login: {
       title: "Welcome",
+      brandLabel: "ScripticX learning workspace",
+      brandTitle: "Learn, build and collaborate in one focused workspace.",
+      brandDescription: "Structured learning, practical challenges and a complete development environment for every stage of your programming journey.",
+      brandMessages: {
+        learn: {
+          keyword: "Learn",
+          statement: "with clarity.",
+        },
+        build: {
+          keyword: "Build",
+          statement: "with confidence.",
+        },
+        create: {
+          keyword: "Create",
+          statement: "what comes next.",
+        },
+      },
+      signInTitle: "Welcome back",
+      signInDescription: "Sign in to continue to your ScripticX workspace.",
+      registerTitle: "Create your account",
+      registerDescription: "Set up your account, then personalize your learning workspace.",
       tabs: {
         login: "Login",
         register: "Register",
@@ -1841,12 +2005,48 @@ export const translations = {
       loginButton: "Login",
       registerButton: "Create Account",
       googleButton: "Continue with Google",
-      or: "or continue with email",
+      githubButton: "Continue with GitHub",
+      or: "OR",
       forgotPassword: "Forgot your password?",
+      passwordless: {
+        open: "Other sign-in methods",
+        title: "Other sign-in methods",
+        description: "Access an existing account without entering your password.",
+        magicLink: "Magic link",
+        otp: "One-time code",
+        magicLinkDescription: "We will email you a secure link that signs you in.",
+        otpDescription: "We will email you a one-time code to enter here.",
+        sendMagicLink: "Send magic link",
+        sendCode: "Send code",
+        sentTitle: "Check your inbox",
+        magicLinkSent: "Open the secure link we sent to continue to your account.",
+        enterCode: "Enter your code",
+        otpSent: "Enter the one-time code sent to your email address.",
+        codeLabel: "One-time code",
+        verifyCode: "Verify code",
+        back: "Back",
+        done: "Done",
+        sendError: "The sign-in email could not be sent. Check the address and try again.",
+        codeError: "The code is invalid or has expired. Request a new code and try again.",
+      },
+      registration: {
+        step: "Email verification",
+        verifyTitle: "Verify your email",
+        verifyDescription: "Confirm the link we sent. Your workspace stays locked until the email address is verified.",
+        sentTo: "Confirmation sent to",
+        resend: "Resend email",
+        checkVerification: "I've verified my email",
+        verifyHint: "You'll need to verify your account to access the ScripticX Platform. Check your inbox, including the spam folder :)",
+        backToLogin: "Back to login",
+        signOut: "Sign out from this account",
+        signOutError: "This account could not be signed out. Please try again.",
+        stillPending: "The email address has not been confirmed yet.",
+      },
       modal: {
         loginErrorTitle: "Unable to sign in",
         registerErrorTitle: "Unable to sign up",
         googleErrorTitle: "Google sign-in could not start",
+        githubErrorTitle: "GitHub sign-in could not start",
         usernameRequired: "Username is required",
         profileError: "Your account was created, but the profile could not be saved.",
         verificationRequiredTitle: "Verify your email",
@@ -1864,6 +2064,8 @@ export const translations = {
     authCallback: {
       title: "Signing you in",
       description: "We are securely completing your sign-in and account verification.",
+      verifiedTitle: "Your account has been verified successfully!",
+      verifiedDescription: "You can close this tab now and return to your previous tab to start the tour :)",
       errorTitle: "Sign-in could not be completed",
       profileError: "Your account was connected, but the ScripticX profile could not be created.",
       timeout: "The sign-in response took too long. Please try again.",
@@ -1903,13 +2105,52 @@ export const translations = {
       noFile: "No file selected",
 
       account: "Account",
+      email: "Email",
       username: "Username",
       bio: "Bio",
+      pronouns: "Pronouns",
+      pronounsPlaceholder: "e.g. she/her, he/him, they/them",
+      pronounsHint: "Optional. Leave this empty to hide it from your profile.",
 
       social: "Social Links",
       github: "GitHub Profile",
       twitter: "Twitter (X) Profile",
       website: "Website",
+
+      publicProfile: {
+        title: "Public profile",
+        description: "Choose which widgets other people can see on your public profile.",
+        items: {
+          points: {
+            title: "Platform points",
+            description: "Show your total score earned across ScripticX.",
+          },
+          activity: {
+            title: "Activity map",
+            description: "Show your daily problem and submission activity.",
+          },
+          stats: {
+            title: "Learning statistics",
+            description: "Show solved problems, average score, and streak.",
+          },
+          achievements: {
+            title: "Achievements",
+            description: "Show badges and achievements you have unlocked.",
+          },
+          posts: {
+            title: "Recent posts",
+            description: "Show your latest public community posts.",
+          },
+          submissions: {
+            title: "Recent submissions",
+            description: "Show your latest problem results and scores.",
+          },
+          socialLinks: {
+            title: "Social links",
+            description: "Show the GitHub, X, and website links from your profile.",
+          },
+        },
+      },
 
       saveProfile: "Save Profile Changes",
 
@@ -2045,15 +2286,33 @@ export const translations = {
 
     command: {
       title: "Meniu de comenzi",
-      description: "Caută pagini, sesiuni live și profiluri.",
+      description: "Caută pagini și rulează acțiuni ale platformei.",
       placeholder: "Scrie o comandă sau caută...",
       open: "Deschide meniul de comenzi",
       empty: "Nu s-au găsit rezultate.",
       untitledSession: "Sesiune fără titlu",
       groups: {
         navigation: "Navigare",
+        quickActions: "Acțiuni rapide",
+        editor: "Editor",
+        settings: "Setări",
         liveSessions: "Sesiuni live",
         participants: "Participanți în sesiuni",
+      },
+      actions: {
+        newProject: "Creează un proiect nou",
+        cloneGitHub: "Clonează un proiect din GitHub",
+        openAccountProjects: "Deschide proiectele contului",
+        newFile: "Creează un fișier în proiect",
+        sourceControl: "Deschide controlul sursei",
+        editorSettings: "Deschide setările editorului",
+        openTerminal: "Deschide terminalul editorului",
+        startLiveShare: "Pornește Live Share",
+        editProfile: "Editează profilul",
+        editPronouns: "Editează pronumele",
+        profileVisibility: "Configurează profilul public",
+        emailPreferences: "Configurează preferințele email",
+        accountSecurity: "Deschide securitatea contului",
       },
     },
 
@@ -2332,6 +2591,10 @@ export const translations = {
     network: {
       offlineTitle: "Nu există conexiune la internet",
       reconnecting: "Încerc reconectarea în {seconds}s...",
+      retryNow: "Încearcă acum",
+      checking: "Verific...",
+      onlineTitle: "Conexiunea a revenit",
+      onlineBody: "Actualizăm acum datele deschise.",
     },
 
     learn: {
@@ -2526,36 +2789,36 @@ export const translations = {
     },
 
     editor: {
-      title: "Editor MiniScript+",
-      placeholderTitle: "Titlu",
-      placeholderDescription: "Descriere",
+      title: "Editor ScripticX",
+      placeholderTitle: "Numele proiectului",
+      placeholderDescription: "Descrierea proiectului",
 
       actions: {
-        newSnippet: "Snippet nou",
+        newSnippet: "Proiect nou",
         compile: "Compilează codul",
         step: "Execuție pas cu pas",
         run: "Rulează programul",
-        download: "Descarcă .msp",
-        save: "Salvează snippet",
-        update: "Actualizează snippet",
-        share: "Distribuie snippet",
+        download: "Descarcă fișierul",
+        save: "Salvează proiectul",
+        update: "Actualizează proiectul",
+        share: "Distribuie proiectul",
       },
 
       githubImport: {
         action: "Importă din GitHub",
-        title: "Importă fișiere .msp din GitHub",
-        description: "Introdu linkul unui repository public GitHub, iar ScripticX va adăuga doar fișierele MiniScript+ în proiectul curent.",
+        title: "Importă un proiect din GitHub",
+        description: "Introdu linkul unui repository public GitHub, iar ScripticX va păstra fișierele sursă și directoarele acceptate.",
         label: "Link repository GitHub",
         placeholder: "https://github.com/user/repository",
-        hint: "În varianta rapidă sunt acceptate repository-uri publice. Se importă maximum 30 de fișiere .msp.",
+        hint: "Vor fi importate maximum 30 de fișiere.",
         import: "Importă fișiere",
         importing: "Se importă...",
         cancel: "Anulează",
         toast: {
           invalidUrl: "Introdu un link valid de repository GitHub.",
-          noFiles: "Nu am găsit fișiere .msp în acest repository.",
+          noFiles: "Nu am găsit fișiere sursă acceptate în acest repository.",
           failed: "Nu am putut importa fișierele din GitHub.",
-          imported: "Am importat {count} fișier(e) .msp din GitHub.",
+          imported: "Am importat {count} fișier(e) din GitHub.",
         },
       },
 
@@ -2603,39 +2866,51 @@ export const translations = {
       },
 
       snippets: {
-        title: "Snippet-urile mele",
-        empty: "Nu ai snippet-uri încă",
-        untitled: "Fără titlu",
-        edit: "Editează snippet",
-        delete: "Șterge snippet",
+        title: "Proiectele mele",
+        empty: "Nu ai proiecte salvate încă",
+        untitled: "Proiect fără titlu",
+        edit: "Deschide proiectul",
+        delete: "Șterge proiectul",
       },
 
       toast: {
         savedFile: "Fișier salvat!",
         saveError: "Eroare la salvare fișier",
-        snippetSaved: "Snippet salvat",
-        snippetSaveError: "Eroare la salvare snippet",
+        snippetSaved: "Proiect salvat",
+        snippetSaveError: "Eroare la salvarea proiectului",
         copied: "Link copiat!",
         deleteError: "Eroare la ștergere",
-        deleted: "Snippet șters",
+        deleted: "Proiect șters",
       }
     },
 
     snippetPage: {
-      notFound: "Snippet-ul nu a fost găsit",
-      untitled: "Fără titlu",
+      notFound: "Proiectul nu a fost găsit",
+      notFoundDescription: "Proiectul poate fi privat, indisponibil sau nu mai este distribuit.",
+      untitled: "Proiect fără titlu",
       unknownUser: "Necunoscut",
-      shared: "A distribuit un snippet",
+      shared: "A distribuit un proiect",
       public: "Public",
 
       actions: {
+        backToProjects: "Înapoi la proiecte",
         copy: "Copiază",
+        copied: "Copiat",
         share: "Distribuie",
         openEditor: "Deschide editorul",
       },
 
+      meta: {
+        file: "fișier",
+        files: "fișiere",
+        sharedBy: "Distribuit de",
+      },
+
       code: {
-        title: "Cod",
+        title: "Fișiere sursă",
+        empty: "Fișier gol",
+        fallbackFile: "main.msp",
+        fileNavigation: "Fișierele proiectului",
       },
 
       toast: {
@@ -2648,26 +2923,85 @@ export const translations = {
 
     problems: {
       title: "Probleme",
+      subtitle: "Exersează concentrat, consolidează conceptele și urmărește cel mai bun rezultat pentru fiecare problemă.",
       searchPlaceholder: "Caută probleme...",
 
+      actions: {
+        continue: "Continuă exercițiul",
+      },
+
+      stats: {
+        label: "Progresul problemelor",
+        total: "Disponibile",
+        solved: "Rezolvate",
+        inProgress: "În lucru",
+        completion: "Progres total",
+      },
+
+      daily: {
+        title: "Provocarea zilei",
+        points: "pct",
+        open: "Deschide provocarea",
+      },
+
+      library: {
+        title: "Biblioteca de probleme",
+        description: "Filtrează după dificultate sau progres și continuă de la cel mai bun scor.",
+        result: "problemă",
+        results: "probleme",
+      },
+
       filters: {
+        label: "Filtrează după dificultate",
         all: "Toate",
         easy: "Ușor",
         medium: "Mediu",
         hard: "Greu",
       },
 
+      progressFilter: {
+        label: "Filtrează după progres",
+        all: "Orice progres",
+        notStarted: "Neîncepute",
+        inProgress: "În lucru",
+        solved: "Rezolvate",
+      },
+
+      sort: {
+        label: "Sortează problemele",
+        code: "Sortează după număr",
+        difficulty: "Sortează după dificultate",
+        progress: "Sortează după progres",
+      },
+
       status: {
         solved: "Rezolvat",
+        inProgress: "În lucru",
         notStarted: "Neînceput",
+      },
+
+      empty: {
+        title: "Nicio problemă potrivită",
+        description: "Încearcă o altă căutare sau resetează filtrele active.",
+        reset: "Resetează filtrele",
+      },
+
+      error: {
+        title: "Problemele nu sunt disponibile",
+        description: "Biblioteca nu a putut fi încărcată. Verifică conexiunea și încearcă din nou.",
+        retry: "Încearcă din nou",
       }
     },
 
     problemPage: {
       notFound: "Problema nu a fost găsită",
+      panelNavigation: "Panourile spațiului de rezolvare",
+      resizePanel: "Redimensionează panoul problemei",
 
       actions: {
+        back: "Înapoi la probleme",
         submit: "Trimite",
+        submitting: "Se trimite",
       },
 
       result: {
@@ -2691,12 +3025,26 @@ export const translations = {
       tabs: {
         description: "Cerință",
         solution: "Soluția mea",
+        submissions: "Submisii",
       },
 
       solution: {
         points: "puncte",
         successMessage: "Felicitări! Codul tău a trecut toate testele.",
         encouragement: "Codul tău a obținut un punctaj parțial. Analizează exemplele, încearcă să îți corectezi soluția și trimite o nouă soluție.",
+        emptyTitle: "Nicio evaluare încă",
+        emptyDescription: "Trimite soluția pentru a o rula pe testele problemei.",
+      },
+
+      submissions: {
+        title: "Istoricul submisiilor",
+        description: "Deschide o încercare pentru a vedea și copia codul trimis.",
+        empty: "Nu ai trimis încă nicio soluție.",
+        error: "Istoricul submisiilor nu a putut fi încărcat.",
+      },
+
+      editor: {
+        label: "Editorul de cod al problemei",
       },
 
       evaluation: {
@@ -2885,12 +3233,32 @@ export const translations = {
       recent: "Căutări recente",
       noResults: "Nu au fost găsiți utilizatori",
       points: "pct",
+      title: "Caută pe ScripticX",
+      subtitle: "Găsește persoane după username și deschide profilurile lor publice.",
+      submit: "Caută",
+      clearSearch: "Șterge căutarea",
+      suggested: "Profiluri de explorat",
+      suggestedDescription: "Profiluri active din comunitatea ScripticX.",
+      recentDescription: "Continuă de la o căutare anterioară.",
+      clearRecent: "Șterge istoricul",
+      noRecent: "Nu există căutări recente",
+      noRecentDescription: "Ultimele căutări vor apărea aici pe acest dispozitiv.",
+      results: "Rezultatele căutării",
+      resultsDescription: "Profiluri care corespund căutării curente.",
+      result: "profil",
+      resultsCount: "profiluri",
+      noResultsDescription: "Încearcă alt username sau verifică ortografia.",
+      loadError: "Profilurile nu au putut fi încărcate",
+      loadErrorDescription: "Verifică conexiunea și încearcă din nou această secțiune.",
+      retry: "Încearcă din nou",
+      refreshing: "Se actualizează rezultatele",
     },
 
     profile: {
       followers: "followers",
       following: "following",
       shareCopied: "Link profil copiat!",
+      points: "Puncte pe platformă",
 
       stats: {
         title: "Statistici",
@@ -2929,6 +3297,7 @@ export const translations = {
 
     publicProfile: {
       notFound: "Utilizator negăsit",
+      points: "Puncte",
 
       stats: {
         solved: "Rezolvate",
@@ -3003,10 +3372,17 @@ export const translations = {
       send: "Trimite",
 
       inviteTitle: "Invită utilizatori",
+      inviteDescription: "Adaugă utilizatori ScripticX în sesiunea Live Share curentă.",
+      inviteLinkDescription: "Distribuie linkul sesiunii sau invită persoane direct.",
+      copyInviteLink: "Copiază linkul",
       searchPlaceholder: "Caută utilizatori...",
       noInviteUsers: "Nu am găsit utilizatori",
+      noInviteUsersDescription: "Încearcă alt username sau urmărește mai întâi câteva persoane.",
       inSession: "În sesiune",
       inviteButton: "Invită",
+      inviting: "Se invită...",
+      following: "Urmărești",
+      scripticxUser: "Utilizator ScripticX",
 
       toast: {
         userInSession: "Utilizatorul este deja în sesiune",
@@ -3549,6 +3925,14 @@ export const translations = {
         title: "Configurator lecții",
         description: "Editează roadmap-ul, nodurile și quiz-urile lecțiilor.",
       },
+      designSystem: {
+        cardTitle: "Sistem de design",
+        cardDescription: "Consultă token-urile, componentele și regulile de interfață ScripticX.",
+        page: {
+          title: "sistem de design",
+          description: "Bine ai venit în centrul sistemului de design ScripticX: fiecare componentă și regulă tipografică, explicată. :)",
+        },
+      },
       badgeManager: {
         title: "Badge-uri",
         description: "Creează badge-uri pentru realizări și evenimente, cu iconuri custom.",
@@ -3691,8 +4075,8 @@ export const translations = {
             segment: "Segment de public",
             segmentHint: "Utilizatori verificați și abonați din segmentul {segment}.",
             users: "Utilizatori specifici",
-            usersHint: "{count} ID-uri selectate, filtrate după verificare și consimțământ.",
-            usersPlaceholder: "Lipește ID-uri separate prin virgulă sau pe linii noi",
+            usersHint: "{count} username-uri sau ID-uri selectate, filtrate după verificare și consimțământ.",
+            usersPlaceholder: "Introdu username-uri sau ID-uri, separate prin virgulă ori pe linii noi",
           },
           content: {
             subject: "Subiect",
@@ -3843,6 +4227,27 @@ export const translations = {
 
     login: {
       title: "Bine ai venit",
+      brandLabel: "Workspace-ul educațional ScripticX",
+      brandTitle: "Învață, construiește și colaborează într-un singur workspace.",
+      brandDescription: "Învățare structurată, probleme practice și un mediu complet de dezvoltare pentru fiecare etapă a progresului tău.",
+      brandMessages: {
+        learn: {
+          keyword: "Învață",
+          statement: "cu claritate.",
+        },
+        build: {
+          keyword: "Construiește",
+          statement: "cu încredere.",
+        },
+        create: {
+          keyword: "Creează",
+          statement: "ce urmează.",
+        },
+      },
+      signInTitle: "Bine ai revenit",
+      signInDescription: "Autentifică-te pentru a continua în workspace-ul ScripticX.",
+      registerTitle: "Creează-ți contul",
+      registerDescription: "Configurează contul, apoi personalizează-ți workspace-ul de învățare.",
       tabs: {
         login: "Autentificare",
         register: "Înregistrare",
@@ -3853,12 +4258,48 @@ export const translations = {
       loginButton: "Autentificare",
       registerButton: "Creează cont",
       googleButton: "Continuă cu Google",
-      or: "sau continuă cu email",
+      githubButton: "Continuă cu GitHub",
+      or: "SAU",
       forgotPassword: "Ai uitat parola?",
+      passwordless: {
+        open: "Alte metode de autentificare",
+        title: "Alte metode de autentificare",
+        description: "Accesează un cont existent fără să introduci parola.",
+        magicLink: "Link securizat",
+        otp: "Cod unic",
+        magicLinkDescription: "Îți trimitem pe email un link securizat pentru autentificare.",
+        otpDescription: "Îți trimitem pe email un cod unic pe care îl introduci aici.",
+        sendMagicLink: "Trimite linkul",
+        sendCode: "Trimite codul",
+        sentTitle: "Verifică emailul",
+        magicLinkSent: "Deschide linkul securizat trimis pentru a continua în cont.",
+        enterCode: "Introdu codul",
+        otpSent: "Introdu codul unic trimis la adresa ta de email.",
+        codeLabel: "Cod unic",
+        verifyCode: "Verifică codul",
+        back: "Înapoi",
+        done: "Gata",
+        sendError: "Emailul de autentificare nu a putut fi trimis. Verifică adresa și încearcă din nou.",
+        codeError: "Codul este incorect sau a expirat. Solicită un cod nou și încearcă din nou.",
+      },
+      registration: {
+        step: "Verificarea emailului",
+        verifyTitle: "Verifică adresa de email",
+        verifyDescription: "Confirmă linkul trimis. Workspace-ul rămâne blocat până când adresa de email este verificată.",
+        sentTo: "Confirmare trimisă la",
+        resend: "Retrimite emailul",
+        checkVerification: "Am verificat emailul",
+        verifyHint: "Trebuie să îți verifici contul pentru a accesa platforma ScripticX. Verifică inboxul, inclusiv folderul Spam :)",
+        backToLogin: "Înapoi la autentificare",
+        signOut: "Deconectează-te de la acest cont",
+        signOutError: "Nu te-am putut deconecta de la acest cont. Încearcă din nou.",
+        stillPending: "Adresa de email nu a fost confirmată încă.",
+      },
       modal: {
         loginErrorTitle: "Nu te-ai putut autentifica",
         registerErrorTitle: "Nu te-ai putut înregistra",
         googleErrorTitle: "Autentificarea Google nu a putut porni",
+        githubErrorTitle: "Autentificarea GitHub nu a putut porni",
         usernameRequired: "Numele de utilizator este necesar",
         profileError: "Contul a fost creat, dar profilul nu a putut fi salvat.",
         verificationRequiredTitle: "Verifică adresa de email",
@@ -3876,6 +4317,8 @@ export const translations = {
     authCallback: {
       title: "Te autentificăm",
       description: "Finalizăm în siguranță autentificarea și verificarea contului.",
+      verifiedTitle: "Contul tău a fost verificat cu succes!",
+      verifiedDescription: "Poți închide acest tab acum și reveni la tabul anterior pentru a începe turul :)",
       errorTitle: "Autentificarea nu a putut fi finalizată",
       profileError: "Contul a fost conectat, dar profilul ScripticX nu a putut fi creat.",
       timeout: "Răspunsul de autentificare a durat prea mult. Încearcă din nou.",
@@ -3915,13 +4358,52 @@ export const translations = {
       noFile: "Niciun fișier selectat",
 
       account: "Cont",
+      email: "Email",
       username: "Nume utilizator",
       bio: "Bio",
+      pronouns: "Pronume",
+      pronounsPlaceholder: "ex. ea/ei, el/lui, ei/lor",
+      pronounsHint: "Opțional. Lasă câmpul gol pentru a nu fi afișat pe profil.",
 
       social: "Link-uri sociale",
       github: "Profil GitHub",
       twitter: "Profil Twitter (X)",
       website: "Website",
+
+      publicProfile: {
+        title: "Profil public",
+        description: "Alege ce widgeturi pot vedea ceilalți pe profilul tău public.",
+        items: {
+          points: {
+            title: "Puncte pe platformă",
+            description: "Afișează punctajul total obținut pe ScripticX.",
+          },
+          activity: {
+            title: "Harta activității",
+            description: "Afișează activitatea zilnică de probleme și submisii.",
+          },
+          stats: {
+            title: "Statistici de învățare",
+            description: "Afișează problemele rezolvate, media și streak-ul.",
+          },
+          achievements: {
+            title: "Realizări",
+            description: "Afișează badge-urile și realizările deblocate.",
+          },
+          posts: {
+            title: "Postări recente",
+            description: "Afișează cele mai recente postări publice din comunitate.",
+          },
+          submissions: {
+            title: "Submisii recente",
+            description: "Afișează ultimele rezultate și punctaje la probleme.",
+          },
+          socialLinks: {
+            title: "Linkuri sociale",
+            description: "Afișează linkurile GitHub, X și website din profil.",
+          },
+        },
+      },
 
       saveProfile: "Salvează modificările profilului",
 

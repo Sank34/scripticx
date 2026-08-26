@@ -78,7 +78,7 @@ function LockdownContent() {
             <LockKeyhole className="size-6" />
           </div>
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               ScripticX
             </p>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">

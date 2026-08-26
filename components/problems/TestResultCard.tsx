@@ -28,16 +28,16 @@ export function TestResultCard({ index, labels, result }: TestResultCardProps) {
     : String(result.input);
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card text-card-foreground">
-      <div className="flex items-center justify-between border-b bg-muted/60 px-4 py-2.5">
+    <div className="sx-surface overflow-hidden">
+      <div className="flex items-center justify-between border-b bg-muted/25 px-4 py-2.5">
         <p className="text-sm font-semibold text-foreground">
           {labels.test} #{index + 1}
         </p>
         <span
-          className={`rounded px-2 py-1 text-xs font-medium ${
+          className={`rounded-[var(--sx-radius-control)] px-2 py-1 text-xs font-medium ${
             result.passed
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-              : "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300"
+              ? "bg-[var(--sx-success-soft)] text-[var(--sx-success)]"
+              : "bg-destructive/10 text-destructive"
           }`}
         >
           {result.passed ? labels.correct : labels.wrong}
@@ -70,7 +70,7 @@ function TestOutputBlock({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
-      <pre className="whitespace-pre-wrap break-all rounded bg-muted px-3 py-2 font-mono text-xs text-foreground">
+      <pre className="whitespace-pre-wrap break-all rounded-[var(--sx-radius-control)] bg-muted/60 px-3 py-2 font-mono text-xs text-foreground">
         {value}
       </pre>
     </div>

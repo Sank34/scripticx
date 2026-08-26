@@ -1,41 +1,36 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-} from "recharts";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
+import { WorkspaceAccessGuard } from "@/components/workspaces/WorkspaceAccessGuard";
 import { EmptyState } from "@/components/common/EmptyState";
 import { SectionCard } from "@/components/common/SectionCard";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  Activity,
   ArrowUpRight,
-  CalendarDays,
-  CheckCircle2,
-  Flame,
-  Target,
-  Trophy,
 } from "lucide-react";
 import { getLocalized } from "@/lib/getLocalized";
 import { useLanguage } from "@/components/LanguageProvider";
 import { api, type DailyChallenge } from "@/lib/api";
 
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RouteLoadingSkeleton } from "@/components/loading/RouteLoadingSkeleton";
+
+const DashboardCharts = dynamic(
+  () =>
+    import("@/components/dashboard/DashboardCharts").then(
+      (module) => module.DashboardCharts
+    ),
+  {
+    ssr: false,
+    loading: () => <div className="h-[340px] animate-pulse rounded-2xl bg-muted" />,
+  }
+);
 
 type DashboardStats = {
   solved: number;
@@ -50,27 +45,6 @@ type DashboardData = {
   feed: any[];
   dailyChallenge: DailyChallenge | null;
   dailySolved: boolean;
-};
-
-const CHART_TOOLTIP_CONTENT_STYLE: CSSProperties = {
-  backgroundColor: "var(--popover)",
-  border: "1px solid var(--border)",
-  borderRadius: "0.75rem",
-  boxShadow: "0 12px 30px rgb(0 0 0 / 0.18)",
-  color: "var(--popover-foreground)",
-  fontSize: "0.75rem",
-  padding: "0.625rem 0.75rem",
-};
-
-const CHART_TOOLTIP_LABEL_STYLE: CSSProperties = {
-  color: "var(--popover-foreground)",
-  fontWeight: 600,
-  marginBottom: "0.25rem",
-};
-
-const CHART_TOOLTIP_ITEM_STYLE: CSSProperties = {
-  color: "var(--popover-foreground)",
-  padding: 0,
 };
 
 function DashboardContent() {
@@ -93,7 +67,12 @@ function DashboardContent() {
       };
     }
 
-    const [{ data }, dailyChallenge] = await Promise.all([
+    const [
+      { data: submissions },
+      dailyChallenge,
+      { data: users },
+      { data: following },
+    ] = await Promise.all([
       supabase
         .from("submissions")
         .select(`
@@ -109,22 +88,18 @@ function DashboardContent() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
       api.dailyChallenges.getForDate(),
+      supabase
+        .from("profiles")
+        .select("id, username, avatar_url, total_score, equipped_rewards")
+        .order("total_score", { ascending: false })
+        .limit(5),
+      supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", user.id),
     ]);
 
-    if (!data) {
-      return {
-        stats: {
-          solved: 0,
-          total: 0,
-          average: 0,
-        },
-        recent: [],
-        leaderboard: [],
-        feed: [],
-        dailyChallenge,
-        dailySolved: false,
-      };
-    }
+    const data = submissions || [];
 
     const best: Record<string, number> = {};
 
@@ -152,59 +127,44 @@ function DashboardContent() {
 
     const recent = data.slice(0, 5);
 
-    const { data: users } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url, total_score, equipped_rewards")
-      .order("total_score", { ascending: false })
-      .limit(5);
-
     const leaderboard = users || [];
-
-    let feed: any[] = [];
-
-    const { data: following } = await supabase
-      .from("follows")
-      .select("following_id")
-      .eq("follower_id", user.id);
-
     const ids = following?.map((f: any) => f.following_id) || [];
 
-    if (ids.length > 0) {
-      const { data: feedData } = await supabase
-        .from("submissions")
-        .select(`
-          score,
-          created_at,
-          user_id,
-          problem_id,
-          problems (title_i18n)
-        `)
-        .in("user_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(10);
+    const [{ data: feedData }, dailyCompletion] = await Promise.all([
+      ids.length
+        ? supabase
+            .from("submissions")
+            .select(`
+              score,
+              created_at,
+              user_id,
+              problem_id,
+              problems (title_i18n)
+            `)
+            .in("user_id", ids)
+            .order("created_at", { ascending: false })
+            .limit(10)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      dailyChallenge
+        ? api.dailyChallenges.getCompletion(dailyChallenge.id, user.id)
+        : Promise.resolve(null),
+    ]);
 
-      if (feedData) {
-        const userIds = [...new Set(feedData.map((f: any) => f.user_id))];
-
-        const { data: usersData } = await supabase
-          .from("profiles")
-          .select("id, username, avatar_url, equipped_rewards")
-          .in("id", userIds);
-
-        const userMap = Object.fromEntries(
-          (usersData || []).map((u: any) => [u.id, u])
-        );
-
-        feed = feedData.map((item: any) => ({
-          ...item,
-          profile: userMap[item.user_id],
-        }));
-      }
+    let feed: any[] = [];
+    if (feedData?.length) {
+      const userIds = [...new Set(feedData.map((item: any) => item.user_id))];
+      const { data: usersData } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, equipped_rewards")
+        .in("id", userIds);
+      const userMap = Object.fromEntries(
+        (usersData || []).map((profile: any) => [profile.id, profile])
+      );
+      feed = feedData.map((item: any) => ({
+        ...item,
+        profile: userMap[item.user_id],
+      }));
     }
-
-    const dailyCompletion = dailyChallenge
-      ? await api.dailyChallenges.getCompletion(dailyChallenge.id, user.id)
-      : null;
 
     return {
       stats,
@@ -223,6 +183,8 @@ function DashboardContent() {
     queryKey: ["dashboard", user?.id, locale],
     queryFn: fetchDashboardData,
     enabled: !!user,
+    staleTime: 1000 * 60 * 2,
+    placeholderData: (previousData) => previousData,
   });
 
   const stats = dashboardData?.stats || {
@@ -262,72 +224,53 @@ function DashboardContent() {
       color: "#ef4444",
     },
   ];
-  const hasScoreDistribution = scoreDistribution.some((item) => item.value > 0);
   const topUser = leaderboard[0];
 
   if (loading || !user) {
-    return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-4 w-60" />
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-
-        <Skeleton className="h-40 w-full" />
-      </div>
-    );
+    return <RouteLoadingSkeleton variant="dashboard" />;
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
-      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
-        <Card className="relative overflow-hidden border-0 bg-zinc-950 text-white ring-0">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(16,185,129,0.35),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(59,130,246,0.25),transparent_30%)]" />
-          <CardContent className="relative flex min-h-56 flex-col justify-between gap-8 p-6">
+    <div className="space-y-6">
+      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]" data-tour="dashboard-overview">
+        <Card className="overflow-hidden border-border bg-card shadow-none">
+          <CardContent className="flex min-h-56 flex-col justify-between gap-8 p-6 sm:p-8">
             <div>
-              <Badge className="mb-4 bg-white/10 text-white hover:bg-white/10">
+              <p className="mb-3 text-sm font-medium text-muted-foreground">
                 {locale === "ro" ? "Workspace personal" : "Personal workspace"}
-              </Badge>
-              <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
+              </p>
+              <h1 className="text-3xl font-semibold sm:text-4xl">
                 {t("dashboard.title")}
               </h1>
-              <p className="mt-2 max-w-xl text-sm text-white/65 sm:text-base">
+              <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
                 {locale === "ro"
                   ? "Urmărește progresul, revino la provocarea zilei și vezi cum evoluează rezolvările tale."
                   : "Track progress, jump back into today's challenge and see how your submissions evolve."}
               </p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid overflow-hidden rounded-xl border border-border sm:grid-cols-3 sm:divide-x">
               {[
                 {
                   label: t("dashboard.stats.solved"),
                   value: stats.solved,
-                  icon: CheckCircle2,
                 },
                 {
                   label: t("dashboard.stats.score"),
                   value: stats.total,
-                  icon: Target,
                 },
                 {
                   label: t("dashboard.stats.streak"),
                   value: `${stats.average}%`,
-                  icon: Flame,
                 },
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur"
+                  className="border-b border-border p-4 last:border-b-0 sm:border-b-0"
                 >
-                  <div className="flex items-center justify-between text-white/60">
-                    <span className="text-xs font-medium">{item.label}</span>
-                    <item.icon className="size-4" />
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {item.label}
                   </div>
-                  <div className="mt-3 text-3xl font-semibold">
+                  <div className="mt-2 text-2xl font-semibold tabular-nums">
                     {item.value}
                   </div>
                 </div>
@@ -336,10 +279,9 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-emerald-50 via-card to-sky-50 ring-emerald-500/20 dark:from-emerald-950/35 dark:via-card dark:to-sky-950/25 dark:ring-emerald-400/20">
+        <Card className="border-border bg-card shadow-none" data-tour="dashboard-daily-challenge">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-orange-500 dark:text-orange-400" />
+            <CardTitle>
               {locale === "ro" ? "Challenge-ul zilei" : "Daily challenge"}
             </CardTitle>
           </CardHeader>
@@ -347,7 +289,7 @@ function DashboardContent() {
             {dailyChallenge?.problems ? (
               <>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400">
+                  <p className="text-sm font-medium text-muted-foreground">
                     {dailySolved
                       ? t("problems.status.solved")
                       : locale === "ro"
@@ -395,128 +337,15 @@ function DashboardContent() {
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_0.72fr]">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="size-4 text-emerald-600 dark:text-emerald-400" />
-              {locale === "ro" ? "Evoluția scorurilor" : "Score trend"}
-            </CardTitle>
-            <Badge variant="secondary">
-              {locale === "ro" ? "ultimele rezultate" : "latest results"}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            {scoreTrend.length ? (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={scoreTrend}>
-                    <defs>
-                      <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      stroke="var(--border)"
-                      strokeDasharray="3 3"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="name"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{
-                        fill: "var(--muted-foreground)",
-                        fontSize: 12,
-                      }}
-                    />
-                    <Tooltip
-                      contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                      itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                      labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                      cursor={{
-                        stroke: "var(--muted-foreground)",
-                        strokeOpacity: 0.45,
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="score"
-                      stroke="#059669"
-                      strokeWidth={2}
-                      fill="url(#scoreGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <EmptyState className="py-10" title={t("dashboard.states.empty")} />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="size-4 text-blue-600 dark:text-blue-400" />
-              {locale === "ro" ? "Distribuția rezultatelor" : "Result mix"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-[180px_1fr] xl:grid-cols-1">
-            <div className="h-44">
-              {hasScoreDistribution ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={scoreDistribution}
-                      dataKey="value"
-                      innerRadius={48}
-                      outerRadius={72}
-                      paddingAngle={4}
-                      stroke="var(--card)"
-                      strokeWidth={2}
-                    >
-                      {scoreDistribution.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
-                      itemStyle={CHART_TOOLTIP_ITEM_STYLE}
-                      labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                      cursor={false}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <EmptyState className="py-8" title={t("dashboard.states.empty")} />
-              )}
-            </div>
-            <div className="space-y-2">
-              {scoreDistribution.map((item) => (
-                <div
-                  key={item.name}
-                  className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2"
-                >
-                  <span className="flex items-center gap-2 text-sm">
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    {item.name}
-                  </span>
-                  <span className="font-semibold">{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <DashboardCharts
+        emptyLabel={t("dashboard.states.empty")}
+        locale={locale}
+        scoreDistribution={scoreDistribution}
+        scoreTrend={scoreTrend}
+      />
 
       <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
         <SectionCard
-          icon={<Trophy className="size-4 text-yellow-500" />}
           title={t("leaderboard.title")}
           action={
             <a
@@ -612,7 +441,6 @@ function DashboardContent() {
       </section>
 
       <SectionCard
-        icon={<Activity className="size-4 text-orange-500" />}
         title={t("dashboard.sections.activity")}
         contentClassName="space-y-3"
       >
@@ -663,7 +491,9 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <RouteGuard requireAuth>
-      <DashboardContent />
+      <WorkspaceAccessGuard kind="personal">
+        <DashboardContent />
+      </WorkspaceAccessGuard>
     </RouteGuard>
   );
 }

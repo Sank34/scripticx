@@ -215,12 +215,12 @@ function escapeHtml(value: string) {
 }
 
 function paragraphHtml(content: string) {
-  return content
-    .trim()
-    .split(/\n{2,}/)
-    .map((paragraph) => {
+  const paragraphs = content.trim().split(/\n{2,}/);
+  return paragraphs
+    .map((paragraph, index) => {
       const safe = escapeHtml(paragraph).replaceAll("\n", "<br>");
-      return `<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">${safe}</p>`;
+      const margin = index === paragraphs.length - 1 ? "0" : "0 0 20px";
+      return `<p class="email-paragraph" style="margin:${margin};color:#3a3a3c;font-size:17px;line-height:1.65;font-weight:400;">${safe}</p>`;
     })
     .join("");
 }
@@ -249,36 +249,66 @@ function renderEmail(input: {
   const subject = escapeHtml(input.subject);
   const preheader = escapeHtml(input.preheader || input.subject);
   const actionHtml = input.actionLabel && input.actionUrl
-    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0 8px;"><tr><td style="border-radius:10px;background:#111827;"><a href="${escapeHtml(input.actionUrl)}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;">${escapeHtml(input.actionLabel)}</a></td></tr></table>`
+    ? `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:32px 0 0;"><tr><td class="email-button" bgcolor="#1d1d1f" style="border-radius:999px;background:#1d1d1f;"><a href="${escapeHtml(input.actionUrl)}" style="display:inline-block;padding:14px 24px;color:#ffffff;text-decoration:none;font-size:15px;line-height:20px;font-weight:600;">${escapeHtml(input.actionLabel)}&nbsp;&nbsp;›</a></td></tr></table>`
     : "";
   const unsubscribeHtml = input.unsubscribeUrl
-    ? `<p style="margin:14px 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">${ro ? "Primești acest mesaj deoarece te-ai abonat la emailurile ScripticX." : "You receive this because you subscribed to ScripticX emails."} <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#64748b;">${ro ? "Dezabonare" : "Unsubscribe"}</a>.</p>`
+    ? `<p style="margin:10px 0 0;color:#86868b;font-size:12px;line-height:1.55;">${ro ? "Primești acest mesaj deoarece te-ai abonat la emailurile ScripticX." : "You receive this because you subscribed to ScripticX emails."} <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#515154;text-decoration:underline;">${ro ? "Dezabonare" : "Unsubscribe"}</a>.</p>`
     : "";
   const logoUrl = absoluteUrl("/scripticx-logo-lung.png");
 
   const html = `<!doctype html>
-<html lang="${ro ? "ro" : "en"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
-<body style="margin:0;background:#f6f7fb;color:#0f172a;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:32px 12px;"><tr><td align="center">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;">
-    <tr><td style="padding:0 8px 20px;"><img src="${logoUrl}" width="150" alt="ScripticX" style="display:block;height:auto;border:0;"></td></tr>
-    <tr><td style="overflow:hidden;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;box-shadow:0 10px 30px rgba(15,23,42,.06);">
-      <div style="height:5px;background:linear-gradient(90deg,#0ea5e9,#6366f1,#8b5cf6);"></div>
-      <div style="padding:38px 38px 32px;">
-        <p style="margin:0 0 10px;color:#6366f1;font-size:13px;font-weight:700;">${escapeHtml(input.senderName)}</p>
-        <h1 style="margin:0 0 24px;color:#0f172a;font-size:29px;line-height:1.2;letter-spacing:-.025em;">${subject}</h1>
-        ${paragraphHtml(input.content)}
-        ${actionHtml}
-      </div>
-    </td></tr>
-    <tr><td style="padding:20px 10px;text-align:center;color:#94a3b8;font-size:12px;line-height:1.6;">
-      <p style="margin:0;">${ro ? "Învață, construiește și evoluează cu ScripticX." : "Learn, build and grow with ScripticX."}</p>
-      ${unsubscribeHtml}
-      <p style="margin:8px 0 0;">© ${new Date().getUTCFullYear()} ScripticX</p>
-    </td></tr>
-  </table>
-</td></tr></table>
+<html lang="${ro ? "ro" : "en"}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light">
+  <title>${subject}</title>
+  <style>
+    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    table { border-collapse: separate; border-spacing: 0; }
+    img { border: 0; line-height: 100%; }
+    a { color: inherit; }
+    @media only screen and (max-width: 620px) {
+      .email-page { padding: 28px 12px 32px !important; }
+      .email-logo { padding: 0 12px 18px !important; }
+      .email-card { border-radius: 22px !important; }
+      .email-content { padding: 38px 26px 34px !important; }
+      .email-title { font-size: 31px !important; line-height: 1.12 !important; letter-spacing: -0.5px !important; }
+      .email-meta { padding: 20px 26px !important; }
+      .email-footer { padding-left: 18px !important; padding-right: 18px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${preheader}&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;</div>
+<table class="email-page" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f5f5f7" style="width:100%;background:#f5f5f7;padding:44px 16px 40px;">
+  <tr><td align="center">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;">
+      <tr><td class="email-logo" align="center" style="padding:0 16px 24px;">
+        <img src="${logoUrl}" width="142" alt="ScripticX" style="display:block;width:142px;max-width:100%;height:auto;">
+      </td></tr>
+      <tr><td>
+        <table class="email-card" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#ffffff" style="width:100%;overflow:hidden;border:1px solid #e5e5e7;border-radius:28px;background:#ffffff;box-shadow:0 12px 34px rgba(0,0,0,0.045);">
+          <tr><td class="email-content" style="padding:52px 56px 48px;">
+            <p style="margin:0 0 18px;color:#6e6e73;font-size:13px;line-height:1.4;font-weight:600;">${escapeHtml(input.senderName)}</p>
+            <h1 class="email-title" style="margin:0 0 28px;color:#1d1d1f;font-size:38px;line-height:1.08;letter-spacing:-0.8px;font-weight:700;">${subject}</h1>
+            ${paragraphHtml(input.content)}
+            ${actionHtml}
+          </td></tr>
+          <tr><td class="email-meta" style="border-top:1px solid #ececee;padding:22px 56px;background:#fbfbfd;color:#6e6e73;font-size:12px;line-height:1.55;">
+            ${ro ? "Creat cu grijă de echipa ScripticX pentru următorul tău pas." : "Thoughtfully made by ScripticX for whatever you build next."}
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td class="email-footer" align="center" style="padding:24px 24px 0;color:#86868b;font-size:12px;line-height:1.55;text-align:center;">
+        <p style="margin:0;">${ro ? "Învață. Construiește. Evoluează." : "Learn. Build. Grow."}</p>
+        ${unsubscribeHtml}
+        <p style="margin:10px 0 0;">© ${new Date().getUTCFullYear()} ScripticX</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
 </body></html>`;
   return { html, text };
 }

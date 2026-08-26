@@ -59,16 +59,25 @@ export async function verifyPlatformAccessToken(
   if (!encodedPayload || !encodedSignature || extra) return null;
 
   try {
+    const payloadBytes = fromBase64Url(encodedPayload);
+    const signatureBytes = fromBase64Url(encodedSignature);
+    if (
+      toBase64Url(payloadBytes) !== encodedPayload ||
+      toBase64Url(signatureBytes) !== encodedSignature
+    ) {
+      return null;
+    }
+
     const valid = await crypto.subtle.verify(
       "HMAC",
       await importKey(secret),
-      fromBase64Url(encodedSignature),
+      signatureBytes,
       new TextEncoder().encode(encodedPayload)
     );
     if (!valid) return null;
 
     const payload = JSON.parse(
-      new TextDecoder().decode(fromBase64Url(encodedPayload))
+      new TextDecoder().decode(payloadBytes)
     ) as PlatformAccessPayload;
     if (
       !payload ||

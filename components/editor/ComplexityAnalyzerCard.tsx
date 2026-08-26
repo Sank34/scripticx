@@ -72,7 +72,7 @@ function ComplexityCircle({
           {score}%
         </div>
         <div
-          className={`${compact ? "text-[9px]" : "text-[10px]"} text-muted-foreground uppercase tracking-wide`}
+          className={`${compact ? "text-[9px]" : "text-[10px]"} font-medium text-muted-foreground`}
         >
           {label}
         </div>
@@ -185,7 +185,7 @@ export function ComplexityAnalyzerCard({
   if (frame === "section") {
     return (
       <section className="rounded-xl border bg-card text-card-foreground">
-        <div className="flex items-center gap-2 border-b px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex items-center gap-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
           <Gauge size={14} />
           {t("editor.complexity.title")}
         </div>

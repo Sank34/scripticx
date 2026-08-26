@@ -20,6 +20,12 @@ export type LearnLessonKind =
 
 export type LessonRuleKind = "required" | "bonus" | "challenge";
 
+export type LessonCompletionRequirement =
+  | "required"
+  | "optional"
+  | "bonus"
+  | "capstone";
+
 export type LearnLessonUnlockRule = {
   kind?: LessonRuleKind;
   locked?: boolean;
@@ -53,6 +59,8 @@ export type LearnLesson = {
   title: LocalizedText;
   summary: LocalizedText;
   transcript: LocalizedText;
+  /** Canonical long-form lesson body. Transcript remains as a legacy fallback. */
+  markdown?: LocalizedText;
   videoUrl?: string;
   tags: string[];
   level: "beginner" | "practice" | "challenge";
@@ -64,12 +72,14 @@ export type LearnLesson = {
   kind?: LearnLessonKind;
   theory?: LearnTheoryBlock[];
   challenge?: LearnChallenge;
+  completionRequirement?: LessonCompletionRequirement;
   unlockRule?: LearnLessonUnlockRule;
 };
 
 export type LearnSection = {
   id: string;
   order: number;
+  pathSlug?: string;
   label: LocalizedText;
   title: LocalizedText;
   description: LocalizedText;
@@ -845,6 +855,7 @@ export const learnSections: LearnSection[] = [
   {
     id: "fundamentals",
     order: 1,
+    pathSlug: "miniscript-plus",
     label: { en: "Section 1", ro: "Secțiunea 1" },
     title: { en: "Programming fundamentals", ro: "Fundamente de programare" },
     description: {
@@ -856,6 +867,7 @@ export const learnSections: LearnSection[] = [
   {
     id: "digits",
     order: 2,
+    pathSlug: "miniscript-plus",
     label: { en: "Section 2", ro: "Secțiunea 2" },
     title: { en: "Working with digits", ro: "Lucrul cu cifre" },
     description: {
@@ -867,6 +879,7 @@ export const learnSections: LearnSection[] = [
   {
     id: "classic-algorithms",
     order: 3,
+    pathSlug: "miniscript-plus",
     label: { en: "Section 3", ro: "Secțiunea 3" },
     title: { en: "Classic algorithms", ro: "Algoritmi clasici" },
     description: {
@@ -878,6 +891,7 @@ export const learnSections: LearnSection[] = [
   {
     id: "advanced-algorithms",
     order: 4,
+    pathSlug: "miniscript-plus",
     label: { en: "Section 4", ro: "Secțiunea 4" },
     title: {
       en: "Advanced algorithms in MiniScript+",
@@ -897,6 +911,7 @@ export const learnSections: LearnSection[] = [
   {
     id: "complexity-basics",
     order: 5,
+    pathSlug: "complexity-analysis",
     label: { en: "Section 1", ro: "Secțiunea 1" },
     title: { en: "Complexity basics", ro: "Bazele complexității" },
     description: {
@@ -908,6 +923,7 @@ export const learnSections: LearnSection[] = [
   {
     id: "complexity-ast",
     order: 6,
+    pathSlug: "complexity-analysis",
     label: { en: "Section 2", ro: "Secțiunea 2" },
     title: {
       en: "AST-based complexity analysis",
@@ -939,8 +955,18 @@ const sectionChallengeLessonIds = new Set(
     .filter((lessonId): lessonId is string => Boolean(lessonId))
 );
 
+export function getLessonCompletionRequirement(
+  lesson: LearnLesson
+): LessonCompletionRequirement {
+  if (lesson.completionRequirement) return lesson.completionRequirement;
+  if (bonusLessonIds.has(lesson.id)) return "bonus";
+  if (sectionChallengeLessonIds.has(lesson.id)) return "capstone";
+  return "required";
+}
+
 export function getLessonRule(lesson: LearnLesson): LessonRule {
   const kind = getLessonKind(lesson);
+  const completionRequirement = getLessonCompletionRequirement(lesson);
   const firstRecommendedProblemCode = lesson.recommendedProblems[0]?.code;
   const isChallenge =
     kind === "challenge" ||
@@ -949,7 +975,13 @@ export function getLessonRule(lesson: LearnLesson): LessonRule {
 
   let rule: LessonRule;
 
-  if (kind === "theory") {
+  if (completionRequirement === "bonus") {
+    rule = {
+      kind: "bonus",
+      requiresCorrectQuiz: false,
+      requiredProblemCodes: [],
+    };
+  } else if (kind === "theory") {
     rule = {
       kind: "required",
       requiresCorrectQuiz: false,
@@ -959,12 +991,6 @@ export function getLessonRule(lesson: LearnLesson): LessonRule {
     rule = {
       kind: "challenge",
       requiresCorrectQuiz: true,
-      requiredProblemCodes: [],
-    };
-  } else if (bonusLessonIds.has(lesson.id)) {
-    rule = {
-      kind: "bonus",
-      requiresCorrectQuiz: false,
       requiredProblemCodes: [],
     };
   } else {

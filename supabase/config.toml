@@ -5,3 +5,25 @@ project_id = "scripticx-local"
 # the independent MAIL_WORKER_SECRET on every request.
 [functions.email-worker]
 verify_jwt = false
+
+# These files are used by the local Supabase stack. Hosted Auth templates are
+# published with `npm run supabase:auth-templates`; they are not SQL migrations.
+[auth.email.template.confirmation]
+subject = "Confirm your email · ScripticX"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your password · ScripticX"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Your sign-in link · ScripticX"
+content_path = "./supabase/templates/magic-link.html"
+
+[auth.email.template.invite]
+subject = "Your ScripticX invitation"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new email · ScripticX"
+content_path = "./supabase/templates/email-change.html"

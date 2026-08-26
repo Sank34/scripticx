@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { queueContactAdminEmails } from "@/lib/mail/service";
+import { createContactSubmittedNotifications } from "@/lib/contact-notifications";
+import {
+  queueContactAcknowledgementEmail,
+  queueContactAdminEmails,
+} from "@/lib/mail/service";
 import { createAdminSupabase, createServerSupabase } from "@/lib/supabaseServer";
 import {
   enforceRateLimit,
@@ -59,6 +63,7 @@ export async function POST(request: Request) {
     ).toLowerCase();
     const topic = stringField(body.topic, { min: 2, max: 30 });
     const description = stringField(body.description, { min: 10, max: 5_000 });
+    const locale = body.locale === "ro" ? "ro" : "en";
 
     if (!EMAIL_PATTERN.test(email) || !TOPICS.has(topic)) {
       throw new HttpError(400, "Invalid contact message");
@@ -77,21 +82,52 @@ export async function POST(request: Request) {
       .single<{ id: string }>();
     if (error) throw error;
 
-    try {
-      await queueContactAdminEmails({
+    let confirmationQueued = false;
+    const mailResults = await Promise.allSettled([
+      queueContactAdminEmails({
         contactId: contact.id,
         name,
         email,
         topic,
         description,
-      });
-    } catch (mailError) {
+      }),
+      queueContactAcknowledgementEmail({
+        contactId: contact.id,
+        name,
+        email,
+        topic,
+        locale,
+      }),
+    ]);
+    confirmationQueued =
+      mailResults[1]?.status === "fulfilled" && mailResults[1].value === true;
+    mailResults.forEach((result) => {
+      if (result.status !== "rejected") return;
       // Contact persistence is authoritative; an email outage must never make
       // the user retry and create a duplicate contact message.
-      console.error("Could not queue contact admin email:", mailError);
+      console.error("Could not queue contact email:", result.reason);
+    });
+
+    try {
+      await createContactSubmittedNotifications(admin, {
+        contactId: contact.id,
+        name,
+        topic,
+        userId,
+        locale,
+      });
+    } catch (notificationError) {
+      console.error("Could not create contact notifications:", notificationError);
     }
 
-    return NextResponse.json({ submitted: true }, { status: 201 });
+    return NextResponse.json(
+      {
+        submitted: true,
+        confirmationQueued,
+        reference: contact.id.slice(0, 8).toUpperCase(),
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
