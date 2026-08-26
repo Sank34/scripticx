@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Crown, Leaf } from "lucide-react";
 
+import { resolveAvatarUrl } from "@/lib/avatar";
 import {
   resolveEquippedReward,
   type EquippedRewardSnapshot,
@@ -59,6 +60,7 @@ export function UserAvatar({
   username,
 }: UserAvatarProps) {
   const initial = (username || email || "U")[0]?.toUpperCase() || "U";
+  const imageUrl = resolveAvatarUrl(avatarUrl);
   const frame = resolveEquippedReward(equippedRewards?.["avatar-frame"]);
   const decoration = resolveEquippedReward(
     equippedRewards?.["avatar-decoration"]
@@ -76,7 +78,7 @@ export function UserAvatar({
       )}
 
       <Avatar className="size-full border-inherit shadow-inherit">
-        {avatarUrl ? <AvatarImage src={avatarUrl} /> : null}
+        <AvatarImage src={imageUrl} alt="" />
         <AvatarFallback>{initial}</AvatarFallback>
       </Avatar>
 

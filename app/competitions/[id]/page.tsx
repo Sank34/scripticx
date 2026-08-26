@@ -3,9 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlarmClock,
+  Beaker,
+  CheckCircle2,
   Clock3,
   Code2,
   Crown,
+  FileText,
+  History,
   LockKeyhole,
   Medal,
   PauseCircle,
@@ -13,6 +17,7 @@ import {
   Send,
   Trophy,
   Users,
+  XCircle,
 } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -55,6 +60,8 @@ type SubmissionResponse = {
   submission: CompetitionSubmission;
   results: Array<{ passed: boolean }>;
 };
+
+type CompetitionPanel = "description" | "solution" | "submissions";
 
 function CompetitionDetailSkeleton() {
   return (
@@ -194,6 +201,20 @@ function CompetitionDetailContent() {
         mySubmissions: "Submisiile mele",
         submissionDescription: "Fiecare încercare păstrează punctajul și codul exact trimis.",
         problem: "Problemă",
+        panelProblem: "Cerință",
+        panelSolution: "Soluția mea",
+        panelSubmissions: "Submisii",
+        solutionEmptyTitle: "Nicio evaluare încă",
+        solutionEmptyDescription: "Trimite soluția ca să vezi ce teste trec.",
+        solutionPerfect: "Toate testele trec. Felicitări!",
+        solutionPartial: "Încă nu trec toate testele. Mai încearcă!",
+        testCase: "Test",
+        testPassed: "Trecut",
+        testFailed: "Picat",
+        bestScore: "Cel mai bun punctaj",
+        problemSubmissionsEmpty: "Nicio submisie pentru această problemă.",
+        selectProblem: "Alege o problemă din listă.",
+        panelNavigation: "Panourile spațiului de concurs",
       }
     : {
         loadFailed: "Could not load the competition.",
@@ -234,6 +255,20 @@ function CompetitionDetailContent() {
         mySubmissions: "My submissions",
         submissionDescription: "Every attempt keeps its score and exact submitted code.",
         problem: "Problem",
+        panelProblem: "Problem",
+        panelSolution: "My solution",
+        panelSubmissions: "Submissions",
+        solutionEmptyTitle: "No evaluation yet",
+        solutionEmptyDescription: "Submit your solution to see which tests pass.",
+        solutionPerfect: "Every test passes. Well done!",
+        solutionPartial: "Some tests still fail. Keep going!",
+        testCase: "Test",
+        testPassed: "Passed",
+        testFailed: "Failed",
+        bestScore: "Best score",
+        problemSubmissionsEmpty: "No submissions for this problem yet.",
+        selectProblem: "Select a problem from the list.",
+        panelNavigation: "Competition workspace panels",
       };
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
@@ -243,6 +278,7 @@ function CompetitionDetailContent() {
   const [lastResults, setLastResults] = useState<Record<string, Array<{ passed: boolean }>>>({});
   const [isNarrowArena, setIsNarrowArena] = useState(false);
   const [activeTab, setActiveTab] = useState("arena");
+  const [activePanel, setActivePanel] = useState<CompetitionPanel>("description");
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1279px)");
@@ -385,6 +421,28 @@ function CompetitionDetailContent() {
     () => competition?.problems.find((problem) => problem.id === selectedProblemId) || null,
     [competition?.problems, selectedProblemId]
   );
+  const selectedResults = selectedProblem ? lastResults[selectedProblem.id] ?? [] : [];
+  const selectedPassedCount = selectedResults.filter((result) => result.passed).length;
+  const selectedScore = selectedResults.length
+    ? Math.round((selectedPassedCount / selectedResults.length) * 100)
+    : 0;
+  const selectedPerfect =
+    selectedResults.length > 0 && selectedPassedCount === selectedResults.length;
+  const selectedSubmissions = selectedProblem
+    ? (submissionsQuery.data?.submissions || []).filter(
+        (submission) => submission.competition_problem_id === selectedProblem.id
+      )
+    : [];
+  const selectedBestPoints = selectedSubmissions.length
+    ? Math.max(...selectedSubmissions.map((submission) => submission.points))
+    : 0;
+
+  const panelItems = [
+    { id: "description" as const, icon: FileText, label: copy.panelProblem },
+    { id: "solution" as const, icon: Beaker, label: copy.panelSolution },
+    { id: "submissions" as const, icon: History, label: copy.panelSubmissions },
+  ];
+
   const canSubmitSelectedProblem = Boolean(
     selectedProblem &&
       activeTab === "arena" &&
@@ -395,6 +453,7 @@ function CompetitionDetailContent() {
   const submitSolution = submitMutation.mutate;
   const submitSelectedProblem = useCallback(() => {
     if (!selectedProblem || !canSubmitSelectedProblem) return;
+    setActivePanel("solution");
     submitSolution(selectedProblem.id);
   }, [canSubmitSelectedProblem, selectedProblem, submitSolution]);
 
@@ -639,14 +698,133 @@ function CompetitionDetailContent() {
                     </div>
                     {selectedProblem && <Badge variant="secondary" className="shrink-0">{selectedProblem.max_points} {copy.points}</Badge>}
                   </div>
+
+                  <nav
+                    className="grid h-10 shrink-0 grid-cols-3 border-b bg-muted/25 p-1"
+                    aria-label={copy.panelNavigation}
+                  >
+                    {panelItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activePanel === item.id;
+                      return (
+                        <button
+                          type="button"
+                          key={item.id}
+                          onClick={() => setActivePanel(item.id)}
+                          aria-pressed={isActive}
+                          className={`relative flex items-center justify-center gap-1.5 rounded-[var(--sx-radius-control)] text-xs font-medium transition-colors ${
+                            isActive
+                              ? "border border-border bg-background text-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Icon className="size-3.5" aria-hidden="true" />
+                          <span className="truncate">{item.label}</span>
+                          {item.id === "solution" && selectedResults.length > 0 && (
+                            <span
+                              className={`size-1.5 shrink-0 rounded-full ${
+                                selectedPerfect ? "bg-[var(--sx-success)]" : "bg-destructive"
+                              }`}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </nav>
+
                   <ScrollArea className="min-h-0 flex-1">
-                    <div className="p-5">
-                      {selectedProblem && (
+                    {!selectedProblem ? (
+                      <p className="p-5 text-sm text-muted-foreground">{copy.selectProblem}</p>
+                    ) : activePanel === "description" ? (
+                      <div className="p-5">
                         <div className="text-sm leading-6 text-foreground/90">
                           <Markdown>{getLocalized(selectedProblem.problem.description_i18n, locale)}</Markdown>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : activePanel === "solution" ? (
+                      <div className="space-y-5 p-5">
+                        {selectedResults.length === 0 ? (
+                          <div className="rounded-[var(--sx-radius-card)] border border-dashed px-5 py-10 text-center">
+                            <Beaker className="mx-auto size-6 text-muted-foreground/50" />
+                            <p className="mt-3 text-sm font-medium">{copy.solutionEmptyTitle}</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              {copy.solutionEmptyDescription}
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="border-b pb-5">
+                              <p
+                                className={`text-3xl font-semibold tabular-nums ${
+                                  selectedPerfect ? "text-[var(--sx-success)]" : "text-destructive"
+                                }`}
+                              >
+                                {selectedScore}%
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                {selectedPerfect ? copy.solutionPerfect : copy.solutionPartial}
+                              </p>
+                            </div>
+                            <div className="divide-y overflow-hidden rounded-[var(--sx-radius-card)] border">
+                              {selectedResults.map((result, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                                >
+                                  <span className="font-medium">
+                                    {copy.testCase} {index + 1}/{selectedResults.length}
+                                  </span>
+                                  <span
+                                    className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                                      result.passed
+                                        ? "text-[var(--sx-success)]"
+                                        : "text-destructive"
+                                    }`}
+                                  >
+                                    {result.passed ? (
+                                      <CheckCircle2 className="size-3.5" />
+                                    ) : (
+                                      <XCircle className="size-3.5" />
+                                    )}
+                                    {result.passed ? copy.testPassed : copy.testFailed}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4 p-5">
+                        <div className="flex items-center justify-between gap-3">
+                          <h2 className="font-semibold">{copy.mySubmissions}</h2>
+                          {selectedSubmissions.length > 0 && (
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {copy.bestScore}: {selectedBestPoints}/{selectedProblem.max_points}
+                            </span>
+                          )}
+                        </div>
+                        {submissionsQuery.isPending ? (
+                          <div className="space-y-2">
+                            <Skeleton className="h-16 w-full" />
+                            <Skeleton className="h-16 w-full" />
+                          </div>
+                        ) : (
+                          <SubmissionHistory
+                            locale={locale}
+                            emptyDescription={copy.problemSubmissionsEmpty}
+                            items={selectedSubmissions.map((submission) => ({
+                              code: submission.code,
+                              id: submission.id,
+                              maximumPoints: selectedProblem.max_points,
+                              points: submission.points,
+                              score: submission.score,
+                              submittedAt: submission.submitted_at,
+                            }))}
+                          />
+                        )}
+                      </div>
+                    )}
                   </ScrollArea>
                 </div>
               </ResizablePanel>

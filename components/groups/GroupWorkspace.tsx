@@ -46,6 +46,7 @@ import {
   type StudyGroupSticker,
   type StudyGroupWorkspace as StudyGroupWorkspaceData,
 } from "@/lib/api";
+import { resolveAvatarUrl } from "@/lib/avatar";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -285,7 +286,6 @@ function buildReactionGroups(
 
 function MentionPreview({ profile }: { profile: ProfileSummary }) {
   const username = profile.username || "user";
-  const initial = username.slice(0, 1).toUpperCase();
 
   return (
     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-64 -translate-x-1/2 overflow-hidden rounded-xl border bg-popover text-left text-popover-foreground shadow-lg group-hover/mention:block">
@@ -302,14 +302,10 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
       <span className="-mt-5 flex items-end gap-3 px-3 pb-3">
         <span
           className="flex size-12 shrink-0 items-center justify-center rounded-full border-4 border-popover bg-muted bg-cover bg-center text-sm font-semibold text-muted-foreground shadow-sm"
-          style={
-            profile.avatar_url
-              ? { backgroundImage: `url(${profile.avatar_url})` }
-              : undefined
-          }
-        >
-          {profile.avatar_url ? null : initial}
-        </span>
+          style={{
+            backgroundImage: `url("${resolveAvatarUrl(profile.avatar_url)}")`,
+          }}
+        />
         <span className="min-w-0 pb-1">
           <span className="block truncate text-sm font-semibold">
             {username}

@@ -57,16 +57,38 @@ export async function POST(request: Request) {
       windowSeconds: 60 * 60,
     });
 
-    const name = verifiedName || stringField(body.name, { min: 2, max: 80 });
+    const name = verifiedName || stringField(body.name, {
+      min: 2,
+      max: 80,
+      tooShortMessage: "Please enter your name.",
+      tooLongMessage: "That name is too long.",
+    });
     const email = (
-      verifiedEmail || stringField(body.email, { min: 5, max: 254 })
+      verifiedEmail || stringField(body.email, {
+        min: 5,
+        max: 254,
+        tooShortMessage: "Please enter a valid email address.",
+        tooLongMessage: "That email address is too long.",
+      })
     ).toLowerCase();
-    const topic = stringField(body.topic, { min: 2, max: 30 });
-    const description = stringField(body.description, { min: 10, max: 5_000 });
+    const topic = stringField(body.topic, {
+      min: 2,
+      max: 30,
+      tooShortMessage: "Please select a topic.",
+    });
+    const description = stringField(body.description, {
+      min: 10,
+      max: 5_000,
+      tooShortMessage: "Your message is too short! Tell us a bit more.",
+      tooLongMessage: "Your message is too long. Please keep it under 5,000 characters.",
+    });
     const locale = body.locale === "ro" ? "ro" : "en";
 
-    if (!EMAIL_PATTERN.test(email) || !TOPICS.has(topic)) {
-      throw new HttpError(400, "Invalid contact message");
+    if (!EMAIL_PATTERN.test(email)) {
+      throw new HttpError(400, "Please enter a valid email address.");
+    }
+    if (!TOPICS.has(topic)) {
+      throw new HttpError(400, "Please select a valid topic.");
     }
 
     const { data: contact, error } = await admin

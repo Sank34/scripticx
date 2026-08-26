@@ -157,12 +157,24 @@ export function jsonObject(value: unknown): Record<string, unknown> {
 
 export function stringField(
   value: unknown,
-  options: { min?: number; max: number; trim?: boolean }
+  options: {
+    min?: number;
+    max: number;
+    trim?: boolean;
+    invalidTypeMessage?: string;
+    tooShortMessage?: string;
+    tooLongMessage?: string;
+  }
 ) {
-  if (typeof value !== "string") throw new HttpError(400, "Invalid request");
+  if (typeof value !== "string") {
+    throw new HttpError(400, options.invalidTypeMessage || "Invalid request");
+  }
   const text = options.trim === false ? value : value.trim();
-  if (text.length < (options.min || 0) || text.length > options.max) {
-    throw new HttpError(400, "Invalid request");
+  if (text.length < (options.min || 0)) {
+    throw new HttpError(400, options.tooShortMessage || "Invalid request");
+  }
+  if (text.length > options.max) {
+    throw new HttpError(400, options.tooLongMessage || "Invalid request");
   }
   return text;
 }

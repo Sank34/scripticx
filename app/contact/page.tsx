@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase";
 type Topic = "bug" | "feature" | "account" | "feedback" | "other";
 
 const MAX_MESSAGE_LENGTH = 5_000;
+const MIN_MESSAGE_LENGTH = 10;
 
 export default function ContactPage() {
   const { locale } = useLanguage();
@@ -62,6 +63,7 @@ export default function ContactPage() {
         successAgain: "Trimite alt mesaj",
         errorRequired: "Completează toate câmpurile obligatorii.",
         errorEmail: "Introdu o adresă de email validă.",
+        errorMessageTooShort: "Mesajul tău este prea scurt! Spune-ne puțin mai multe.",
         errorGeneric: "Mesajul nu a putut fi trimis. Încearcă din nou.",
         resourcesTitle: "Găsește mai repede un răspuns",
         resourcesDescription: "Pentru întrebările uzuale, aceste resurse sunt disponibile imediat.",
@@ -104,6 +106,7 @@ export default function ContactPage() {
         successAgain: "Send another message",
         errorRequired: "Complete all required fields.",
         errorEmail: "Enter a valid email address.",
+        errorMessageTooShort: "Your message is too short! Tell us a bit more.",
         errorGeneric: "The message could not be sent. Please try again.",
         resourcesTitle: "Find an answer sooner",
         resourcesDescription: "These resources are available immediately for common questions.",
@@ -155,6 +158,11 @@ export default function ContactPage() {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
       setError(copy.errorEmail);
+      return;
+    }
+
+    if (description.trim().length < MIN_MESSAGE_LENGTH) {
+      setError(copy.errorMessageTooShort);
       return;
     }
 
