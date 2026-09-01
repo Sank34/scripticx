@@ -4,6 +4,7 @@ export const onboardingMetadataKeys = {
   goal: "scripticx_learning_goal",
   interests: "scripticx_learning_interests",
   language: "scripticx_default_language",
+  languageUpdatedAt: "scripticx_language_updated_at",
   persona: "scripticx_workspace_persona",
   required: "scripticx_onboarding_required",
   tourCompletedAt: "scripticx_product_tour_completed_at",

@@ -27,6 +27,7 @@ const realtimeScopesByTable: Record<string, string[]> = {
   room_participants: ["livecode"],
   live_participants: ["livecode"],
   live_messages: ["livecode"],
+  live_message_reactions: ["livecode"],
   profiles: [
     "auth",
     "admin",

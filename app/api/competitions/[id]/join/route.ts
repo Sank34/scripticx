@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 
-import { createAuthenticatedServerSupabase } from "@/lib/supabaseServer";
+import { isCompetitionRegistrationOpen } from "@/lib/competitions";
+import {
+  createAdminSupabase,
+  createAuthenticatedServerSupabase,
+} from "@/lib/supabaseServer";
 import {
   enforceRateLimit,
   HttpError,
@@ -20,6 +24,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const { user, accessToken } = await requireUser(request);
     const { id } = await context.params;
+    const safeCompetitionId = competitionId(id);
     await enforceRateLimit({
       action: "competition_join",
       key: user.id,
@@ -31,6 +36,33 @@ export async function POST(request: Request, context: RouteContext) {
     const inviteCode =
       typeof body.inviteCode === "string" ? body.inviteCode.trim() : "";
     if (inviteCode.length > 200) throw new HttpError(400, "Invite code is invalid");
+
+    const { data: competition, error: competitionError } = await createAdminSupabase()
+      .from("competitions")
+      .select("status, ends_at, registration_ends_at")
+      .eq("id", safeCompetitionId)
+      .maybeSingle<{
+        ends_at: string;
+        registration_ends_at: string | null;
+        status: string;
+      }>();
+    if (competitionError) throw competitionError;
+    if (!competition) throw new HttpError(404, "Competition not found");
+
+    const now = new Date();
+    if (!isCompetitionRegistrationOpen(competition, now)) {
+      const registrationTimestamp = competition.registration_ends_at
+        ? Date.parse(competition.registration_ends_at)
+        : Number.NaN;
+      if (
+        Number.isFinite(registrationTimestamp) &&
+        now.getTime() >= registrationTimestamp
+      ) {
+        throw new HttpError(400, "Competition registration deadline has passed");
+      }
+      throw new HttpError(400, "Competition is not open for registration");
+    }
+
     const inviteHash = inviteCode
       ? createHash("sha256").update(inviteCode).digest("hex")
       : null;
@@ -38,7 +70,7 @@ export async function POST(request: Request, context: RouteContext) {
     const { data, error } = await createAuthenticatedServerSupabase(accessToken).rpc(
       "join_competition",
       {
-        p_competition_id: competitionId(id),
+        p_competition_id: safeCompetitionId,
         p_invite_token_hash: inviteHash,
       }
     );

@@ -47,6 +47,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatCompetitionDuration,
   getRemainingMilliseconds,
+  isCompetitionRegistrationOpen,
 } from "@/lib/competitions";
 import { competitionApiFetch } from "@/lib/competitionClient";
 import type {
@@ -176,6 +177,12 @@ function CompetitionDetailContent() {
         joinDescription: "Înscrie-te pentru a trimite soluții și a intra în clasament.",
         joining: "Se înscrie...",
         join: "Înscrie-mă",
+        registrationDeadline: "Termen de înscriere",
+        registrationCloses: "Înscrierile se închid la",
+        registrationClosedTitle: "Înscrierile sunt închise",
+        registrationClosedDescription: "Înscrierea nu mai este disponibilă pentru această competiție.",
+        registrationOpenUntilEnd: "Nu există un termen separat; înscrierile rămân deschise până la finalul competiției.",
+        dateUnavailable: "Dată indisponibilă",
         ranking: "Clasament",
         submissions: "Submisii",
         hiddenProblems: "Problemele vor fi dezvăluite când începe competiția.",
@@ -230,6 +237,12 @@ function CompetitionDetailContent() {
         joinDescription: "Join to submit solutions and enter the leaderboard.",
         joining: "Joining...",
         join: "Join",
+        registrationDeadline: "Registration deadline",
+        registrationCloses: "Registration closes at",
+        registrationClosedTitle: "Registration is closed",
+        registrationClosedDescription: "Registration is no longer available for this competition.",
+        registrationOpenUntilEnd: "There is no separate deadline; registration stays open until the competition ends.",
+        dateUnavailable: "Date unavailable",
         ranking: "Leaderboard",
         submissions: "Submissions",
         hiddenProblems: "Problems will be revealed when the competition starts.",
@@ -377,11 +390,15 @@ function CompetitionDetailContent() {
   }, [competition, language]);
 
   const joinMutation = useMutation({
-    mutationFn: () =>
-      competitionApiFetch<{ joined: boolean }>(`/api/competitions/${id}/join`, {
+    mutationFn: () => {
+      if (!competition || !isCompetitionRegistrationOpen(competition, now)) {
+        throw new Error(copy.registrationClosedDescription);
+      }
+      return competitionApiFetch<{ joined: boolean }>(`/api/competitions/${id}/join`, {
         method: "POST",
         body: JSON.stringify({ inviteCode }),
-      }),
+      });
+    },
     onSuccess: async () => {
       toast.success(language === "ro" ? "Te-ai înscris în competiție." : "You joined the competition.");
       await queryClient.invalidateQueries({ queryKey: detailKey });
@@ -495,6 +512,13 @@ function CompetitionDetailContent() {
     return <Card><CardContent className="p-10 text-center text-sm text-red-600 dark:text-red-400">{copy.loadFailed}</CardContent></Card>;
   }
 
+  const registrationOpen = isCompetitionRegistrationOpen(competition, now);
+  const registrationClosesAt = competition.registration_ends_at || competition.ends_at;
+  const registrationClosesDate = new Date(registrationClosesAt);
+  const registrationClosesLabel = Number.isFinite(registrationClosesDate.getTime())
+    ? registrationClosesDate.toLocaleString(ro ? "ro-RO" : "en-US")
+    : copy.dateUnavailable;
+
   if (competition.access === "invite_required") {
     return (
       <div className="mx-auto flex min-h-[65vh] max-w-xl items-center">
@@ -503,12 +527,29 @@ function CompetitionDetailContent() {
             <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-muted"><LockKeyhole className="size-5" /></div>
             <div>
               <h1 className="text-2xl font-semibold">{competition.name}</h1>
-              <p className="mt-2 text-sm text-muted-foreground">{copy.privateDescription}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {registrationOpen
+                  ? copy.privateDescription
+                  : copy.registrationClosedDescription}
+              </p>
             </div>
-            <Input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder={copy.inviteCode} />
-            <Button className="w-full" onClick={() => joinMutation.mutate()} disabled={!inviteCode.trim() || joinMutation.isPending}>
-              {joinMutation.isPending ? copy.checking : copy.accept}
-            </Button>
+            <div className={`rounded-xl px-4 py-3 text-left text-sm ${registrationOpen ? "bg-muted/60" : "bg-amber-50 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200"}`}>
+              <p className="text-xs font-medium opacity-75">
+                {registrationOpen ? copy.registrationCloses : copy.registrationClosedTitle}
+              </p>
+              <p className="mt-1 font-semibold">{registrationClosesLabel}</p>
+              {!competition.registration_ends_at && (
+                <p className="mt-1 text-xs opacity-75">{copy.registrationOpenUntilEnd}</p>
+              )}
+            </div>
+            {registrationOpen && (
+              <>
+                <Input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder={copy.inviteCode} />
+                <Button className="w-full" onClick={() => joinMutation.mutate()} disabled={!inviteCode.trim() || joinMutation.isPending}>
+                  {joinMutation.isPending ? copy.checking : copy.accept}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -547,8 +588,27 @@ function CompetitionDetailContent() {
         </div>
       )}
 
-      {!competition.isParticipant && competition.phase !== "finished" && (
-        <Card><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{copy.joinTitle}</p><p className="mt-1 text-sm text-muted-foreground">{copy.joinDescription}</p></div><Button onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>{joinMutation.isPending ? copy.joining : copy.join}</Button></CardContent></Card>
+      {!competition.isParticipant && (
+        <Card>
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">
+                {registrationOpen ? copy.joinTitle : copy.registrationClosedTitle}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {registrationOpen ? copy.joinDescription : copy.registrationClosedDescription}
+              </p>
+              <p className="mt-2 text-xs font-medium text-muted-foreground">
+                {copy.registrationDeadline}: {registrationClosesLabel}
+              </p>
+            </div>
+            {registrationOpen && (
+              <Button onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>
+                {joinMutation.isPending ? copy.joining : copy.join}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 gap-3">
@@ -836,7 +896,41 @@ function CompetitionDetailContent() {
           <div className="grid gap-4 md:grid-cols-3">
             {[{ icon: Users, label: copy.participants, value: competition.participantCount }, { icon: Medal, label: copy.maximumScore, value: competition.maximumPoints }, { icon: Code2, label: copy.problems, value: competition.problemCount }].map((item) => <Card key={item.label}><CardContent className="p-5"><item.icon className="size-5 text-muted-foreground" /><p className="mt-4 text-2xl font-semibold">{item.value}</p><p className="mt-1 text-sm text-muted-foreground">{item.label}</p></CardContent></Card>)}
           </div>
-          <Card className="mt-4"><CardContent className="space-y-4 p-5"><h2 className="font-semibold">{copy.schedule}</h2><div className="grid gap-3 text-sm md:grid-cols-2"><div className="rounded-xl bg-muted/60 p-4"><p className="text-xs text-muted-foreground">{copy.starts}</p><p className="mt-1 font-medium">{new Date(competition.starts_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p></div><div className="rounded-xl bg-muted/60 p-4"><p className="text-xs text-muted-foreground">{copy.ends}</p><p className="mt-1 font-medium">{new Date(competition.ends_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p></div></div>{competition.breaks.length > 0 && <div className="space-y-2"><p className="text-sm font-semibold">{copy.breaks}</p>{competition.breaks.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm"><span>{item.title}</span><span className="text-muted-foreground">{new Date(item.starts_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}–{new Date(item.ends_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span></div>)}</div>}</CardContent></Card>
+          <Card className="mt-4">
+            <CardContent className="space-y-4 p-5">
+              <h2 className="font-semibold">{copy.schedule}</h2>
+              <div className="grid gap-3 text-sm md:grid-cols-3">
+                <div className="rounded-xl bg-muted/60 p-4">
+                  <p className="text-xs text-muted-foreground">{copy.starts}</p>
+                  <p className="mt-1 font-medium">{new Date(competition.starts_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p>
+                </div>
+                <div className="rounded-xl bg-muted/60 p-4">
+                  <p className="text-xs text-muted-foreground">{copy.ends}</p>
+                  <p className="mt-1 font-medium">{new Date(competition.ends_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p>
+                </div>
+                <div className={`rounded-xl p-4 ${registrationOpen ? "bg-muted/60" : "bg-amber-50 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200"}`}>
+                  <p className="text-xs opacity-70">{copy.registrationDeadline}</p>
+                  <p className="mt-1 font-medium">{registrationClosesLabel}</p>
+                  {!competition.registration_ends_at && (
+                    <p className="mt-1 text-xs opacity-70">{copy.registrationOpenUntilEnd}</p>
+                  )}
+                </div>
+              </div>
+              {competition.breaks.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">{copy.breaks}</p>
+                  {competition.breaks.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
+                      <span>{item.title}</span>
+                      <span className="text-muted-foreground">
+                        {new Date(item.starts_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}–{new Date(item.ends_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="ranking" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">

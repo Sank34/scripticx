@@ -2232,6 +2232,7 @@ export const translations = {
     common: {
       viewAll: "View all",
       cancel: "Cancel",
+      error: "Error",
     },
 
     updates: {
@@ -4485,6 +4486,7 @@ export const translations = {
     common: {
       viewAll: "Vezi tot",
       cancel: "Anulează",
+      error: "Eroare",
     },
 
     updates: {

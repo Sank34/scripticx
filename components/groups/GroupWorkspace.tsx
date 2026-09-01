@@ -15,15 +15,21 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   Check,
+  ChevronDown,
+  ChevronUp,
   Copy,
   ExternalLink,
+  FileText,
   Hash,
+  Images,
   ImagePlus,
   LinkIcon,
   Lock,
   LogOut,
   MessageSquare,
+  Paperclip,
   Pencil,
+  Pin,
   Plus,
   Radio,
   Search,
@@ -39,10 +45,12 @@ import { toast } from "sonner";
 
 import {
   api,
+  STUDY_GROUP_ATTACHMENT_ACCEPT,
   type MentionCandidate,
   type ProfileSummary,
   type StudyGroupMember,
   type StudyGroupMessage,
+  type StudyGroupMessageAttachment,
   type StudyGroupSticker,
   type StudyGroupWorkspace as StudyGroupWorkspaceData,
 } from "@/lib/api";
@@ -401,6 +409,8 @@ function getInlineStickerToken(sticker: Pick<StudyGroupSticker, "id">) {
   return `:sticker-${sticker.id}:`;
 }
 
+const ATTACHMENT_ONLY_MESSAGE_CONTENT = "\u2063";
+
 function getStickerMessageData(item: StudyGroupMessage) {
   const metadata = item.metadata || {};
   const stickerUrl =
@@ -409,6 +419,16 @@ function getStickerMessageData(item: StudyGroupMessage) {
     typeof metadata.stickerName === "string" ? metadata.stickerName : item.content;
 
   return { stickerUrl, stickerName };
+}
+
+function visibleGroupMessageContent(item: StudyGroupMessage) {
+  const content = item.content.trim();
+  if (!content || content === ATTACHMENT_ONLY_MESSAGE_CONTENT) return "";
+  const duplicatesImageName = (item.attachments || []).some(
+    (attachment) =>
+      attachment.kind === "image" && attachment.file_name.trim() === content
+  );
+  return duplicatesImageName ? "" : content;
 }
 
 function getGroupRoleLabel(role: string | null | undefined, t: (key: string) => string) {
@@ -552,12 +572,18 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const lastAutoScrollChannelRef = useRef<string | null>(null);
+  const lastAutoScrollMessageRef = useRef<string | null>(null);
+  const jumpUnreadChannelRef = useRef<string | null>(null);
+  const groupRealtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const lastTypingSentRef = useRef(0);
   const typingStopTimeoutRef = useRef<number | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, TypingUser>>({});
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -582,6 +608,13 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [editingChannelName, setEditingChannelName] = useState("");
+  const [contentBrowserOpen, setContentBrowserOpen] = useState(false);
+  const [contentBrowserTab, setContentBrowserTab] = useState("search");
+  const [chatSearch, setChatSearch] = useState("");
+  const [jumpUnreadId, setJumpUnreadId] = useState<string | null>(null);
+  const [moderatingMemberId, setModeratingMemberId] = useState<string | null>(null);
   const [inviteQuery, setInviteQuery] = useState("");
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [settingsName, setSettingsName] = useState("");
@@ -627,6 +660,10 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     () => workspace?.stickers || [],
     [workspace?.stickers]
   );
+  const unreadByChannel = useMemo(
+    () => new Map((workspace?.unreads || []).map((item) => [item.channel_id, item])),
+    [workspace?.unreads]
+  );
   const activeChannel =
     channels.find((channel) => channel.id === activeChannelId) ||
     channels[0] ||
@@ -638,6 +675,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const canManageChannels = membership?.role === "owner";
   const canManageStickers = membership?.role === "owner";
   const isGroupOwner = membership?.role === "owner";
+  const activeUnread = activeChannel
+    ? unreadByChannel.get(activeChannel.id) || null
+    : null;
   const channelSlugPreview = normalizeChannelSlug(newChannelName);
   const groupInitial = group?.name?.charAt(0).toUpperCase() || "S";
   const settingsAvatarPreview =
@@ -819,7 +859,46 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     enabled: Boolean(activeChannel?.id && activeMembership),
   });
 
+  const messageSearchQuery = useQuery<StudyGroupMessage[]>({
+    queryKey: ["groups", slug, "search", activeChannel?.id, chatSearch],
+    queryFn: () =>
+      groupId
+        ? api.groups.searchMessages({
+            groupId,
+            channelId: activeChannel?.id,
+            query: chatSearch,
+          })
+        : Promise.resolve([]),
+    enabled: Boolean(contentBrowserOpen && contentBrowserTab === "search" && groupId && chatSearch.trim()),
+  });
+  const pinnedMessagesQuery = useQuery<StudyGroupMessage[]>({
+    queryKey: ["groups", slug, "pins", activeChannel?.id],
+    queryFn: () =>
+      groupId
+        ? api.groups.listPinnedMessages({ groupId, channelId: activeChannel?.id })
+        : Promise.resolve([]),
+    enabled: Boolean(contentBrowserOpen && contentBrowserTab === "pins" && groupId),
+  });
+  const mediaQuery = useQuery<StudyGroupMessageAttachment[]>({
+    queryKey: ["groups", slug, "media", activeChannel?.id],
+    queryFn: () =>
+      groupId
+        ? api.groups.listMedia({ groupId, channelId: activeChannel?.id })
+        : Promise.resolve([]),
+    enabled: Boolean(contentBrowserOpen && contentBrowserTab === "media" && groupId),
+  });
+
   const latestMessageAt = messagesQuery.data?.at(-1)?.created_at || null;
+
+  useEffect(() => {
+    const channelId = activeChannel?.id || null;
+    if (jumpUnreadChannelRef.current !== channelId) {
+      jumpUnreadChannelRef.current = channelId;
+      setJumpUnreadId(activeUnread?.first_unread_message_id || null);
+    } else if (activeUnread?.first_unread_message_id) {
+      setJumpUnreadId((current) => current || activeUnread.first_unread_message_id);
+    }
+  }, [activeChannel?.id, activeUnread?.first_unread_message_id]);
 
   useEffect(() => {
     if (!groupId || !userId || !activeMembership || !latestMessageAt) return;
@@ -827,6 +906,14 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     markStudyGroupSeen(userId, groupId);
     if (activeChannel?.id) {
       markStudyGroupChannelSeen(userId, groupId, activeChannel.id);
+      void api.groups
+        .markChannelRead({
+          groupId,
+          channelId: activeChannel.id,
+          messageId: messagesQuery.data?.at(-1)?.id || null,
+        })
+        .then(() => queryClient.invalidateQueries({ queryKey: ["groups", slug] }))
+        .catch((error) => console.warn("Could not mark group channel read:", error));
     }
 
     void api.notifications
@@ -845,7 +932,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     activeMembership,
     groupId,
     latestMessageAt,
+    messagesQuery.data,
     queryClient,
+    slug,
     userId,
   ]);
 
@@ -867,6 +956,18 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
     const channel = supabase
       .channel(`study-group:${groupId}`)
+      .on("broadcast", { event: "messages-changed" }, ({ payload }) => {
+        const channelId =
+          payload && typeof payload === "object" && "channelId" in payload
+            ? String(payload.channelId || "")
+            : "";
+
+        void queryClient.invalidateQueries({
+          queryKey: channelId
+            ? ["groups", slug, "messages", channelId]
+            : ["groups", slug, "messages"],
+        });
+      })
       .on(
         "postgres_changes",
         {
@@ -933,6 +1034,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     ...nextMessage,
                     profiles: profile,
                     reactions: [],
+                    attachments: [],
+                    pin: null,
                   },
                 ];
               }
@@ -971,9 +1074,35 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           void queryClient.invalidateQueries({ queryKey: ["groups", slug] });
         }
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "study_group_channel_reads", filter: `group_id=eq.${groupId}` },
+        () => void queryClient.invalidateQueries({ queryKey: ["groups", slug] })
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "study_group_message_pins", filter: `group_id=eq.${groupId}` },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["groups", slug, "messages"] });
+          void queryClient.invalidateQueries({ queryKey: ["groups", slug, "pins"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "study_group_message_attachments", filter: `group_id=eq.${groupId}` },
+        () => {
+          void queryClient.invalidateQueries({ queryKey: ["groups", slug, "messages"] });
+          void queryClient.invalidateQueries({ queryKey: ["groups", slug, "media"] });
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") groupRealtimeChannelRef.current = channel;
+      });
 
     return () => {
+      if (groupRealtimeChannelRef.current === channel) {
+        groupRealtimeChannelRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
   }, [groupId, queryClient, slug]);
@@ -1055,9 +1184,39 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     };
   }, [activeChannel?.id, activeMembership, groupId, userId]);
 
+  const latestMessageId = messagesQuery.data?.at(-1)?.id || null;
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messagesQuery.data?.length, activeChannel?.id, visibleTypingUsers.length]);
+    const channelId = activeChannel?.id || null;
+    if (!channelId || !latestMessageId) {
+      lastAutoScrollChannelRef.current = channelId;
+      lastAutoScrollMessageRef.current = latestMessageId;
+      return;
+    }
+
+    if (
+      lastAutoScrollChannelRef.current === channelId &&
+      lastAutoScrollMessageRef.current === latestMessageId
+    ) {
+      return;
+    }
+
+    const shouldAnimate =
+      lastAutoScrollChannelRef.current === channelId &&
+      lastAutoScrollMessageRef.current !== null &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    lastAutoScrollChannelRef.current = channelId;
+    lastAutoScrollMessageRef.current = latestMessageId;
+
+    const frame = window.requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({
+        behavior: shouldAnimate ? "smooth" : "auto",
+        block: "end",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeChannel?.id, latestMessageId]);
 
   useEffect(() => {
     setMentionActiveIndex(0);
@@ -1076,6 +1235,15 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         channelId: activeChannel.id,
         isTyping,
       },
+    });
+  }
+
+  function broadcastMessageChange(channelId: string) {
+    if (!groupRealtimeChannelRef.current) return;
+    void groupRealtimeChannelRef.current.send({
+      type: "broadcast",
+      event: "messages-changed",
+      payload: { channelId, sentAt: new Date().toISOString() },
     });
   }
 
@@ -1246,9 +1414,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   }
 
   async function sendMessage() {
-    if (!group || !activeChannel || !userId || !message.trim() || sending) return;
+    if (!group || !activeChannel || !userId || (!message.trim() && !attachmentFiles.length) || sending) return;
 
-    const content = message.trim();
+    const files = attachmentFiles;
+    const caption = message.trim();
+    const content = caption || ATTACHMENT_ONLY_MESSAGE_CONTENT;
     const optimisticMessage: StudyGroupMessage = {
       id: `optimistic-${Date.now()}`,
       group_id: group.id,
@@ -1260,9 +1430,12 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       created_at: new Date().toISOString(),
       profiles: currentProfile,
       reactions: [],
+      attachments: [],
+      pin: null,
     };
 
     setMessage("");
+    setAttachmentFiles([]);
     setMentionOpen(false);
     setMentionStart(null);
     setMentionQuery("");
@@ -1280,7 +1453,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         userId,
         content,
         locale,
+        files,
       });
+      broadcastMessageChange(activeChannel.id);
       await queryClient.invalidateQueries({
         queryKey: ["groups", slug, "messages", activeChannel.id],
       });
@@ -1291,7 +1466,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         (current = []) =>
           current.filter((item) => item.id !== optimisticMessage.id)
       );
-      setMessage((current) => current || content);
+      setMessage((current) => current || caption);
+      setAttachmentFiles(files);
       toast.error(t("groups.toasts.messageFailed"));
     } finally {
       setSending(false);
@@ -1308,6 +1484,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         userId,
         emoji,
       });
+      if (activeChannel?.id) broadcastMessageChange(activeChannel.id);
       await queryClient.invalidateQueries({
         queryKey: ["groups", slug, "messages", activeChannel?.id],
       });
@@ -1342,6 +1519,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         userId,
         content,
       });
+      if (activeChannel?.id) broadcastMessageChange(activeChannel.id);
       cancelEditingMessage();
       await queryClient.invalidateQueries({
         queryKey: ["groups", slug, "messages", activeChannel?.id],
@@ -1365,6 +1543,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         groupId: group.id,
         messageId: item.id,
       });
+      if (activeChannel?.id) broadcastMessageChange(activeChannel.id);
       await queryClient.invalidateQueries({
         queryKey: ["groups", slug, "messages", activeChannel?.id],
       });
@@ -1375,6 +1554,42 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     } finally {
       setDeletingMessageId(null);
     }
+  }
+
+  async function toggleMessagePin(item: StudyGroupMessage) {
+    if (!group || !canManage) return;
+    try {
+      await api.groups.toggleMessagePin({
+        groupId: group.id,
+        messageId: item.id,
+        pin: !item.pin,
+      });
+      broadcastMessageChange(item.channel_id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["groups", slug, "messages", item.channel_id] }),
+        queryClient.invalidateQueries({ queryKey: ["groups", slug, "pins"] }),
+      ]);
+      toast.success(item.pin ? "Message unpinned" : "Message pinned");
+    } catch (error) {
+      console.error("Could not update message pin:", error);
+      toast.error("Could not update the pinned message");
+    }
+  }
+
+  function jumpToMessage(messageId: string) {
+    setContentBrowserOpen(false);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`group-message-${messageId}`)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "center",
+      });
+    });
+  }
+
+  function openMessageResult(item: StudyGroupMessage) {
+    if (item.channel_id !== activeChannel?.id) setActiveChannelId(item.channel_id);
+    setContentBrowserOpen(false);
+    window.setTimeout(() => jumpToMessage(item.id), item.channel_id === activeChannel?.id ? 0 : 260);
   }
 
   async function createChannel() {
@@ -1422,6 +1637,63 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       toast.error(t("groups.toasts.channelDeleteFailed"));
     } finally {
       setDeletingChannelId(null);
+    }
+  }
+
+  async function renameChannel() {
+    if (!group || !userId || !editingChannelId || !editingChannelName.trim()) return;
+    try {
+      await api.groups.renameChannel({
+        groupId: group.id,
+        channelId: editingChannelId,
+        userId,
+        name: editingChannelName,
+      });
+      setEditingChannelId(null);
+      setEditingChannelName("");
+      await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
+      toast.success("Channel renamed");
+    } catch (error) {
+      console.error("Could not rename channel:", error);
+      toast.error("Could not rename the channel");
+    }
+  }
+
+  async function moveChannel(channelId: string, direction: -1 | 1) {
+    if (!group || !userId || !canManageChannels) return;
+    const currentIndex = channels.findIndex((channel) => channel.id === channelId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= channels.length) return;
+    const nextChannels = [...channels];
+    [nextChannels[currentIndex], nextChannels[nextIndex]] = [nextChannels[nextIndex], nextChannels[currentIndex]];
+    try {
+      await api.groups.reorderChannels({
+        groupId: group.id,
+        userId,
+        channelIds: nextChannels.map((channel) => channel.id),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
+    } catch (error) {
+      console.error("Could not reorder channels:", error);
+      toast.error("Could not reorder the channels");
+    }
+  }
+
+  async function moderateMember(memberId: string, action: "remove" | "ban" | "unban") {
+    if (!group || !canManage || moderatingMemberId) return;
+    setModeratingMemberId(memberId);
+    try {
+      await api.groups.moderateMember({ groupId: group.id, memberId, action });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["groups", slug] }),
+        queryClient.invalidateQueries({ queryKey: ["groups"] }),
+      ]);
+      toast.success(action === "ban" ? "Member banned" : action === "unban" ? "Member unbanned" : "Member removed");
+    } catch (error) {
+      console.error("Could not moderate member:", error);
+      toast.error("Could not update this member");
+    } finally {
+      setModeratingMemberId(null);
     }
   }
 
@@ -1769,6 +2041,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               const active = channel.id === activeChannel?.id;
               const channelMentionCount =
                 groupActivity.mentionCountsByChannel.get(channel.id) || 0;
+              const unreadCount = unreadByChannel.get(channel.id)?.unread_count || 0;
               const hasChannelActivity =
                 !channelMentionCount &&
                 groupActivity.activityChannelIds.has(channel.id);
@@ -1789,7 +2062,14 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   >
                     <Hash className="size-4 shrink-0" />
                     <span className="truncate">{channel.name}</span>
-                    {channelMentionCount > 0 ? (
+                    {unreadCount > 0 ? (
+                      <span
+                        className="ml-auto flex min-w-5 shrink-0 items-center justify-center rounded-full bg-zinc-950 px-1.5 text-[10px] font-semibold text-white"
+                        aria-label={`${unreadCount} unread messages`}
+                      >
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    ) : channelMentionCount > 0 ? (
                       <span
                         className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white"
                         aria-label={`${channelMentionCount} ${t("groups.activity.ping")}`}
@@ -1804,8 +2084,12 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     ) : null}
                   </button>
 
-                  {canManageChannels && channels.length > 1 ? (
-                    <AlertDialog>
+                  {canManageChannels ? (
+                    <div className="mr-1 hidden items-center gap-0.5 group-hover/channel:flex">
+                      <button type="button" disabled={channels[0]?.id === channel.id} onClick={() => void moveChannel(channel.id, -1)} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-25" aria-label="Move channel up"><ChevronUp className="size-3.5" /></button>
+                      <button type="button" disabled={channels.at(-1)?.id === channel.id} onClick={() => void moveChannel(channel.id, 1)} className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-25" aria-label="Move channel down"><ChevronDown className="size-3.5" /></button>
+                      <button type="button" onClick={() => { setEditingChannelId(channel.id); setEditingChannelName(channel.name); }} className="rounded p-1 text-muted-foreground hover:bg-accent" aria-label="Rename channel"><Pencil className="size-3.5" /></button>
+                    {channels.length > 1 ? <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <button
                           type="button"
@@ -1842,7 +2126,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
-                    </AlertDialog>
+                    </AlertDialog> : null}
+                    </div>
                   ) : null}
                 </div>
               );
@@ -1864,6 +2149,15 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setContentBrowserOpen(true)}
+              className="gap-2"
+            >
+              <Search className="size-4" />
+              <span className="hidden sm:inline">Search</span>
+            </Button>
             {canInvite && (
               <Button
                 size="sm"
@@ -1931,6 +2225,20 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
           </div>
         </header>
 
+        {jumpUnreadId ? (
+          <div className="border-b bg-emerald-50/80 px-4 py-2 dark:bg-emerald-950/25">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-2 text-emerald-800 dark:text-emerald-200"
+              onClick={() => { jumpToMessage(jumpUnreadId); setJumpUnreadId(null); }}
+            >
+              <ChevronDown className="size-4" />
+              Jump to first unread
+            </Button>
+          </div>
+        ) : null}
         <ScrollArea className="min-h-0 flex-1">
           <div className="space-y-4 p-4">
             {messagesQuery.isLoading ? (
@@ -1972,6 +2280,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     return (
                       <Marker
                         key={item.id}
+                        id={`group-message-${item.id}`}
                         variant="separator"
                         className="py-1 text-xs"
                       >
@@ -1999,6 +2308,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   return (
                     <Message
                       key={item.id}
+                      id={`group-message-${item.id}`}
                       align={isMine ? "end" : "start"}
                     >
                       <MessageAvatar>
@@ -2112,12 +2422,32 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                     className="max-h-16 max-w-16 rounded-xl object-contain drop-shadow-sm"
                                   />
                                 ) : (
-                                  <div className="inline-flex flex-wrap items-center whitespace-pre-wrap break-words align-middle">
-                                    {renderMessageContent(
-                                      item.content,
-                                      mentionProfilesByUsername,
-                                      stickersByInlineToken
-                                    )}
+                                  <div className="space-y-2">
+                                    {visibleGroupMessageContent(item) ? (
+                                      <div className="inline-flex flex-wrap items-center whitespace-pre-wrap break-words align-middle">
+                                        {renderMessageContent(
+                                          visibleGroupMessageContent(item),
+                                          mentionProfilesByUsername,
+                                          stickersByInlineToken
+                                        )}
+                                      </div>
+                                    ) : null}
+                                    {item.attachments?.length ? (
+                                      <div className="grid max-w-sm gap-2">
+                                        {item.attachments.map((attachment) =>
+                                          attachment.kind === "image" ? (
+                                            <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-white/15 bg-background/10">
+                                              <img src={attachment.url} alt={attachment.file_name} className="max-h-72 w-full object-cover" />
+                                            </a>
+                                          ) : (
+                                            <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-current/15 bg-background/10 p-3 no-underline">
+                                              <FileText className="size-5 shrink-0" />
+                                              <span className="min-w-0"><span className="block truncate text-sm font-medium">{attachment.file_name}</span><span className="block text-[10px] opacity-70">{Math.max(1, Math.round(attachment.size_bytes / 1024))} KB</span></span>
+                                            </a>
+                                          )
+                                        )}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 )}
                               </BubbleContent>
@@ -2321,6 +2651,16 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                 {emoji}
                               </button>
                             ))}
+                            {canManage ? (
+                              <button
+                                type="button"
+                                onClick={() => { closeEmojiPicker(); void toggleMessagePin(item); }}
+                                className={`rounded-full px-1.5 py-0.5 transition hover:bg-accent ${item.pin ? "text-emerald-600" : "text-muted-foreground"}`}
+                                aria-label={item.pin ? "Unpin message" : "Pin message"}
+                              >
+                                <Pin className="size-3.5" />
+                              </button>
+                            ) : null}
                             {canEditMessage ? (
                               <button
                                 type="button"
@@ -2383,6 +2723,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                 {t("groups.workspace.edited")}
                               </span>
                             ) : null}
+                            {item.pin ? <span className="ml-1 inline-flex items-center gap-1"><Pin className="size-3" /> Pinned</span> : null}
                           </MessageFooter>
                         ) : null}
                       </MessageContent>
@@ -2436,6 +2777,16 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         </ScrollArea>
 
         <div className="border-t p-3">
+          {attachmentFiles.length ? (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {attachmentFiles.map((file, index) => (
+                <span key={`${file.name}-${index}`} className="inline-flex max-w-56 items-center gap-2 rounded-full border bg-muted px-3 py-1 text-xs">
+                  <Paperclip className="size-3" /><span className="truncate">{file.name}</span>
+                  <button type="button" onClick={() => setAttachmentFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove attachment"><X className="size-3" /></button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="relative flex items-end gap-2">
             {mentionOpen ? (
               <div className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
@@ -2499,6 +2850,28 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               placeholder={t("groups.workspace.messagePlaceholder")}
               className="max-h-32 min-h-10 resize-none rounded-xl"
             />
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              accept={STUDY_GROUP_ATTACHMENT_ACCEPT}
+              onChange={(event) => {
+                const files = Array.from(event.target.files || []).slice(0, 5);
+                setAttachmentFiles(files);
+                event.currentTarget.value = "";
+              }}
+            />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" size="icon" variant="outline" className="shrink-0 rounded-xl" onClick={() => attachmentInputRef.current?.click()} aria-label="Attach images or files">
+                    <Paperclip className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Attach images or files</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Popover
               open={composerPickerOpen}
               onOpenChange={(open) => {
@@ -2615,7 +2988,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             <Button
               size="icon"
               onClick={sendMessage}
-              disabled={!message.trim() || sending}
+              disabled={(!message.trim() && !attachmentFiles.length) || sending}
             >
               <Send className="size-4" />
             </Button>
@@ -2673,6 +3046,49 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               {t("groups.actions.create")}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editingChannelId)} onOpenChange={(open) => { if (!open) setEditingChannelId(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Rename channel</DialogTitle></DialogHeader>
+          <Input value={editingChannelName} onChange={(event) => setEditingChannelName(event.target.value)} placeholder="channel-name" />
+          <DialogFooter><Button onClick={() => void renameChannel()} disabled={!editingChannelName.trim()}>Save channel</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={contentBrowserOpen} onOpenChange={setContentBrowserOpen}>
+        <DialogContent className="max-h-[82vh] max-w-2xl overflow-hidden p-0">
+          <DialogHeader className="border-b px-6 pb-4 pt-6">
+            <DialogTitle>Channel content</DialogTitle>
+          </DialogHeader>
+          <Tabs value={contentBrowserTab} onValueChange={setContentBrowserTab} className="min-h-0">
+            <div className="px-6 pt-4">
+              <TabsList className="grid w-full grid-cols-3 rounded-xl">
+                <TabsTrigger value="search"><Search className="mr-2 size-4" />Search</TabsTrigger>
+                <TabsTrigger value="pins"><Pin className="mr-2 size-4" />Pinned</TabsTrigger>
+                <TabsTrigger value="media"><Images className="mr-2 size-4" />Media</TabsTrigger>
+              </TabsList>
+            </div>
+            <ScrollArea className="h-[min(60vh,34rem)] px-6 pb-6">
+              <TabsContent value="search" className="mt-4 space-y-3">
+                <Input value={chatSearch} onChange={(event) => setChatSearch(event.target.value)} placeholder={`Search #${activeChannel?.name || "channel"}`} autoFocus />
+                {!chatSearch.trim() ? <p className="py-12 text-center text-sm text-muted-foreground">Search this channel by message text.</p> : messageSearchQuery.isLoading ? <Skeleton className="h-24 w-full" /> : messageSearchQuery.data?.length ? messageSearchQuery.data.map((item) => {
+                  const profile = api.groups.getMessageProfile(item);
+                  return <button key={item.id} type="button" onClick={() => openMessageResult(item)} className="flex w-full gap-3 rounded-xl border bg-card p-3 text-left transition hover:bg-muted/50"><UserAvatar avatarUrl={profile?.avatar_url} username={profile?.username || "user"} equippedRewards={profile?.equipped_rewards} className="size-9" /><span className="min-w-0"><span className="block text-xs font-semibold">{profile?.username || "user"}</span><span className="mt-1 block line-clamp-2 text-sm text-muted-foreground">{item.content}</span></span></button>;
+                }) : <p className="py-12 text-center text-sm text-muted-foreground">No matching messages.</p>}
+              </TabsContent>
+              <TabsContent value="pins" className="mt-4 space-y-3">
+                {pinnedMessagesQuery.isLoading ? <Skeleton className="h-24 w-full" /> : pinnedMessagesQuery.data?.length ? pinnedMessagesQuery.data.map((item) => {
+                  const profile = api.groups.getMessageProfile(item);
+                  return <button key={item.id} type="button" onClick={() => openMessageResult(item)} className="flex w-full gap-3 rounded-xl border bg-card p-3 text-left transition hover:bg-muted/50"><Pin className="mt-1 size-4 shrink-0 text-emerald-600" /><span className="min-w-0"><span className="block text-xs font-semibold">{profile?.username || "user"}</span><span className="mt-1 block line-clamp-3 text-sm text-muted-foreground">{item.content}</span></span></button>;
+                }) : <p className="py-12 text-center text-sm text-muted-foreground">No pinned messages in this channel.</p>}
+              </TabsContent>
+              <TabsContent value="media" className="mt-4">
+                {mediaQuery.isLoading ? <Skeleton className="h-40 w-full" /> : mediaQuery.data?.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{mediaQuery.data.map((item) => item.kind === "image" ? <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-xl border bg-muted"><img src={item.url} alt={item.file_name} className="aspect-square w-full object-cover transition group-hover:scale-105" /><span className="block truncate px-2 py-1.5 text-xs">{item.file_name}</span></a> : <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border bg-muted p-3 text-center"><FileText className="size-7" /><span className="line-clamp-2 text-xs">{item.file_name}</span></a>)}</div> : <p className="py-12 text-center text-sm text-muted-foreground">No images or files have been shared here.</p>}
+              </TabsContent>
+            </ScrollArea>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -3177,6 +3593,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                       const isUpdating = updatingMemberId === member.user_id;
                       const isTransferring =
                         transferringOwnerId === member.user_id;
+                      const canModerateTarget =
+                        canManage &&
+                        !isOwnerMember &&
+                        member.user_id !== userId &&
+                        (isGroupOwner || !isAdminMember);
 
                       return (
                         <div
@@ -3272,9 +3693,31 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                               {getGroupRoleLabel(member.role, t)}
                             </span>
                           )}
+                          {canModerateTarget ? (
+                            <div className="flex flex-wrap gap-2 sm:justify-end">
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild><Button type="button" size="sm" variant="outline" disabled={moderatingMemberId === member.user_id}>Remove</Button></AlertDialogTrigger>
+                                <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove {username}?</AlertDialogTitle><AlertDialogDescription>They can join again later unless you ban them.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel><AlertDialogAction onClick={() => void moderateMember(member.user_id, "remove")}>Remove member</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                              </AlertDialog>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild><Button type="button" size="sm" variant="destructive" disabled={moderatingMemberId === member.user_id}>Ban</Button></AlertDialogTrigger>
+                                <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Ban {username}?</AlertDialogTitle><AlertDialogDescription>The member will be removed and cannot rejoin until a moderator lifts the ban.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => void moderateMember(member.user_id, "ban")}>Ban member</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
+                  </div>
+                  {workspace?.bans.length ? (
+                    <div className="space-y-2 rounded-2xl border bg-muted/40 p-4">
+                      <p className="text-sm font-semibold">Banned members</p>
+                      {workspace.bans.map((ban) => <div key={ban.id} className="flex items-center justify-between gap-3 rounded-xl bg-card p-3"><div className="flex min-w-0 items-center gap-3"><UserAvatar avatarUrl={ban.profile?.avatar_url} username={ban.profile?.username || "user"} equippedRewards={ban.profile?.equipped_rewards} className="size-9" /><span className="truncate text-sm font-medium">{ban.profile?.username || ban.user_id}</span></div><Button type="button" size="sm" variant="outline" disabled={moderatingMemberId === ban.user_id} onClick={() => void moderateMember(ban.user_id, "unban")}>Unban</Button></div>)}
+                    </div>
+                  ) : null}
+                  <div className="space-y-2 rounded-2xl border bg-muted/40 p-4">
+                    <p className="text-sm font-semibold">Moderation log</p>
+                    {workspace?.moderationLog.length ? workspace.moderationLog.slice(0, 30).map((entry) => <div key={entry.id} className="flex items-start justify-between gap-3 border-b py-2 last:border-0"><div><p className="text-sm"><span className="font-medium">{entry.actor?.username || "Moderator"}</span> · {entry.action.replaceAll("_", " ")}</p>{entry.target ? <p className="text-xs text-muted-foreground">{entry.target.username}</p> : null}</div><span className="shrink-0 text-[11px] text-muted-foreground">{entry.created_at ? new Date(entry.created_at).toLocaleDateString() : ""}</span></div>) : <p className="text-sm text-muted-foreground">No moderation actions yet.</p>}
                   </div>
                 </TabsContent>
                 ) : null}

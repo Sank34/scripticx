@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import {
   Check,
   ChevronsUpDown,
@@ -35,9 +36,8 @@ import {
 } from "@/components/ui/tooltip";
 import {
   getAvailableWorkspaceKinds,
-  getWorkspaceKindFromMetadata,
   getWorkspacePersonaFromMetadata,
-  workspaceMetadataKeys,
+  resolveWorkspaceIdForKind,
   workspaceDefinitions,
   type WorkspaceKind,
 } from "@/lib/workspaces";
@@ -127,8 +127,11 @@ export function WorkspaceSwitcher({
   variant = "desktop",
 }: WorkspaceSwitcherProps) {
   const pathname = usePathname() || "/";
+  const router = useRouter();
   const { locale } = useLanguage();
   const { isAdmin, profile, user } = useAuth();
+  const switchingRef = useRef(false);
+  const [switchingKind, setSwitchingKind] = useState<WorkspaceKind | null>(null);
   const ro = locale === "ro";
   const metadata = user?.user_metadata as Record<string, unknown> | undefined;
   const metadataUsername = [metadata?.username, metadata?.user_name].find(
@@ -145,7 +148,6 @@ export function WorkspaceSwitcher({
   );
   const persona = getWorkspacePersonaFromMetadata(metadata) || "learner";
   const availableKinds = getAvailableWorkspaceKinds(persona, isAdmin);
-  const storedActiveKind = getWorkspaceKindFromMetadata(metadata);
   const workspaces: WorkspaceOption[] = ([
     {
       kind: "personal",
@@ -180,23 +182,77 @@ export function WorkspaceSwitcher({
     workspaces.find((workspace) => workspace.kind === activeKind) ?? workspaces[0];
   const compact = collapsed && variant === "desktop";
 
-  function rememberWorkspace(kind: WorkspaceKind) {
-    onNavigate?.();
-    if (!user || kind === storedActiveKind) return;
+  async function switchWorkspace(workspace: WorkspaceOption) {
+    if (!user || switchingRef.current) return;
+    switchingRef.current = true;
+    setSwitchingKind(workspace.kind);
 
-    void supabase.auth
-      .updateUser({ data: {
-        [workspaceMetadataKeys.activeWorkspaceKind]: kind,
-      } })
-      .then(({ error }) => {
-        if (!error) return;
-        toast.error(
+    try {
+      const { data: candidates, error: workspaceError } = await supabase
+        .from("workspaces")
+        .select("id,kind,created_by,is_default")
+        .eq("kind", workspace.kind)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: true });
+      if (workspaceError) throw workspaceError;
+
+      const workspaceId = resolveWorkspaceIdForKind(
+        candidates || [],
+        workspace.kind,
+        user.id
+      );
+      if (!workspaceId) {
+        throw new Error(
           ro
-            ? "Workspace-ul implicit nu a putut fi actualizat."
-            : "Could not update your default workspace.",
-          { description: error.message }
+            ? "Nu ai acces la acest workspace."
+            : "You do not have access to this workspace."
         );
-      });
+      }
+
+      const { data: selection, error: selectionError } = await supabase.rpc(
+        "set_active_workspace",
+        { p_workspace_id: workspaceId }
+      );
+      if (selectionError) throw selectionError;
+
+      const selectedWorkspace = Array.isArray(selection)
+        ? selection[0]
+        : selection;
+      if (
+        !selectedWorkspace ||
+        selectedWorkspace.active_workspace_id !== workspaceId ||
+        selectedWorkspace.workspace_kind !== workspace.kind
+      ) {
+        throw new Error(
+          ro
+            ? "Răspunsul workspace-ului nu a putut fi validat."
+            : "The workspace response could not be validated."
+        );
+      }
+
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        toast.warning(
+          ro
+            ? "Workspace-ul a fost schimbat, dar sesiunea se va actualiza la următoarea autentificare."
+            : "The workspace changed, but your session will refresh the next time you sign in.",
+          { description: refreshError.message }
+        );
+      }
+
+      onNavigate?.();
+      router.push(workspace.href);
+    } catch (error) {
+      toast.error(
+        ro
+          ? "Workspace-ul implicit nu a putut fi actualizat."
+          : "Could not update your default workspace.",
+        { description: error instanceof Error ? error.message : undefined }
+      );
+    } finally {
+      switchingRef.current = false;
+      setSwitchingKind(null);
+    }
   }
 
   if (!user) {
@@ -323,8 +379,24 @@ export function WorkspaceSwitcher({
             >
               <Link
                 href={workspace.href}
-                onClick={() => rememberWorkspace(workspace.kind)}
-                className="flex w-full items-center gap-3 px-2.5 py-2.5"
+                aria-disabled={switchingKind !== null}
+                aria-busy={switchingKind === workspace.kind}
+                onClick={(event) => {
+                  if (switchingRef.current) {
+                    event.preventDefault();
+                    return;
+                  }
+                  if (workspace.kind === activeKind) {
+                    onNavigate?.();
+                    return;
+                  }
+                  event.preventDefault();
+                  void switchWorkspace(workspace);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-3 px-2.5 py-2.5",
+                  switchingKind !== null && "pointer-events-none opacity-60"
+                )}
               >
                 <WorkspaceMark kind={workspace.kind} />
                 <span className="min-w-0 flex-1">

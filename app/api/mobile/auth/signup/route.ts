@@ -49,7 +49,9 @@ export async function POST(request: Request) {
 
     const rawMetadata = jsonObject(body.metadata);
     const metadata = {
+      locale,
       scripticx_default_language: locale,
+      scripticx_language_updated_at: Date.now(),
       scripticx_mobile_onboarding_required: true,
       ...(typeof rawMetadata.preferred_username === "string"
         ? { preferred_username: rawMetadata.preferred_username.slice(0, 50) }

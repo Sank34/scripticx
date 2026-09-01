@@ -200,10 +200,19 @@ export async function rollingMailDedupeKey(input: {
 
 const NOTIFICATION_CATEGORY: Record<string, MailCategory | undefined> = {
   new_assignment: "assignments",
+  assignment_deadline: "assignments",
+  class_announcement: "assignments",
+  class_event: "assignments",
+  class_invite: "assignments",
   competition_time: "competitions",
+  competition_starting: "competitions",
   follow: "social",
+  post_like: "social",
+  post_comment: "social",
   post_mention: "social",
   group_message: "social",
+  group_reply: "social",
+  group_reaction: "social",
   group_invite: "social",
   live_invite: "social",
 };

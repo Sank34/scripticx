@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { OnMount } from "@monaco-editor/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -51,6 +51,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { useProblemEditorDraft } from "@/hooks/useProblemEditorDraft";
 import { api, type DailyChallenge } from "@/lib/api";
 import { competitionApiFetch } from "@/lib/competitionClient";
 import type { StandardSubmission } from "@/lib/competitionTypes";
@@ -137,7 +138,6 @@ function ProblemContent() {
   const [, setResult] = useState<string | null>(null);
   const [tabSize, setTabSize] = useState(2);
   const [testResults, setTestResults] = useState<ProblemTestResult[]>([]);
-  const hydratedProblemId = useRef<string | null>(null);
 
   const problemQueryKey = ["problems", "detail", id, user?.id] as const;
   const problemQuery = useQuery({
@@ -183,11 +183,14 @@ function ProblemContent() {
     return () => media.removeEventListener("change", synchronize);
   }, []);
 
-  useEffect(() => {
-    if (!problem || hydratedProblemId.current === id) return;
-    setCode(problem.starter_code || "");
-    hydratedProblemId.current = id;
-  }, [id, problem]);
+  const draftSync = useProblemEditorDraft({
+    code,
+    fallbackCode: problem ? problem.starter_code || "" : null,
+    onHydrate: setCode,
+    problemId: id,
+    scopeKey: "library",
+    userId: user?.id ?? null,
+  });
 
   async function runCode() {
     if (!problem || !user) return;
@@ -624,7 +627,37 @@ function ProblemContent() {
         </div>
       </CodeEditorContextMenu>
       <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-muted/35 px-3 text-[11px] text-muted-foreground">
-        <span>Ln {editorLine}</span>
+        <div className="flex items-center gap-2">
+          <span>Ln {editorLine}</span>
+          <span>·</span>
+          {draftSync.conflict ? (
+            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+              <span>{locale === "ro" ? "Conflict de ciornă" : "Draft conflict"}</span>
+              <button
+                className="underline underline-offset-2"
+                onClick={() => void draftSync.resolveConflict("cloud")}
+                type="button">
+                {locale === "ro" ? "Cloud" : "Use cloud"}
+              </button>
+              <button
+                className="underline underline-offset-2"
+                onClick={() => void draftSync.resolveConflict("local").catch(() => {
+                  toast.error(locale === "ro" ? "Ciorna s-a schimbat din nou." : "The draft changed again.");
+                })}
+                type="button">
+                {locale === "ro" ? "Păstrează aici" : "Keep this"}
+              </button>
+            </span>
+          ) : (
+            <span className={draftSync.state === "synced" ? "text-emerald-600" : undefined}>
+              {draftSync.state === "saving"
+                ? locale === "ro" ? "Se salvează…" : "Saving…"
+                : draftSync.state === "error"
+                  ? locale === "ro" ? "Nesincronizat" : "Not synced"
+                  : locale === "ro" ? "Sincronizat" : "Synced"}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {tabSizeControl}
           <span>·</span>

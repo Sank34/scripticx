@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, FileText, HelpCircle, Send } from "lucide-react";
 
 import { PageHeader } from "@/components/common/PageHeader";
@@ -21,6 +21,23 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 
 type Topic = "bug" | "feature" | "account" | "feedback" | "other";
+
+type SupportHistoryRequest = {
+  id: string;
+  topic: Topic;
+  description: string;
+  status: "new" | "read" | "resolved";
+  created_at: string;
+  reference: string;
+  replies: Array<{
+    id: string;
+    sender_name: string;
+    sender_address: string;
+    subject: string;
+    content: string;
+    created_at: string;
+  }>;
+};
 
 const MAX_MESSAGE_LENGTH = 5_000;
 const MIN_MESSAGE_LENGTH = 10;
@@ -73,6 +90,15 @@ export default function ContactPage() {
         docsText: "Ghiduri pentru editor și MiniScript+.",
         updatesTitle: "Noutăți",
         updatesText: "Schimbări și remedieri recente.",
+        historyTitle: "Solicitările tale",
+        historyText: "Răspunsurile echipei apar aici și sunt livrate și prin email.",
+        historyEmpty: "Nu ai trimis încă nicio solicitare.",
+        historyError: "Istoricul nu a putut fi încărcat.",
+        historyLoading: "Se încarcă istoricul…",
+        historyRetry: "Încearcă din nou",
+        historyWaiting: "Solicitarea este înregistrată. Echipa nu a răspuns încă.",
+        historyReply: "Răspuns ScripticX Support",
+        statuses: { new: "Primită", read: "În verificare", resolved: "Rezolvată" },
       }
     : {
         title: "Contact",
@@ -116,6 +142,15 @@ export default function ContactPage() {
         docsText: "Guides for the editor and MiniScript+.",
         updatesTitle: "What's new",
         updatesText: "Recent changes and resolved issues.",
+        historyTitle: "Your requests",
+        historyText: "Team replies appear here and are also delivered by email.",
+        historyEmpty: "You have not submitted a support request yet.",
+        historyError: "Support history could not be loaded.",
+        historyLoading: "Loading support history…",
+        historyRetry: "Try again",
+        historyWaiting: "Your request is recorded. The team has not replied yet.",
+        historyReply: "ScripticX Support reply",
+        statuses: { new: "Received", read: "In review", resolved: "Resolved" },
       };
 
   const [name, setName] = useState("");
@@ -127,11 +162,42 @@ export default function ContactPage() {
   const [done, setDone] = useState(false);
   const [reference, setReference] = useState<string | null>(null);
   const [confirmationQueued, setConfirmationQueued] = useState(false);
+  const [history, setHistory] = useState<SupportHistoryRequest[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
+  const userId = user?.id ?? null;
 
   const accountName = profile?.username
     || user?.user_metadata?.full_name
     || user?.email?.split("@")[0]
     || "";
+
+  const loadHistory = useCallback(async () => {
+    if (!userId) {
+      setHistory([]);
+      return;
+    }
+    setHistoryLoading(true);
+    setHistoryError(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Authentication required");
+      const response = await fetch("/api/contact", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = (await response.json()) as { error?: string; requests?: SupportHistoryRequest[] };
+      if (!response.ok) throw new Error(result.error || "Could not load support history");
+      setHistory(result.requests || []);
+    } catch {
+      setHistoryError(true);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   function reset() {
     setName("");
@@ -191,6 +257,7 @@ export default function ContactPage() {
       setReference(result.reference || null);
       setConfirmationQueued(result.confirmationQueued === true);
       setDone(true);
+      void loadHistory();
     } catch {
       setError(copy.errorGeneric);
     } finally {
@@ -329,6 +396,62 @@ export default function ContactPage() {
 
         </aside>
       </div>
+
+      {isLoggedIn ? (
+        <section className="sx-surface overflow-hidden" aria-labelledby="contact-history-title">
+          <div className="border-b border-border px-5 py-5 sm:px-7">
+            <h2 id="contact-history-title" className="text-lg font-semibold text-foreground">{copy.historyTitle}</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.historyText}</p>
+          </div>
+          {historyLoading && !history.length ? (
+            <div className="px-5 py-10 text-center text-sm text-muted-foreground">{copy.historyLoading}</div>
+          ) : historyError ? (
+            <div className="flex items-center justify-between gap-4 px-5 py-6 sm:px-7">
+              <p className="text-sm text-destructive">{copy.historyError}</p>
+              <Button variant="outline" onClick={() => void loadHistory()}>{copy.historyRetry}</Button>
+            </div>
+          ) : history.length ? (
+            <div className="divide-y divide-border">
+              {history.map((request) => (
+                <article key={request.id} className="space-y-4 px-5 py-5 sm:px-7">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{copy.topics[request.topic]}</h3>
+                      <p className="mt-1 font-mono text-[11px] text-muted-foreground">{copy.reference}: {request.reference}</p>
+                    </div>
+                    <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                      {copy.statuses[request.status]}
+                    </span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{request.description}</p>
+                  {request.replies.length ? (
+                    <div className="space-y-3">
+                      {request.replies.map((reply) => (
+                        <div key={reply.id} className="rounded-[var(--sx-radius-control)] border border-border bg-muted/20 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-foreground">{copy.historyReply}</p>
+                            <time className="text-[11px] text-muted-foreground">{new Date(reply.created_at).toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}</time>
+                          </div>
+                          <p className="mt-2 text-sm font-medium text-foreground">{reply.subject}</p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{plainSupportContent(reply.content)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-[var(--sx-radius-control)] bg-muted/30 px-4 py-3 text-sm text-muted-foreground">{copy.historyWaiting}</p>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">{copy.historyEmpty}</p>
+          )}
+        </section>
+      ) : null}
     </PageContainer>
   );
+}
+
+function plainSupportContent(value: string) {
+  return value.replace(/<br\s*\/?\s*>/gi, "\n").replace(/<[^>]+>/g, "").trim();
 }

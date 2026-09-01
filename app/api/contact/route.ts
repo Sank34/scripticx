@@ -14,6 +14,7 @@ import {
   requestIpKey,
   readJsonBody,
   stringField,
+  requireUser,
 } from "@/lib/server/requestSecurity";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,63 @@ export const runtime = "nodejs";
 
 const TOPICS = new Set(["bug", "feature", "account", "feedback", "other"]);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type ContactReplyRow = {
+  id: string;
+  contact_id: string;
+  sender_name: string;
+  sender_address: string;
+  subject: string;
+  content: string;
+  mode: "html" | "plain";
+  created_at: string;
+};
+
+export async function GET(request: Request) {
+  try {
+    const { user } = await requireUser(request);
+    const admin = createAdminSupabase();
+    const { data: messages, error: messagesError } = await admin
+      .from("contact_messages")
+      .select("id, topic, description, status, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    if (messagesError) throw messagesError;
+
+    const contactIds = (messages || []).map((message) => message.id);
+    let replies: ContactReplyRow[] = [];
+    if (contactIds.length) {
+      const { data, error } = await admin
+        .from("contact_message_replies")
+        .select("id, contact_id, sender_name, sender_address, subject, content, mode, created_at")
+        .in("contact_id", contactIds)
+        .order("created_at", { ascending: true });
+      if (error && error.code !== "42P01" && error.code !== "PGRST205") throw error;
+      replies = (data || []) as ContactReplyRow[];
+    }
+
+    const repliesByContact = new Map<string, ContactReplyRow[]>();
+    replies.forEach((reply) => {
+      const current = repliesByContact.get(reply.contact_id) || [];
+      current.push(reply);
+      repliesByContact.set(reply.contact_id, current);
+    });
+
+    return NextResponse.json({
+      requests: (messages || []).map((message) => ({
+        ...message,
+        reference: message.id.slice(0, 8).toUpperCase(),
+        replies: repliesByContact.get(message.id) || [],
+      })),
+    });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error("Could not load contact history:", error);
+    return NextResponse.json({ error: "Could not load support history" }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {

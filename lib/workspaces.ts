@@ -11,6 +11,16 @@ export const workspaceKinds = ["personal", "student", "teacher"] as const;
 
 export type WorkspaceKind = (typeof workspaceKinds)[number];
 
+export type WorkspaceSelectionCandidate = Readonly<{
+  created_by?: unknown;
+  id?: unknown;
+  is_default?: unknown;
+  kind?: unknown;
+}>;
+
+const databaseWorkspaceIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const WORKSPACE_SETUP_VERSION = 2;
 
 /**
@@ -150,6 +160,35 @@ export function canAccessClassesForAccount(
   isAdmin = false
 ) {
   return isAdmin || persona === "student" || persona === "teacher";
+}
+
+/**
+ * Chooses a real database workspace id from rows already filtered by RLS.
+ * Prefer the account's provisioned default, while retaining a membership
+ * fallback for future shared workspaces and administrator support flows.
+ */
+export function resolveWorkspaceIdForKind(
+  candidates: readonly WorkspaceSelectionCandidate[],
+  kind: WorkspaceKind,
+  userId: string
+): string | null {
+  const matching = candidates.filter(
+    (candidate) =>
+      candidate.kind === kind &&
+      typeof candidate.id === "string" &&
+      databaseWorkspaceIdPattern.test(candidate.id)
+  );
+
+  const selected =
+    matching.find(
+      (candidate) =>
+        candidate.created_by === userId && candidate.is_default === true
+    ) ||
+    matching.find((candidate) => candidate.is_default === true) ||
+    matching.find((candidate) => candidate.created_by === userId) ||
+    matching[0];
+
+  return typeof selected?.id === "string" ? selected.id : null;
 }
 
 export function getWorkspaceKindFromMetadata(

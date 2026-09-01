@@ -31,14 +31,25 @@ type GitHubInstallation = {
 };
 
 type GitHubApiRepository = {
+  archived?: boolean;
   default_branch?: string;
   description?: string | null;
   full_name?: string;
+  html_url?: string;
   id?: number;
+  language?: string | null;
   name?: string;
   owner?: { login?: string };
   private?: boolean;
+  stargazers_count?: number;
   updated_at?: string | null;
+};
+
+export type AccessibleGitHubRepository = GitHubApiRepository & {
+  default_branch: string;
+  id: number;
+  name: string;
+  owner: { login: string };
 };
 
 type GitHubTreeItem = {
@@ -223,6 +234,40 @@ export async function requireInstallationForUser(userId: string, installationId:
     : data.github_installations;
   if (installation?.suspended_at) throw new HttpError(409, "GitHub installation is suspended");
   return createInstallationToken(installationId);
+}
+
+export async function requireRepositoryForUser(input: {
+  installationId: number;
+  owner: string;
+  repo: string;
+  repositoryId: number;
+  userId: string;
+}) {
+  const token = await requireInstallationForUser(input.userId, input.installationId);
+  const repository = await githubFetch<GitHubApiRepository>(
+    `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}`,
+    { authToken: token }
+  );
+  if (
+    repository.id !== input.repositoryId ||
+    repository.name?.toLowerCase() !== input.repo.toLowerCase() ||
+    repository.owner?.login?.toLowerCase() !== input.owner.toLowerCase()
+  ) {
+    throw new HttpError(403, "GitHub repository access denied");
+  }
+  if (!repository.id || !repository.name || !repository.owner?.login) {
+    throw new GitHubApiError(502, "GitHub returned an invalid repository");
+  }
+  return {
+    repository: {
+      ...repository,
+      default_branch: repository.default_branch || "main",
+      id: repository.id,
+      name: repository.name,
+      owner: { login: repository.owner.login },
+    } satisfies AccessibleGitHubRepository,
+    token,
+  };
 }
 
 export async function getProjectLink(userId: string, projectId: string) {

@@ -5,6 +5,7 @@ import {
   calculateCompetitionPoints,
   formatCompetitionDuration,
   getCompetitionPhase,
+  isCompetitionRegistrationOpen,
   slugifyCompetitionName,
 } from "@/lib/competitions";
 
@@ -58,6 +59,71 @@ describe("competition timing", () => {
     expect(
       getCompetitionPhase(competition, [], new Date("2026-08-05T12:00:00Z"))
     ).toBe("finished");
+  });
+
+  it("closes registration exactly at the configured deadline", () => {
+    const registration = {
+      ends_at: "2026-08-05T12:00:00.000Z",
+      registration_ends_at: "2026-08-05T09:30:00.000Z",
+      status: "published",
+    };
+
+    expect(
+      isCompetitionRegistrationOpen(
+        registration,
+        new Date("2026-08-05T09:29:59.999Z")
+      )
+    ).toBe(true);
+    expect(
+      isCompetitionRegistrationOpen(
+        registration,
+        new Date("2026-08-05T09:30:00.000Z")
+      )
+    ).toBe(false);
+  });
+
+  it("uses the competition end when no separate deadline exists", () => {
+    const registration = {
+      ends_at: "2026-08-05T12:00:00.000Z",
+      registration_ends_at: null,
+      status: "published",
+    };
+
+    expect(
+      isCompetitionRegistrationOpen(
+        registration,
+        new Date("2026-08-05T11:59:59.999Z")
+      )
+    ).toBe(true);
+    expect(
+      isCompetitionRegistrationOpen(
+        registration,
+        new Date("2026-08-05T12:00:00.000Z")
+      )
+    ).toBe(false);
+  });
+
+  it("fails closed for drafts and invalid deadlines", () => {
+    expect(
+      isCompetitionRegistrationOpen(
+        {
+          ends_at: "2026-08-05T12:00:00.000Z",
+          registration_ends_at: "not-a-date",
+          status: "published",
+        },
+        new Date("2026-08-05T09:00:00.000Z")
+      )
+    ).toBe(false);
+    expect(
+      isCompetitionRegistrationOpen(
+        {
+          ends_at: "2026-08-05T12:00:00.000Z",
+          registration_ends_at: null,
+          status: "draft",
+        },
+        new Date("2026-08-05T09:00:00.000Z")
+      )
+    ).toBe(false);
   });
 });
 

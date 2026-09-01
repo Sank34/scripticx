@@ -76,6 +76,20 @@ export type LiveMessage = {
   [key: string]: unknown;
 };
 
+export type LiveMessageReaction = {
+  id: string;
+  room_id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at?: string | null;
+};
+
+export type LiveChatMessage = LiveMessage & {
+  profile?: ProfileSummary | null;
+  reactions: LiveMessageReaction[];
+};
+
 export type RoomParticipant = {
   id?: string;
   room_id?: string;
@@ -185,6 +199,138 @@ export type StudyGroupMessage = {
   created_at?: string | null;
   profiles?: ProfileSummary | ProfileSummary[] | null;
   reactions?: StudyGroupMessageReaction[];
+  attachments?: StudyGroupMessageAttachment[];
+  pin?: StudyGroupMessagePin | null;
+};
+
+export type StudyGroupMessageAttachment = {
+  id: string;
+  group_id: string;
+  channel_id: string;
+  message_id: string;
+  uploaded_by: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  url: string;
+  storage_path: string;
+  kind: "image" | "file";
+  created_at?: string | null;
+};
+
+export const STUDY_GROUP_ATTACHMENT_MIME_TYPES = [
+  "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
+  "image/heic", "image/heif", "image/tiff", "image/bmp",
+  "image/dng", "image/x-adobe-dng",
+  "video/mp4", "video/quicktime", "video/x-m4v", "video/webm",
+  "video/3gpp", "video/3gpp2", "video/hevc",
+  "audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/aac",
+  "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac",
+  "audio/3gpp", "audio/3gpp2", "audio/x-caf", "audio/aiff", "audio/x-aiff",
+  "application/pdf", "text/plain", "text/markdown", "text/csv",
+  "application/json", "application/zip", "application/x-zip-compressed",
+  "application/rtf", "text/rtf", "text/calendar", "text/vcard", "text/x-vcard",
+  "application/epub+zip", "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.oasis.opendocument.text",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.oasis.opendocument.presentation",
+  "application/vnd.apple.pages", "application/vnd.apple.numbers", "application/vnd.apple.keynote",
+  "application/x-iwork-pages-sffpages", "application/x-iwork-numbers-sffnumbers",
+  "application/x-iwork-keynote-sffkey",
+] as const;
+
+export const STUDY_GROUP_ATTACHMENT_ACCEPT = [
+  ...STUDY_GROUP_ATTACHMENT_MIME_TYPES,
+  ".heic", ".heif", ".dng", ".tif", ".tiff", ".mov", ".m4v", ".m4a", ".caf",
+  ".pages", ".numbers", ".key", ".keynote", ".doc", ".docx", ".xls", ".xlsx",
+  ".ppt", ".pptx", ".odt", ".ods", ".odp", ".epub", ".ics", ".vcf",
+].join(",");
+
+const studyGroupAttachmentMimeTypes = new Set<string>(STUDY_GROUP_ATTACHMENT_MIME_TYPES);
+const studyGroupPreviewImageMimeTypes = new Set([
+  "image/jpeg", "image/png", "image/webp", "image/gif", "image/avif",
+]);
+
+const studyGroupAttachmentMimeByExtension: Record<string, string> = {
+  "3gp": "video/3gpp", "3g2": "video/3gpp2", aac: "audio/aac", aif: "audio/aiff",
+  aiff: "audio/aiff", avif: "image/avif", bmp: "image/bmp", caf: "audio/x-caf",
+  csv: "text/csv", dng: "image/dng", doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  epub: "application/epub+zip", flac: "audio/flac", gif: "image/gif", heic: "image/heic",
+  heif: "image/heif", ics: "text/calendar", jpeg: "image/jpeg", jpg: "image/jpeg",
+  json: "application/json", key: "application/vnd.apple.keynote",
+  keynote: "application/vnd.apple.keynote", m4a: "audio/mp4", m4v: "video/x-m4v",
+  md: "text/markdown", mov: "video/quicktime", mp3: "audio/mpeg", mp4: "video/mp4",
+  numbers: "application/vnd.apple.numbers", odp: "application/vnd.oasis.opendocument.presentation",
+  ods: "application/vnd.oasis.opendocument.spreadsheet", odt: "application/vnd.oasis.opendocument.text",
+  oga: "audio/ogg", ogg: "audio/ogg", pages: "application/vnd.apple.pages",
+  pdf: "application/pdf", png: "image/png", ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  rtf: "application/rtf", tif: "image/tiff", tiff: "image/tiff", txt: "text/plain",
+  vcf: "text/vcard", wav: "audio/wav", webm: "video/webm", webp: "image/webp",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", zip: "application/zip",
+};
+
+function normalizeStudyGroupAttachmentMimeType(file: File) {
+  const rawMime = file.type.toLowerCase().split(";", 1)[0].trim();
+  const aliases: Record<string, string> = {
+    "application/x-rtf": "application/rtf",
+    "audio/m4a": "audio/mp4",
+    "audio/mp3": "audio/mpeg",
+    "audio/x-flac": "audio/flac",
+    "image/jpg": "image/jpeg",
+    "image/x-heic": "image/heic",
+    "image/x-heif": "image/heif",
+    "text/x-markdown": "text/markdown",
+    "video/mov": "video/quicktime",
+  };
+  const normalizedMime = aliases[rawMime] || rawMime;
+  if (studyGroupAttachmentMimeTypes.has(normalizedMime)) return normalizedMime;
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  return studyGroupAttachmentMimeByExtension[extension] || normalizedMime;
+}
+
+export type StudyGroupMessagePin = {
+  id: string;
+  group_id: string;
+  channel_id: string;
+  message_id: string;
+  pinned_by: string;
+  pinned_at?: string | null;
+};
+
+export type StudyGroupChannelUnread = {
+  channel_id: string;
+  unread_count: number;
+  first_unread_message_id: string | null;
+};
+
+export type StudyGroupBan = {
+  id: string;
+  group_id: string;
+  user_id: string;
+  banned_by: string;
+  reason?: string | null;
+  created_at?: string | null;
+  profile?: ProfileSummary | null;
+};
+
+export type StudyGroupModerationEntry = {
+  id: string;
+  group_id: string;
+  actor_id: string;
+  target_user_id?: string | null;
+  action: string;
+  metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+  actor?: ProfileSummary | null;
+  target?: ProfileSummary | null;
 };
 
 export type StudyGroupSticker = {
@@ -244,6 +390,9 @@ export type StudyGroupWorkspace = {
   channels: StudyGroupChannel[];
   members: StudyGroupMember[];
   stickers: StudyGroupSticker[];
+  unreads: StudyGroupChannelUnread[];
+  bans: StudyGroupBan[];
+  moderationLog: StudyGroupModerationEntry[];
 };
 
 type SupabaseAuthSubscription = ReturnType<
@@ -1134,6 +1283,86 @@ class LiveApi {
     return data || [];
   }
 
+  async getChat(roomId: string): Promise<LiveChatMessage[]> {
+    const messages = await this.getMessages(roomId);
+    if (!messages.length) return [];
+
+    const messageIds = messages
+      .map((message) => message.id)
+      .filter((id): id is string => Boolean(id));
+    const userIds = [
+      ...new Set(
+        messages
+          .map((message) => message.user_id ?? message.userId)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
+    const [{ data: reactions, error: reactionError }, profiles] = await Promise.all([
+      this.client
+        .from("live_message_reactions")
+        .select("id,room_id,message_id,user_id,emoji,created_at")
+        .eq("room_id", roomId)
+        .in("message_id", messageIds),
+      this.listProfilesByIds(userIds),
+    ]);
+
+    if (reactionError && reactionError.code !== "42P01" && reactionError.code !== "PGRST205") {
+      throw reactionError;
+    }
+
+    const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
+    const reactionsByMessage = new Map<string, LiveMessageReaction[]>();
+    for (const reaction of (reactions || []) as LiveMessageReaction[]) {
+      const current = reactionsByMessage.get(reaction.message_id) || [];
+      current.push(reaction);
+      reactionsByMessage.set(reaction.message_id, current);
+    }
+
+    return messages.map((message) => {
+      const userId = message.user_id ?? message.userId;
+      return {
+        ...message,
+        profile: userId ? profileMap.get(userId) || null : null,
+        reactions: message.id ? reactionsByMessage.get(message.id) || [] : [],
+      };
+    });
+  }
+
+  async toggleMessageReaction(input: {
+    emoji: string;
+    messageId: string;
+    roomId: string;
+    userId: string;
+  }) {
+    const { data: existing, error: existingError } = await this.client
+      .from("live_message_reactions")
+      .select("id")
+      .eq("message_id", input.messageId)
+      .eq("user_id", input.userId)
+      .eq("emoji", input.emoji)
+      .maybeSingle<{ id: string }>();
+
+    if (existingError) throw existingError;
+    if (existing) {
+      const { error } = await this.client
+        .from("live_message_reactions")
+        .delete()
+        .eq("id", existing.id)
+        .eq("user_id", input.userId);
+      if (error) throw error;
+      return false;
+    }
+
+    const { error } = await this.client.from("live_message_reactions").insert({
+      emoji: input.emoji,
+      message_id: input.messageId,
+      room_id: input.roomId,
+      user_id: input.userId,
+    });
+    if (error && error.code !== "23505") throw error;
+    return true;
+  }
+
   async listProfiles(limit = 50): Promise<ProfileSummary[]> {
     const { data, error } = await this.client
       .from("profiles")
@@ -1677,6 +1906,19 @@ function getJoinedProfile<T>(
 
 class StudyGroupsApi {
   constructor(private readonly client: SupabaseClient) {}
+
+  private async signAttachments(attachments: StudyGroupMessageAttachment[]) {
+    return Promise.all(
+      attachments.map(async (attachment) => {
+        const { data, error } = await this.client.storage
+          .from("study-group-attachments")
+          .createSignedUrl(attachment.storage_path, 60 * 60);
+        return error || !data?.signedUrl
+          ? attachment
+          : { ...attachment, url: data.signedUrl };
+      })
+    );
+  }
 
   private async uploadGroupMedia(input: {
     groupId: string;
@@ -2377,6 +2619,9 @@ class StudyGroupsApi {
         channels: [],
         members: [],
         stickers: [],
+        unreads: [],
+        bans: [],
+        moderationLog: [],
       };
     }
 
@@ -2421,6 +2666,61 @@ class StudyGroupsApi {
       console.warn("Could not load study group stickers:", stickerError);
     }
 
+    const activeMembership = membership?.status === "active";
+    const moderator =
+      activeMembership && ["owner", "admin"].includes(membership?.role || "");
+    const [unreadsResult, bansResult, logResult] = activeMembership
+      ? await Promise.all([
+          this.client.rpc("get_study_group_unread_counts", {
+            p_group_id: group.id,
+          }),
+          moderator
+            ? this.client
+                .from("study_group_bans")
+                .select("*")
+                .eq("group_id", group.id)
+                .order("created_at", { ascending: false })
+            : Promise.resolve({ data: [], error: null }),
+          moderator
+            ? this.client
+                .from("study_group_moderation_log")
+                .select("*")
+                .eq("group_id", group.id)
+                .order("created_at", { ascending: false })
+                .limit(100)
+            : Promise.resolve({ data: [], error: null }),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+
+    if (unreadsResult.error) {
+      console.warn("Could not load study group unread state:", unreadsResult.error);
+    }
+    if (bansResult.error) console.warn("Could not load study group bans:", bansResult.error);
+    if (logResult.error) console.warn("Could not load study group audit log:", logResult.error);
+
+    const bans = (bansResult.data || []) as StudyGroupBan[];
+    const log = (logResult.data || []) as StudyGroupModerationEntry[];
+    const profileIds = [
+      ...bans.map((ban) => ban.user_id),
+      ...log.flatMap((entry) => [entry.actor_id, entry.target_user_id || ""]),
+    ].filter(Boolean);
+    let profileMap = new Map<string, ProfileSummary>();
+    if (profileIds.length) {
+      const { data: profiles, error: profilesError } = await this.client
+        .from("profiles")
+        .select("*")
+        .in("id", [...new Set(profileIds)]);
+      if (!profilesError) {
+        profileMap = new Map(
+          ((profiles || []) as ProfileSummary[]).map((profile) => [profile.id, profile])
+        );
+      }
+    }
+
     return {
       userId,
       group: {
@@ -2434,7 +2734,84 @@ class StudyGroupsApi {
       channels: (channels || []) as StudyGroupChannel[],
       members: (members || []) as StudyGroupMember[],
       stickers: stickerError ? [] : ((stickers || []) as StudyGroupSticker[]),
+      unreads: unreadsResult.error
+        ? []
+        : ((unreadsResult.data || []) as Array<{
+            channel_id: string;
+            unread_count: number | string;
+            first_unread_message_id?: string | null;
+          }>).map((item) => ({
+            channel_id: item.channel_id,
+            unread_count: Number(item.unread_count || 0),
+            first_unread_message_id: item.first_unread_message_id || null,
+          })),
+      bans: bans.map((ban) => ({ ...ban, profile: profileMap.get(ban.user_id) || null })),
+      moderationLog: log.map((entry) => ({
+        ...entry,
+        actor: profileMap.get(entry.actor_id) || null,
+        target: entry.target_user_id ? profileMap.get(entry.target_user_id) || null : null,
+      })),
     };
+  }
+
+  private async enrichMessages(messages: StudyGroupMessage[]): Promise<StudyGroupMessage[]> {
+    if (!messages.length) return [];
+    const messageIds = messages.map((message) => message.id);
+    const groupId = messages[0]?.group_id;
+    const [reactionsResult, attachmentsResult, pinsResult] = await Promise.all([
+      this.client
+        .from("study_group_message_reactions")
+        .select("*, profiles(*)")
+        .eq("group_id", groupId)
+        .in("message_id", messageIds),
+      this.client
+        .from("study_group_message_attachments")
+        .select("*")
+        .eq("group_id", groupId)
+        .in("message_id", messageIds)
+        .order("created_at", { ascending: true }),
+      this.client
+        .from("study_group_message_pins")
+        .select("*")
+        .eq("group_id", groupId)
+        .in("message_id", messageIds),
+    ]);
+
+    if (reactionsResult.error) {
+      console.warn("Could not load group message reactions:", reactionsResult.error);
+    }
+    if (attachmentsResult.error) {
+      console.warn("Could not load group message attachments:", attachmentsResult.error);
+    }
+    if (pinsResult.error) console.warn("Could not load group message pins:", pinsResult.error);
+
+    const reactionsByMessage = new Map<string, StudyGroupMessageReaction[]>();
+    for (const reaction of (reactionsResult.data || []) as StudyGroupMessageReaction[]) {
+      const current = reactionsByMessage.get(reaction.message_id) || [];
+      current.push(reaction);
+      reactionsByMessage.set(reaction.message_id, current);
+    }
+    const signedAttachments = attachmentsResult.error
+      ? []
+      : await this.signAttachments(
+          (attachmentsResult.data || []) as StudyGroupMessageAttachment[]
+        );
+    const attachmentsByMessage = new Map<string, StudyGroupMessageAttachment[]>();
+    for (const attachment of signedAttachments) {
+      const current = attachmentsByMessage.get(attachment.message_id) || [];
+      current.push(attachment);
+      attachmentsByMessage.set(attachment.message_id, current);
+    }
+    const pinsByMessage = new Map(
+      ((pinsResult.data || []) as StudyGroupMessagePin[]).map((pin) => [pin.message_id, pin])
+    );
+
+    return messages.map((message) => ({
+      ...message,
+      reactions: reactionsByMessage.get(message.id) || [],
+      attachments: attachmentsByMessage.get(message.id) || [],
+      pin: pinsByMessage.get(message.id) || null,
+    }));
   }
 
   async listMessages(channelId: string): Promise<StudyGroupMessage[]> {
@@ -2447,33 +2824,7 @@ class StudyGroupsApi {
 
     if (error) throw error;
 
-    const messages = (data || []) as StudyGroupMessage[];
-    const messageIds = messages.map((message) => message.id);
-
-    if (!messageIds.length) return messages;
-
-    const { data: reactions, error: reactionsError } = await this.client
-      .from("study_group_message_reactions")
-      .select("*, profiles(*)")
-      .eq("group_id", messages[0]?.group_id)
-      .in("message_id", messageIds);
-
-    if (reactionsError) {
-      console.warn("Could not load group message reactions:", reactionsError);
-      return messages;
-    }
-
-    const reactionsByMessage = new Map<string, StudyGroupMessageReaction[]>();
-    for (const reaction of (reactions || []) as StudyGroupMessageReaction[]) {
-      const current = reactionsByMessage.get(reaction.message_id) || [];
-      current.push(reaction);
-      reactionsByMessage.set(reaction.message_id, current);
-    }
-
-    return messages.map((message) => ({
-      ...message,
-      reactions: reactionsByMessage.get(message.id) || [],
-    }));
+    return this.enrichMessages((data || []) as StudyGroupMessage[]);
   }
 
   async sendMessage(input: {
@@ -2485,6 +2836,7 @@ class StudyGroupsApi {
     metadata?: Record<string, unknown>;
     notify?: boolean;
     locale?: "en" | "ro" | string;
+    files?: File[];
   }) {
     const kind = input.kind || "message";
     const { data, error } = await this.client
@@ -2502,6 +2854,58 @@ class StudyGroupsApi {
 
     if (error) throw error;
 
+    const uploadedPaths: string[] = [];
+    try {
+      for (const file of input.files || []) {
+        if (file.size > 15 * 1024 * 1024) throw new Error("Attachment is too large");
+        const mimeType = normalizeStudyGroupAttachmentMimeType(file);
+        if (!studyGroupAttachmentMimeTypes.has(mimeType)) {
+          throw new Error("Unsupported attachment type");
+        }
+        const isPreviewableImage = studyGroupPreviewImageMimeTypes.has(mimeType);
+        const uploadFile = file.type.toLowerCase() === mimeType
+          ? file
+          : new File([file], file.name, { lastModified: file.lastModified, type: mimeType });
+        const fileId =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120);
+        const storagePath = `${input.groupId}/${input.channelId}/${fileId}-${safeName}`;
+        const { error: uploadError } = await this.client.storage
+          .from("study-group-attachments")
+          .upload(storagePath, uploadFile, { cacheControl: "3600", contentType: mimeType, upsert: false });
+        if (uploadError) throw uploadError;
+        uploadedPaths.push(storagePath);
+        const { data: signedData, error: signedError } = await this.client.storage
+          .from("study-group-attachments")
+          .createSignedUrl(storagePath, 60 * 60);
+        if (signedError) throw signedError;
+        const url = signedData.signedUrl;
+        const { error: attachmentError } = await this.client
+          .from("study_group_message_attachments")
+          .insert({
+            group_id: input.groupId,
+            channel_id: input.channelId,
+            message_id: data.id,
+            uploaded_by: input.userId,
+            file_name: file.name.slice(0, 180),
+            mime_type: mimeType,
+            size_bytes: file.size,
+            url,
+            storage_path: storagePath,
+            kind: isPreviewableImage ? "image" : "file",
+          });
+        if (attachmentError) throw attachmentError;
+      }
+    } catch (attachmentError) {
+      if (uploadedPaths.length) {
+        void this.client.storage.from("study-group-attachments").remove(uploadedPaths);
+      }
+      void this.client.from("study_group_messages").delete().eq("id", data.id);
+      throw attachmentError;
+    }
+
     if (kind === "message" && input.notify !== false) {
       await this.notifyGroupMembers({
         groupId: input.groupId,
@@ -2512,6 +2916,93 @@ class StudyGroupsApi {
         locale: input.locale,
       });
     }
+    return data;
+  }
+
+  async markChannelRead(input: {
+    groupId: string;
+    channelId: string;
+    messageId?: string | null;
+  }) {
+    const { error } = await this.client.rpc("mark_study_group_channel_read", {
+      p_group_id: input.groupId,
+      p_channel_id: input.channelId,
+      p_message_id: input.messageId || null,
+    });
+    if (error) throw error;
+  }
+
+  async searchMessages(input: {
+    groupId: string;
+    query: string;
+    channelId?: string | null;
+  }): Promise<StudyGroupMessage[]> {
+    const query = input.query.trim();
+    if (!query) return [];
+    let request = this.client
+      .from("study_group_messages")
+      .select("*, profiles(*)")
+      .eq("group_id", input.groupId)
+      .ilike("content", `%${query.replace(/[%_]/g, "")}%`)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (input.channelId) request = request.eq("channel_id", input.channelId);
+    const { data, error } = await request;
+    if (error) throw error;
+    return this.enrichMessages((data || []) as StudyGroupMessage[]);
+  }
+
+  async listPinnedMessages(input: {
+    groupId: string;
+    channelId?: string | null;
+  }): Promise<StudyGroupMessage[]> {
+    let pinsRequest = this.client
+      .from("study_group_message_pins")
+      .select("message_id,pinned_at")
+      .eq("group_id", input.groupId)
+      .order("pinned_at", { ascending: false });
+    if (input.channelId) pinsRequest = pinsRequest.eq("channel_id", input.channelId);
+    const { data: pins, error: pinsError } = await pinsRequest;
+    if (pinsError) throw pinsError;
+    const messageIds = (pins || []).map((pin) => pin.message_id);
+    if (!messageIds.length) return [];
+    const { data, error } = await this.client
+      .from("study_group_messages")
+      .select("*, profiles(*)")
+      .in("id", messageIds);
+    if (error) throw error;
+    const order = new Map(messageIds.map((id, index) => [id, index]));
+    const enriched = await this.enrichMessages((data || []) as StudyGroupMessage[]);
+    return enriched.sort((a, b) => (order.get(a.id) || 0) - (order.get(b.id) || 0));
+  }
+
+  async listMedia(input: {
+    groupId: string;
+    channelId?: string | null;
+  }): Promise<StudyGroupMessageAttachment[]> {
+    let request = this.client
+      .from("study_group_message_attachments")
+      .select("*")
+      .eq("group_id", input.groupId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (input.channelId) request = request.eq("channel_id", input.channelId);
+    const { data, error } = await request;
+    if (error) throw error;
+    return this.signAttachments((data || []) as StudyGroupMessageAttachment[]);
+  }
+
+  async toggleMessagePin(input: {
+    groupId: string;
+    messageId: string;
+    pin: boolean;
+  }) {
+    const { error } = await this.client.rpc("toggle_study_group_message_pin", {
+      p_group_id: input.groupId,
+      p_message_id: input.messageId,
+      p_pin: input.pin,
+    });
+    if (error) throw error;
   }
 
   async createSticker(input: {
@@ -2940,6 +3431,34 @@ class StudyGroupsApi {
     return data;
   }
 
+  async renameChannel(input: {
+    groupId: string;
+    channelId: string;
+    userId: string;
+    name: string;
+  }) {
+    await this.ensureGroupOwner(input.groupId, input.userId);
+    const { error } = await this.client.rpc("update_study_group_channel", {
+      p_group_id: input.groupId,
+      p_channel_id: input.channelId,
+      p_name: input.name,
+    });
+    if (error) throw error;
+  }
+
+  async reorderChannels(input: {
+    groupId: string;
+    channelIds: string[];
+    userId: string;
+  }) {
+    await this.ensureGroupOwner(input.groupId, input.userId);
+    const { error } = await this.client.rpc("reorder_study_group_channels", {
+      p_group_id: input.groupId,
+      p_channel_ids: input.channelIds,
+    });
+    if (error) throw error;
+  }
+
   async deleteChannel(input: {
     groupId: string;
     channelId: string;
@@ -3013,6 +3532,21 @@ class StudyGroupsApi {
       .eq("user_id", input.memberId)
       .neq("role", "owner");
 
+    if (error) throw error;
+  }
+
+  async moderateMember(input: {
+    groupId: string;
+    memberId: string;
+    action: "remove" | "ban" | "unban";
+    reason?: string;
+  }) {
+    const { error } = await this.client.rpc("moderate_study_group_member", {
+      p_group_id: input.groupId,
+      p_member_id: input.memberId,
+      p_action: input.action,
+      p_reason: input.reason?.trim() || null,
+    });
     if (error) throw error;
   }
 

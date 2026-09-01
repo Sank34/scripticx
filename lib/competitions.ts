@@ -17,10 +17,34 @@ export type CompetitionTiming = {
   status: "draft" | "published" | "cancelled" | string;
 };
 
+export type CompetitionRegistrationTiming = {
+  ends_at: string;
+  registration_ends_at?: string | null;
+  status: "draft" | "published" | "cancelled" | string;
+};
+
 export function isValidCompetitionWindow(startsAt: string, endsAt: string) {
   const start = Date.parse(startsAt);
   const end = Date.parse(endsAt);
   return Number.isFinite(start) && Number.isFinite(end) && end > start;
+}
+
+export function isCompetitionRegistrationOpen(
+  competition: CompetitionRegistrationTiming,
+  now = new Date()
+) {
+  if (competition.status !== "published") return false;
+
+  const endsAt = Date.parse(competition.ends_at);
+  if (!Number.isFinite(endsAt)) return false;
+
+  const explicitDeadline = competition.registration_ends_at;
+  const registrationEndsAt = explicitDeadline
+    ? Date.parse(explicitDeadline)
+    : endsAt;
+  if (!Number.isFinite(registrationEndsAt)) return false;
+
+  return now.getTime() < Math.min(registrationEndsAt, endsAt);
 }
 
 export function isCompetitionBreak(

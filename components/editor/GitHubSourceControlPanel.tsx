@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import {
   ArrowDownToLine,
   Check,
@@ -47,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   getChangedGitHubPaths,
   isSupportedGitHubTextPath,
@@ -421,7 +429,7 @@ export function GitHubSourceControlPanel({
 
   if (!userId) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="@container/source-control flex h-full min-h-0 flex-col">
         <PanelHeader title={ro ? "Controlul sursei" : "Source control"} />
         <div className="p-4 text-xs leading-relaxed text-muted-foreground">
           {ro ? "Autentifică-te pentru a conecta un repository GitHub." : "Sign in to connect a GitHub repository."}
@@ -432,7 +440,7 @@ export function GitHubSourceControlPanel({
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="@container/source-control flex h-full min-h-0 flex-col">
         <PanelHeader title={ro ? "Controlul sursei" : "Source control"} />
         <div className="flex items-center gap-2 p-4 text-xs text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" />
@@ -444,7 +452,7 @@ export function GitHubSourceControlPanel({
 
   const link = payload?.link;
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="@container/source-control flex h-full min-h-0 flex-col bg-background">
       <PanelHeader
         title={ro ? "Controlul sursei" : "Source control"}
         action={
@@ -480,18 +488,24 @@ export function GitHubSourceControlPanel({
                   : "Connect your GitHub account to access your repositories."}
               </p>
             </div>
-            <Button
-              className="w-full justify-start gap-2"
+            <ResponsivePanelAction
+              label={ro ? "Conectează contul GitHub" : "Connect GitHub account"}
+              icon={
+                busy === "install" ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <GitHubMark className="size-[15px]" />
+                )
+              }
               onClick={() => void startInstallation()}
               disabled={busy === "install"}
-            >
-              {busy === "install" ? <LoaderCircle className="size-4 animate-spin" /> : <GitHubMark className="size-[15px]" />}
-              {ro ? "Conectează contul GitHub" : "Connect GitHub account"}
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2" onClick={onOpenPublicImport}>
-              <ArrowDownToLine size={15} />
-              {ro ? "Importă prin URL public" : "Import by public URL"}
-            </Button>
+            />
+            <ResponsivePanelAction
+              variant="outline"
+              label={ro ? "Importă prin URL public" : "Import by public URL"}
+              icon={<ArrowDownToLine size={15} />}
+              onClick={onOpenPublicImport}
+            />
           </div>
         ) : !link ? (
           <div className="space-y-4 p-3">
@@ -534,22 +548,24 @@ export function GitHubSourceControlPanel({
                   : "Connecting imports the default branch into the current project."}
               </p>
             </div>
-            <Button
-              className="w-full justify-start gap-2"
+            <ResponsivePanelAction
+              label={ro ? "Conectează și importă" : "Connect and import"}
+              icon={
+                busy === "connect" || busy === "sync" ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <ChevronRight size={15} />
+                )
+              }
               disabled={!selectedRepositoryData || busy !== null}
               onClick={() => void connectRepository()}
-            >
-              {busy === "connect" || busy === "sync" ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <ChevronRight size={15} />
-              )}
-              {ro ? "Conectează și importă" : "Connect and import"}
-            </Button>
-            <Button variant="outline" className="w-full justify-start gap-2" onClick={onOpenPublicImport}>
-              <ArrowDownToLine size={15} />
-              {ro ? "Import rapid prin URL" : "Quick import by URL"}
-            </Button>
+            />
+            <ResponsivePanelAction
+              variant="outline"
+              label={ro ? "Import rapid prin URL" : "Quick import by URL"}
+              icon={<ArrowDownToLine size={15} />}
+              onClick={onOpenPublicImport}
+            />
           </div>
         ) : (
           <div>
@@ -640,17 +656,22 @@ export function GitHubSourceControlPanel({
                 maxLength={240}
                 disabled={busy !== null}
               />
-              <Button
-                className="w-full justify-start gap-2"
+              <ResponsivePanelAction
+                label={ro ? "Commit și push" : "Commit & push"}
+                icon={
+                  busy === "commit" ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : (
+                    <Send size={14} />
+                  )
+                }
                 disabled={!commitMessage.trim() || changeCount === 0 || busy !== null}
                 onClick={() => void commitAndPush()}
-              >
-                {busy === "commit" ? <LoaderCircle className="size-4 animate-spin" /> : <Send size={14} />}
-                {ro ? "Commit și push" : "Commit & push"}
-              </Button>
-              <Button
+              />
+              <ResponsivePanelAction
                 variant="outline"
-                className="w-full justify-start gap-2"
+                label={ro ? "Creează pull request" : "Create pull request"}
+                icon={<GitPullRequest size={14} />}
                 disabled={
                   link.branch === link.defaultBranch ||
                   changeCount > 0 ||
@@ -662,10 +683,7 @@ export function GitHubSourceControlPanel({
                   );
                   setPullRequestOpen(true);
                 }}
-              >
-                <GitPullRequest size={14} />
-                {ro ? "Creează pull request" : "Create pull request"}
-              </Button>
+              />
               {link.branch === link.defaultBranch ? (
                 <p className="text-[10px] leading-relaxed text-muted-foreground">
                   {ro
@@ -679,10 +697,13 @@ export function GitHubSourceControlPanel({
                     : "Push your changes before creating the pull request."}
                 </p>
               ) : null}
-              <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground" onClick={() => setDisconnectOpen(true)}>
-                <Unlink size={14} />
-                {ro ? "Deconectează repository-ul" : "Disconnect repository"}
-              </Button>
+              <ResponsivePanelAction
+                variant="ghost"
+                className="text-muted-foreground"
+                label={ro ? "Deconectează repository-ul" : "Disconnect repository"}
+                icon={<Unlink size={14} />}
+                onClick={() => setDisconnectOpen(true)}
+              />
             </section>
           </div>
         )}
@@ -822,10 +843,44 @@ function titleForPullRequest(branch: string) {
     .join(" ");
 }
 
+type ResponsivePanelActionProps = Omit<ComponentProps<typeof Button>, "children"> & {
+  icon: ReactNode;
+  label: string;
+};
+
+function ResponsivePanelAction({
+  className,
+  icon,
+  label,
+  ...props
+}: ResponsivePanelActionProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          {...props}
+          aria-label={label}
+          className={cn(
+            "w-full min-w-0 justify-start gap-2 overflow-hidden",
+            "@max-[280px]/source-control:justify-center @max-[280px]/source-control:px-2",
+            className
+          )}
+        >
+          {icon}
+          <span className="min-w-0 truncate @max-[280px]/source-control:sr-only">
+            {label}
+          </span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function PanelHeader({ title, action }: { title: string; action?: ReactNode }) {
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between border-b px-3">
-      <span className="text-xs font-semibold">{title}</span>
+    <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b px-3">
+      <span className="min-w-0 truncate text-xs font-semibold">{title}</span>
       {action}
     </div>
   );

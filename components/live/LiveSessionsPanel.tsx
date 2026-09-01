@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { InvitePeoplePicker } from "@/components/collaboration/InvitePeoplePicker";
+import { LiveRoomChat } from "@/components/live/LiveRoomChat";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -487,6 +488,14 @@ export function LiveSessionsPanel({
                 )}
               </div>
             </TooltipProvider>
+            {userId ? (
+              <LiveRoomChat
+                disabled={activeRoomStatus === "closed"}
+                locale={locale}
+                roomId={activeRoomId}
+                userId={userId}
+              />
+            ) : null}
           </section>
         ) : null}
 

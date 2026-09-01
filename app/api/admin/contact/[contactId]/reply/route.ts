@@ -124,6 +124,24 @@ export async function POST(
       : (await deliverEmailWithWorker(row.id)).sent;
     if (!delivered) throw new HttpError(502, "Reply could not be delivered");
 
+    const { error: replyHistoryError } = await admin
+      .from("contact_message_replies")
+      .upsert({
+        contact_id: contact.id,
+        outbox_id: row.id,
+        sender_id: user.id,
+        sender_name: fromName,
+        sender_address: replyTo,
+        subject,
+        content,
+        mode,
+      }, { onConflict: "outbox_id", ignoreDuplicates: true });
+    if (replyHistoryError) {
+      // Delivery is already complete. Never return a retryable failure that
+      // could send the same email twice; surface the persistence failure in logs.
+      console.error("Contact reply sent, but history could not be persisted:", replyHistoryError);
+    }
+
     const { error: statusError } = await admin
       .from("contact_messages")
       .update({ status: "resolved" })

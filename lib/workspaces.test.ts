@@ -18,6 +18,7 @@ import {
   getWorkspacePersonaFromMetadata,
   isWorkspaceKind,
   isWorkspacePersona,
+  resolveWorkspaceIdForKind,
   workspaceMetadataKeys,
 } from "@/lib/workspaces";
 
@@ -126,5 +127,76 @@ describe("workspace metadata", () => {
       })
     ).toBe("/workspace/student");
     expect(getWorkspaceLandingRoute(undefined)).toBe("/dashboard");
+  });
+});
+
+describe("workspace database selection", () => {
+  it("prefers the signed-in account's provisioned default workspace", () => {
+    const ownedDefault = "80d44d1e-5589-47d8-8e2e-50f162d59f58";
+
+    expect(
+      resolveWorkspaceIdForKind(
+        [
+          {
+            id: "c56417df-11a8-4292-9424-21531ac8f1d4",
+            kind: "student",
+            created_by: "another-user",
+            is_default: true,
+          },
+          {
+            id: "dfaf0615-fc44-44ce-94bd-8c73fd8c1643",
+            kind: "student",
+            created_by: "current-user",
+            is_default: false,
+          },
+          {
+            id: ownedDefault,
+            kind: "student",
+            created_by: "current-user",
+            is_default: true,
+          },
+        ],
+        "student",
+        "current-user"
+      )
+    ).toBe(ownedDefault);
+  });
+
+  it("ignores aliases, malformed rows, and other workspace kinds", () => {
+    expect(
+      resolveWorkspaceIdForKind(
+        [
+          { id: "", kind: "personal", is_default: true },
+          { id: "personal-workspace", kind: "personal", is_default: true },
+          { id: null, kind: "personal", is_default: true },
+          {
+            id: "c56417df-11a8-4292-9424-21531ac8f1d4",
+            kind: "student",
+            is_default: true,
+          },
+        ],
+        "personal",
+        "current-user"
+      )
+    ).toBeNull();
+  });
+
+  it("falls back to an accessible membership when no owned default exists", () => {
+    const sharedWorkspace = "41612ed9-9084-4557-b5bd-81322d419f13";
+
+    expect(
+      resolveWorkspaceIdForKind(
+        [
+          {
+            id: sharedWorkspace,
+            kind: "personal",
+            created_by: "another-user",
+            is_default: false,
+          },
+        ],
+        "personal",
+        "current-user"
+      )
+    ).toBe(sharedWorkspace);
   });
 });

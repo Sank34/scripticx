@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import RouteGuard from "@/components/RouteGuard";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { RouteLoadingSkeleton } from "@/components/loading/RouteLoadingSkeleton";
 import { useLanguage } from "@/components/LanguageProvider";
 import { competitionApiFetch } from "@/lib/competitionClient";
+import { isCompetitionRegistrationOpen } from "@/lib/competitions";
 import type { CompetitionSummary } from "@/lib/competitionTypes";
 
 const phaseLabels = {
@@ -43,6 +45,11 @@ const phaseLabels = {
 function CompetitionsContent() {
   const { locale } = useLanguage();
   const language = locale === "ro" ? "ro" : "en";
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
   const query = useQuery<{ competitions: CompetitionSummary[] }>({
     queryKey: ["competitions", "list"],
     queryFn: () => competitionApiFetch("/api/competitions"),
@@ -110,7 +117,16 @@ function CompetitionsContent() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {competitions.map((competition) => (
+          {competitions.map((competition) => {
+            const registrationOpen = isCompetitionRegistrationOpen(competition, now);
+            const registrationClosesAt = competition.registration_ends_at || competition.ends_at;
+            const registrationLabel = competition.isParticipant
+              ? language === "ro" ? "Termenul înscrierii" : "Registration deadline"
+              : registrationOpen
+                ? language === "ro" ? "Înscrierile se închid" : "Registration closes"
+                : language === "ro" ? "Înscrieri închise" : "Registration closed";
+
+            return (
             <Card key={competition.id} className="gap-0 overflow-hidden py-0 shadow-sm">
               <CardContent className="flex h-full flex-col p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -144,6 +160,16 @@ function CompetitionsContent() {
                   {competition.description || "ScripticX coding competition"}
                 </p>
 
+                <div className={`mt-4 rounded-xl px-3 py-2.5 text-xs ${registrationOpen || competition.isParticipant ? "bg-muted/60 text-muted-foreground" : "bg-amber-50 text-amber-800 dark:bg-amber-950/35 dark:text-amber-200"}`}>
+                  <p className="font-medium">{registrationLabel}</p>
+                  <p className="mt-1">
+                    {formatCompetitionDate(registrationClosesAt, language)}
+                    {!competition.registration_ends_at
+                      ? language === "ro" ? " · până la finalul competiției" : " · when the competition ends"
+                      : ""}
+                  </p>
+                </div>
+
                 <div className="mt-5 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
                   <span className="flex items-center gap-1.5"><CalendarClock className="size-3.5" />{new Date(competition.starts_at).toLocaleDateString(language === "ro" ? "ro-RO" : "en-US")}</span>
                   <span className="flex items-center gap-1.5"><Clock3 className="size-3.5" />{new Date(competition.starts_at).toLocaleTimeString(language === "ro" ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -159,11 +185,23 @@ function CompetitionsContent() {
                 </Button>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
+}
+
+function formatCompetitionDate(value: string, language: "en" | "ro") {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return language === "ro" ? "Dată indisponibilă" : "Date unavailable";
+  }
+  return date.toLocaleString(language === "ro" ? "ro-RO" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export default function CompetitionsPage() {

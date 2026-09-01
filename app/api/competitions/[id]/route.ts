@@ -97,12 +97,20 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (reminderInterval < 5 || reminderInterval > 180) {
       throw new HttpError(400, "Reminder interval must be between 5 and 180 minutes");
     }
-    const registrationEndsAt =
-      body.registrationEndsAt === undefined
-        ? current.registration_ends_at
-        : typeof body.registrationEndsAt === "string" && body.registrationEndsAt
-          ? new Date(body.registrationEndsAt).toISOString()
-          : null;
+    let registrationEndsAt = current.registration_ends_at;
+    if (body.registrationEndsAt !== undefined) {
+      if (body.registrationEndsAt === null || body.registrationEndsAt === "") {
+        registrationEndsAt = null;
+      } else if (typeof body.registrationEndsAt === "string") {
+        const registrationTimestamp = Date.parse(body.registrationEndsAt);
+        if (!Number.isFinite(registrationTimestamp)) {
+          throw new HttpError(400, "Registration deadline is invalid");
+        }
+        registrationEndsAt = new Date(registrationTimestamp).toISOString();
+      } else {
+        throw new HttpError(400, "Registration deadline is invalid");
+      }
+    }
     if (registrationEndsAt && Date.parse(registrationEndsAt) > Date.parse(endsAt)) {
       throw new HttpError(400, "Registration deadline is invalid");
     }

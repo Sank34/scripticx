@@ -4,7 +4,7 @@ import type { SubmissionActivityHeatmap } from "@/lib/submissionActivity";
 import {
   buildContributionHeatmapModel,
   resolveContributionLevel,
-} from "./ContributionHeatmap";
+} from "@/lib/contribution-heatmap";
 
 function activity(
   input: Partial<SubmissionActivityHeatmap> = {}

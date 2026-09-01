@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { processEmailQueueWithWorker } from "@/lib/mail/workerClient";
+import { finishSystemJob, startSystemJob } from "@/lib/server/jobRuns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,11 +15,14 @@ async function run(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const runId = await startSystemJob("email");
   try {
     const result = await processEmailQueueWithWorker();
+    await finishSystemJob(runId, { status: "succeeded", result });
     return NextResponse.json(result);
   } catch (error) {
     console.error("Email worker failed:", error);
+    await finishSystemJob(runId, { status: "failed", error });
     return NextResponse.json({ error: "Email worker failed" }, { status: 500 });
   }
 }

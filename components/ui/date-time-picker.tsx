@@ -115,6 +115,7 @@ export function DateTimePicker({
         <Input
           type="time"
           value={timeValue}
+          disabled={!selected}
           aria-label={timeLabel || (locale === "ro" ? "Ora" : "Time")}
           onChange={(event) => selectTime(event.target.value)}
           className="px-2"

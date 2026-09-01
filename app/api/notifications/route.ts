@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { queueNotificationEmail } from "@/lib/mail/service";
 import { getDailyChallengeNotificationContent } from "@/lib/daily-challenge-notification";
+import { deliverQueuedPushNotifications } from "@/lib/push-notifications";
 import { createAdminSupabase } from "@/lib/supabaseServer";
 import {
   enforceRateLimit,
@@ -190,6 +191,40 @@ export async function POST(request: Request) {
         };
         break;
       }
+      case "class_invite": {
+        const invitationId = metadataId(metadata, "invitationId");
+        const classId = metadataId(metadata, "classId");
+        const [{ data: invitation }, { data: classRow }] = await Promise.all([
+          admin
+            .from("class_invitations")
+            .select("id, class_id, user_id, invited_by, status")
+            .eq("id", invitationId)
+            .eq("class_id", classId)
+            .eq("user_id", recipientId)
+            .eq("invited_by", user.id)
+            .eq("status", "pending")
+            .maybeSingle(),
+          admin
+            .from("classes")
+            .select("name")
+            .eq("id", classId)
+            .maybeSingle<{ name: string }>(),
+        ]);
+        if (!invitation || !classRow) {
+          throw new HttpError(403, "Notification event is not valid");
+        }
+        draft = {
+          title: locale === "ro" ? `Invitație în ${classRow.name}` : `Invitation to ${classRow.name}`,
+          body:
+            locale === "ro"
+              ? `${actorName} te-a invitat să intri în această clasă.`
+              : `${actorName} invited you to join this class.`,
+          href: `/classes/invitations/${invitationId}`,
+          metadata: { classId, className: classRow.name, invitationId },
+          eventId: invitationId,
+        };
+        break;
+      }
       case "daily_challenge": {
         if (recipientId !== user.id) throw new HttpError(403, "Notification event is not valid");
         const challengeId = metadataId(metadata, "challengeId");
@@ -251,13 +286,128 @@ export async function POST(request: Request) {
         };
         break;
       }
+      case "group_reply": {
+        const groupId = metadataId(metadata, "groupId");
+        const messageId = metadataId(metadata, "messageId");
+        const [{ data: message }, { data: group }, { data: member }] = await Promise.all([
+          admin
+            .from("study_group_messages")
+            .select("content, channel_id, metadata")
+            .eq("id", messageId)
+            .eq("group_id", groupId)
+            .eq("user_id", user.id)
+            .maybeSingle<{
+              content: string;
+              channel_id: string;
+              metadata: Record<string, unknown> | null;
+            }>(),
+          admin
+            .from("study_groups")
+            .select("name, slug")
+            .eq("id", groupId)
+            .maybeSingle<{ name: string; slug: string }>(),
+          admin
+            .from("study_group_members")
+            .select("status")
+            .eq("group_id", groupId)
+            .eq("user_id", recipientId)
+            .eq("status", "active")
+            .maybeSingle(),
+        ]);
+        const replyMetadata = jsonObject(message?.metadata?.replyTo);
+        const replyToMessageId = metadataId(replyMetadata, "messageId");
+        const { data: originalMessage } = await admin
+          .from("study_group_messages")
+          .select("user_id")
+          .eq("id", replyToMessageId)
+          .eq("group_id", groupId)
+          .eq("user_id", recipientId)
+          .maybeSingle();
+        if (!message || !group || !member || !originalMessage) {
+          throw new HttpError(403, "Notification event is not valid");
+        }
+        draft = {
+          title:
+            locale === "ro"
+              ? `${actorName} ți-a răspuns în ${group.name}`
+              : `${actorName} replied to you in ${group.name}`,
+          body: message.content.slice(0, 140),
+          href: `/groups/${group.slug}`,
+          metadata: {
+            groupId,
+            channelId: message.channel_id,
+            messageId,
+            replyToMessageId,
+          },
+          eventId: messageId,
+        };
+        break;
+      }
+      case "group_reaction": {
+        const groupId = metadataId(metadata, "groupId");
+        const messageId = metadataId(metadata, "messageId");
+        const reactionId = metadataId(metadata, "reactionId");
+        const [{ data: reaction }, { data: message }, { data: group }, { data: member }] =
+          await Promise.all([
+            admin
+              .from("study_group_message_reactions")
+              .select("emoji")
+              .eq("id", reactionId)
+              .eq("group_id", groupId)
+              .eq("message_id", messageId)
+              .eq("user_id", user.id)
+              .maybeSingle<{ emoji: string }>(),
+            admin
+              .from("study_group_messages")
+              .select("user_id, channel_id, content")
+              .eq("id", messageId)
+              .eq("group_id", groupId)
+              .eq("user_id", recipientId)
+              .maybeSingle<{ user_id: string; channel_id: string; content: string }>(),
+            admin
+              .from("study_groups")
+              .select("name, slug")
+              .eq("id", groupId)
+              .maybeSingle<{ name: string; slug: string }>(),
+            admin
+              .from("study_group_members")
+              .select("status")
+              .eq("group_id", groupId)
+              .eq("user_id", recipientId)
+              .eq("status", "active")
+              .maybeSingle(),
+          ]);
+        if (!reaction || !message || !group || !member) {
+          throw new HttpError(403, "Notification event is not valid");
+        }
+        draft = {
+          title:
+            locale === "ro"
+              ? `${actorName} a reacționat ${reaction.emoji} la mesajul tău`
+              : `${actorName} reacted ${reaction.emoji} to your message`,
+          body: `${group.name} · ${message.content.slice(0, 110)}`,
+          href: `/groups/${group.slug}`,
+          metadata: {
+            emoji: reaction.emoji,
+            groupId,
+            channelId: message.channel_id,
+            messageId,
+            reactionId,
+          },
+          eventId: `${messageId}:${user.id}:${reaction.emoji}`,
+        };
+        break;
+      }
       case "group_invite": {
         const groupId = metadataId(metadata, "groupId");
-        const [{ data: group }, { data: invite }] = await Promise.all([
-          admin.from("study_groups").select("name, slug, owner_id").eq("id", groupId).maybeSingle<{ name: string; slug: string; owner_id: string }>(),
+        const [{ data: group }, { data: invite }, { data: actorMembership }] = await Promise.all([
+          admin.from("study_groups").select("name, slug").eq("id", groupId).maybeSingle<{ name: string; slug: string }>(),
           admin.from("study_group_members").select("status").eq("group_id", groupId).eq("user_id", recipientId).eq("status", "invited").maybeSingle(),
+          admin.from("study_group_members").select("role,status").eq("group_id", groupId).eq("user_id", user.id).eq("status", "active").maybeSingle<{ role: string; status: string }>(),
         ]);
-        if (!group || group.owner_id !== user.id || !invite) throw new HttpError(403, "Notification event is not valid");
+        if (!group || !invite || !actorMembership || !["owner", "admin"].includes(actorMembership.role)) {
+          throw new HttpError(403, "Notification event is not valid");
+        }
         draft = {
           title: locale === "ro" ? `Ai fost invitat în ${group.name}` : `You were invited to ${group.name}`,
           body: locale === "ro" ? `${actorName} te-a invitat să intri în grup.` : `${actorName} invited you to join this group.`,
@@ -319,6 +469,13 @@ export async function POST(request: Request) {
       // In-app delivery is authoritative. Email is a best-effort secondary
       // channel and remains retryable through its own outbox.
       console.error("Could not queue notification email:", mailError);
+    }
+
+    try {
+      await deliverQueuedPushNotifications(25);
+    } catch (pushError) {
+      // The transactional outbox keeps this notification retryable by cron.
+      console.error("Could not deliver queued push notification:", pushError);
     }
 
     return NextResponse.json({ created: true }, { status: 201 });

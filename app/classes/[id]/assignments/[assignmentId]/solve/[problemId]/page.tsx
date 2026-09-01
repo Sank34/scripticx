@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Check, Send } from "lucide-react";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { useProblemEditorDraft } from "@/hooks/useProblemEditorDraft";
 import { supabase } from "@/lib/supabase";
 
 type Submission = { code?: string | null; created_at?: string | null };
@@ -24,7 +25,7 @@ type SolvePageData = { assignment: Record<string, unknown> | null; problem: Reco
 export default function SolvePage() {
   const params = useParams<{ id: string; assignmentId: string; problemId: string }>();
   const router = useRouter(); const { locale } = useLanguage(); const language = locale === "ro" ? "ro" : "en"; const { user, loading: authLoading } = useAuth(); const queryClient = useQueryClient();
-  const [code, setCode] = useState(""); const [submitting, setSubmitting] = useState(false); const hydratedRoute = useRef<string | null>(null); const userId = user?.id || null;
+  const [code, setCode] = useState(""); const [submitting, setSubmitting] = useState(false); const userId = user?.id || null;
   const queryKey = ["classes", "assignment-solve", params.assignmentId, params.problemId, userId, language] as const;
   const pageQuery = useQuery({
     queryKey,
@@ -47,7 +48,7 @@ export default function SolvePage() {
   });
   const page = pageQuery.data; const assignment = page?.assignment; const problem = page?.problem; const attempts = useMemo(() => page?.attempts || [], [page?.attempts]); const previousSubmission = Boolean(page?.submission);
 
-  useEffect(() => { const routeKey = `${params.assignmentId}:${params.problemId}:${userId || "anonymous"}`; if (!page || hydratedRoute.current === routeKey) return; setCode(attempts[0]?.code || page.submission?.code || ""); hydratedRoute.current = routeKey; }, [attempts, page, params.assignmentId, params.problemId, userId]);
+  const draftSync = useProblemEditorDraft({ code, fallbackCode: page ? attempts[0]?.code || page.submission?.code || "" : null, onHydrate: setCode, problemId: params.problemId, scopeKey: `assignment:${params.assignmentId}`, userId });
 
   async function handleSubmit() {
     if (!code.trim() || !userId || !assignment || !problem) return;
@@ -70,7 +71,7 @@ export default function SolvePage() {
     <div><h1 className="text-3xl font-semibold tracking-tight">{String(assignment.title || "Assignment")}</h1><p className="mt-2 text-sm text-muted-foreground">{String(problem.title || "Problem")}</p></div>
     <div className="grid min-h-[38rem] gap-4 lg:grid-cols-2">
       <Card className="min-h-[38rem]"><CardHeader className="border-b"><CardTitle>{String(problem.title || "Problem")}</CardTitle></CardHeader><CardContent className="min-h-0 flex-1 overflow-y-auto py-5"><Markdown>{String(problem.description || (language === "ro" ? "Problema nu are descriere." : "This problem has no description."))}</Markdown></CardContent></Card>
-      <Card className="min-h-[38rem]"><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{language === "ro" ? "Soluția ta" : "Your solution"}</CardTitle><Badge variant="outline">MS+</Badge></div></CardHeader><CardContent className="flex min-h-0 flex-1 flex-col gap-4 py-4"><div className="min-h-[28rem] flex-1 overflow-hidden rounded-[var(--sx-radius-control)] border"><MiniScriptMonacoEditor key={String(problem.id)} height="100%" value={code} onChange={setCode} options={{ padding: { top: 16, bottom: 16 }, smoothScrolling: true, wordWrap: "on", automaticLayout: true, cursorSmoothCaretAnimation: "on", cursorBlinking: "smooth", glyphMargin: true, minimap: { enabled: false }, scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 }, tabSize: 2, insertSpaces: true, wrappingIndent: "same" }} /></div><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{canSubmit ? (previousSubmission ? (language === "ro" ? "Poți trimite o versiune nouă." : "You can submit a new revision.") : (language === "ro" ? "Soluția va fi salvată în istoric." : "The solution will be added to attempt history.")) : (language === "ro" ? "Ai atins numărul maxim de încercări." : "Maximum attempts reached.")}</p><Button onClick={handleSubmit} disabled={submitting || !code.trim() || !canSubmit}><Send className="size-4" />{previousSubmission ? (language === "ro" ? "Trimite din nou" : "Submit revision") : (language === "ro" ? "Trimite" : "Submit")}</Button></div></CardContent></Card>
+      <Card className="min-h-[38rem]"><CardHeader className="border-b"><div className="flex items-center justify-between"><CardTitle>{language === "ro" ? "Soluția ta" : "Your solution"}</CardTitle><Badge variant="outline">MS+</Badge></div></CardHeader><CardContent className="flex min-h-0 flex-1 flex-col gap-4 py-4"><div className="min-h-[28rem] flex-1 overflow-hidden rounded-[var(--sx-radius-control)] border"><MiniScriptMonacoEditor key={String(problem.id)} height="100%" value={code} onChange={setCode} options={{ padding: { top: 16, bottom: 16 }, smoothScrolling: true, wordWrap: "on", automaticLayout: true, cursorSmoothCaretAnimation: "on", cursorBlinking: "smooth", glyphMargin: true, minimap: { enabled: false }, scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 }, tabSize: 2, insertSpaces: true, wrappingIndent: "same" }} /></div>{draftSync.conflict ? <div className="flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-100"><span>{language === "ro" ? "Ciorna s-a schimbat pe alt dispozitiv." : "The draft changed on another device."}</span><Button size="sm" variant="outline" onClick={() => void draftSync.resolveConflict("cloud")}>{language === "ro" ? "Folosește cloud" : "Use cloud"}</Button><Button size="sm" onClick={() => void draftSync.resolveConflict("local").catch(() => toast.error(language === "ro" ? "Ciorna s-a schimbat din nou." : "The draft changed again."))}>{language === "ro" ? "Păstrează aici" : "Keep this"}</Button></div> : null}<div className="flex items-center justify-between gap-3"><div><p className="text-xs text-muted-foreground">{canSubmit ? (previousSubmission ? (language === "ro" ? "Poți trimite o versiune nouă." : "You can submit a new revision.") : (language === "ro" ? "Soluția va fi salvată în istoric." : "The solution will be added to attempt history.")) : (language === "ro" ? "Ai atins numărul maxim de încercări." : "Maximum attempts reached.")}</p><p className={`mt-1 text-xs ${draftSync.state === "synced" ? "text-emerald-600" : "text-muted-foreground"}`}>{draftSync.state === "saving" ? (language === "ro" ? "Se salvează…" : "Saving…") : draftSync.state === "synced" ? (language === "ro" ? "Sincronizat" : "Synced") : (language === "ro" ? "Nesincronizat" : "Not synced")}</p></div><Button onClick={handleSubmit} disabled={submitting || !code.trim() || !canSubmit}><Send className="size-4" />{previousSubmission ? (language === "ro" ? "Trimite din nou" : "Submit revision") : (language === "ro" ? "Trimite" : "Submit")}</Button></div></CardContent></Card>
     </div>
     {attempts.length > 0 && <Card><CardHeader><CardTitle>{language === "ro" ? "Istoric încercări" : "Attempt history"}</CardTitle></CardHeader><CardContent className="divide-y">{attempts.map((attempt) => <div key={attempt.id} className="flex items-center justify-between gap-4 py-3"><div><p className="text-sm font-medium">{language === "ro" ? "Încercarea" : "Attempt"} {attempt.attempt_number}</p><p className="text-xs text-muted-foreground">{new Date(attempt.submitted_at).toLocaleString()}</p></div><div className="flex items-center gap-2"><Badge variant="outline">{attempt.status}</Badge>{attempt.score != null && <Badge variant="secondary">{attempt.score}p</Badge>}</div></div>)}</CardContent></Card>}
   </PageContainer>;

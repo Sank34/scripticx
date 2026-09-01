@@ -56,14 +56,20 @@ export async function POST(request: Request) {
     if (!isValidCompetitionWindow(startsAt, endsAt)) {
       throw new HttpError(400, "Competition end must be after its start");
     }
-    const registrationEndsAt =
-      typeof body.registrationEndsAt === "string" && body.registrationEndsAt
-        ? body.registrationEndsAt
-        : null;
+    let registrationEndsAt: string | null = null;
+    if (body.registrationEndsAt !== undefined && body.registrationEndsAt !== null && body.registrationEndsAt !== "") {
+      if (typeof body.registrationEndsAt !== "string") {
+        throw new HttpError(400, "Registration deadline is invalid");
+      }
+      const registrationTimestamp = Date.parse(body.registrationEndsAt);
+      if (!Number.isFinite(registrationTimestamp)) {
+        throw new HttpError(400, "Registration deadline is invalid");
+      }
+      registrationEndsAt = new Date(registrationTimestamp).toISOString();
+    }
     if (
       registrationEndsAt &&
-      (!Number.isFinite(Date.parse(registrationEndsAt)) ||
-        Date.parse(registrationEndsAt) > Date.parse(endsAt))
+      Date.parse(registrationEndsAt) > Date.parse(endsAt)
     ) {
       throw new HttpError(400, "Registration deadline is invalid");
     }
