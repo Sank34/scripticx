@@ -338,8 +338,6 @@ function DashboardContent() {
       </section>
 
       <DashboardCharts
-        emptyLabel={t("dashboard.states.empty")}
-        locale={locale}
         scoreDistribution={scoreDistribution}
         scoreTrend={scoreTrend}
       />
