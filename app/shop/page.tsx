@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -8,6 +8,7 @@ import {
   Gift,
   PackageOpen,
   Palette,
+  PartyPopper,
   Search,
   ShoppingBag,
   Sparkles,
@@ -40,6 +41,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { BIRTHDAY_REWARD_IDS } from "@/lib/birthday";
 import {
   RARITY_STYLES,
   type RewardCategory,
@@ -66,6 +68,7 @@ const FILTER_ICONS = {
 
 function InventoryDrawer({
   avatarUrl,
+  birthdayGift,
   busyProduct,
   data,
   locale,
@@ -75,6 +78,7 @@ function InventoryDrawer({
   username,
 }: {
   avatarUrl?: string | null;
+  birthdayGift: boolean;
   busyProduct: string | null;
   data: Awaited<ReturnType<typeof fetchRewardsShop>>;
   locale: "en" | "ro";
@@ -91,6 +95,9 @@ function InventoryDrawer({
         equipped: "Echipat",
         equip: "Echipează",
         unequip: "Dezechipează",
+        birthdayTitle: "Cadourile tale aniversare au sosit",
+        birthdayDescription: "Le-am marcat cu Nou. Alege preferatul și echipează-l!",
+        new: "Nou",
       }
     : {
         title: "My inventory",
@@ -99,6 +106,9 @@ function InventoryDrawer({
         equipped: "Equipped",
         equip: "Equip",
         unequip: "Unequip",
+        birthdayTitle: "Your birthday gifts have arrived",
+        birthdayDescription: "We marked them as New. Pick a favorite and equip it!",
+        new: "New",
       };
 
   return (
@@ -117,9 +127,23 @@ function InventoryDrawer({
         </DrawerHeader>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          {birthdayGift ? (
+            <div className="flex gap-3 rounded-xl border bg-muted/50 p-4">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background shadow-sm">
+                <PartyPopper className="size-5" />
+              </span>
+              <div>
+                <p className="font-medium">{copy.birthdayTitle}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {copy.birthdayDescription}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           {data.inventory.length ? (
             data.inventory.map((item) => (
-              <div key={item.product.id} className="flex gap-3 rounded-xl border p-3">
+              <div key={item.product.id} className="flex min-w-0 gap-3 overflow-hidden rounded-xl border p-3">
                 <div className="h-20 w-24 shrink-0">
                   <RewardProductPreview
                     product={item.product}
@@ -131,15 +155,29 @@ function InventoryDrawer({
                   />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="truncate font-medium">{item.product.name[locale]}</p>
-                      <p className="mt-0.5 text-xs capitalize text-muted-foreground">
-                        {item.product.rarity}
+                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium" title={item.product.name[locale]}>
+                        {item.product.name[locale]}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {item.product.rarity}
+                        </p>
+                        {birthdayGift && BIRTHDAY_REWARD_IDS.includes(
+                          item.product.id as (typeof BIRTHDAY_REWARD_IDS)[number]
+                        ) ? (
+                          <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                            {copy.new}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                        {item.product.description[locale]}
                       </p>
                     </div>
                     {item.equipped && (
-                      <Badge variant="secondary" className="shrink-0">
+                      <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
                         <Check className="size-3" />{copy.equipped}
                       </Badge>
                     )}
@@ -179,6 +217,7 @@ function ShopContent() {
   const [filter, setFilter] = useState<ShopFilter>("all");
   const [query, setQuery] = useState("");
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [birthdayGiftNotice, setBirthdayGiftNotice] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<RewardProduct | null>(null);
   const [busyProduct, setBusyProduct] = useState<string | null>(null);
 
@@ -188,6 +227,21 @@ function ShopContent() {
     enabled: Boolean(user?.id),
   });
   const data = shopQuery.data;
+
+  useEffect(() => {
+    const hasBirthdayGift =
+      new URLSearchParams(window.location.search).get("birthday") === "1";
+    setBirthdayGiftNotice(hasBirthdayGift);
+    if (hasBirthdayGift && user?.id) {
+      void queryClient.invalidateQueries({
+        queryKey: ["rewards-shop", user.id],
+      });
+    }
+  }, [queryClient, user?.id]);
+
+  useEffect(() => {
+    if (data && birthdayGiftNotice) setInventoryOpen(true);
+  }, [birthdayGiftNotice, data]);
 
   const copy = locale === "ro"
     ? {
@@ -435,10 +489,14 @@ function ShopContent() {
                 </div>
                 <CardContent className="flex flex-1 flex-col gap-4 p-4">
                   <div className="min-h-20">
-                    <div className="flex items-center justify-between gap-2">
-                      <h2 className="font-semibold">{product.name[locale]}</h2>
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                      <h2 className="truncate font-semibold" title={product.name[locale]}>
+                        {product.name[locale]}
+                      </h2>
                       {ownedItem?.equipped && (
-                        <Badge variant="secondary"><Check className="size-3" />{copy.equipped}</Badge>
+                        <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
+                          <Check className="size-3" />{copy.equipped}
+                        </Badge>
                       )}
                     </div>
                     <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{product.description[locale]}</p>
@@ -476,6 +534,7 @@ function ShopContent() {
         data={data}
         locale={locale}
         avatarUrl={profile?.avatar_url}
+        birthdayGift={birthdayGiftNotice}
         username={profile?.username}
         busyProduct={busyProduct}
         onEquip={(product, equipped) => void toggleEquip(product, equipped)}

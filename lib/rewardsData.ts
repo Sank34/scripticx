@@ -371,6 +371,25 @@ export async function fetchRewardsShop(userId: string): Promise<RewardsShopData>
   };
 }
 
+export async function fetchRewardProductsByIds(
+  productIds: string[]
+): Promise<RewardProduct[]> {
+  const uniqueIds = [...new Set(productIds.filter(Boolean))];
+  if (!uniqueIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("reward_products")
+    .select("*")
+    .in("id", uniqueIds);
+
+  if (error) throw error;
+
+  const order = new Map(uniqueIds.map((id, index) => [id, index]));
+  return ((data || []) as RewardProductRow[])
+    .map(normalizeProduct)
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+}
+
 export async function purchaseReward(productId: string) {
   const { data, error } = await supabase.rpc("purchase_reward", {
     p_product_id: productId,

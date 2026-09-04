@@ -19,9 +19,9 @@ import { toast } from "sonner";
 
 import { AdminStatTile } from "@/components/admin/AdminStatTile";
 import {
-  AdminUserEditorSheet,
+  AdminUserEditorDrawer,
   type AdminManagedUser,
-} from "@/components/admin/AdminUserEditorSheet";
+} from "@/components/admin/AdminUserEditorDrawer";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -214,8 +214,25 @@ function AdminUsersContent() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "Could not delete user");
+      const result = (await response.json()) as {
+        blockers?: Array<{
+          column_name: string;
+          constraint_name: string;
+          schema_name: string;
+          table_name: string;
+        }>;
+        code?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        const blocker = result.blockers?.[0];
+        const blockerMessage = blocker
+          ? ro
+            ? `Contul este încă referit de ${blocker.schema_name}.${blocker.table_name}.${blocker.column_name} (${blocker.constraint_name}).`
+            : `The account is still referenced by ${blocker.schema_name}.${blocker.table_name}.${blocker.column_name} (${blocker.constraint_name}).`
+          : null;
+        throw new Error(blockerMessage || result.error || "Could not delete user");
+      }
 
       queryClient.setQueryData<AdminManagedUser[]>(usersQueryKey, (current = []) =>
         current.filter((listedUser) => listedUser.id !== target.id)
@@ -360,7 +377,7 @@ function AdminUsersContent() {
         </section>
       )}
 
-      <AdminUserEditorSheet
+      <AdminUserEditorDrawer
         actorId={user?.id}
         locale={locale}
         open={Boolean(selectedUser)}

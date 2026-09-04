@@ -17,18 +17,18 @@ import { toast } from "sonner";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,7 +48,7 @@ export type AdminManagedUser = {
   username: string | null;
 };
 
-type AdminUserEditorSheetProps = {
+type AdminUserEditorDrawerProps = {
   actorId?: string | null;
   locale: string;
   onDelete: (user: AdminManagedUser) => void;
@@ -59,7 +59,7 @@ type AdminUserEditorSheetProps = {
   user: AdminManagedUser | null;
 };
 
-export function AdminUserEditorSheet({
+export function AdminUserEditorDrawer({
   actorId,
   locale,
   onDelete,
@@ -68,7 +68,7 @@ export function AdminUserEditorSheet({
   open,
   saving,
   user,
-}: AdminUserEditorSheetProps) {
+}: AdminUserEditorDrawerProps) {
   const ro = locale === "ro";
   const copy = ro
     ? {
@@ -188,9 +188,9 @@ export function AdminUserEditorSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="data-[side=right]:w-full sm:data-[side=right]:max-w-[560px]">
-        <SheetHeader className="border-b px-6 py-5 pr-14">
+    <Drawer direction="right" open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="w-[94vw] sm:max-w-[560px]">
+        <DrawerHeader className="border-b p-5">
           <div className="flex items-center gap-3">
             <UserAvatar
               avatarUrl={avatarPreview}
@@ -200,13 +200,13 @@ export function AdminUserEditorSheet({
             />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <SheetTitle className="truncate text-lg">{username || user.username || "User"}</SheetTitle>
+                <DrawerTitle className="truncate text-lg">{username || user.username || "User"}</DrawerTitle>
                 {isSelf && <Badge variant="secondary">{ro ? "Tu" : "You"}</Badge>}
               </div>
-              <SheetDescription>{copy.description}</SheetDescription>
+              <DrawerDescription>{copy.description}</DrawerDescription>
             </div>
           </div>
-        </SheetHeader>
+        </DrawerHeader>
 
         <ScrollArea className="min-h-0 flex-1">
           <Tabs defaultValue="profile" className="p-6">
@@ -334,7 +334,7 @@ export function AdminUserEditorSheet({
           </Tabs>
         </ScrollArea>
 
-        <SheetFooter className="border-t bg-background px-6 py-4">
+        <DrawerFooter className="border-t bg-background px-5 py-4">
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Button type="button" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onDelete(user)} disabled={isSelf || saving}>
               <Trash2 />{copy.delete}
@@ -346,8 +346,8 @@ export function AdminUserEditorSheet({
               </Button>
             </div>
           </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }

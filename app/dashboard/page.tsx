@@ -346,20 +346,24 @@ function DashboardContent() {
 
       <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
         <SectionCard
-          title={t("leaderboard.title")}
+          title={t("dashboard.leaderboard.title")}
           action={
             <a
               href="/leaderboard"
               className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
-              {t("common.viewAll")}
+              {t("dashboard.leaderboard.viewAll")}
               <ArrowUpRight className="size-3.5" />
             </a>
           }
           contentClassName="space-y-3"
         >
           {leaderboard.length === 0 && (
-            <EmptyState className="py-4" title={t("dashboard.states.empty")} />
+            <EmptyState
+              className="py-4"
+              title={t("dashboard.leaderboard.emptyTitle")}
+              description={t("dashboard.leaderboard.emptyDescription")}
+            />
           )}
 
           {topUser && (
@@ -371,21 +375,24 @@ function DashboardContent() {
                   className="size-10"
                   username={topUser.username}
                 />
-                <div>
-                  <p className="font-semibold">{topUser.username}</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-200/80">
+                    {t("dashboard.leaderboard.leader")}
+                  </p>
+                  <p className="truncate font-semibold">{topUser.username}</p>
                   <p className="text-xs text-zinc-600 dark:text-amber-100/70">
-                    {topUser.total_score || 0} pts
+                    {topUser.total_score || 0} {t("leaderboard.points")}
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {leaderboard.slice(0, 5).map((u, i) => (
+          {leaderboard.slice(1, 5).map((u, i) => (
             <div key={u.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <span className="w-7 text-sm font-medium text-muted-foreground">
-                  #{i + 1}
+                  #{i + 2}
                 </span>
                 <UserAvatar
                   avatarUrl={u.avatar_url}
@@ -393,7 +400,7 @@ function DashboardContent() {
                   className="size-7"
                   username={u.username}
                 />
-                <span className="text-sm font-medium">{u.username}</span>
+                <span className="truncate text-sm font-medium">{u.username}</span>
               </div>
               <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
                 {u.total_score || 0}
@@ -407,7 +414,11 @@ function DashboardContent() {
           contentClassName="space-y-3"
         >
           {recent.length === 0 && (
-            <EmptyState className="py-4" title={t("dashboard.states.empty")} />
+            <EmptyState
+              className="py-4"
+              title={t("dashboard.states.noSubmissionsTitle")}
+              description={t("dashboard.states.noSubmissionsDescription")}
+            />
           )}
 
           {recent.map((r, i) => (
@@ -421,7 +432,9 @@ function DashboardContent() {
                     t("dashboard.states.unknownProblem")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(r.created_at).toLocaleString()}
+                  {new Date(r.created_at).toLocaleString(
+                    locale === "ro" ? "ro-RO" : "en-US"
+                  )}
                 </p>
               </div>
               <Badge
@@ -445,7 +458,11 @@ function DashboardContent() {
         contentClassName="space-y-3"
       >
         {feed.length === 0 && (
-          <EmptyState className="py-4" title={t("dashboard.states.empty")} />
+          <EmptyState
+            className="py-4"
+            title={t("dashboard.states.quietFeedTitle")}
+            description={t("dashboard.states.quietFeedDescription")}
+          />
         )}
 
         {feed.map((item, i) => (
@@ -469,9 +486,7 @@ function DashboardContent() {
                 </span>
               </a>
               <span className="text-sm text-muted-foreground">
-                {locale === "ro"
-                  ? t("dashboard.activity.solvedMiddle")
-                  : t("dashboard.activity.solvedPrefix")}
+                {t("dashboard.activity.solved")}
               </span>
               <a
                 href={`/problems/${item.problem_id}`}

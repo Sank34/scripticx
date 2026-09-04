@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import { enUS, ro as roLocale } from "date-fns/locale";
 import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  CakeSlice,
+  CalendarDays,
   Check,
   Code2,
   GraduationCap,
@@ -14,6 +17,7 @@ import {
   Languages,
   Presentation,
   Route,
+  ShieldCheck,
   Sparkles,
   Target,
   Trophy,
@@ -23,9 +27,16 @@ import { toast } from "sonner";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type ProfileSummary } from "@/lib/api";
+import {
+  formatBirthDateForStorage,
+  isAllowedBirthDate,
+  parseStoredBirthDate,
+} from "@/lib/birthday";
+import { savePrivateBirthDate } from "@/lib/birthdayData";
 import {
   normalizeOnboardingUsername,
   onboardingMetadataKeys,
@@ -54,7 +65,7 @@ type OnboardingExperienceProps = {
   };
 };
 
-const totalSteps = 8;
+const totalSteps = 9;
 
 type StepTransitionPhase = "entering" | "idle" | "leaving";
 
@@ -63,6 +74,10 @@ const copy = {
     back: "Back",
     bio: "A short bio",
     bioPlaceholder: "What are you curious to build or understand?",
+    birthdayDescription: "Choose the date from the calendar below.",
+    birthdayPrivacy: "We only use this for private, aggregate statistics and a small surprise once a year. Your birthday is never shown on your public profile.",
+    birthdaySelected: "Birthday selected",
+    birthdayTitle: "When is your birthday?",
     complete: "Start exploring",
     createAccount: "Create account",
     continue: "Continue",
@@ -97,6 +112,10 @@ const copy = {
     back: "Înapoi",
     bio: "O scurtă descriere",
     bioPlaceholder: "Ce ești curios să construiești sau să înțelegi?",
+    birthdayDescription: "Alege data din calendarul de mai jos.",
+    birthdayPrivacy: "Folosim data doar pentru statistici interne, agregate, și pentru o mică surpriză o dată pe an. Ziua ta de naștere nu apare niciodată pe profilul public.",
+    birthdaySelected: "Data selectată",
+    birthdayTitle: "Când este ziua ta de naștere?",
     complete: "Începe explorarea",
     createAccount: "Creează contul",
     continue: "Continuă",
@@ -234,6 +253,7 @@ export function OnboardingExperience({
     avatarPreview:
       typeof profile?.avatar_url === "string" ? profile.avatar_url : null,
     bio: typeof profile?.bio === "string" ? profile.bio : "",
+    birthDate: "",
     experience: "beginner",
     goal: "learn-programming",
     interests: ["fundamentals", "visual-execution"],
@@ -263,7 +283,14 @@ export function OnboardingExperience({
   const accountEmail = registration?.email || user?.email || "";
   const initials = (draft.username || accountEmail || "S").slice(0, 2).toUpperCase();
   const normalizedUsername = normalizeOnboardingUsername(draft.username);
-  const canContinue = step !== 3 || normalizedUsername.length >= 3;
+  const canContinue =
+    (step !== 3 || normalizedUsername.length >= 3) &&
+    (step !== 4 || isAllowedBirthDate(draft.birthDate));
+  const today = useMemo(() => new Date(), []);
+  const selectedBirthDate = useMemo(
+    () => parseStoredBirthDate(draft.birthDate),
+    [draft.birthDate]
+  );
   const selectedGoal = useMemo(
     () => goalOptions.find((option) => option.id === draft.goal),
     [draft.goal]
@@ -396,6 +423,8 @@ export function OnboardingExperience({
         })
         .eq("id", user.id);
       if (profileError) throw profileError;
+
+      await savePrivateBirthDate(draft.birthDate);
 
       const { error: workspaceError } = await supabase.rpc(
         "provision_default_workspaces",
@@ -690,6 +719,79 @@ export function OnboardingExperience({
             )}
 
             {step === 4 && (
+              <div className="mx-auto w-full max-w-3xl">
+                <div className="text-center">
+                  <div className="mx-auto flex size-14 items-center justify-center rounded-xl border bg-card shadow-sm">
+                    <CakeSlice className="size-6" />
+                  </div>
+                  <h1 className="mt-5 text-3xl font-semibold tracking-normal sm:text-4xl">
+                    {c.birthdayTitle}
+                  </h1>
+                  <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+                    {c.birthdayDescription}
+                  </p>
+                </div>
+
+                <div className="mx-auto mt-5 grid max-w-2xl gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-stretch">
+                  <div className="rounded-[var(--sx-radius-card)] border bg-card p-2 shadow-sm">
+                    <Calendar
+                      mode="single"
+                      selected={selectedBirthDate}
+                      onSelect={(date) =>
+                        setDraft((current) => ({
+                          ...current,
+                          birthDate: date ? formatBirthDateForStorage(date) : "",
+                        }))
+                      }
+                      defaultMonth={
+                        selectedBirthDate ||
+                        new Date(
+                          today.getFullYear() - 12,
+                          today.getMonth(),
+                          today.getDate()
+                        )
+                      }
+                      startMonth={new Date(1900, 0, 1)}
+                      endMonth={today}
+                      disabled={{ after: today }}
+                      captionLayout="dropdown"
+                      locale={language === "ro" ? roLocale : enUS}
+                      className="mx-auto bg-transparent p-1 [--cell-size:--spacing(8)]"
+                    />
+                  </div>
+
+                  <div className="flex min-w-0 flex-col gap-3">
+                    <div className="flex min-h-20 items-center gap-3 rounded-[var(--sx-radius-card)] border bg-card p-4 shadow-sm">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <CalendarDays className="size-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {c.birthdaySelected}
+                        </p>
+                        <p className="mt-0.5 truncate font-semibold">
+                          {selectedBirthDate
+                            ? new Intl.DateTimeFormat(
+                                language === "ro" ? "ro-RO" : "en-US",
+                                { day: "numeric", month: "long", year: "numeric" }
+                              ).format(selectedBirthDate)
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-1 items-start gap-3 rounded-[var(--sx-radius-card)] border bg-muted/50 p-4 text-left">
+                      <ShieldCheck className="mt-0.5 size-5 shrink-0" />
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {c.birthdayPrivacy}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 5 && (
               <div className="mx-auto max-w-2xl">
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
@@ -742,7 +844,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 5 && (
+            {step === 6 && (
               <div className="mx-auto max-w-2xl">
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
@@ -795,7 +897,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 6 && (
+            {step === 7 && (
               <div>
                 <div className="text-center">
                   <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.interestsTitle}</h1>
@@ -830,7 +932,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 7 && (
+            {step === 8 && (
               <div>
                 <div className="text-center">
                   <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">

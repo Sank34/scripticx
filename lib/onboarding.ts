@@ -30,6 +30,7 @@ export type OnboardingDraft = {
   avatarFile: File | null;
   avatarPreview: string | null;
   bio: string;
+  birthDate: string;
   experience: OnboardingExperienceLevel;
   goal: OnboardingGoal;
   interests: string[];

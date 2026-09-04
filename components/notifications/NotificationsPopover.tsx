@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { Bell, BellRing, CheckCheck, Inbox } from "lucide-react";
+import { Bell, BellRing, CheckCheck, Gift, Inbox } from "lucide-react";
 
 import { api, type AppNotification } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -133,6 +133,17 @@ function getLocalizedNotification(
         : ro
           ? "Rezolvă provocarea de azi."
           : "Solve today's coding challenge.",
+    };
+  }
+
+  if (notification.type === "birthday_surprise") {
+    return {
+      title: ro
+        ? "Surpriza ta aniversară a sosit"
+        : "Your birthday surprise is here",
+      body: ro
+        ? "Ți-am lăsat două cadouri speciale în Inventory. La mulți ani!"
+        : "We left two special gifts in your Inventory. Happy birthday!",
     };
   }
 
@@ -656,12 +667,18 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                       unread && "bg-red-50/40 dark:bg-red-950/20"
                     )}
                   >
-                    <UserAvatar
-                      avatarUrl={notification.actor?.avatar_url}
-                      username={notification.actor?.username || "S"}
-                      equippedRewards={notification.actor?.equipped_rewards}
-                      className="h-9 w-9"
-                    />
+                    {notification.type === "birthday_surprise" ? (
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted">
+                        <Gift className="size-4" />
+                      </span>
+                    ) : (
+                      <UserAvatar
+                        avatarUrl={notification.actor?.avatar_url}
+                        username={notification.actor?.username || "S"}
+                        equippedRewards={notification.actor?.equipped_rewards}
+                        className="h-9 w-9"
+                      />
+                    )}
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start gap-2">

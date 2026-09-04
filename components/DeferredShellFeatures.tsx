@@ -19,6 +19,13 @@ const OnboardingManager = dynamic(
     ),
   { ssr: false }
 );
+const BirthdayManager = dynamic(
+  () =>
+    import("@/components/birthday/BirthdayManager").then(
+      (module) => module.BirthdayManager
+    ),
+  { ssr: false }
+);
 
 export function DeferredShellFeatures() {
   const pathname = usePathname();
@@ -60,6 +67,7 @@ export function DeferredShellFeatures() {
       {isMobile ? <MobileDrawer /> : null}
       <NetworkStatus />
       {shellIdle && pathname !== "/auth/callback" ? <OnboardingManager /> : null}
+      {shellIdle ? <BirthdayManager /> : null}
     </>
   );
 }

@@ -28,6 +28,8 @@ export type RewardVisual =
   | "laurel"
   | "pixel-crown"
   | "leaf-canopy"
+  | "birthday-party"
+  | "birthday-confetti"
   | "title"
   | "custom-overlay"
   | "custom-background";
@@ -150,6 +152,39 @@ export const SHOP_CATALOG: RewardProduct[] = [
     price: 300,
     rarity: "common",
     visual: "title",
+  },
+  {
+    id: "birthday-party-decoration",
+    category: "avatar-decoration",
+    name: { en: "Birthday party!", ro: "Petrecere aniversară!" },
+    description: {
+      en: "A party hat and confetti made just for your birthday.",
+      ro: "Un coif de petrecere și confetti create special pentru ziua ta.",
+    },
+    price: 500,
+    rarity: "legendary",
+    visual: "birthday-party",
+    active: false,
+    sort_order: 900,
+  },
+  {
+    id: "birthday-confetti-background",
+    category: "profile-background",
+    name: { en: "Birthday confetti", ro: "Confetti aniversar" },
+    description: {
+      en: "A cheerful birthday pattern for your profile.",
+      ro: "Un pattern aniversar vesel pentru profilul tău.",
+    },
+    price: 500,
+    rarity: "legendary",
+    visual: "birthday-confetti",
+    active: false,
+    sort_order: 901,
+    styleConfig: {
+      backgroundColor: "#fffdf8",
+      patternOpacity: 0.72,
+      patternSize: 88,
+    },
   },
 ];
 

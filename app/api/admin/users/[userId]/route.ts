@@ -24,6 +24,23 @@ type AdminContext = {
   admin: ReturnType<typeof createAdminSupabase>;
 };
 
+type UserDeletionBlocker = {
+  column_name: string;
+  constraint_name: string;
+  delete_action: "no_action" | "restrict";
+  matching_rows: number | string;
+  schema_name: string;
+  table_name: string;
+};
+
+type UserStorageObject = {
+  bucket_id: string;
+  object_name: string;
+};
+
+const STORAGE_OBJECT_PAGE_SIZE = 500;
+const MAX_STORAGE_OBJECTS_PER_USER = 50_000;
+
 async function authorizeAdmin(request: Request): Promise<AdminContext | NextResponse> {
   const token = getBearerToken(request);
   if (!token) {
@@ -80,32 +97,75 @@ function isHttpUrl(value: string) {
   }
 }
 
-async function removeAvatarFiles(
+async function getUserDeletionBlockers(
   admin: ReturnType<typeof createAdminSupabase>,
-  prefix: string
-) {
-  const bucket = admin.storage.from("avatars");
-  const paths: string[] = [];
+  userId: string
+): Promise<UserDeletionBlocker[]> {
+  const { data, error } = await admin.rpc("admin_user_deletion_blockers", {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  return (data || []) as UserDeletionBlocker[];
+}
 
-  async function collect(currentPrefix: string) {
-    const { data, error } = await bucket.list(currentPrefix, { limit: 1000 });
+async function listUserStorageObjects(
+  admin: ReturnType<typeof createAdminSupabase>,
+  userId: string
+): Promise<UserStorageObject[]> {
+  const objects: UserStorageObject[] = [];
+
+  while (true) {
+    const { data, error } = await admin.rpc("admin_list_user_storage_objects", {
+      p_user_id: userId,
+      p_limit: STORAGE_OBJECT_PAGE_SIZE,
+      p_offset: objects.length,
+    });
     if (error) throw error;
 
-    for (const entry of data || []) {
-      const path = `${currentPrefix}/${entry.name}`;
-      if (entry.id) {
-        paths.push(path);
-      } else {
-        await collect(path);
-      }
+    const page = (data || []) as UserStorageObject[];
+    objects.push(...page);
+    if (objects.length > MAX_STORAGE_OBJECTS_PER_USER) {
+      throw new Error(
+        `Account owns more than ${MAX_STORAGE_OBJECTS_PER_USER} storage objects; manual cleanup is required`
+      );
     }
+    if (page.length < STORAGE_OBJECT_PAGE_SIZE) return objects;
+  }
+}
+
+async function removeUserStorageObjects(
+  admin: ReturnType<typeof createAdminSupabase>,
+  objects: UserStorageObject[]
+) {
+  const byBucket = new Map<string, string[]>();
+  for (const object of objects) {
+    const paths = byBucket.get(object.bucket_id) || [];
+    paths.push(object.object_name);
+    byBucket.set(object.bucket_id, paths);
   }
 
-  await collect(prefix);
-  if (!paths.length) return;
+  for (const [bucketId, paths] of byBucket) {
+    for (let offset = 0; offset < paths.length; offset += STORAGE_OBJECT_PAGE_SIZE) {
+      const { error } = await admin.storage
+        .from(bucketId)
+        .remove(paths.slice(offset, offset + STORAGE_OBJECT_PAGE_SIZE));
+      if (error) throw error;
+    }
+  }
+}
 
-  const { error } = await bucket.remove(paths);
-  if (error) throw error;
+function errorDetails(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return { code: undefined, message: "Could not delete user" };
+  }
+  const value = error as { code?: unknown; message?: unknown };
+  return {
+    code: typeof value.code === "string" ? value.code : undefined,
+    message:
+      typeof value.message === "string" && value.message.trim()
+        ? value.message
+        : "Could not delete user",
+  };
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
@@ -122,7 +182,20 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   try {
-    await removeAvatarFiles(admin, userId);
+    const blockers = await getUserDeletionBlockers(admin, userId);
+    if (blockers.length > 0) {
+      return NextResponse.json(
+        {
+          code: "USER_DELETE_BLOCKED",
+          error: "The user is still referenced by protected platform records",
+          blockers,
+        },
+        { status: 409 }
+      );
+    }
+
+    const storageObjects = await listUserStorageObjects(admin, userId);
+    await removeUserStorageObjects(admin, storageObjects);
 
     const { error: authDeleteError } = await admin.auth.admin.deleteUser(userId);
     if (authDeleteError) throw authDeleteError;
@@ -138,11 +211,13 @@ export async function DELETE(request: Request, context: RouteContext) {
     return NextResponse.json({
       deleted: true,
       profileCleanupPending: Boolean(profileDeleteError),
+      storageObjectsDeleted: storageObjects.length,
     });
   } catch (error) {
     console.error("Could not delete user:", error);
+    const details = errorDetails(error);
     return NextResponse.json(
-      { error: "Could not delete user" },
+      { code: details.code, error: details.message },
       { status: 500 }
     );
   }

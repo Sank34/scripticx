@@ -173,6 +173,9 @@ export function OnboardingManager() {
         onComplete={() => {
           tourActiveRef.current = false;
           setShowTour(false);
+          window.dispatchEvent(
+            new Event("scripticx-product-tour-completed")
+          );
           router.replace(landingRouteRef.current);
         }}
       />

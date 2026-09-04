@@ -831,23 +831,64 @@ export const translations = {
     dashboard: {
       title: "Dashboard",
       overview: "Overview",
+      hero: {
+        eyebrow: "Your coding corner",
+        title: "Hey, {name}. Ready to teach the computer a new trick?",
+        description:
+          "Your code has been busy. Here's what you solved, what's waiting, and where one more little win might be hiding :)",
+        coderFallback: "coder",
+      },
       stats: {
-        solved: "Problems solved",
-        score: "Total score",
-        streak: "Streak",
+        solved: "Solved",
+        attempted: "Tried",
+        average: "Average score",
+      },
+      daily: {
+        title: "Your daily brain snack",
+        ready: "Fresh and waiting :D",
+        solved: "Crushed it for today :)",
+        description: "One problem a day keeps the bugs away. Mostly.",
+        start: "Let's code",
+        done: "Done for today",
+        emptyTitle: "No challenge today :)",
+        emptyDescription: "Even code needs a snack break.",
+      },
+      charts: {
+        trendTitle: "Your code is leveling up",
+        trendHint: "your last 5 runs",
+        mixTitle: "How the runs went",
+        emptyTitle: "This chart is taking a tiny nap :)",
+        emptyDescription: "Solve something to wake it up.",
+        buckets: {
+          perfect: "Nailed it",
+          almost: "Almost there",
+          retry: "One more try",
+        },
+      },
+      leaderboard: {
+        title: "Code legends",
+        viewAll: "See the whole crew",
+        leader: "Leading the pack :D",
+        emptyTitle: "Suspiciously peaceful :)",
+        emptyDescription: "No scores yet. Be the first name on the board.",
       },
       sections: {
-        recent: "Recent Submissions",
-        activity: "Activity",
+        recent: "Fresh from your editor",
+        activity: "What your people are solving",
       },
       states: {
-        loading: "Loading...",
-        empty: "No data yet",
-        unknownProblem: "Unknown Problem",
+        loading: "Getting things ready...",
+        empty: "Nothing here yet :)",
+        unknownProblem: "Mystery problem",
+        noSubmissionsTitle: "Nothing from the editor yet :)",
+        noSubmissionsDescription:
+          "Your first submission gets the best seat.",
+        quietFeedTitle: "Quiet in here :)",
+        quietFeedDescription:
+          "Follow a few coders and their wins will show up here.",
       },
       activity: {
-        solvedPrefix: "solved",
-        solvedMiddle: "",
+        solved: "solved",
       },
     },
 
@@ -3081,23 +3122,64 @@ export const translations = {
     dashboard: {
       title: "Panou",
       overview: "Prezentare",
+      hero: {
+        eyebrow: "Colțul tău de coding",
+        title: "Hei, {name}. Mai învățăm calculatorul un truc?",
+        description:
+          "Codul tău n-a stat degeaba. Uite ce ai rezolvat, ce te așteaptă și unde se mai ascunde o mică victorie :)",
+        coderFallback: "programatorule",
+      },
       stats: {
-        solved: "Probleme rezolvate",
-        score: "Scor total",
-        streak: "Streak",
+        solved: "Rezolvate",
+        attempted: "Încercate",
+        average: "Scor mediu",
+      },
+      daily: {
+        title: "Porția de coding de azi",
+        ready: "Proaspătă și gata de rezolvat :D",
+        solved: "Ai cucerit-o pe azi :)",
+        description: "O problemă pe zi ține bug-urile la distanță. Aproape.",
+        start: "Dă-i drumul",
+        done: "Gata pe azi",
+        emptyTitle: "Nicio provocare azi :)",
+        emptyDescription: "Până și codul mai ia o pauză.",
+      },
+      charts: {
+        trendTitle: "Codul tău prinde puteri",
+        trendHint: "ultimele 5 rulări",
+        mixTitle: "Cum au mers rulările",
+        emptyTitle: "Graficul trage un pui de somn :)",
+        emptyDescription: "Rezolvă ceva ca să-l trezești.",
+        buckets: {
+          perfect: "Fix la țintă",
+          almost: "Aproape",
+          retry: "Mai încercăm",
+        },
+      },
+      leaderboard: {
+        title: "Legendele codului",
+        viewAll: "Vezi toată gașca",
+        leader: "Conduce plutonul :D",
+        emptyTitle: "Suspect de liniște :)",
+        emptyDescription: "Niciun scor încă. Fii primul din clasament.",
       },
       sections: {
-        recent: "Submisii recente",
-        activity: "Activitate",
+        recent: "Proaspăt ieșite din editor",
+        activity: "Ce mai rezolvă gașca ta",
       },
       states: {
-        loading: "Se încarcă...",
-        empty: "Nu există date",
-        unknownProblem: "Problemă necunoscută",
+        loading: "Pregătim lucrurile...",
+        empty: "Nimic aici deocamdată :)",
+        unknownProblem: "Problemă misterioasă",
+        noSubmissionsTitle: "Nimic din editor încă :)",
+        noSubmissionsDescription:
+          "Prima soluție trimisă primește locul din față.",
+        quietFeedTitle: "E liniște aici :)",
+        quietFeedDescription:
+          "Urmărește câțiva colegi și reușitele lor vor apărea aici.",
       },
       activity: {
-        solvedPrefix: "",
-        solvedMiddle: "a rezolvat problema",
+        solved: "a rezolvat",
       },
     },
 

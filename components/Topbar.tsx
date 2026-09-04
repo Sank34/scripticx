@@ -14,10 +14,13 @@ import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useSavedAccounts } from "@/hooks/useSavedAccounts";
 import {
-  removeSavedAccount,
   saveAccountSession,
   type SavedScripticXAccount,
 } from "@/lib/account-switcher";
+import {
+  activateSavedAccount,
+  logoutCurrentAccount,
+} from "@/lib/account-session-manager";
 import { supabase } from "@/lib/supabase";
 import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 
@@ -83,6 +86,7 @@ export function Topbar() {
   const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
     null
   );
+  const [loggingOut, setLoggingOut] = useState(false);
   const [themeMounted, setThemeMounted] = useState(false);
   const themeTransitionId = useRef(0);
   const requestedTheme = useRef<string | undefined>(theme);
@@ -165,13 +169,45 @@ export function Topbar() {
   }
 
   async function logout() {
-    if (user) removeSavedAccount(user.id);
-    await supabase.auth.signOut();
-    router.replace("/login");
+    if (!user || switchingAccountId || loggingOut) return;
+    setLoggingOut(true);
+
+    try {
+      const result = await logoutCurrentAccount(user.id);
+      if (result) {
+        toast.success(
+          locale === "ro"
+            ? `Te-ai deconectat și ai trecut pe contul ${result.account.nickname}.`
+            : `Signed out and switched to ${result.account.nickname}.`
+        );
+        router.replace(
+          getWorkspaceLandingRoute(result.session.user.user_metadata)
+        );
+      } else {
+        router.replace("/login");
+      }
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        locale === "ro"
+          ? "Nu te-am putut deconecta fără să pierdem celelalte sesiuni."
+          : "Could not sign out without losing the other sessions.",
+        {
+          description: error instanceof Error ? error.message : String(error),
+        }
+      );
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   async function switchAccount(account: SavedScripticXAccount) {
-    if (!user || account.userId === user.id || switchingAccountId) return;
+    if (
+      !user ||
+      account.userId === user.id ||
+      switchingAccountId ||
+      loggingOut
+    ) return;
     setSwitchingAccountId(account.userId);
 
     try {
@@ -183,25 +219,14 @@ export function Topbar() {
         });
       }
 
-      const { data, error } = await supabase.auth.setSession({
-        access_token: account.accessToken,
-        refresh_token: account.refreshToken,
-      });
-      if (error) throw error;
-      if (!data.session) throw new Error("Session unavailable");
-
-      saveAccountSession(data.session, {
-        avatarUrl: account.avatarUrl,
-        nickname: account.nickname,
-        username: account.username,
-      });
+      const session = await activateSavedAccount(account);
 
       toast.success(
         locale === "ro"
           ? `Ai trecut pe contul ${account.nickname}.`
           : `Switched to ${account.nickname}.`
       );
-      router.replace(getWorkspaceLandingRoute(data.session.user.user_metadata));
+      router.replace(getWorkspaceLandingRoute(session.user.user_metadata));
       router.refresh();
     } catch (error) {
       toast.error(
@@ -296,7 +321,7 @@ export function Topbar() {
                     <DropdownMenuItem
                       key={account.userId}
                       onSelect={() => void switchAccount(account)}
-                      disabled={switchingAccountId !== null}
+                      disabled={switchingAccountId !== null || loggingOut}
                       className="gap-3 py-2"
                     >
                       <UserAvatar
@@ -432,11 +457,20 @@ export function Topbar() {
               <DropdownMenuSeparator />
 
               <DropdownMenuItem
-                onClick={logout}
+                onClick={() => void logout()}
+                disabled={loggingOut || switchingAccountId !== null}
                 className="flex items-center gap-2 text-red-500"
               >
-                <LogOut size={16} />
-                {t("user.logout")}
+                {loggingOut ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <LogOut size={16} />
+                )}
+                {otherAccounts.length
+                  ? locale === "ro"
+                    ? "Deconectează și schimbă contul"
+                    : "Log out and switch account"
+                  : t("user.logout")}
               </DropdownMenuItem>
 
             </DropdownMenuContent>

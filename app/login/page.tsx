@@ -11,10 +11,14 @@ import type { User } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { KeyRound, LoaderCircle } from "lucide-react";
+import { ArrowRight, KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { siGithub, siGoogle } from "simple-icons";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import {
+  getRegistrationBirthDate,
+} from "@/lib/birthday";
+import { savePrivateBirthDate } from "@/lib/birthdayData";
 import {
   clearPendingEmailVerification,
   emailVerificationBroadcastChannel,
@@ -34,11 +38,22 @@ import {
   buildRegistrationMetadata,
   registrationProfileMetadataKeys,
 } from "@/lib/registration-onboarding";
+import {
+  saveAccountSession,
+  type SavedScripticXAccount,
+} from "@/lib/account-switcher";
+import {
+  activateSavedAccount,
+  logoutCurrentAccount,
+  logoutSavedAccount,
+} from "@/lib/account-session-manager";
 import { supabase } from "@/lib/supabase";
 import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 import { AppModal } from "@/components/ui/app-modal";
 import { RegistrationVerification } from "@/components/onboarding/RegistrationVerification";
 import { PasswordlessSignInDialog } from "@/components/auth/PasswordlessSignInDialog";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import { useSavedAccounts } from "@/hooks/useSavedAccounts";
 
 import {
   Tabs,
@@ -250,6 +265,12 @@ export default function LoginPage() {
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [passwordlessOpen, setPasswordlessOpen] = useState(false);
   const [authAction, setAuthAction] = useState<AuthAction>(null);
+  const [savedAccountActionId, setSavedAccountActionId] = useState<
+    string | null
+  >(null);
+  const [savedAccountRemovalId, setSavedAccountRemovalId] = useState<
+    string | null
+  >(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -267,7 +288,25 @@ export default function LoginPage() {
   >(null);
 
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const { accounts: savedAccounts } = useSavedAccounts();
+  const savedAccountsCopy = locale === "ro"
+    ? {
+        title: "Conturi salvate",
+        description: "Continuă pe acest dispozitiv fără să introduci parola.",
+        continue: "Continuă cu acest cont",
+        remove: "Deconectează acest cont de pe dispozitiv",
+        removed: "Contul a fost eliminat de pe acest dispozitiv.",
+        error: "Contul salvat nu a putut fi activat.",
+      }
+    : {
+        title: "Saved accounts",
+        description: "Continue on this device without entering your password.",
+        continue: "Continue with this account",
+        remove: "Log this account out on this device",
+        removed: "The account was removed from this device.",
+        error: "The saved account could not be activated.",
+      };
   const brandMessages: BrandMessage[] = [
     {
       keyword: t("login.brandMessages.learn.keyword"),
@@ -381,6 +420,11 @@ export default function LoginPage() {
           registrationDraft?.bio ||
             (typeof storedBio === "string" ? storedBio : undefined)
         );
+
+        const birthDate =
+          registrationDraft?.birthDate ||
+          getRegistrationBirthDate(verifiedUser.user_metadata);
+        if (birthDate) await savePrivateBirthDate(birthDate);
 
         const { error: workspaceError } = await supabase.rpc(
           "provision_default_workspaces",
@@ -569,7 +613,38 @@ export default function LoginPage() {
       return;
     }
 
+    if (data.session) saveAccountSession(data.session);
     router.replace(getWorkspaceLandingRoute(data.user.user_metadata));
+  }
+
+  async function continueWithSavedAccount(account: SavedScripticXAccount) {
+    if (savedAccountActionId || authAction) return;
+    setSavedAccountActionId(account.userId);
+
+    try {
+      const session = await activateSavedAccount(account);
+      router.replace(getWorkspaceLandingRoute(session.user.user_metadata));
+      router.refresh();
+    } catch (error) {
+      showModal(
+        t("login.modal.loginErrorTitle"),
+        error instanceof Error ? error.message : savedAccountsCopy.error,
+        "error"
+      );
+    } finally {
+      setSavedAccountActionId(null);
+    }
+  }
+
+  async function forgetSavedAccount(account: SavedScripticXAccount) {
+    if (savedAccountActionId || savedAccountRemovalId || authAction) return;
+    setSavedAccountRemovalId(account.userId);
+    try {
+      await logoutSavedAccount(account);
+      toast.success(savedAccountsCopy.removed);
+    } finally {
+      setSavedAccountRemovalId(null);
+    }
   }
 
   async function handleRegister() {
@@ -642,6 +717,7 @@ export default function LoginPage() {
           normalizedUsername,
           draft.bio
         );
+        await savePrivateBirthDate(draft.birthDate);
         const { error: workspaceError } = await supabase.rpc(
           "provision_default_workspaces",
           {
@@ -705,23 +781,38 @@ export default function LoginPage() {
     if (authAction) return;
 
     setAuthAction("signout");
-    const { error } = await api.auth.signOut();
+    try {
+      const { data } = await api.auth.getSession();
+      const result = data.session?.user
+        ? await logoutCurrentAccount(data.session.user.id)
+        : null;
+      if (!data.session?.user) {
+        const { error } = await api.auth.signOut();
+        if (error) throw error;
+      }
 
-    verificationCheckInFlightRef.current = false;
-    clearPendingEmailVerification();
-    setRegistration(null);
-    setRegistrationDraft(null);
-    setRegistrationUserId(null);
-    setRegistrationVerificationEmail(null);
-    setPendingVerificationEmail(null);
-    setEmail("");
-    setPassword("");
-    setUsername("");
-    setAuthTab("login");
-    setAuthAction(null);
+      verificationCheckInFlightRef.current = false;
+      clearPendingEmailVerification();
+      setRegistration(null);
+      setRegistrationDraft(null);
+      setRegistrationUserId(null);
+      setRegistrationVerificationEmail(null);
+      setPendingVerificationEmail(null);
+      setEmail("");
+      setPassword("");
+      setUsername("");
+      setAuthTab("login");
 
-    if (error) {
+      if (result) {
+        router.replace(
+          getWorkspaceLandingRoute(result.session.user.user_metadata)
+        );
+        router.refresh();
+      }
+    } catch {
       toast.error(t("login.registration.signOutError"));
+    } finally {
+      setAuthAction(null);
     }
   }
 
@@ -838,6 +929,76 @@ export default function LoginPage() {
                 </div>
               ) : null}
               <CardContent className="space-y-5 p-5 sm:p-6">
+                {authTab === "login" && savedAccounts.length ? (
+                  <section className="rounded-xl border bg-muted/25 p-2">
+                    <div className="px-2 pb-2 pt-1">
+                      <p className="text-sm font-medium">{savedAccountsCopy.title}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {savedAccountsCopy.description}
+                      </p>
+                    </div>
+                    <div className="max-h-52 space-y-1 overflow-y-auto">
+                      {savedAccounts.map((account) => (
+                        <div
+                          key={account.userId}
+                          className="flex min-w-0 items-center gap-2 rounded-lg bg-background p-2 shadow-sm"
+                        >
+                          <UserAvatar
+                            avatarUrl={account.avatarUrl}
+                            username={account.username}
+                            email={account.email}
+                            className="size-9"
+                          />
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 text-left"
+                            onClick={() => void continueWithSavedAccount(account)}
+                            disabled={Boolean(savedAccountActionId) || Boolean(savedAccountRemovalId) || authAction !== null}
+                          >
+                            <span className="block truncate text-sm font-medium">
+                              {account.nickname}
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {account.email}
+                            </span>
+                          </button>
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            title={savedAccountsCopy.continue}
+                            aria-label={savedAccountsCopy.continue}
+                            disabled={Boolean(savedAccountActionId) || Boolean(savedAccountRemovalId) || authAction !== null}
+                            onClick={() => void continueWithSavedAccount(account)}
+                          >
+                            {savedAccountActionId === account.userId ? (
+                              <LoaderCircle className="animate-spin" />
+                            ) : (
+                              <ArrowRight />
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            className="text-muted-foreground hover:text-destructive"
+                            title={savedAccountsCopy.remove}
+                            aria-label={`${savedAccountsCopy.remove}: ${account.nickname}`}
+                            disabled={Boolean(savedAccountActionId) || Boolean(savedAccountRemovalId) || authAction !== null}
+                            onClick={() => void forgetSavedAccount(account)}
+                          >
+                            {savedAccountRemovalId === account.userId ? (
+                              <LoaderCircle className="animate-spin" />
+                            ) : (
+                              <LogOut />
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
                 <Tabs
                   value={authTab}
                   onValueChange={(value) =>

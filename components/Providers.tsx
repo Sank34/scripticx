@@ -19,6 +19,7 @@ import {
   type AuthState,
 } from "@/hooks/useAuth";
 import { createQueryCacheStorage } from "@/lib/queryCacheStorage";
+import { saveAccountSession } from "@/lib/account-switcher";
 import { getSupabaseSessionWithTimeout } from "@/lib/supabase-session";
 import { NETWORK_RECOVERED_EVENT } from "@/lib/network-recovery";
 
@@ -352,6 +353,10 @@ function AuthCacheSync({
   useEffect(() => {
     const subscription = onAuthStateChange((session) => {
       const user = session?.user ?? null;
+
+      // Supabase rotates refresh tokens. Keep every saved account usable by
+      // persisting the latest token pair after sign-in and token refreshes.
+      if (session) saveAccountSession(session);
 
       synchronizeQueryCacheOwner(
         queryClient,

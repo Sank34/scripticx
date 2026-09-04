@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { api } from "@/lib/api";
+import {
+  getRegistrationBirthDate,
+} from "@/lib/birthday";
+import { savePrivateBirthDate } from "@/lib/birthdayData";
 import { isEmailVerificationCallback } from "@/lib/auth-callback";
 import { publishEmailVerificationCompleted } from "@/lib/email-verification";
 import {
@@ -87,6 +91,9 @@ export default function AuthCallbackPage() {
             preferredUsername,
             typeof registrationBio === "string" ? registrationBio : undefined
           );
+
+          const birthDate = getRegistrationBirthDate(user.user_metadata);
+          if (birthDate) await savePrivateBirthDate(birthDate);
 
           const { error: workspaceError } = await supabase.rpc(
             "provision_default_workspaces",

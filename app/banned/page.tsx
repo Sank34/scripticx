@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/i18n";
+import { logoutCurrentAccount } from "@/lib/account-session-manager";
+import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,8 +39,26 @@ export default function BannedPage() {
   }, [loading, profile?.banned, router, user]);
 
   async function logout() {
-    await supabase.auth.signOut();
-    router.replace("/login");
+    if (!user) return;
+
+    try {
+      const result = await logoutCurrentAccount(user.id);
+      router.replace(
+        result
+          ? getWorkspaceLandingRoute(result.session.user.user_metadata)
+          : "/login"
+      );
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        locale === "ro"
+          ? "Nu am putut activa următorul cont salvat."
+          : "Could not activate the next saved account.",
+        {
+          description: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
   }
 
   if (loading || !user || !profile?.banned) return null;

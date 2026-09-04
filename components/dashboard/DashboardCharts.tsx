@@ -14,6 +14,7 @@ import {
 } from "recharts";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { useLanguage } from "@/components/LanguageProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const TOOLTIP_CONTENT_STYLE: CSSProperties = {
@@ -41,16 +42,13 @@ type ScorePoint = { name: string; score: number };
 type ScoreBucket = { color: string; name: string; value: number };
 
 export function DashboardCharts({
-  emptyLabel,
-  locale,
   scoreDistribution,
   scoreTrend,
 }: {
-  emptyLabel: string;
-  locale: string;
   scoreDistribution: ScoreBucket[];
   scoreTrend: ScorePoint[];
 }) {
+  const { t } = useLanguage();
   const hasScoreDistribution = scoreDistribution.some((item) => item.value > 0);
 
   return (
@@ -58,10 +56,10 @@ export function DashboardCharts({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>
-            {locale === "ro" ? "Evoluția scorurilor" : "Score trend"}
+            {t("dashboard.charts.trendTitle")}
           </CardTitle>
           <span className="text-xs text-muted-foreground">
-            {locale === "ro" ? "ultimele rezultate" : "latest results"}
+            {t("dashboard.charts.trendHint")}
           </span>
         </CardHeader>
         <CardContent>
@@ -101,7 +99,11 @@ export function DashboardCharts({
               </ResponsiveContainer>
             </div>
           ) : (
-            <EmptyState className="py-10" title={emptyLabel} />
+            <EmptyState
+              className="py-10"
+              title={t("dashboard.charts.emptyTitle")}
+              description={t("dashboard.charts.emptyDescription")}
+            />
           )}
         </CardContent>
       </Card>
@@ -109,7 +111,7 @@ export function DashboardCharts({
       <Card>
         <CardHeader>
           <CardTitle>
-            {locale === "ro" ? "Distribuția rezultatelor" : "Result mix"}
+            {t("dashboard.charts.mixTitle")}
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-[180px_1fr] xl:grid-cols-1">
@@ -139,7 +141,11 @@ export function DashboardCharts({
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <EmptyState className="py-8" title={emptyLabel} />
+              <EmptyState
+                className="py-8"
+                title={t("dashboard.charts.emptyTitle")}
+                description={t("dashboard.charts.emptyDescription")}
+              />
             )}
           </div>
           <div className="space-y-2">

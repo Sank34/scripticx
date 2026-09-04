@@ -7,9 +7,11 @@ import {
   WORKSPACE_SETUP_VERSION,
   workspaceMetadataKeys,
 } from "@/lib/workspaces";
+import { BIRTH_DATE_METADATA_KEY } from "@/lib/birthday";
 
 export const registrationProfileMetadataKeys = {
   bio: "scripticx_registration_bio",
+  birthDate: BIRTH_DATE_METADATA_KEY,
 } as const;
 
 type RegistrationOnboardingInput = {
@@ -32,6 +34,7 @@ export function buildRegistrationMetadata({
     [onboardingMetadataKeys.persona]: draft.persona,
     [onboardingMetadataKeys.required]: false,
     [registrationProfileMetadataKeys.bio]: draft.bio.trim(),
+    [registrationProfileMetadataKeys.birthDate]: draft.birthDate,
     [workspaceMetadataKeys.activeWorkspaceKind]: getDefaultWorkspaceKind(
       draft.persona
     ),

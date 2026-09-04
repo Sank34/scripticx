@@ -8,6 +8,7 @@ import { RegistrationVerification } from "@/components/onboarding/RegistrationVe
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
+import { logoutCurrentAccount } from "@/lib/account-session-manager";
 import {
   clearPendingEmailVerification,
   isEmailVerified,
@@ -134,13 +135,30 @@ export function EmailVerificationAccessGate() {
   async function signOut() {
     if (action) return;
     setAction("signout");
-    const { error } = await api.auth.signOut();
-    clearPendingEmailVerification();
-    setPending(null);
-    setAction(null);
-    router.replace("/login");
 
-    if (error) toast.error(t("login.registration.signOutError"));
+    try {
+      let result = null;
+      if (user) {
+        result = await logoutCurrentAccount(user.id);
+      } else {
+        const { error } = await api.auth.signOut();
+        if (error) throw error;
+      }
+      clearPendingEmailVerification();
+      setPending(null);
+      router.replace(
+        result
+          ? getWorkspaceLandingRoute(result.session.user.user_metadata)
+          : "/login"
+      );
+      router.refresh();
+    } catch (error) {
+      toast.error(t("login.registration.signOutError"), {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setAction(null);
+    }
   }
 
   return (
