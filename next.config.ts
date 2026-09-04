@@ -21,7 +21,7 @@ const contentSecurityPolicy = [
   "media-src 'self' blob: https:",
   "worker-src 'self' blob:",
   `connect-src 'self' ${supabaseOrigin} ${supabaseRealtimeOrigin} https://api.github.com https://raw.githubusercontent.com`.replace(/\s+/g, " "),
-  "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+  "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.canva.com",
   ...(process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 

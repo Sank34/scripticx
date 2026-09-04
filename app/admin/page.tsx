@@ -18,6 +18,7 @@ import {
   Mails,
   Megaphone,
   Palette,
+  Presentation,
   RefreshCw,
   Send,
   ShoppingBag,
@@ -552,6 +553,19 @@ function AdminContent() {
               description={locale === "ro"
                 ? "Configurează concursuri, probleme, invitații și maintenance."
                 : "Configure competitions, problems, invites, and maintenance."}
+              count={null}
+            />
+          </div>
+
+          <div className="min-w-0">
+            <AdminNavCard
+              href="/admin/workshops"
+              icon={<Presentation className="h-5 w-5 text-teal-500" />}
+              ringClassName="ring-teal-500/50"
+              title={locale === "ro" ? "Portal traineri" : "Trainer portal"}
+              description={locale === "ro"
+                ? "Planifică workshopuri: program, prezentări, jocuri și notițe."
+                : "Plan workshops: agenda, decks, games, and trainer notes."}
               count={null}
             />
           </div>

@@ -82,6 +82,7 @@ export function TopbarBreadcrumbs() {
     profile: t("user.profile"),
     search: t("nav.search"),
     settings: t("user.settings"),
+    workshops: locale === "ro" ? "Portal traineri" : "Trainer portal",
     workspace: locale === "ro" ? "Workspace-uri" : "Workspaces",
     student: locale === "ro" ? "Elev" : "Student",
     teacher: locale === "ro" ? "Profesor" : "Teacher",
