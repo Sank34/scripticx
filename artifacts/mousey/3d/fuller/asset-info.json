@@ -1,0 +1,10 @@
+{
+  "triangles": 14312,
+  "mesh_objects": 29,
+  "rigged": true,
+  "bones": 7,
+  "animated": false,
+  "forward": "-Y",
+  "up": "+Z",
+  "export": "character and skin rig only; no display plinth/lights"
+}

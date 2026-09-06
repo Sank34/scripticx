@@ -1,0 +1,37 @@
+.island-welcome{--look-x:0;--look-y:0;position:absolute;inset:0;z-index:20;isolation:isolate;overflow:hidden;background:#0a1112;color:#edf1e9;animation:welcome-arrive .8s ease both;transition:opacity .55s ease,filter .55s ease}
+.island-welcome.is-departing{opacity:0;filter:blur(7px);pointer-events:none}
+.welcome-environment{position:absolute;inset:0;z-index:-3;background:linear-gradient(90deg,#080f12ed 0%,#080f1299 45%,#080f1222),url('/game/welcome/backdrop.webp') center/cover}
+.welcome-code{position:absolute;inset:-15% -10%;z-index:-2;transform:rotate(-13deg) scale(1.1);overflow:hidden;mask-image:linear-gradient(90deg,#0002,#0009 65%,#0005);pointer-events:none}
+.welcome-code>div{display:flex;justify-content:space-around;height:5vh;min-height:24px;white-space:nowrap;opacity:.2;animation:welcome-code-wave 9s ease-in-out infinite;animation-delay:calc(var(--row)*-.45s)}
+.welcome-code span{font:24px/1 monospace;color:#a1c9b5;opacity:.8}
+.welcome-code span:nth-child(3n){opacity:.4}.welcome-code span:nth-child(5n){color:#d1e6ba}
+.welcome-top{position:absolute;inset:clamp(22px,4vw,54px) clamp(24px,5vw,80px) auto;display:flex;align-items:center;justify-content:space-between;z-index:3}
+.welcome-top a,.welcome-top button{display:flex;align-items:center;gap:13px;color:#c7d4cf;background:none;border:0;text-decoration:none;font:12px 'Nunito',sans-serif;letter-spacing:.12em;cursor:pointer;padding:8px 0}
+.welcome-top b{font-weight:400;color:#566561;margin:0 9px}.welcome-top button{letter-spacing:.02em;font-size:14px}
+.welcome-copy{position:absolute;left:clamp(24px,8vw,140px);top:50%;transform:translateY(-47%);width:48%;max-width:660px;z-index:2}
+.welcome-overline{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#b5c7bd;margin:0 0 24px}.welcome-overline>span{height:5px;width:5px;border-radius:50%;background:#c5e8af;box-shadow:0 0 16px #a5e3a899}
+.welcome-copy h1{font:400 clamp(56px,6.5vw,110px)/1.08 'Amatic SC',sans-serif;letter-spacing:-.025em;margin:0 0 25px;text-wrap:balance}.welcome-copy em{font-style:normal;color:#c5e8af}
+.welcome-description{font:16px/1.85 'Nunito',sans-serif;color:#abbab5;max-width:370px;margin:0 0 32px;text-wrap:pretty}
+.welcome-play{display:flex;align-items:center;gap:20px;border:1px solid #daecc9;background:#c5e8af;color:#14261f;padding:17px 23px;min-width:210px;font:17px 'Nunito',sans-serif;cursor:pointer;box-shadow:0 6px 0 #719776,0 16px 48px #0006;transition:transform .2s,box-shadow .2s,background .2s}
+.welcome-play svg:last-child{margin-left:auto}.welcome-play:hover{transform:translateY(-3px);background:#d4f4c0;box-shadow:0 9px 0 #719776,0 20px 55px #0008}.welcome-play:active{transform:translateY(4px);box-shadow:0 2px 0 #719776}.welcome-play:disabled{cursor:default}
+.welcome-note{margin:24px 0 0;color:#71867d;font-size:12px}.welcome-top :focus-visible,.welcome-play:focus-visible{outline:2px solid #edfbdc;outline-offset:7px}
+.welcome-mascot{position:absolute;right:0;top:10%;width:52%;height:84%;pointer-events:none;perspective:1000px}
+.welcome-mouse-float{position:absolute;inset:0;animation:welcome-breathe 7s ease-in-out infinite}.welcome-mouse-tilt{width:100%;height:100%;transform:translate(calc(var(--look-x)*8px),calc(var(--look-y)*4px)) rotateY(calc(var(--look-x)*4deg)) rotateZ(calc(var(--look-x)*1.2deg));transition:transform .8s cubic-bezier(.2,.75,.2,1)}
+.welcome-mouse-tilt img{position:absolute;width:100%;height:100%;object-fit:contain;user-select:none}.welcome-gaze{transform:translate(calc(var(--look-x)*5px),calc(var(--look-y)*4px));transition:transform .55s ease-out}
+.island-welcome[data-tracking=false] .welcome-gaze{animation:welcome-curious 10s ease-in-out infinite}
+.welcome-ground-shadow{position:absolute;bottom:3%;left:26%;width:48%;height:7%;background:#000b;filter:blur(18px);border-radius:50%;transform:rotate(-9deg)}
+.welcome-mascot-note{position:absolute;right:12%;top:37%;font:23px 'Amatic SC',sans-serif;color:#9bb8aa;transform:rotate(8deg);opacity:.7}
+.welcome-bottom{position:absolute;bottom:28px;left:clamp(24px,5vw,80px);right:clamp(24px,5vw,80px);display:flex;justify-content:space-between;gap:15px;color:#6e8279;font:10px 'Nunito',sans-serif;letter-spacing:.16em}.welcome-bottom span:first-child{display:flex;align-items:center;gap:14px}.welcome-bottom i{width:34px;height:1px;background:#435b50}
+@keyframes welcome-code-wave{0%,100%{opacity:.12;transform:translateY(0)}40%{opacity:.4}60%{opacity:.2;transform:translateY(-5px)}}
+.welcome-code-fragments{position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden;mask-image:linear-gradient(90deg,transparent 15%,#000 55%)}
+.welcome-code-fragments span{position:absolute;left:calc(24% + var(--fragment)*7%);top:calc(14% + var(--fragment)*14%);color:#b6dec5;opacity:.17;white-space:nowrap;font:13px monospace;letter-spacing:.06em;transform:rotate(-13deg);animation:welcome-code-drift 12s ease-in-out infinite alternate;animation-delay:calc(var(--fragment)*-2s)}
+@keyframes welcome-code-drift{to{transform:translate(-18px,-8px) rotate(-13deg);opacity:.28}}
+@keyframes welcome-breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes welcome-curious{0%,20%,100%{transform:translate(-2px,0)}35%,48%{transform:translate(4px,-3px)}65%,80%{transform:translate(-4px,1px)}}
+@keyframes welcome-arrive{from{opacity:0}to{opacity:1}}
+@media(max-width:700px){.welcome-mascot-note{display:none}}
+@media(max-width:700px){.welcome-top{inset:20px 22px auto}.welcome-mascot{top:9%;height:46%;right:-7%;width:85%}.welcome-mascot-note{right:8%;top:40%;font-size:20px}.welcome-copy{left:26px;top:auto;bottom:68px;transform:none;width:calc(100% - 52px)}.welcome-copy h1{font-size:52px;margin-bottom:12px}.welcome-description{font-size:13px;line-height:1.6;max-width:330px;margin-bottom:20px}.welcome-overline{font-size:9px;margin-bottom:14px}.welcome-note{display:none}.welcome-play{padding:12px 19px;min-width:190px;font-size:15px}.welcome-bottom{bottom:22px;left:26px;right:26px}.welcome-bottom>span:last-child{display:none}.welcome-code span{font-size:19px}.welcome-environment{background-image:linear-gradient(0deg,#080f12 8%,#080f1280 60%),url('/game/welcome/backdrop.webp')}}
+@media(max-height:620px) and (min-width:701px){.welcome-copy h1{font-size:58px}.welcome-overline{margin-bottom:12px}.welcome-description{font-size:14px;margin-bottom:18px}.welcome-note{display:none}.welcome-mascot{top:8%;height:88%}}
+@media(max-height:730px) and (max-width:700px){.welcome-mascot{height:39%;top:8%}.welcome-copy{bottom:55px}.welcome-copy h1{font-size:42px}.welcome-description{font-size:12px;max-width:300px}.welcome-overline{margin-bottom:8px}}
+@media(prefers-reduced-motion:reduce){.island-welcome,.island-welcome *{animation:none!important;transition:none!important}.welcome-mouse-tilt,.welcome-gaze{transform:none!important}}
+.sx-game[data-reduced-motion=true] .island-welcome,.sx-game[data-reduced-motion=true] .island-welcome *{animation:none!important;transition:none!important}.sx-game[data-reduced-motion=true] .welcome-mouse-tilt,.sx-game[data-reduced-motion=true] .welcome-gaze{transform:none!important}

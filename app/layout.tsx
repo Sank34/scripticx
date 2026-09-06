@@ -8,6 +8,7 @@ import { Topbar } from "@/components/Topbar";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { MainWrapper } from "@/components/MainWrapper";
+import { PlayShellBoundary, OutsideGame } from "@/components/PlayShellBoundary";
 import Providers from "@/components/Providers";
 import { DeferredShellFeatures } from "@/components/DeferredShellFeatures";
 import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
@@ -143,6 +144,7 @@ export default function RootLayout({
               <EmailVerificationAccessGate />
               <GlobalContextMenu>
                 <SidebarProvider>
+                  <PlayShellBoundary game={children}>
                   <div
                     data-shell-root
                     className="h-screen w-full overflow-hidden bg-sidebar p-2"
@@ -168,8 +170,9 @@ export default function RootLayout({
                       </div>
                     </div>
                   </div>
+                  </PlayShellBoundary>
                 </SidebarProvider>
-                <DeferredShellFeatures />
+                <OutsideGame><DeferredShellFeatures /></OutsideGame>
               </GlobalContextMenu>
             </LanguageProvider>
           </Providers>

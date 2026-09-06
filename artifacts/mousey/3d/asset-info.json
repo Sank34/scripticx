@@ -1,0 +1,9 @@
+{
+  "triangles": 14312,
+  "mesh_objects": 29,
+  "rigged": false,
+  "animated": false,
+  "forward": "-Y",
+  "up": "+Z",
+  "export": "character only; no display plinth/lights"
+}

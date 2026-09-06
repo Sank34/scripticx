@@ -11,7 +11,8 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { isGameRoute } from "@/lib/game-routes";
 import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -31,6 +32,7 @@ import { startShellRouteProgress } from "@/components/navigation/ShellRouteProgr
 
 export function GlobalContextMenu({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { locale } = useLanguage();
   const ro = locale === "ro";
   const copy = ro
@@ -81,6 +83,11 @@ export function GlobalContextMenu({ children }: { children: React.ReactNode }) {
   async function copyPageLink() {
     await navigator.clipboard.writeText(window.location.href);
     toast.success(copy.copied);
+  }
+
+  // Do not mount the platform trigger or its portal in the fullscreen game.
+  if (isGameRoute(pathname)) {
+    return <div className="contents" onContextMenu={event => event.preventDefault()}>{children}</div>;
   }
 
   return (

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="680" viewBox="0 0 480 680">
+  <g id="Mousey-Slim">
+    <g id="Tail"><path d="M290 585 C322 574 354 582 359 597 C363 610 350 615 338 608" fill="none" stroke="#B9BFBB" stroke-width="14" stroke-linecap="round"/></g>
+    <g id="Foot-left"><ellipse cx="215" cy="613" rx="22" ry="32" fill="#C9CFCA"/></g>
+    <g id="Foot-right"><ellipse cx="265" cy="613" rx="22" ry="32" fill="#C9CFCA"/></g>
+    <g id="Robe">
+      <path d="M209 399 Q240 386 271 399 C278 447 295 511 310 560 Q323 596 296 604 Q240 622 184 604 Q157 596 170 560 C185 511 202 447 209 399Z" fill="#202825"/>
+      <path d="M207 458 C200 504 186 552 185 573 Q183 589 198 593 Q174 596 178 574Z" fill="#2D3832"/>
+    </g>
+    <g id="Head">
+      <g id="Ear-left">
+        <circle cx="117" cy="254" r="66" fill="#C9CFCA"/>
+        <circle cx="117" cy="254" r="42" fill="#A4AEA6"/>
+        <ellipse cx="110" cy="246" rx="28" ry="29" fill="#B4BEB5"/>
+      </g>
+      <g id="Ear-right">
+        <circle cx="363" cy="254" r="66" fill="#C9CFCA"/>
+        <circle cx="363" cy="254" r="42" fill="#A4AEA6"/>
+        <ellipse cx="370" cy="246" rx="28" ry="29" fill="#B4BEB5"/>
+      </g>
+      <g id="Whiskers-left" fill="none" stroke="#59675E" stroke-width="6" stroke-linecap="round">
+        <path d="M129 344 L90 340"/><path d="M135 360 L102 371"/>
+      </g>
+      <g id="Whiskers-right" fill="none" stroke="#59675E" stroke-width="6" stroke-linecap="round">
+        <path d="M351 344 L390 340"/><path d="M345 360 L378 371"/>
+      </g>
+      <path id="Face" d="M240 225 C315 225 355 267 355 323 C355 384 309 418 240 424 C171 418 125 384 125 323 C125 267 165 225 240 225Z" fill="#C9CFCA"/>
+      <path id="Muzzle" d="M183 370 C195 352 221 347 240 350 C259 347 285 352 297 370 C298 397 265 411 240 413 C215 411 182 397 183 370Z" fill="#DEE3DD"/>
+      <g id="Eye-left">
+        <ellipse cx="190" cy="320" rx="43" ry="53" fill="#D2F9C8"/>
+        <g id="Pupil-left">
+          <rect x="177" y="281" width="40" height="64" rx="20" fill="#17291D"/>
+          <ellipse cx="188" cy="291" rx="10" ry="12" fill="#FFFFFF"/>
+        </g>
+      </g>
+      <g id="Eye-right">
+        <ellipse cx="290" cy="320" rx="43" ry="53" fill="#D2F9C8"/>
+        <g id="Pupil-right">
+          <rect x="277" y="281" width="40" height="64" rx="20" fill="#17291D"/>
+          <ellipse cx="288" cy="291" rx="10" ry="12" fill="#FFFFFF"/>
+        </g>
+      </g>
+      <path id="Nose" d="M234 361 Q240 357 246 361 Q248 364 244 368 Q240 373 236 368 Q232 364 234 361Z" fill="#59675E"/>
+      <g id="Smile">
+        <path d="M222 384 Q240 400 258 384" fill="none" stroke="#384A3D" stroke-width="5" stroke-linecap="round"/>
+      </g>
+      <g id="Hat">
+        <path d="M226 64 Q240 38 254 64 L313 216 Q319 231 306 237 Q240 259 174 237 Q161 231 167 216Z" fill="#202825"/>
+        <path d="M227 91 Q231 79 238 75 L195 213 Q191 224 180 222Z" fill="#35443A"/>
+        <path d="M177 218 Q240 239 303 218 L311 235 Q240 261 169 235Z" fill="#A9E6B3"/>
+        <path d="M156 239 Q155 229 167 231 Q240 256 313 231 Q325 229 324 239 Q324 246 313 250 Q240 274 167 250 Q156 246 156 239Z" fill="#202825"/>
+      </g>
+    </g>
+    <g id="ScripticX-Bow" transform="translate(201.6 403) scale(1.6)">
+      <g id="X-Outline" fill="#BCEFC4" stroke="#17291D" stroke-width="3.4" stroke-linejoin="round"><path d="M36.6756 32.1014L21.6211 19.6272L32.9464 5.95932L36.3138 8.7496L27.943 18.852L39.63 28.5359L36.6756 32.1014Z"/>
+        <path d="M11.3264 1.40809L26.3809 13.8823L15.0556 27.5502L11.6881 24.7599L20.059 14.6576L8.37196 4.97363L11.3264 1.40809Z"/></g>
+      <g id="X-Mint" fill="#BCEFC4"><path d="M36.6756 32.1014L21.6211 19.6272L32.9464 5.95932L36.3138 8.7496L27.943 18.852L39.63 28.5359L36.6756 32.1014Z"/>
+        <path d="M11.3264 1.40809L26.3809 13.8823L15.0556 27.5502L11.6881 24.7599L20.059 14.6576L8.37196 4.97363L11.3264 1.40809Z"/></g>
+    </g>
+  </g>
+</svg>

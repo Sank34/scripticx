@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="720" viewBox="0 0 480 720">
+  <g id="Mousey" stroke="#171B18" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <g id="Tail">
+      <path d="M310 617 C357 602 420 605 436 635 C451 666 414 674 390 659 C421 664 429 644 408 636 C379 625 349 644 316 640Z" fill="#BFC1BF"/>
+      <path d="M322 627 C364 613 415 620 426 642" fill="none" stroke="#D0FAC4" stroke-width="3"/>
+    </g>
+    <g id="Robe">
+      <path d="M185 418 C176 465 147 512 118 580 C95 623 126 652 165 646 C183 645 194 636 210 638 C235 644 246 648 270 640 C299 630 319 653 344 637 C367 622 357 602 348 582 L286 420Z" fill="#111412" stroke="#C7F2BC" stroke-width="5"/>
+      <path d="M170 456 C159 506 131 555 125 584 C110 612 125 630 151 626" fill="none" stroke="#60715C" stroke-width="3"/>
+      <path d="M284 464 C300 512 321 551 338 593" fill="none" stroke="#202820" stroke-width="3"/>
+    </g>
+    <g id="Foot-left">
+      <path d="M166 621 C145 626 143 660 159 677 C167 688 179 687 189 679 C201 687 217 676 216 659 C215 640 192 619 178 618Z" fill="#BFC1BF"/>
+      <path d="M184 679 L178 667 M194 676 L189 665" fill="none" stroke-width="2.5"/>
+    </g>
+    <g id="Foot-right">
+      <path d="M263 620 C244 622 227 642 230 662 C230 680 244 689 257 681 C268 689 281 681 289 671 C304 652 299 627 281 621Z" fill="#BFC1BF"/>
+      <path d="M255 681 L260 667 M246 676 L250 665" fill="none" stroke-width="2.5"/>
+    </g>
+    <g id="Head">
+      <g id="Ear-left">
+        <path d="M133 249 C108 210 55 218 33 249 C9 285 30 327 59 338 C88 352 122 333 142 306Z" fill="#BFC1BF" stroke="#C7F2BC" stroke-width="5"/>
+        <path d="M126 251 C103 221 63 228 42 253 C21 282 36 317 61 329 C82 338 107 330 120 318" fill="none" stroke-width="3"/>
+      </g>
+      <g id="Ear-right">
+        <path d="M336 264 C364 226 413 234 440 267 C463 296 456 338 426 351 C397 365 367 350 346 329Z" fill="#BFC1BF" stroke="#C7F2BC" stroke-width="5"/>
+        <path d="M343 268 C368 240 408 242 430 270 C448 296 446 326 421 342 C401 352 378 342 365 332" fill="none" stroke-width="3"/>
+      </g>
+      <g id="Whiskers-left" fill="none">
+        <path d="M99 370 Q64 366 25 379 M100 385 Q64 391 41 407"/>
+      </g>
+      <g id="Whiskers-right" fill="none">
+        <path d="M365 380 Q403 384 432 398 M360 395 Q397 405 418 425"/>
+      </g>
+      <path id="Face" d="M107 301 C127 267 174 253 220 258 C277 247 333 274 354 314 C377 357 371 398 341 430 C315 454 279 467 241 470 C209 464 168 451 137 432 C100 408 80 367 92 335Z" fill="#BFC1BF"/>
+      <g id="Eye-left">
+        <path d="M187 282 C211 286 219 316 215 344 C211 372 190 395 164 397 C136 400 117 381 116 355 C115 327 131 296 151 286 C162 280 176 278 187 282Z" fill="#CEFBC2" stroke-width="3"/>
+        <g id="Pupil-left">
+          <ellipse cx="169" cy="323" rx="35" ry="42" fill="#020A05" stroke="none"/>
+          <ellipse cx="184" cy="307" rx="5" ry="6" fill="#DBFFD1" stroke="none"/>
+        </g>
+      </g>
+      <g id="Eye-right">
+        <path d="M276 293 C304 283 331 304 340 333 C349 362 345 390 323 405 C300 419 272 411 255 390 C238 369 234 341 246 318 C253 305 264 297 276 293Z" fill="#CEFBC2" stroke-width="3"/>
+        <g id="Pupil-right">
+          <ellipse cx="289" cy="337" rx="37" ry="44" transform="rotate(-13 289 337)" fill="#020A05" stroke="none"/>
+          <ellipse cx="305" cy="321" rx="5" ry="6" fill="#DBFFD1" stroke="none"/>
+        </g>
+      </g>
+      <path id="Smile" d="M195 425 Q223 436 252 424 M256 418 L252 431" fill="none" stroke-width="2.5"/>
+      <g id="Hat">
+        <path d="M129 257 C152 205 202 100 232 51 Q239 40 244 54 C270 109 302 197 329 274 C289 298 197 297 129 269Z" fill="#111412" stroke="#C7F2BC" stroke-width="5"/>
+        <path d="M140 258 C170 194 207 112 237 62 M245 68 Q283 160 317 266" fill="none" stroke="#D0FAC4" stroke-width="2.5"/>
+        <path d="M133 268 C193 291 279 297 325 277" fill="none" stroke="#343D33" stroke-width="3"/>
+      </g>
+    </g>
+    <g id="Bow" fill="#CEFBC2" stroke="#171B18" stroke-width="2">
+      <path d="M208 447 C192 433 184 443 187 451 L245 490 C253 495 261 487 254 480Z"/>
+      <path d="M191 477 L256 449 C270 443 281 457 269 465 L201 489 C189 494 183 484 191 477Z"/>
+    </g>
+  </g>
+</svg>

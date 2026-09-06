@@ -34,6 +34,7 @@ import {
   HelpCircle,
   Sparkles,
   ShoppingBag,
+  Gamepad2,
   Mail,
   FileText,
   type LucideIcon,
@@ -474,7 +475,10 @@ export function AppSidebar() {
             )}
             <NavItem href="/leaderboard" icon={Trophy} label={t("nav.leaderboard")} active={pathname.startsWith("/leaderboard")} />
             {user && (
+              <>
               <NavItem href="/shop" icon={ShoppingBag} label={t("nav.shop")} active={pathname.startsWith("/shop")} />
+              <NavItem href="/play" icon={Gamepad2} label="Playground" active={pathname.startsWith("/play")} />
+              </>
             )}
             {user && (
               <NavItem href="/feed" icon={MessageSquare} label={t("nav.feed")} active={pathname.startsWith("/feed")} />
