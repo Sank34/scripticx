@@ -657,7 +657,7 @@ export function GraphVisualizer() {
             <h2 className="text-base font-medium">{c.edgeList}</h2>
           </div>
           <div className="space-y-4 px-4 py-4 pb-6">
-            <label className="block space-y-1.5 text-xs font-medium">
+            <label className="flex flex-col gap-1.5 text-xs font-medium">
               {c.titleLabel}
               <Input
                 value={title}
@@ -710,7 +710,7 @@ export function GraphVisualizer() {
               ))}
             </div>
 
-            <label className="block space-y-1.5 text-xs font-medium">
+            <label className="flex flex-col gap-1.5 text-xs font-medium">
               {c.nodeCount}
               <Input
                 type="number"
@@ -722,7 +722,7 @@ export function GraphVisualizer() {
             </label>
 
             {indexMode === "custom" && (
-              <label className="block space-y-1.5 text-xs font-medium">
+              <label className="flex flex-col gap-1.5 text-xs font-medium">
                 {c.custom}
                 <Textarea
                   value={customLabels}
@@ -737,7 +737,7 @@ export function GraphVisualizer() {
               </label>
             )}
 
-            <label className="block space-y-1.5 text-xs font-medium">
+            <label className="flex flex-col gap-1.5 text-xs font-medium">
               {c.edgeList}
               <Textarea
                 value={edgeList}

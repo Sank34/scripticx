@@ -459,8 +459,8 @@ function AdminContactContent() {
                     <p className="mt-1 text-sm text-muted-foreground">{copy.responseDescription}</p>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="space-y-1.5 text-sm font-medium"><span>{copy.fromName}</span><Input value={replyDraft.senderName} onChange={(event) => setReplyDraft({ ...replyDraft, senderName: event.target.value })} /></label>
-                    <label className="space-y-1.5 text-sm font-medium">
+                    <label className="flex flex-col gap-1.5 text-sm font-medium"><span>{copy.fromName}</span><Input value={replyDraft.senderName} onChange={(event) => setReplyDraft({ ...replyDraft, senderName: event.target.value })} /></label>
+                    <label className="flex flex-col gap-1.5 text-sm font-medium">
                       <span>{copy.emailFormat}</span>
                       <Select value={replyDraft.mode} onValueChange={(value) => setReplyDraft({ ...replyDraft, mode: value as ReplyMode })}>
                         <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -468,15 +468,15 @@ function AdminContactContent() {
                       </Select>
                     </label>
                   </div>
-                  <label className="space-y-1.5 text-sm font-medium">
+                  <label className="flex flex-col gap-1.5 text-sm font-medium">
                     <span>{copy.fromAddress}</span>
                     <div className="flex h-9 overflow-hidden rounded-[var(--sx-radius-control)] border border-input bg-background focus-within:ring-[3px] focus-within:ring-ring/50">
                       <input value={replyDraft.senderLocalPart} onChange={(event) => setReplyDraft({ ...replyDraft, senderLocalPart: event.target.value })} className="min-w-0 flex-1 bg-transparent px-3 text-sm outline-none" aria-label={copy.fromAddress} />
                       <span className="flex items-center border-l bg-muted/50 px-3 text-sm text-muted-foreground">@scripticx.org</span>
                     </div>
                   </label>
-                  <label className="space-y-1.5 text-sm font-medium"><span>{copy.subject}</span><Input value={replyDraft.subject} onChange={(event) => setReplyDraft({ ...replyDraft, subject: event.target.value })} /></label>
-                  <label className="space-y-1.5 text-sm font-medium"><span>{copy.body}</span><Textarea value={replyDraft.content} onChange={(event) => setReplyDraft({ ...replyDraft, content: event.target.value })} className="min-h-48 resize-y leading-6" /></label>
+                  <label className="flex flex-col gap-1.5 text-sm font-medium"><span>{copy.subject}</span><Input value={replyDraft.subject} onChange={(event) => setReplyDraft({ ...replyDraft, subject: event.target.value })} /></label>
+                  <label className="flex flex-col gap-1.5 text-sm font-medium"><span>{copy.body}</span><Textarea value={replyDraft.content} onChange={(event) => setReplyDraft({ ...replyDraft, content: event.target.value })} className="min-h-48 resize-y leading-6" /></label>
                   <div className="rounded-[var(--sx-radius-control)] border bg-muted/20 p-3 text-xs text-muted-foreground">
                     <p>{copy.sentFrom} <span className="font-medium text-foreground">{replyDraft.senderLocalPart || "support"}@scripticx.org</span>.</p>
                     <p className="mt-1">{viewing.user_id ? copy.registeredHint : copy.guestHint}</p>

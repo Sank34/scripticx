@@ -2,6 +2,7 @@ export type StepResult = {
   output: any;
   variables: Record<string, Value>;
   currentLine: number;
+  executedLine: number;
   inputRequest?: string;
 } | null;
 
@@ -691,13 +692,19 @@ export function step(program: any[]): StepResult {
 
   let inst = program[currentLine];
   let output: any = null;
+  const executedLine = currentLine + 1;
 
   if (inst.type === "ERROR") {
     throw createLineError(inst.message, currentLine + 1);
   }
   if (inst.type === "EMPTY") {
     currentLine++;
-    return { output: null, variables: { ...variables }, currentLine };
+    return {
+      output: null,
+      variables: { ...variables },
+      currentLine,
+      executedLine,
+    };
   } else if (inst.type === "ASSIGN") {
     try {
       variables[inst.var] = evaluate(inst.value);
@@ -736,11 +743,12 @@ export function step(program: any[]): StepResult {
       output: null,
       variables: { ...variables },
       currentLine,
+      executedLine,
       inputRequest: inst.var,
     };
   }
 
   currentLine++;
 
-  return { output, variables: { ...variables }, currentLine };
+  return { output, variables: { ...variables }, currentLine, executedLine };
 }

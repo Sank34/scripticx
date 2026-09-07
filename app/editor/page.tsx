@@ -370,7 +370,7 @@ END
 
   const [program, setProgram] = useState<ProgramInstruction[]>([]);
   const [variables, setVariables] = useState<Record<string, Value>>({});
-  const [currentLine, setCurrentLine] = useState(0);
+  const [executedLine, setExecutedLine] = useState(0);
   const [output, setOutput] = useState<string[]>([]);
   const [stopped, setStopped] = useState(false);
   const [errorLine, setErrorLine] = useState<number | null>(null);
@@ -464,7 +464,7 @@ END
     setSidePanelOpen(true);
     setProgram([]);
     setVariables({});
-    setCurrentLine(0);
+    setExecutedLine(0);
     setOutput([]);
     setStopped(false);
     setErrorLine(null);
@@ -594,7 +594,7 @@ END
     void terminalRef.current.runActiveFile();
   }, [activePanel, bottomPanelOpen, pendingTerminalRun]);
   const executionLine =
-    errorLine ?? (program.length > 0 && !stopped && currentLine > 0 ? currentLine : null);
+    errorLine ?? (program.length > 0 && !stopped && executedLine > 0 ? executedLine : null);
   const complexityAnalysis = useMemo<ComplexityAnalysis | null>(() => {
     if (!complexityEnabled) return null;
     return analyzeMiniScriptComplexity(code, locale);
@@ -650,7 +650,7 @@ END
       });
       setProgram([]);
       setVariables({});
-      setCurrentLine(0);
+      setExecutedLine(0);
       setOutput([]);
       setStopped(false);
       setErrorLine(null);
@@ -767,7 +767,7 @@ END
     reset();
     setProgram(parsed);
     setVariables({});
-    setCurrentLine(0);
+    setExecutedLine(0);
     setOutput([]);
     setStopped(false);
     setErrorLine(null);
@@ -783,6 +783,8 @@ END
       return false;
     }
 
+    setExecutedLine(result.executedLine);
+
     if (result.inputRequest) {
       setInputVar(result.inputRequest);
       setActivePanel("console");
@@ -790,7 +792,6 @@ END
     }
 
     setVariables(result.variables as Record<string, Value>);
-    setCurrentLine(result.currentLine);
 
     if (result.output !== null) {
       collectedOutput.push(String(result.output));
@@ -822,7 +823,7 @@ END
     } catch (error: unknown) {
       const details = getErrorDetails(error);
       setOutput((prev) => [...prev, `ERROR: ${details.message}`]);
-      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine));
+      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, executedLine));
       setStopped(true);
       setActivePanel("console");
     }
@@ -846,7 +847,7 @@ END
     } catch (error: unknown) {
       const details = getErrorDetails(error);
       newOutput.push(`ERROR: ${details.message}`);
-      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, currentLine));
+      setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, executedLine));
       setStopped(true);
     }
 
@@ -886,7 +887,6 @@ END
     setInputValue("");
 
     advanceLine();
-    setCurrentLine((prev) => prev + 1);
 
     if (isRunning) {
       runProgram(program);
@@ -896,7 +896,7 @@ END
   function resetRuntimeState(clearOutput = false) {
     setProgram([]);
     setVariables({});
-    setCurrentLine(0);
+    setExecutedLine(0);
     if (clearOutput) setOutput([]);
     setStopped(false);
     setErrorLine(null);
@@ -1645,7 +1645,7 @@ END
 
   const consolePanel = (
     <LiveConsolePanel
-      currentLine={currentLine}
+      executedLine={executedLine}
       inputPlaceholder={t("live.inputPlaceholder")}
       inputPrompt={t("editor.debugger.input")}
       inputValue={inputValue}
@@ -1674,7 +1674,7 @@ END
   const debuggerPanel = (
     <div className="h-full overflow-y-auto p-4">
       <DebuggerStateCard
-        currentLine={currentLine}
+        executedLine={executedLine}
         title={t("editor.debugger.title")}
         variables={variables}
       />

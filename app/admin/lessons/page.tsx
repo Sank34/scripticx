@@ -899,10 +899,18 @@ function isTextEditingTarget(target: EventTarget | null) {
   );
 }
 
+const CANVAS_WIDGET_SELECTOR = [
+  "[data-canvas-widget]",
+  "[data-radix-popper-content-wrapper]",
+  "[role='dialog']",
+  "[role='listbox']",
+  "[role='menu']",
+].join(", ");
+
 function isCanvasWidgetTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
 
-  return Boolean(target.closest("[data-canvas-widget]"));
+  return Boolean(target.closest(CANVAS_WIDGET_SELECTOR));
 }
 
 function clampZoom(value: number) {
@@ -2754,7 +2762,7 @@ function LessonsAdminContent() {
               {createDialogType === "category" ? c.addCategory : c.addSection}
             </DialogTitle>
           </DialogHeader>
-          <label className="space-y-2 text-sm font-medium">
+          <label className="flex flex-col gap-2 text-sm font-medium">
             {createDialogType === "category"
               ? c.categoryNamePrompt
               : c.sectionNamePrompt}
@@ -3399,7 +3407,7 @@ function LessonsAdminContent() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-2 text-xs font-medium text-muted-foreground">
+                  <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
                     {c.startSide}
                     <Select
                       value={selectedConnection.sourceSide}
@@ -3419,7 +3427,7 @@ function LessonsAdminContent() {
                       </SelectContent>
                     </Select>
                   </label>
-                  <label className="space-y-2 text-xs font-medium text-muted-foreground">
+                  <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
                     {c.endSide}
                     <Select
                       value={selectedConnection.targetSide}
@@ -3469,7 +3477,7 @@ function LessonsAdminContent() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {c.categoryTitle}
                   <Input
                     value={text(selectedCategoryDetails.title, lessonLocale)}
@@ -3483,7 +3491,7 @@ function LessonsAdminContent() {
                     }
                   />
                 </label>
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {c.categoryDescription}
                   <Textarea
                     value={text(selectedCategoryDetails.description, lessonLocale)}
@@ -3499,7 +3507,7 @@ function LessonsAdminContent() {
                   />
                 </label>
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.pathKind}
                     <Select
                       value={selectedCategoryDetails.kind}
@@ -3519,7 +3527,7 @@ function LessonsAdminContent() {
                       </SelectContent>
                     </Select>
                   </label>
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.availability}
                     <Select
                       value={selectedCategoryDetails.availability}
@@ -3542,7 +3550,7 @@ function LessonsAdminContent() {
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.programmingLanguage}
                     <Input
                       value={selectedCategoryDetails.language}
@@ -3556,7 +3564,7 @@ function LessonsAdminContent() {
                       placeholder="python"
                     />
                   </label>
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     Slug
                     <Input
                       value={selectedCategoryDetails.slug}
@@ -3568,7 +3576,7 @@ function LessonsAdminContent() {
                     />
                   </label>
                 </div>
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {c.prerequisite}
                   <Select
                     value={selectedCategoryDetails.prerequisitePathId ?? "none"}
@@ -3596,7 +3604,7 @@ function LessonsAdminContent() {
                   </Select>
                 </label>
                 <div className="grid grid-cols-3 gap-3">
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.estimatedHours}
                     <Input
                       type="number"
@@ -3611,7 +3619,7 @@ function LessonsAdminContent() {
                       }
                     />
                   </label>
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.pathIcon}
                     <Input
                       value={selectedCategoryDetails.icon ?? ""}
@@ -3622,7 +3630,7 @@ function LessonsAdminContent() {
                       }
                     />
                   </label>
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.accentColor}
                     <Input
                       type="color"
@@ -3661,7 +3669,7 @@ function LessonsAdminContent() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {c.sectionTitle}
                   <Input
                     value={text(selectedSectionDetails.title, lessonLocale)}
@@ -3675,7 +3683,7 @@ function LessonsAdminContent() {
                     }
                   />
                 </label>
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {c.category}
                   <Select
                     value={selectedCategoryDetails?.id ?? ""}
@@ -3717,7 +3725,7 @@ function LessonsAdminContent() {
                     </SelectContent>
                   </Select>
                 </label>
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {c.section}
                   <Input
                     value={text(selectedSectionDetails.label, lessonLocale)}
@@ -3731,7 +3739,7 @@ function LessonsAdminContent() {
                     }
                   />
                 </label>
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {c.sectionDescription}
                   <Textarea
                     value={text(selectedSectionDetails.description, lessonLocale)}
@@ -3828,7 +3836,7 @@ function LessonsAdminContent() {
                 <TabsContent value="lesson" className="mt-3 space-y-3">
                   <Card>
                     <CardContent className="space-y-4 p-5">
-                      <label className="space-y-2 text-sm font-medium">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
                         {c.titleLabel}
                         <Input
                           value={draftText(selectedDraft.title, contentLocale)}
@@ -3837,7 +3845,7 @@ function LessonsAdminContent() {
                           }
                         />
                       </label>
-                      <label className="space-y-2 text-sm font-medium">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
                         {c.summary}
                         <Textarea
                           value={draftText(selectedDraft.summary, contentLocale)}
@@ -3848,7 +3856,7 @@ function LessonsAdminContent() {
                         />
                       </label>
                       <div className="grid grid-cols-2 gap-3">
-                        <label className="space-y-2 text-sm font-medium">
+                        <label className="flex flex-col gap-2 text-sm font-medium">
                           {c.section}
                           <Select
                             value={selectedNode.sectionId}
@@ -3875,7 +3883,7 @@ function LessonsAdminContent() {
                           </Select>
                         </label>
                         {selectedSection && (
-                          <label className="space-y-2 text-sm font-medium">
+                          <label className="flex flex-col gap-2 text-sm font-medium">
                             {c.sectionTitle}
                             <Input
                               value={text(selectedSection.title, lessonLocale)}
@@ -3894,7 +3902,7 @@ function LessonsAdminContent() {
                             />
                           </label>
                         )}
-                        <label className="space-y-2 text-sm font-medium">
+                        <label className="flex flex-col gap-2 text-sm font-medium">
                           {c.kind}
                           <Select
                             value={selectedDraft.kind}
@@ -3921,7 +3929,7 @@ function LessonsAdminContent() {
                             </SelectContent>
                           </Select>
                         </label>
-                        <label className="space-y-2 text-sm font-medium">
+                        <label className="flex flex-col gap-2 text-sm font-medium">
                           {c.level}
                           <Select
                             value={selectedDraft.level}
@@ -3941,7 +3949,7 @@ function LessonsAdminContent() {
                             </SelectContent>
                           </Select>
                         </label>
-                        <label className="col-span-2 space-y-2 text-sm font-medium">
+                        <label className="col-span-2 flex flex-col gap-2 text-sm font-medium">
                           {c.completionRequirement}
                           <Select
                             value={selectedDraft.completionRequirement}
@@ -3964,7 +3972,7 @@ function LessonsAdminContent() {
                           </Select>
                         </label>
                       </div>
-                      <label className="space-y-2 text-sm font-medium">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
                         {c.minutes}
                         <Input
                           value={selectedDraft.minutes}
@@ -3996,7 +4004,7 @@ function LessonsAdminContent() {
                           </Button>
                         </div>
                       </div>
-                      <label className="space-y-2 text-sm font-medium">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
                         {c.tags}
                         <Input
                           value={selectedDraft.tags}
@@ -4066,7 +4074,7 @@ function LessonsAdminContent() {
                           {c.openStudio}
                         </Button>
                       </div>
-                      <label className="space-y-2 text-sm font-medium">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
                         {c.transcript}
                         <Textarea
                           value={draftText(selectedDraft.transcript, contentLocale)}
@@ -4080,7 +4088,7 @@ function LessonsAdminContent() {
                           className="min-h-28"
                         />
                       </label>
-                      <label className="space-y-2 text-sm font-medium">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
                         {c.code}
                         <Textarea
                           value={selectedDraft.code}
@@ -4090,7 +4098,7 @@ function LessonsAdminContent() {
                           className="min-h-44 font-mono text-xs"
                         />
                       </label>
-                      <label className="space-y-2 text-sm font-medium">
+                      <label className="flex flex-col gap-2 text-sm font-medium">
                         {c.sampleInput}
                         <Input
                           value={selectedDraft.sampleInput}
@@ -4133,7 +4141,7 @@ function LessonsAdminContent() {
                               <Check className="h-4 w-4" />
                             </Button>
                           </div>
-                          <label className="space-y-2 text-sm font-medium">
+                          <label className="flex flex-col gap-2 text-sm font-medium">
                             {c.question}
                             <Textarea
                               value={draftText(question.question, contentLocale)}
@@ -4200,7 +4208,7 @@ function LessonsAdminContent() {
                   <CardTitle>{c.visualRules}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.unlockStatus}
                     <Select
                       value={selectedDraft.locked ? "locked" : "unlocked"}
@@ -4219,7 +4227,7 @@ function LessonsAdminContent() {
                       </SelectContent>
                     </Select>
                   </label>
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.requiredQuiz}
                     <Select
                       value={selectedDraft.requiresCorrectQuiz ? "yes" : "no"}
@@ -4239,7 +4247,7 @@ function LessonsAdminContent() {
                       </SelectContent>
                     </Select>
                   </label>
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.requiredProblems}
                     <Input
                       value={selectedDraft.requiredProblemCodes}

@@ -400,17 +400,17 @@ export function DesignSystemShowcase() {
 
               <SampleCard title="Form controls" description="Visible labels, useful hints, and local validation.">
                 <div className="space-y-4">
-                  <label className="block space-y-1.5">
+                  <label className="block flex flex-col gap-1.5">
                     <span className="text-sm font-medium">Class name</span>
                     <Input placeholder="Algorithms — grade 10" />
                     <span className="text-xs text-muted-foreground">Students will see this name in their workspace.</span>
                   </label>
-                  <label className="block space-y-1.5">
+                  <label className="block flex flex-col gap-1.5">
                     <span className="text-sm font-medium">Description</span>
                     <Textarea placeholder="What will students learn?" />
                   </label>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="space-y-1.5">
+                    <label className="flex flex-col gap-1.5">
                       <span className="block text-sm font-medium">Default language</span>
                       <Select defaultValue="cpp">
                         <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>

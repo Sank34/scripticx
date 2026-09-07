@@ -4,9 +4,22 @@ import {
   DEFAULT_BADGES,
   SHOP_CATALOG,
   hasLeafCanopyBackground,
+  isRewardVisibleInShop,
   resolveEquippedReward,
   rewardProductToSnapshot,
 } from "@/lib/rewards";
+
+describe("isRewardVisibleInShop", () => {
+  it("hides only the rewards that were explicitly taken off the shelf", () => {
+    expect(isRewardVisibleInShop({ active: false })).toBe(false);
+    expect(isRewardVisibleInShop({ active: true })).toBe(true);
+  });
+
+  it("treats a reward with no visibility recorded as on sale", () => {
+    expect(isRewardVisibleInShop({})).toBe(true);
+    expect(isRewardVisibleInShop({ active: undefined })).toBe(true);
+  });
+});
 
 describe("reward catalog", () => {
   it("uses unique product ids and positive prices", () => {

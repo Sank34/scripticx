@@ -518,7 +518,7 @@ export function ProblemForm({
       <Separator />
 
       <section className="space-y-3">
-        <label className="space-y-2 text-sm font-medium">
+        <label className="flex flex-col gap-2 text-sm font-medium">
           {t("admin.problems.form.difficulty")}
           <Select value={difficulty} onValueChange={setDifficulty}>
             <SelectTrigger className="w-full">
@@ -636,7 +636,7 @@ export function ProblemForm({
               </div>
 
               <div className="space-y-3 border-b p-4">
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {t("admin.problems.form.title")} · {activeLang.toUpperCase()}
                   <Input value={title} onChange={(event) => updateTitle(event.target.value)} />
                 </label>
@@ -745,7 +745,7 @@ export function ProblemForm({
                       </CardAction>
                     </CardHeader>
                     <CardContent className="grid gap-3 py-4 md:grid-cols-2">
-                      <label className="space-y-2 text-xs font-medium text-muted-foreground">
+                      <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
                         {copy.input}
                         <Textarea
                           value={serializeInput(test.input)}
@@ -754,7 +754,7 @@ export function ProblemForm({
                           placeholder={t("admin.problems.form.inputPlaceholder")}
                         />
                       </label>
-                      <label className="space-y-2 text-xs font-medium text-muted-foreground">
+                      <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
                         {copy.output}
                         <Textarea
                           value={test.output}
@@ -847,7 +847,7 @@ export function ProblemForm({
                     <h2 className="text-sm font-semibold">{copy.options}</h2>
                   </div>
                   <div className="space-y-5">
-                    <label className="space-y-2 text-sm font-medium">
+                    <label className="flex flex-col gap-2 text-sm font-medium">
                       {copy.translation}
                       <Select value={activeLang} onValueChange={setActiveLang}>
                         <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -856,11 +856,11 @@ export function ProblemForm({
                         </SelectContent>
                       </Select>
                     </label>
-                    <label className="space-y-2 text-sm font-medium">
+                    <label className="flex flex-col gap-2 text-sm font-medium">
                       {t("admin.problems.form.title")}
                       <Input value={title} onChange={(event) => updateTitle(event.target.value)} />
                     </label>
-                    <label className="space-y-2 text-sm font-medium">
+                    <label className="flex flex-col gap-2 text-sm font-medium">
                       {t("admin.problems.form.difficulty")}
                       <Select value={difficulty} onValueChange={setDifficulty}>
                         <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>

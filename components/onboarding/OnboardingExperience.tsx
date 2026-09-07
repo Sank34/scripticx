@@ -690,7 +690,7 @@ export function OnboardingExperience({
                     )}
                     <p className="text-xs text-muted-foreground">{c.skipAvatar}</p>
                   </div>
-                  <label className="block space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.username}
                     <Input
                       value={draft.username}
@@ -702,7 +702,7 @@ export function OnboardingExperience({
                       autoFocus
                     />
                   </label>
-                  <label className="block space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.bio}
                     <Textarea
                       value={draft.bio}

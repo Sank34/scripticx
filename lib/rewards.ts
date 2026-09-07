@@ -92,6 +92,12 @@ export type RewardProduct = {
   visual: RewardVisual;
 };
 
+export function isRewardVisibleInShop(
+  product: Pick<RewardProduct, "active">
+) {
+  return product.active !== false;
+}
+
 export const SHOP_CATALOG: RewardProduct[] = [
   {
     id: "orbit-frame",

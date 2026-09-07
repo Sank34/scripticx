@@ -6,6 +6,7 @@ import {
   updateSupabaseSessionSnapshot,
 } from "@/lib/supabase-session";
 import { extractMentionUsernames } from "@/lib/mentions";
+import { buildUsernameSearchPattern } from "@/lib/profile-search";
 import type { EquippedRewards } from "@/lib/rewards";
 import type { PublicProfileVisibility } from "@/lib/profile-visibility";
 import { getDailyChallengeNotificationContent } from "@/lib/daily-challenge-notification";
@@ -691,7 +692,7 @@ class ProfilesApi {
     query: string,
     limit = 12
   ): Promise<MentionCandidate[]> {
-    const normalizedQuery = query.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+    const searchPattern = buildUsernameSearchPattern(query);
     const { data: followRows, error: followsError } = await this.client
       .from("follows")
       .select("following_id")
@@ -711,11 +712,8 @@ class ProfilesApi {
       .order("username", { ascending: true })
       .limit(Math.max(limit * 3, 30));
 
-    if (normalizedQuery) {
-      profilesQuery = profilesQuery.ilike(
-        "username",
-        `%${normalizedQuery}%`
-      );
+    if (searchPattern) {
+      profilesQuery = profilesQuery.ilike("username", searchPattern);
     } else if (followingIds.size > 0) {
       profilesQuery = profilesQuery.in("id", [...followingIds]);
     } else {

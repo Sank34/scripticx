@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { buildUsernameSearchPattern } from "@/lib/profile-search";
 import { useRouter, useSearchParams } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -84,25 +85,27 @@ function SearchContent() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const searchPattern = buildUsernameSearchPattern(debouncedQuery);
+
   const {
     data: results = [],
     isError: resultsError,
     isFetching,
-    isPending: loading,
+    isPending,
     refetch: refetchResults,
   } = useQuery({
-    queryKey: ["search", "profiles", debouncedQuery.toLowerCase()],
+    queryKey: ["search", "profiles", searchPattern],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, username, avatar_url, bio, total_score, equipped_rewards")
-        .ilike("username", `%${debouncedQuery}%`)
+        .ilike("username", searchPattern ?? "")
         .limit(10);
 
       if (error) throw error;
       return data || [];
     },
-    enabled: Boolean(debouncedQuery),
+    enabled: Boolean(searchPattern),
     staleTime: 2 * 60 * 1000,
     placeholderData: (previous) => previous ?? [],
   });
@@ -142,6 +145,7 @@ function SearchContent() {
   }
 
   const hasQuery = Boolean(query.trim());
+  const loading = Boolean(searchPattern) && isPending;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">

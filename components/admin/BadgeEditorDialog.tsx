@@ -272,7 +272,7 @@ export function BadgeEditorDialog({
 
         <div className="grid gap-5 py-1 sm:grid-cols-[1fr_190px]">
           <div className="space-y-4">
-            <label className="block space-y-1.5">
+            <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">{copy.title}</span>
               <Input
                 value={draft.title}
@@ -281,7 +281,7 @@ export function BadgeEditorDialog({
               />
             </label>
 
-            <label className="block space-y-1.5">
+            <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">{copy.key}</span>
               <Input
                 value={draft.key}
@@ -295,7 +295,7 @@ export function BadgeEditorDialog({
               <span className="block text-xs text-muted-foreground">{copy.keyHint}</span>
             </label>
 
-            <label className="block space-y-1.5">
+            <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">{copy.description}</span>
               <Textarea
                 value={draft.description}
@@ -306,7 +306,7 @@ export function BadgeEditorDialog({
             </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-1.5">
+              <label className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium">{copy.rarity}</span>
                 <Select
                   value={draft.rarity}
@@ -323,7 +323,7 @@ export function BadgeEditorDialog({
                 </Select>
               </label>
 
-              <label className="block space-y-1.5">
+              <label className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium">{copy.trigger}</span>
                 <Select
                   value={draft.trigger}
@@ -340,7 +340,7 @@ export function BadgeEditorDialog({
             </div>
 
             {draft.trigger === "event" && (
-              <label className="block space-y-1.5">
+              <label className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium">{copy.event}</span>
                 <Input
                   value={draft.eventName || ""}
@@ -359,7 +359,7 @@ export function BadgeEditorDialog({
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
-                  <label className="block space-y-1.5">
+                  <label className="flex flex-col gap-1.5">
                     <span className="text-xs font-medium text-foreground/80">{copy.ruleMetric}</span>
                     <Select
                       value={draft.automaticRule?.metric || "problems_solved"}
@@ -376,7 +376,7 @@ export function BadgeEditorDialog({
                       </SelectContent>
                     </Select>
                   </label>
-                  <label className="block space-y-1.5">
+                  <label className="flex flex-col gap-1.5">
                     <span className="text-xs font-medium text-foreground/80">{copy.ruleThreshold}</span>
                     <Input
                       type="number"

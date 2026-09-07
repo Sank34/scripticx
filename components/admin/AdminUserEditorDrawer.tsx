@@ -244,7 +244,7 @@ export function AdminUserEditorDrawer({
                     </Button>
                   </div>
                 </div>
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {copy.avatarUrl}
                   <Input
                     inputMode="url"
@@ -261,16 +261,16 @@ export function AdminUserEditorDrawer({
               <Separator />
 
               <div className="grid gap-5 sm:grid-cols-2">
-                <label className="space-y-2 text-sm font-medium sm:col-span-2">
+                <label className="flex flex-col gap-2 text-sm font-medium sm:col-span-2">
                   {copy.username}
                   <Input value={username} onChange={(event) => setUsername(event.target.value)} maxLength={24} autoComplete="off" />
                 </label>
-                <label className="space-y-2 text-sm font-medium sm:col-span-2">
+                <label className="flex flex-col gap-2 text-sm font-medium sm:col-span-2">
                   {copy.bio}
                   <Textarea value={bio} onChange={(event) => setBio(event.target.value)} maxLength={500} className="min-h-28 resize-y" />
                   <span className="block text-right text-xs font-normal text-muted-foreground">{bio.length}/500</span>
                 </label>
-                <label className="space-y-2 text-sm font-medium sm:col-span-2">
+                <label className="flex flex-col gap-2 text-sm font-medium sm:col-span-2">
                   {copy.pronouns}
                   <Input value={pronouns} onChange={(event) => setPronouns(event.target.value)} maxLength={40} />
                 </label>
@@ -279,7 +279,7 @@ export function AdminUserEditorDrawer({
 
             <TabsContent value="access" className="space-y-6 pt-5">
               <section className="space-y-4">
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {copy.role}
                   <Select value={role} onValueChange={setRole} disabled={isSelf}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -306,11 +306,11 @@ export function AdminUserEditorDrawer({
                   <h3 className="text-sm font-semibold">{ro ? "Puncte" : "Points"}</h3>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {copy.totalScore}
                     <Input type="number" min={0} step={1} value={totalScore} onChange={(event) => setTotalScore(event.target.value)} />
                   </label>
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="flex flex-col gap-2 text-sm font-medium">
                     {copy.rewardPoints}
                     <Input type="number" min={0} step={1} value={rewardPoints} onChange={(event) => setRewardPoints(event.target.value)} />
                   </label>

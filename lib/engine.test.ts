@@ -95,6 +95,48 @@ PRINT X
     expect(lastOutput).toBe(2);
   });
 
+  it("reports the line each step actually ran", () => {
+    const program = compile(`
+I = 0
+WHILE I < 2
+  I = I + 1
+END
+PRINT I
+`);
+
+    const executed: number[] = [];
+    let current = step(program);
+
+    while (current) {
+      executed.push(current.executedLine);
+      current = step(program);
+    }
+
+    expect(executed).toEqual([1, 2, 3, 4, 2, 3, 4, 2, 5]);
+  });
+
+  it("reports a real line for every step of a loop that starts the program", () => {
+    const program = compile(`
+WHILE I < 1
+  I = 1
+END
+PRINT I
+`);
+
+    setVariable("I", 0);
+
+    const executed: number[] = [];
+    let current = step(program);
+
+    while (current) {
+      executed.push(current.executedLine);
+      current = step(program);
+    }
+
+    expect(executed).toEqual([1, 2, 3, 1, 4]);
+    expect(executed).not.toContain(0);
+  });
+
   it("keeps looping when a while body contains an if else block", () => {
     const program = compile(`
 A = 20

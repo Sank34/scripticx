@@ -66,6 +66,12 @@ const rules = [
     message: "Use the shared dialog components instead of browser dialogs.",
     expression: /\b(?:window\.)?(?:alert|confirm|prompt)\s*\(/g,
   },
+  {
+    id: "label-space-y",
+    message:
+      "A label stacks its caption and control with flex flex-col gap-*; space-y-* leaves them touching.",
+    expression: /<label className="[^"]*\bspace-y-/g,
+  },
 ];
 
 function walk(directory) {

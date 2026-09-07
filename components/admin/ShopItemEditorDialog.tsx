@@ -427,17 +427,17 @@ export function ShopItemEditorDialog({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.nameRo}</span>
                   <Input value={draft.name.ro} onChange={(event) => updateName("ro", event.target.value)} />
                 </label>
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.nameEn}</span>
                   <Input value={draft.name.en} onChange={(event) => updateName("en", event.target.value)} />
                 </label>
               </div>
 
-              <label className="block space-y-1.5">
+              <label className="block flex flex-col gap-1.5">
                 <span className="text-sm font-medium">{copy.key}</span>
                 <Input
                   value={draft.id}
@@ -452,18 +452,18 @@ export function ShopItemEditorDialog({
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.descriptionRo}</span>
                   <Textarea className="min-h-20" value={draft.description.ro} onChange={(event) => updateDescription("ro", event.target.value)} />
                 </label>
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.descriptionEn}</span>
                   <Textarea className="min-h-20" value={draft.description.en} onChange={(event) => updateDescription("en", event.target.value)} />
                 </label>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.category}</span>
                   <Select value={draft.category} onValueChange={(value) => changeCategory(value as RewardCategory)}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -472,7 +472,7 @@ export function ShopItemEditorDialog({
                     </SelectContent>
                   </Select>
                 </label>
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.rarity}</span>
                   <Select value={draft.rarity} onValueChange={(value) => update("rarity", value as RewardRarity)}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -481,11 +481,11 @@ export function ShopItemEditorDialog({
                     </SelectContent>
                   </Select>
                 </label>
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.price}</span>
                   <Input type="number" min={1} value={draft.price} onChange={(event) => update("price", Number(event.target.value))} />
                 </label>
-                <label className="space-y-1.5">
+                <label className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">{copy.order}</span>
                   <Input type="number" value={draft.sort_order || 0} onChange={(event) => update("sort_order", Number(event.target.value))} />
                 </label>
@@ -527,7 +527,7 @@ export function ShopItemEditorDialog({
               {draft.category === "profile-background" && (
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-1.5">
+                    <label className="flex flex-col gap-1.5">
                       <span className="text-sm font-medium">{copy.backgroundMode}</span>
                       <Select
                         value={backgroundMode}
@@ -543,7 +543,7 @@ export function ShopItemEditorDialog({
                         </SelectContent>
                       </Select>
                     </label>
-                    <label className="space-y-1.5">
+                    <label className="flex flex-col gap-1.5">
                       <span className="text-sm font-medium">{copy.color}</span>
                       <div className="flex gap-2">
                         <input
@@ -645,7 +645,7 @@ function RangeField({
   value: number;
 }) {
   return (
-    <label className="block space-y-2">
+    <label className="block flex flex-col gap-2">
       <span className="flex items-center justify-between text-xs font-medium">
         {label}<span className="font-mono text-muted-foreground">{value}{suffix}</span>
       </span>

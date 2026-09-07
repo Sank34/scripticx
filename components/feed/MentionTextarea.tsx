@@ -2,6 +2,7 @@
 
 import {
   useDeferredValue,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -9,6 +10,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 
 import { api, type MentionCandidate } from "@/lib/api";
+import {
+  clampMentionSelection,
+  moveMentionSelection,
+} from "@/lib/mentions";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -58,6 +63,7 @@ export function MentionTextarea({
   value,
 }: MentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [activeMention, setActiveMention] = useState<ActiveMention | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const deferredQuery = useDeferredValue(activeMention?.query ?? "");
@@ -74,6 +80,16 @@ export function MentionTextarea({
     () => candidates.filter((candidate) => candidate.username),
     [candidates]
   );
+
+  useEffect(() => {
+    setSelectedIndex((current) =>
+      clampMentionSelection(current, visibleCandidates.length)
+    );
+  }, [visibleCandidates.length]);
+
+  useEffect(() => {
+    optionRefs.current[selectedIndex]?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex, visibleCandidates]);
 
   function updateActiveMention(nextValue: string, caret: number) {
     const nextMention = findActiveMention(nextValue, caret);
@@ -148,18 +164,16 @@ export function MentionTextarea({
 
             if (event.key === "ArrowDown" && visibleCandidates.length > 0) {
               event.preventDefault();
-              setSelectedIndex(
-                (current) => (current + 1) % visibleCandidates.length
+              setSelectedIndex((current) =>
+                moveMentionSelection(current, 1, visibleCandidates.length)
               );
               return;
             }
 
             if (event.key === "ArrowUp" && visibleCandidates.length > 0) {
               event.preventDefault();
-              setSelectedIndex(
-                (current) =>
-                  (current - 1 + visibleCandidates.length) %
-                  visibleCandidates.length
+              setSelectedIndex((current) =>
+                moveMentionSelection(current, -1, visibleCandidates.length)
               );
               return;
             }
@@ -199,6 +213,9 @@ export function MentionTextarea({
               visibleCandidates.map((candidate, index) => (
                 <button
                   key={candidate.id}
+                  ref={(element) => {
+                    optionRefs.current[index] = element;
+                  }}
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => selectCandidate(candidate)}

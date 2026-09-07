@@ -334,7 +334,7 @@ export async function fetchRewardsShop(userId: string): Promise<RewardsShopData>
     supabase
       .from("reward_products")
       .select("*")
-      .eq("active", true)
+      .not("active", "is", false)
       .order("sort_order", { ascending: true }),
     supabase
       .from("user_reward_inventory")

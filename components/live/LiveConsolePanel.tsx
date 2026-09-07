@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type LiveConsolePanelProps = {
-  currentLine: number;
+  executedLine: number;
   inputPlaceholder: string;
   inputPrompt: string;
   inputValue: string;
@@ -19,7 +19,7 @@ type LiveConsolePanelProps = {
 };
 
 export function LiveConsolePanel({
-  currentLine,
+  executedLine,
   inputPlaceholder,
   inputPrompt,
   inputValue,
@@ -70,7 +70,7 @@ export function LiveConsolePanel({
       <div className="grid grid-cols-2 gap-2 border-t bg-background p-3">
         <div className="rounded-lg border p-2">
           <div className="text-xs text-muted-foreground">Line</div>
-          <div className="font-mono text-sm">{currentLine}</div>
+          <div className="font-mono text-sm">{executedLine}</div>
         </div>
         <div className="rounded-lg border p-2">
           <div className="text-xs text-muted-foreground">Variables</div>

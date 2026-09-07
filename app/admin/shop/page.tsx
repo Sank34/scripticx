@@ -46,6 +46,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import {
   RARITY_STYLES,
+  isRewardVisibleInShop,
   type RewardCategory,
   type RewardProduct,
 } from "@/lib/rewards";
@@ -156,7 +157,7 @@ function AdminShopContent() {
   }, [category, locale, products, query]);
 
   const stats = [
-    { label: copy.active, value: products.filter((item) => item.active).length, Icon: CheckCircle2 },
+    { label: copy.active, value: products.filter(isRewardVisibleInShop).length, Icon: CheckCircle2 },
     { label: copy.owners, value: products.reduce((sum, item) => sum + (item.owners || 0), 0), Icon: Users },
     { label: copy.custom, value: products.filter((item) => item.visual.startsWith("custom-")).length, Icon: Boxes },
   ];
@@ -275,7 +276,7 @@ function AdminShopContent() {
                     username={profile?.username || "scripticx"}
                   />
                   <Badge variant="outline" className={cn("absolute left-5 top-5 capitalize", styles.badge)}>{product.rarity}</Badge>
-                  {!product.active && <Badge variant="secondary" className="absolute right-5 top-5">{copy.inactive}</Badge>}
+                  {!isRewardVisibleInShop(product) && <Badge variant="secondary" className="absolute right-5 top-5">{copy.inactive}</Badge>}
                 </div>
                 <CardContent className="space-y-4 p-4">
                   <div>

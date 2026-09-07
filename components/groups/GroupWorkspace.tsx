@@ -55,6 +55,11 @@ import {
   type StudyGroupWorkspace as StudyGroupWorkspaceData,
 } from "@/lib/api";
 import { resolveAvatarUrl } from "@/lib/avatar";
+import {
+  getInlineStickerToken,
+  isStickerOnlyMessage,
+  tokenizeGroupMessage,
+} from "@/lib/group-messages";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -330,83 +335,64 @@ function MentionPreview({ profile }: { profile: ProfileSummary }) {
 function renderMessageContent(
   content: string,
   profilesByUsername: Map<string, ProfileSummary>,
-  stickersByToken: Map<string, StudyGroupSticker>
+  stickersByToken: Map<string, StudyGroupSticker>,
+  stickerClassName = "mx-0.5 inline-block size-8 object-contain align-middle"
 ) {
-  const pattern = /(\/editor\/live\/[a-f0-9-]+|\/live\/[a-f0-9-]+|@[a-zA-Z0-9_-]+|:sticker-[a-f0-9-]+:)/gi;
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
+  const nodes = tokenizeGroupMessage(content).map((token, index) => {
+    const key = `${token.value}-${index}`;
 
-  for (const match of content.matchAll(pattern)) {
-    const token = match[0];
-    const index = match.index || 0;
+    if (token.type === "text") return token.value;
 
-    if (index > lastIndex) {
-      nodes.push(content.slice(lastIndex, index));
-    }
-
-    if (token.startsWith("/live/") || token.startsWith("/editor/live/")) {
-      const roomId = token.split("/").filter(Boolean).at(-1) || "";
-      const href = `/editor?live=${encodeURIComponent(roomId)}&view=live`;
-      nodes.push(
+    if (token.type === "live-room") {
+      const href = `/editor?live=${encodeURIComponent(token.roomId)}&view=live`;
+      return (
         <Link
-          key={`${token}-${index}`}
+          key={key}
           href={href}
           className="font-medium text-emerald-600 underline-offset-4 hover:underline"
         >
-          {token}
+          {token.value}
         </Link>
-      );
-    } else if (token.toLowerCase().startsWith(":sticker-")) {
-      const sticker = stickersByToken.get(token.toLowerCase());
-
-      nodes.push(
-        sticker ? (
-          <img
-            key={`${token}-${index}`}
-            src={sticker.image_url}
-            alt={sticker.name}
-            className="mx-0.5 inline-block size-8 object-contain align-middle"
-          />
-        ) : (
-          token
-        )
-      );
-    } else {
-      const username = token.slice(1);
-      const profile = profilesByUsername.get(username.toLowerCase());
-
-      nodes.push(
-        <span
-          key={`${token}-${index}`}
-          className="group/mention relative inline-flex align-baseline"
-        >
-          {profile?.username ? (
-            <Link
-              href={`/u/${profile.username}`}
-              className="font-semibold text-emerald-600 underline-offset-4 hover:underline"
-            >
-              @{profile.username}
-            </Link>
-          ) : (
-            <span className="font-semibold text-emerald-600">{token}</span>
-          )}
-          {profile ? <MentionPreview profile={profile} /> : null}
-        </span>
       );
     }
 
-    lastIndex = index + token.length;
-  }
+    if (token.type === "sticker") {
+      const sticker = stickersByToken.get(token.token);
+      if (!sticker) return token.value;
 
-  if (lastIndex < content.length) {
-    nodes.push(content.slice(lastIndex));
-  }
+      return (
+        <img
+          key={key}
+          src={sticker.image_url}
+          alt={sticker.name}
+          className={stickerClassName}
+        />
+      );
+    }
+
+    const profile = profilesByUsername.get(token.username.toLowerCase());
+
+    return (
+      <span
+        key={key}
+        className="group/mention relative inline-flex align-baseline"
+      >
+        {profile?.username ? (
+          <Link
+            href={`/u/${profile.username}`}
+            className="font-semibold text-emerald-600 underline-offset-4 hover:underline"
+          >
+            @{profile.username}
+          </Link>
+        ) : (
+          <span className="font-semibold text-emerald-600">{token.value}</span>
+        )}
+        {profile ? <MentionPreview profile={profile} /> : null}
+      </span>
+    );
+  });
 
   return <>{nodes}</>;
-}
-
-function getInlineStickerToken(sticker: Pick<StudyGroupSticker, "id">) {
-  return `:sticker-${sticker.id}:`;
 }
 
 const ATTACHMENT_ONLY_MESSAGE_CONTENT = "\u2063";
@@ -2260,6 +2246,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   const stickerData = isStickerMessage
                     ? getStickerMessageData(item)
                     : null;
+                  const messageContent = visibleGroupMessageContent(item);
+                  const inlineStickerOnly =
+                    !isStickerMessage &&
+                    !item.attachments?.length &&
+                    isStickerOnlyMessage(messageContent);
                   const canEditMessage = isMine && item.kind === "message";
                   const canDeleteMessage =
                     item.kind !== "system" && (isMine || canManage);
@@ -2408,7 +2399,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                             >
                               <BubbleContent
                                 className={`min-w-[2.25rem] rounded-2xl border-transparent ${
-                                  isStickerMessage
+                                  isStickerMessage || inlineStickerOnly
                                     ? "bg-transparent p-0 shadow-none"
                                     : isMine
                                     ? "bg-zinc-950 text-white"
@@ -2423,12 +2414,15 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                   />
                                 ) : (
                                   <div className="space-y-2">
-                                    {visibleGroupMessageContent(item) ? (
+                                    {messageContent ? (
                                       <div className="inline-flex flex-wrap items-center whitespace-pre-wrap break-words align-middle">
                                         {renderMessageContent(
-                                          visibleGroupMessageContent(item),
+                                          messageContent,
                                           mentionProfilesByUsername,
-                                          stickersByInlineToken
+                                          stickersByInlineToken,
+                                          inlineStickerOnly
+                                            ? "max-h-16 max-w-16 rounded-xl object-contain drop-shadow-sm"
+                                            : undefined
                                         )}
                                       </div>
                                     ) : null}

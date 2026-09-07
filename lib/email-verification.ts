@@ -30,6 +30,17 @@ export function isEmailVerified(
   return Boolean(user?.email_confirmed_at);
 }
 
+export function isEmailNotConfirmedError(
+  error: { code?: string | null; message?: string | null } | null | undefined
+) {
+  if (!error) return false;
+
+  return (
+    error.code === "email_not_confirmed" ||
+    /email[^.]*not[^.]*confirm/i.test(error.message || "")
+  );
+}
+
 function writePendingVerificationCookie(pending: boolean) {
   if (typeof document === "undefined") return;
 

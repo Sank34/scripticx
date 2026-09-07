@@ -23,6 +23,7 @@ import {
   clearPendingEmailVerification,
   emailVerificationBroadcastChannel,
   emailVerificationStorageKey,
+  isEmailNotConfirmedError,
   isEmailVerified,
   readPendingEmailVerification,
   storePendingEmailVerification,
@@ -471,9 +472,7 @@ export default function LoginPage() {
           );
 
           if (error) {
-            const isPending =
-              error.code === "email_not_confirmed" ||
-              /email[^.]*not[^.]*confirm/i.test(error.message);
+            const isPending = isEmailNotConfirmedError(error);
 
             if (showPendingFeedback) {
               if (isPending) {
@@ -585,11 +584,8 @@ export default function LoginPage() {
     setAuthAction(null);
 
     if (error) {
-      const isEmailNotConfirmed =
-        error.code === "email_not_confirmed" ||
-        /email[^.]*not[^.]*confirm/i.test(error.message);
-
-      if (isEmailNotConfirmed) {
+      if (isEmailNotConfirmedError(error)) {
+        storePendingEmailVerification(email.trim(), null);
         showModal(
           t("login.modal.verificationRequiredTitle"),
           t("login.modal.verificationRequiredDescription"),
@@ -604,6 +600,8 @@ export default function LoginPage() {
     }
 
     if (!isEmailVerified(data.user)) {
+      storePendingEmailVerification(email.trim(), data.user?.id ?? null);
+      await api.auth.signOut();
       showModal(
         t("login.modal.verificationRequiredTitle"),
         t("login.modal.verificationRequiredDescription"),

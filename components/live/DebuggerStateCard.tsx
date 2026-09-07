@@ -3,13 +3,13 @@
 import { CheckCircle2 } from "lucide-react";
 
 type DebuggerStateCardProps = {
-  currentLine: number;
+  executedLine: number;
   title: string;
   variables: Record<string, unknown>;
 };
 
 export function DebuggerStateCard({
-  currentLine,
+  executedLine,
   title,
   variables,
 }: DebuggerStateCardProps) {
@@ -24,7 +24,7 @@ export function DebuggerStateCard({
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-lg bg-muted p-3">
             <p className="text-xs text-muted-foreground">Line</p>
-            <p className="font-mono font-semibold">{currentLine}</p>
+            <p className="font-mono font-semibold">{executedLine}</p>
           </div>
 
           <div className="rounded-lg bg-muted p-3">

@@ -469,7 +469,7 @@ export function UpdateForm({
 
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">{copy.publication}</h3>
-        <label className="space-y-2 text-sm font-medium">
+        <label className="flex flex-col gap-2 text-sm font-medium">
           {t("admin.updates.form.slug")}
           <Input
             value={slug}
@@ -480,7 +480,7 @@ export function UpdateForm({
             placeholder="release-2026-08-25"
           />
         </label>
-        <label className="space-y-2 text-sm font-medium">
+        <label className="flex flex-col gap-2 text-sm font-medium">
           {t("admin.updates.form.date")}
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
@@ -509,7 +509,7 @@ export function UpdateForm({
             </PopoverContent>
           </Popover>
         </label>
-        <label className="space-y-2 text-sm font-medium">
+        <label className="flex flex-col gap-2 text-sm font-medium">
           {t("admin.updates.form.tag")}
           <Select value={tag || "none"} onValueChange={(value) => setTag(value === "none" ? "" : value as UpdateTag)}>
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -597,7 +597,7 @@ export function UpdateForm({
                 </div>
               </div>
               <div className="space-y-3 border-b p-4">
-                <label className="space-y-2 text-sm font-medium">
+                <label className="flex flex-col gap-2 text-sm font-medium">
                   {t("admin.updates.form.title")} · {activeLang.toUpperCase()}
                   <Input value={title} onChange={(event) => updateTitle(event.target.value)} placeholder={t("admin.updates.form.titlePlaceholder")} />
                 </label>
