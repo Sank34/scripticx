@@ -77,6 +77,32 @@ const AttentionPopover = dynamic(
   { ssr: false }
 );
 
+async function resolveAccountHandle(
+  account: SavedScripticXAccount,
+  userId: string,
+  metadata: Record<string, unknown> | null | undefined
+) {
+  let username: string | null = null;
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", userId)
+      .maybeSingle<{ username: string | null }>();
+    username = data?.username?.trim() || null;
+  } catch {
+    // The saved username remains a safe fallback when the profile is offline.
+  }
+
+  username = username
+    || account.username?.trim()
+    || (typeof metadata?.preferred_username === "string" ? metadata.preferred_username.trim() : null)
+    || (typeof metadata?.user_name === "string" ? metadata.user_name.trim() : null);
+
+  const normalized = username?.replace(/^@+/, "");
+  return normalized ? `@${normalized}` : null;
+}
+
 export function Topbar() {
   const router = useRouter();
   const { t, locale, setLocale } = useLanguage();
@@ -198,10 +224,15 @@ export function Topbar() {
     try {
       const result = await logoutCurrentAccount(user.id);
       if (result) {
+        const accountHandle = await resolveAccountHandle(
+          result.account,
+          result.session.user.id,
+          result.session.user.user_metadata
+        );
         toast.success(
           locale === "ro"
-            ? `Te-ai deconectat și ai trecut pe contul ${result.account.nickname}.`
-            : `Signed out and switched to ${result.account.nickname}.`
+            ? `Te-ai deconectat și ai trecut pe contul ${accountHandle || "selectat"}.`
+            : `Signed out and switched to ${accountHandle || "the selected account"}.`
         );
         router.replace(
           getWorkspaceLandingRoute(result.session.user.user_metadata)
@@ -243,11 +274,16 @@ export function Topbar() {
       }
 
       const session = await activateSavedAccount(account);
+      const accountHandle = await resolveAccountHandle(
+        account,
+        session.user.id,
+        session.user.user_metadata
+      );
 
       toast.success(
         locale === "ro"
-          ? `Ai trecut pe contul ${account.nickname}.`
-          : `Switched to ${account.nickname}.`
+          ? `Ai trecut pe contul ${accountHandle || "selectat"}.`
+          : `Switched to ${accountHandle || "the selected account"}.`
       );
       router.replace(getWorkspaceLandingRoute(session.user.user_metadata));
       router.refresh();

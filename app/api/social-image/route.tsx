@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 const geistFont = readFile(join(process.cwd(), "node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf"));
 const logoFile = readFile(join(process.cwd(), "public/logoSCX.svg"), "utf8");
-const logoTextFile = readFile(join(process.cwd(), "public/scripticx-logo-text.png"));
+const logoWordmarkFile = readFile(join(process.cwd(), "public/logo-text.svg"), "utf8");
 
 function cleanText(value: string | null, fallback: string, maxLength: number) {
   const cleaned = (value || fallback).replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
@@ -39,16 +39,16 @@ export async function GET(request: Request) {
   const displayPath = pagePath === "/" ? "platform.scripticx.org" : `platform.scripticx.org${pagePath}`;
   const theme = getRouteTheme(pagePath);
   const titleSize = title.length > 68 ? 50 : title.length > 48 ? 58 : 68;
-  const [fontData, logoSvg, logoText] = await Promise.all([geistFont, logoFile, logoTextFile]);
+  const [fontData, logoSvg, logoWordmark] = await Promise.all([geistFont, logoFile, logoWordmarkFile]);
   const logoDataUrl = `data:image/svg+xml;base64,${Buffer.from(logoSvg).toString("base64")}`;
-  const logoTextDataUrl = `data:image/png;base64,${Buffer.from(logoText).toString("base64")}`;
+  const logoWordmarkDataUrl = `data:image/svg+xml;base64,${Buffer.from(logoWordmark).toString("base64")}`;
 
   return new ImageResponse((
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden", backgroundColor: "#fafaf8", color: "#101112", fontFamily: "Geist", padding: "54px 62px 48px" }}>
       <div style={{ position: "absolute", inset: 24, display: "flex", border: "1px solid rgba(16,17,18,0.09)" }} />
       <div style={{ position: "absolute", top: 24, left: 24, width: 188, height: 4, display: "flex", backgroundColor: theme.accent }} />
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", height: 48 }}>
-        <div style={{ display: "flex", alignItems: "center" }}><img alt="" src={logoTextDataUrl} width={143} height={33} /><img alt="" src={logoDataUrl} width={44} height={31} style={{ marginLeft: 1 }} /></div>
+        <div style={{ display: "flex", alignItems: "center" }}><img alt="ScripticX" src={logoWordmarkDataUrl} width={168} height={34} /></div>
         <div style={{ display: "flex", alignItems: "center", borderLeft: `3px solid ${theme.accent}`, paddingLeft: 13, color: "rgba(16,17,18,0.52)", fontSize: 14, letterSpacing: "0.11em", textTransform: "uppercase" }}>{section}</div>
       </div>
       <div style={{ position: "relative", display: "flex", flex: 1, alignItems: "center", justifyContent: "space-between" }}>
