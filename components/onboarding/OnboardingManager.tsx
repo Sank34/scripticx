@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
+import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { LoaderCircle } from "lucide-react";
+import { toast } from "sonner";
+import { useLanguage } from "@/components/LanguageProvider";
+import { LegacyAlphaWelcome } from "./LegacyAlphaWelcome";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
 
 import { api, type ProfileSummary } from "@/lib/api";
 import {
@@ -12,175 +16,164 @@ import {
   hasCompletedProductTour,
   needsOnboarding,
   productTourStorageKey,
+  onboardingMetadataKeys,
+  shouldShowLegacyAlphaWelcome,
+  legacyAlphaCohortKey,
 } from "@/lib/onboarding";
 import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 
-const OnboardingExperience = dynamic(
-  () =>
-    import("@/components/onboarding/OnboardingExperience").then(
-      (module) => module.OnboardingExperience
-    ),
-  { ssr: false }
-);
-const OnboardingPreparing = dynamic(
-  () =>
-    import("@/components/onboarding/OnboardingPreparing").then(
-      (module) => module.OnboardingPreparing
-    ),
-  { ssr: false }
-);
-const ProductTour = dynamic(
-  () =>
-    import("@/components/onboarding/ProductTour").then(
-      (module) => module.ProductTour
-    ),
-  { ssr: false }
-);
+import { OnboardingExperience } from "./OnboardingExperience";
+import { OnboardingPreparing } from "./OnboardingPreparing";
+import { ProductTour } from "./ProductTour";
+
+type Phase = "idle" | "loading" | "welcome" | "setup" | "preparing" | "ready" | "tour" | "error";
 
 export function OnboardingManager() {
+  const { locale } = useLanguage();
   const router = useRouter();
-  const preparingRef = useRef(false);
-  const tourActiveRef = useRef(false);
+  const pathname = usePathname();
+  const [phase, setPhase] = useState<Phase>("idle");
+  const phaseRef = useRef<Phase>("idle");
+  const activeUserRef = useRef<string | null>(null);
   const landingRouteRef = useRef("/dashboard");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
-  const [resolvingProfile, setResolvingProfile] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showPreparing, setShowPreparing] = useState(false);
-  const [showTour, setShowTour] = useState(false);
+  const [startingLegacyOnboarding, setStartingLegacyOnboarding] = useState(false);
+  const [retrySync, setRetrySync] = useState(0);
 
-  const finishPreparing = useCallback(() => {
-    preparingRef.current = false;
-    tourActiveRef.current = true;
-    setShowPreparing(false);
-    setShowTour(true);
+  const transitionTo = useCallback((next: Phase) => {
+    phaseRef.current = next;
+    setPhase(next);
   }, []);
+  const finishPreparing = useCallback(() => transitionTo("ready"), [transitionTo]);
 
   useEffect(() => {
     let active = true;
+    let revision = 0;
 
     async function sync(currentUser: User | null) {
       if (!active) return;
-
+      const currentRevision = ++revision;
+      const sameUser = activeUserRef.current === (currentUser?.id ?? null);
+      if (!sameUser) {
+        activeUserRef.current = currentUser?.id ?? null;
+        setProfile(null);
+        setStartingLegacyOnboarding(false);
+        transitionTo("idle");
+      }
       setUser(currentUser);
       if (!currentUser) {
-        preparingRef.current = false;
-        tourActiveRef.current = false;
-        setProfile(null);
-        setResolvingProfile(false);
-        setShowOnboarding(false);
-        setShowPreparing(false);
-        setShowTour(false);
+        transitionTo("idle");
         return;
       }
 
-      landingRouteRef.current = getWorkspaceLandingRoute(
-        currentUser.user_metadata
-      );
+      // Metadata saves and token refreshes must not interrupt an active screen.
+      if (sameUser && !["idle", "loading"].includes(phaseRef.current)) return;
+      landingRouteRef.current = getWorkspaceLandingRoute(currentUser.user_metadata);
 
-      const requiresOnboarding = needsOnboarding(currentUser.user_metadata);
-      setResolvingProfile(requiresOnboarding);
-      if (!requiresOnboarding) setShowOnboarding(false);
-
-      try {
-        const currentProfile = requiresOnboarding
-          ? await api.profiles.ensureForUser(currentUser)
-          : await api.profiles.getProfile(currentUser.id);
-        if (active) setProfile(currentProfile);
-      } catch {
-        if (active) setProfile(null);
-      }
-
-      if (!active) return;
-
-      setResolvingProfile(false);
-      setShowOnboarding(requiresOnboarding);
-
-      if (requiresOnboarding) {
-        setShowTour(false);
-        return;
-      }
-
-      if (preparingRef.current) {
-        setShowTour(false);
-        return;
-      }
-
-      if (tourActiveRef.current) {
-        setShowTour(true);
+      if (needsOnboarding(currentUser.user_metadata)) {
+        transitionTo("loading");
+        try {
+          const currentProfile = await api.profiles.ensureForUser(currentUser);
+          if (!active || currentRevision !== revision) return;
+          if (currentUser.app_metadata?.[legacyAlphaCohortKey] === true) {
+            const { error } = await supabase.rpc("claim_alpha_background_gift");
+            if (error) throw error;
+          }
+          if (!active || currentRevision !== revision) return;
+          setProfile(currentProfile);
+          transitionTo(shouldShowLegacyAlphaWelcome(currentUser) ? "welcome" : "setup");
+        } catch {
+          if (active && currentRevision === revision) transitionTo("error");
+        }
         return;
       }
 
       const pendingTour = localStorage.getItem(productTourStorageKey);
-      const shouldShowTour =
-        (pendingTour === currentUser.id || pendingTour === "pending") &&
-        !hasCompletedProductTour(currentUser.user_metadata);
-      tourActiveRef.current = shouldShowTour;
-      setShowTour(shouldShowTour);
+      if ((pendingTour === currentUser.id || pendingTour === "pending") &&
+          !hasCompletedProductTour(currentUser.user_metadata)) {
+        transitionTo("preparing");
+      } else {
+        transitionTo("idle");
+      }
     }
 
     void api.auth.getSession().then(({ data }) => {
-      void sync(data.session?.user ?? null);
+      if (revision === 0) void sync(data.session?.user ?? null);
     });
-
     const subscription = api.auth.onAuthStateChange((session) => {
-      window.setTimeout(() => {
-        void sync(session?.user ?? null);
-      }, 0);
+      window.setTimeout(() => void sync(session?.user ?? null), 0);
     });
-
     return () => {
       active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [retrySync, transitionTo]);
 
-  if (!user) return null;
+  // Registration can queue its tour after the sign-in event has already fired.
+  useEffect(() => {
+    if (phase !== "idle" || !user || pathname === "/login" || pathname === "/auth/callback") return;
+    if (needsOnboarding(user.user_metadata) || hasCompletedProductTour(user.user_metadata)) return;
+    if (localStorage.getItem(productTourStorageKey) === user.id) transitionTo("preparing");
+  }, [pathname, phase, transitionTo, user]);
 
-  if (resolvingProfile) {
-    return (
-      <div className="fixed inset-0 z-[120] flex items-center justify-center bg-background text-muted-foreground">
-        <LoaderCircle className="h-6 w-6 animate-spin" aria-label="Loading onboarding" />
-      </div>
-    );
+  async function startLegacyOnboarding() {
+    if (!user || startingLegacyOnboarding) return;
+    const userId = user.id;
+    setStartingLegacyOnboarding(true);
+    try {
+      const { error } = await api.auth.updateUserMetadata({
+        [onboardingMetadataKeys.legacyWelcomeSeenAt]: new Date().toISOString(),
+      });
+      if (error) throw error;
+      if (activeUserRef.current === userId) transitionTo("setup");
+    } catch {
+      if (activeUserRef.current === userId) toast.error(locale === "ro" ? "Configurarea nu a putut fi pornită. Încearcă din nou." : "Could not start onboarding. Please try again.");
+    } finally {
+      if (activeUserRef.current === userId) setStartingLegacyOnboarding(false);
+    }
   }
 
-  if (showPreparing) {
-    return <OnboardingPreparing onComplete={finishPreparing} />;
-  }
+  if (!user || phase === "idle") return null;
 
-  if (showOnboarding) {
-    return (
-      <OnboardingExperience
-        user={user}
-        profile={profile}
-        onComplete={(persona) => {
-          preparingRef.current = true;
-          landingRouteRef.current = getOnboardingLandingRoute(persona);
-          localStorage.setItem(productTourStorageKey, user.id);
-          setShowOnboarding(false);
-          setShowTour(false);
-          setShowPreparing(true);
-          router.replace("/dashboard");
-        }}
-      />
-    );
-  }
+  if (phase === "loading") return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-background text-muted-foreground">
+      <LoaderCircle className="h-6 w-6 animate-spin" aria-label={locale === "ro" ? "Se încarcă configurarea" : "Loading onboarding"} />
+    </div>
+  );
 
-  if (showTour) {
-    return (
-      <ProductTour
-        onComplete={() => {
-          tourActiveRef.current = false;
-          setShowTour(false);
-          window.dispatchEvent(
-            new Event("scripticx-product-tour-completed")
-          );
-          router.replace(landingRouteRef.current);
-        }}
-      />
-    );
-  }
+  if (phase === "error") return (
+    <div role="alert" className="fixed inset-0 z-[120] flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+      <p>{locale === "ro" ? "Nu am putut pregăti contul. Încearcă din nou." : "We couldn’t prepare your account. Please try again."}</p>
+      <Button onClick={() => { transitionTo("loading"); setRetrySync(value => value + 1); }}>{locale === "ro" ? "Reîncearcă" : "Retry"}</Button>
+    </div>
+  );
 
-  return null;
+  if (phase === "preparing" || phase === "ready") return (
+    <OnboardingPreparing ready={phase === "ready"} onComplete={finishPreparing} onStart={() => transitionTo("tour")} />
+  );
+  if (phase === "welcome") return <LegacyAlphaWelcome starting={startingLegacyOnboarding} onStart={() => void startLegacyOnboarding()} />;
+  if (phase === "setup") return (
+    <OnboardingExperience
+      user={user}
+      profile={profile}
+      onComplete={(persona) => {
+        if (activeUserRef.current !== user.id) return;
+        landingRouteRef.current = getOnboardingLandingRoute(persona);
+        localStorage.setItem(productTourStorageKey, user.id);
+        transitionTo("preparing");
+        router.replace(landingRouteRef.current);
+      }}
+    />
+  );
+
+  return (
+    <ProductTour
+      onComplete={() => {
+        transitionTo("idle");
+        window.dispatchEvent(new Event("scripticx-product-tour-completed"));
+        router.replace(landingRouteRef.current);
+      }}
+    />
+  );
 }

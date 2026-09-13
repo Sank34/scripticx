@@ -34,7 +34,6 @@ import {
   HelpCircle,
   Sparkles,
   ShoppingBag,
-  Gamepad2,
   Mail,
   FileText,
   type LucideIcon,
@@ -232,10 +231,9 @@ export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const { locale, t } = useLanguage();
-  const { user, isAdmin } = useAuth();
+  const { user, canAccessAdmin: isAdmin } = useAuth();
   const {
     hasUnread: hasUnreadUpdates,
-    latestSlug: latestUpdateSlug,
   } = useUnreadUpdates();
 
   const groupActivity = useGroupActivity(user?.id);
@@ -477,7 +475,6 @@ export function AppSidebar() {
             {user && (
               <>
               <NavItem href="/shop" icon={ShoppingBag} label={t("nav.shop")} active={pathname.startsWith("/shop")} />
-              <NavItem href="/play" icon={Gamepad2} label="Playground" active={pathname.startsWith("/play")} />
               </>
             )}
             {user && (
@@ -583,7 +580,7 @@ export function AppSidebar() {
             } ${pathname.startsWith("/updates") ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}`}
           >
             <Link
-              href={latestUpdateSlug ? `/updates/${latestUpdateSlug}` : "/updates"}
+              href={"/updates"}
               prefetch={false}
             >
               <span className="relative inline-flex">

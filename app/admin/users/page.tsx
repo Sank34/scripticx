@@ -71,7 +71,7 @@ function UsersPageSkeleton() {
 
 function AdminUsersContent() {
   const { locale } = useLanguage();
-  const { user } = useAuth();
+  const { user, isAdmin: fullAdmin } = useAuth();
   const queryClient = useQueryClient();
   const ro = locale === "ro";
   const copy = ro
@@ -141,8 +141,8 @@ function AdminUsersContent() {
       if (!user) return [];
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, username, avatar_url, banner_url, bio, pronouns, equipped_rewards, role, banned, total_score, reward_points")
-        .order("username", { ascending: true });
+        .select("id, username, avatar_url, banner_url, bio, pronouns, equipped_rewards, role, banned, total_score, reward_points, platform_user_roles(role_id,platform_roles(name))")
+        .order("username", { ascending: true }).returns<AdminManagedUser[]>();
       if (error) throw error;
       return (data || []) as AdminManagedUser[];
     },
@@ -350,6 +350,7 @@ function AdminUsersContent() {
                       <Badge variant={listedUser.role === "admin" ? "default" : "secondary"} className="capitalize">
                         {listedUser.role || "user"}
                       </Badge>
+                      {listedUser.platform_user_roles?.map(assignment => <Badge key={assignment.role_id} variant="outline" className="ml-1 mt-1">{assignment.platform_roles?.name}</Badge>)}
                     </div>
 
                     <div>
@@ -365,7 +366,7 @@ function AdminUsersContent() {
                           <Link href={`/u/${listedUser.username}`} target="_blank"><ExternalLink /></Link>
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" onClick={() => setSelectedUserId(listedUser.id)}>
+                      <Button variant="outline" size="sm" disabled={!fullAdmin && (listedUser.role === "admin" || Boolean(listedUser.platform_user_roles?.length) || listedUser.id === user?.id)} onClick={() => setSelectedUserId(listedUser.id)}>
                         <Pencil />{copy.manage}
                       </Button>
                     </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { supabase } from "@/lib/supabase";
+import { hasPermission, isPermission, type Permission } from "@/lib/permissions";
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
@@ -35,6 +37,20 @@ export function useAuth() {
   });
   const user = authQuery.data?.user ?? null;
   const profile = authQuery.data?.profile ?? null;
+  const permissionsQuery = useQuery({
+    queryKey: ["platform-permissions", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("platform_user_permissions");
+      if (error) throw error;
+      return (Array.isArray(data) ? data.filter(isPermission) : []) as Permission[];
+    },
+    enabled: Boolean(user) && profile?.role !== "admin",
+    staleTime: 0,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: "always",
+  });
+  const permissions = permissionsQuery.isError ? [] : permissionsQuery.data ?? [];
+  const can = (permission: Permission) => !profile?.banned && hasPermission(profile?.role, permissions, permission);
   const profileResolved = authQuery.data?.profileResolved === true;
 
   const reload = useCallback(async () => {
@@ -44,6 +60,10 @@ export function useAuth() {
   return {
     user,
     profile,
+    permissions,
+    can,
+    permissionsLoading: Boolean(user && profile?.role !== "admin" && permissionsQuery.isPending),
+    canAccessAdmin: !profile?.banned && (profile?.role === "admin" || permissions.some(p => p.startsWith("admin."))),
     loading: authQuery.isPending || Boolean(user && !profileResolved),
     profileResolved,
     error: authQuery.error instanceof Error ? authQuery.error.message : null,

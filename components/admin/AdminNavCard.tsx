@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/hooks/useAuth";
+import { canAccessAdminPage } from "@/lib/permissions";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -31,6 +33,8 @@ export function AdminNavCard({
   title,
 }: AdminNavCardProps) {
   const { t } = useLanguage();
+  const { can, isAdmin, canAccessAdmin } = useAuth();
+  if (!canAccessAdminPage(href, can, isAdmin, canAccessAdmin)) return null;
 
   return (
     <Link

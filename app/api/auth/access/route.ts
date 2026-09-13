@@ -1,3 +1,5 @@
+import { getUserPermissions } from "@/lib/server/permissions";
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import {
@@ -38,10 +40,11 @@ export async function POST(request: Request) {
           .maybeSingle<{ role: string | null; banned: boolean | null }>(),
         authClient
           .from("platform_settings")
-          .select("lockdown_enabled, lockdown_message")
+          .select("lockdown_enabled, lockdown_mode, lockdown_message")
           .eq("id", "global")
           .maybeSingle<{
             lockdown_enabled: boolean;
+            lockdown_mode: "maintenance" | "competition" | null;
             lockdown_message: string;
           }>(),
       ]);
@@ -54,6 +57,13 @@ export async function POST(request: Request) {
     if (settingsError && !settingsUnavailable) throw settingsError;
 
     const role = profile.role || "user";
+    const permissions = await getUserPermissions(user.id);
+    let competitionRestricted = false;
+    if (settings?.lockdown_enabled && settings.lockdown_mode === "competition" && !hasPermission(role, permissions, "competition.bypass")) {
+      const { data: participant, error } = await authClient.from("competition_participants").select("user_id").eq("user_id", user.id).eq("status", "active").limit(1).maybeSingle();
+      if (error) throw error;
+      competitionRestricted = Boolean(participant);
+    }
     const secret = getPlatformAccessSecret();
     if (!secret) throw new HttpError(503, "Access signing is not configured");
 
@@ -68,8 +78,12 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({
       lockdownEnabled: settings?.lockdown_enabled || false,
+      lockdownMode: settings?.lockdown_mode || (settings?.lockdown_enabled ? "maintenance" : null),
       lockdownMessage: settings?.lockdown_message || null,
       role,
+      competitionRestricted,
+      maintenanceBypass: hasPermission(role, permissions, "maintenance.bypass"),
+      competitionBypass: hasPermission(role, permissions, "competition.bypass"),
     });
     response.cookies.set(PLATFORM_ACCESS_COOKIE, token, {
       httpOnly: true,

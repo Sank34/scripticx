@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -32,6 +32,8 @@ import { api, type DailyChallenge } from "@/lib/api";
 import { getLocalized } from "@/lib/getLocalized";
 import { markdownPreview } from "@/lib/markdownPreview";
 import { supabase } from "@/lib/supabase";
+import { ProblemChapters } from "@/components/problems/ProblemChapters";
+import { fetchProblemChapters, type ProblemTopic } from "@/lib/problem-chapters";
 
 type Difficulty = "easy" | "medium" | "hard";
 type DifficultyFilter = "all" | Difficulty;
@@ -75,6 +77,13 @@ export default function ProblemsPage() {
   const [progressFilter, setProgressFilter] = useState<ProgressFilter>("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortMode>("code");
+  const [view, setView] = useState<"chapters" | "all">("chapters");
+  const [topic, setTopic] = useState<ProblemTopic | null>(null);
+  const libraryHeading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (view === "all") libraryHeading.current?.focus({ preventScroll: true });
+  }, [view, topic]);
+  const catalog = useQuery({ queryKey: ["problem-catalog"], queryFn: fetchProblemChapters, staleTime: 60_000 });
 
   const fetchProblemsData = async (): Promise<ProblemsData> => {
     const [problemResult, dailyChallenge, submissionResult] = await Promise.all([
@@ -147,14 +156,18 @@ export default function ProblemsPage() {
 
   const difficultyCounts = useMemo(() => {
     const counts: Record<DifficultyFilter, number> = {
-      all: problems.length,
+      all: 0,
       easy: 0,
       medium: 0,
       hard: 0,
     };
-    for (const problem of problems) counts[problem.difficulty] += 1;
+    for (const problem of problems) {
+      if (topic && !topic.problemIds.includes(problem.id)) continue;
+      counts.all += 1;
+      counts[problem.difficulty] += 1;
+    }
     return counts;
-  }, [problems]);
+  }, [problems, topic]);
 
   const filteredProblems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -162,6 +175,7 @@ export default function ProblemsPage() {
 
     return problems
       .filter((problem) => {
+        if (topic && !topic.problemIds.includes(problem.id)) return false;
         if (difficulty !== "all" && problem.difficulty !== difficulty) return false;
         if (
           progressFilter !== "all" &&
@@ -183,7 +197,7 @@ export default function ProblemsPage() {
         }
         return (first.code ?? Number.MAX_SAFE_INTEGER) - (second.code ?? Number.MAX_SAFE_INTEGER);
       });
-  }, [difficulty, locale, problems, progress, progressFilter, search, sort]);
+  }, [difficulty, locale, problems, progress, progressFilter, search, sort, topic]);
 
   const continueProblem = useMemo(
     () =>
@@ -236,16 +250,16 @@ export default function ProblemsPage() {
         }
       />
 
-      <section aria-label={t("problems.stats.label")} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label={t("problems.stats.label")} className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
         {[
           [t("problems.stats.total"), summary.total],
           [t("problems.stats.solved"), summary.solved],
           [t("problems.stats.inProgress"), summary.inProgress],
           [t("problems.stats.completion"), `${summary.completion}%`],
         ].map(([label, value]) => (
-          <div key={label} className="sx-surface px-4 py-4">
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
+          <div key={label} className="sx-surface min-w-0 px-2 py-2.5 sm:px-4 sm:py-4">
+            <p className="text-[10px] leading-tight text-muted-foreground sm:text-sm">{label}</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums sm:mt-2 sm:text-2xl">{value}</p>
           </div>
         ))}
       </section>
@@ -296,9 +310,25 @@ export default function ProblemsPage() {
       )}
 
       <section aria-labelledby="problem-library-title" className="space-y-4">
+        <div className="flex flex-wrap gap-2" role="group" aria-label={locale === "ro" ? "Vizualizarea problemelor" : "Problem view"}>
+          <Button variant={view === "chapters" ? "secondary" : "ghost"} aria-pressed={view === "chapters"} onClick={() => { setView("chapters"); setTopic(null); resetFilters(); }}>
+            {locale === "ro" ? "Pe capitole" : "By chapter"}
+          </Button>
+          <Button variant={view === "all" ? "secondary" : "ghost"} aria-pressed={view === "all"} onClick={() => { setView("all"); setTopic(null); }}>
+            {locale === "ro" ? "Toate problemele" : "All problems"}
+          </Button>
+        </div>
+        {view === "chapters" ? <>
+          <div>
+            <h2 id="problem-library-title" className="text-xl font-semibold">{locale === "ro" ? "Alege ce vrei să exersezi" : "Choose what to practice"}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{locale === "ro" ? "Explorează capitolele și urmărește progresul pe fiecare subiect." : "Explore chapters and follow your progress in each topic."}</p>
+          </div>
+          {catalog.isPending ? <p role="status">{locale === "ro" ? "Se încarcă capitolele…" : "Loading chapters…"}</p> : catalog.isError ? <div className="sx-surface space-y-3 p-4"><p>{locale === "ro" ? "Nu am putut încărca capitolele. Poți folosi lista tuturor problemelor." : "Could not load chapters. You can still browse all problems."}</p><Button variant="outline" onClick={() => void catalog.refetch()}>{t("problems.error.retry")}</Button></div> : problems.length ? <ProblemChapters chapters={catalog.data.chapters} problemIds={problems.map(p => p.id)} progress={progress} onSelect={selected => { setTopic(selected); resetFilters(); setView("all"); }} /> : <p className="sx-surface p-5 text-muted-foreground">{t("problems.empty.title")}</p>}
+        </> : <>
+        {topic && <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"><p className="text-sm font-medium">{getLocalized(topic.title, locale)}</p><Button variant="ghost" size="sm" onClick={() => setTopic(null)}>{locale === "ro" ? "Elimină filtrul de subcapitol" : "Clear topic filter"}</Button></div>}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 id="problem-library-title" className="text-xl font-semibold">
+            <h2 ref={libraryHeading} tabIndex={-1} id="problem-library-title" className="text-xl font-semibold">
               {t("problems.library.title")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -435,6 +465,7 @@ export default function ProblemsPage() {
             />
           </div>
         )}
+        </>}
       </section>
     </div>
   );

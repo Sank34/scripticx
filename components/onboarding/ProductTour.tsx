@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Check,
   MousePointer2,
-  Sparkles,
   X,
 } from "lucide-react";
 
@@ -16,8 +15,10 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
+import { clipTourSpotlight, getTourVisibleBounds } from "@/lib/tour-spotlight";
 import {
   onboardingMetadataKeys,
+  getProductTourScopeKey,
   productTourStorageKey,
 } from "@/lib/onboarding";
 import {
@@ -86,6 +87,13 @@ function getLearningTourSteps(persona: WorkspacePersona): TourStep[] {
               en: "Open the planner, write Markdown notes, sketch on a whiteboard or build an interactive graph from one place.",
               ro: "Deschide planner-ul, scrie notițe Markdown, desenează pe whiteboard sau construiește un graf interactiv din același loc.",
             },
+          },
+          {
+            chapter: chapters.workspace,
+            route: "/workspace/student/calendar",
+            selector: "[data-tour='student-calendar']",
+            title: { en: "Plan school work in one place", ro: "Planifică activitatea școlară într-un singur loc" },
+            description: { en: "The student calendar keeps deadlines and upcoming work visible across your school workspace.", ro: "Calendarul elevului păstrează vizibile deadline-urile și activitățile următoare din workspace-ul de școală." },
           },
           {
             chapter: chapters.orientation,
@@ -245,6 +253,27 @@ function getLearningTourSteps(persona: WorkspacePersona): TourStep[] {
         ro: "Filtrează biblioteca, rezolvă în editorul integrat și folosește submisiile pentru a măsura progresul real.",
       },
     },
+    {
+      chapter: chapters.learning,
+      route: "/competitions",
+      selector: "[data-tour='competitions-overview']",
+      title: { en: "Practice under pressure", ro: "Exersează contra cronometru" },
+      description: { en: "Join live and upcoming programming competitions, then review your ranking and submitted solutions.", ro: "Participă la competiții live sau viitoare, apoi urmărește clasamentul și soluțiile trimise." },
+    },
+    {
+      chapter: chapters.learning,
+      route: "/shop",
+      selector: "[data-tour='rewards-shop']",
+      title: { en: "Make progress feel personal", ro: "Fă progresul mai personal" },
+      description: { en: "Use points in the Rewards Shop to unlock profile items and customize how you appear across ScripticX.", ro: "Folosește punctele în Rewards Shop pentru obiecte de profil și personalizează felul în care apari în ScripticX." },
+    },
+    {
+      chapter: chapters.orientation,
+      route: "/docs/basics",
+      selector: "[data-tour='docs-overview']",
+      title: { en: "Keep the reference close", ro: "Păstrează documentația aproape" },
+      description: { en: "Docs explain the language and platform concepts with focused pages you can revisit whenever you need a reminder.", ro: "Documentația explică limbajul și conceptele platformei în pagini clare, ușor de revizitat." },
+    },
   ];
 }
 
@@ -346,17 +375,6 @@ function waitFor(milliseconds: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
-function getSpotlightRect(element: Element): SpotlightRect {
-  const rect = element.getBoundingClientRect();
-  const padding = 8;
-  return {
-    height: rect.height + padding * 2,
-    left: rect.left - padding,
-    top: rect.top - padding,
-    width: rect.width + padding * 2,
-  };
-}
-
 function findVisibleTarget(selector: string) {
   return Array.from(document.querySelectorAll(selector)).find((element) => {
     const bounds = element.getBoundingClientRect();
@@ -385,6 +403,7 @@ export function ProductTour({ onComplete }: ProductTourProps) {
     getWorkspacePersonaFromMetadata(
       user?.user_metadata as Record<string, unknown> | undefined
     ) || "learner";
+  const tourScope = persona === "teacher" ? "teacher" : persona === "student" ? "student" : "personal";
   const steps = useMemo(
     () => (persona === "teacher" && !isAdmin ? getTeacherTourSteps() : getLearningTourSteps(persona)),
     [isAdmin, persona]
@@ -394,6 +413,7 @@ export function ProductTour({ onComplete }: ProductTourProps) {
   useEffect(() => {
     let enterFrame = 0;
     let visibleFrame = 0;
+    document.documentElement.classList.add("sx-tour-active");
     setMounted(true);
     enterFrame = window.requestAnimationFrame(() => {
       visibleFrame = window.requestAnimationFrame(() => setOverlayVisible(true));
@@ -403,6 +423,7 @@ export function ProductTour({ onComplete }: ProductTourProps) {
       window.cancelAnimationFrame(enterFrame);
       window.cancelAnimationFrame(visibleFrame);
       if (stepTimerRef.current) window.clearTimeout(stepTimerRef.current);
+      document.documentElement.classList.remove("sx-tour-active");
     };
   }, []);
 
@@ -425,6 +446,7 @@ export function ProductTour({ onComplete }: ProductTourProps) {
     let target: Element | null = null;
     let animationFrame = 0;
     let targetFallbackTimer = 0;
+    let scrolledToTarget = false;
 
     // Never keep the previous spotlight visible while the next page or target
     // is resolving. A stale rectangle makes the tour appear frozen.
@@ -446,10 +468,18 @@ export function ProductTour({ onComplete }: ProductTourProps) {
       if (!target) return;
 
       const bounds = target.getBoundingClientRect();
-      if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      const visibleBounds = getTourVisibleBounds(target);
+      if (!scrolledToTarget) {
+        scrolledToTarget = true;
+        if (bounds.top < visibleBounds.top || bounds.bottom > visibleBounds.bottom) {
+          target.scrollIntoView({
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+            block: bounds.height > visibleBounds.bottom - visibleBounds.top ? "start" : "nearest",
+            inline: "nearest",
+          });
+        }
       }
-      setRect(getSpotlightRect(target));
+      setRect(clipTourSpotlight(bounds, visibleBounds));
       setResolvedStepIndex(stepIndex);
     }
 
@@ -462,6 +492,8 @@ export function ProductTour({ onComplete }: ProductTourProps) {
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("resize", scheduleUpdate);
     window.addEventListener("scroll", scheduleUpdate, true);
+    window.visualViewport?.addEventListener("resize", scheduleUpdate);
+    window.visualViewport?.addEventListener("scroll", scheduleUpdate);
     const retry = window.setInterval(updateTarget, 300);
     targetFallbackTimer = window.setTimeout(() => {
       if (findVisibleTarget(step.selector)) return;
@@ -481,6 +513,8 @@ export function ProductTour({ onComplete }: ProductTourProps) {
       window.clearTimeout(targetFallbackTimer);
       window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("scroll", scheduleUpdate, true);
+      window.visualViewport?.removeEventListener("resize", scheduleUpdate);
+      window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
     };
   }, [authLoading, pathname, router, step.activateSelector, step.route, step.selector, stepIndex]);
 
@@ -524,6 +558,7 @@ export function ProductTour({ onComplete }: ProductTourProps) {
     setCardVisible(false);
     setOverlayVisible(false);
     localStorage.removeItem(productTourStorageKey);
+    localStorage.setItem(getProductTourScopeKey(tourScope), "1");
     void api.auth
       .updateUserMetadata({
         [onboardingMetadataKeys.tourCompletedAt]: new Date().toISOString(),
@@ -573,7 +608,7 @@ export function ProductTour({ onComplete }: ProductTourProps) {
     >
       {rect ? (
         <div
-          className="fixed rounded-lg border-2 border-sky-300 transition-all duration-700 ease-out"
+          className="fixed rounded-lg border-2 border-sky-300 transition-[border-color,box-shadow] duration-700 ease-out"
           style={{
             height: rect.height,
             left: rect.left,
@@ -601,7 +636,7 @@ export function ProductTour({ onComplete }: ProductTourProps) {
 
       <section
         key={stepIndex}
-        className={`sx-overlay fixed z-[2] overflow-hidden rounded-xl border border-white/15 bg-zinc-950 text-white shadow-2xl transition-[opacity,transform] duration-300 ease-out ${
+        className={`sx-overlay sx-tour-scroll fixed z-[2] max-h-[calc(100dvh-32px)] overflow-x-hidden overflow-y-auto rounded-xl border border-white/15 bg-zinc-950 text-white shadow-2xl transition-[opacity,transform] duration-300 ease-out ${
           cardVisible && overlayVisible
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-1.5 opacity-0"
@@ -624,7 +659,6 @@ export function ProductTour({ onComplete }: ProductTourProps) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-medium text-sky-200">
-                <Sparkles className="h-3.5 w-3.5" />
                 {step.chapter[language]}
               </div>
               <p className="mt-1 text-xs tabular-nums text-white/50">

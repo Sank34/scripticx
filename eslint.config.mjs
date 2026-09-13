@@ -21,6 +21,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "disabled/**",
     "public/monaco/**",
     "supabase/functions/**",
     "next-env.d.ts",

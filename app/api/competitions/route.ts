@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import {
@@ -14,15 +15,17 @@ import {
   stringField,
 } from "@/lib/server/requestSecurity";
 import { createAdminSupabase } from "@/lib/supabaseServer";
+import { logger } from "@/lib/loggerSystem";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    const { user, role } = await requireUser(request);
+    const { user, role, permissions } = await requireUser(request);
+    const managesCompetitions = hasPermission(role, permissions, "admin.competitions");
     const wantsAdmin = new URL(request.url).searchParams.get("scope") === "admin";
-    if (wantsAdmin && role !== "admin") {
+    if (wantsAdmin && !managesCompetitions) {
       throw new HttpError(403, "Admin access required");
     }
     const competitions = await listCompetitionSummaries(
@@ -30,12 +33,13 @@ export async function GET(request: Request) {
       user.id,
       wantsAdmin
     );
+    logger.info("competitions", "Listed competitions", { scope: wantsAdmin ? "admin" : "public", count: competitions.length });
     return NextResponse.json({ competitions });
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error("Could not list competitions:", error);
+    logger.error("competitions", "Could not list competitions", { error });
     return NextResponse.json({ error: "Could not list competitions" }, { status: 500 });
   }
 }
@@ -105,12 +109,14 @@ export async function POST(request: Request) {
     }
     if (error) throw error;
 
+    logger.success("competitions", "Competition created", { competitionId: data.id, visibility, status });
+
     return NextResponse.json({ competition: data }, { status: 201 });
   } catch (error) {
     if (error instanceof HttpError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error("Could not create competition:", error);
+    logger.error("competitions", "Could not create competition", { error });
     return NextResponse.json({ error: "Could not create competition" }, { status: 500 });
   }
 }

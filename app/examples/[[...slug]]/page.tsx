@@ -57,10 +57,10 @@ export default async function ExamplesPage({ params }: ExamplesPageProps) {
   if (!localizedPage.en && !localizedPage.ro) notFound();
 
   return (
-    <DocsArticle
+    <div data-tour="docs-overview"><DocsArticle
       collection="examples"
       localizedPage={localizedPage}
       navigation={navigation}
-    />
+    /></div>
   );
 }

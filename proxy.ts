@@ -8,7 +8,7 @@ import {
 import { pendingEmailVerificationCookie } from "@/lib/email-verification";
 
 type LockdownSnapshot = {
-  enabled: boolean;
+  mode: "normal" | "maintenance" | "competition";
   freshUntil: number;
   staleUntil: number;
 };
@@ -28,6 +28,7 @@ const ALWAYS_AVAILABLE = new Set([
   "/login",
   "/reset-password",
   "/api/auth/access",
+  "/api/social-image",
   "/api/cron/email",
   "/api/platform/status",
   "/api/cron/competitions",
@@ -63,7 +64,7 @@ async function refreshLockdownState() {
     if (configuredState !== null) {
       const now = Date.now();
       lockdownCache = {
-        enabled: configuredState,
+        mode: configuredState ? "maintenance" : "normal",
         freshUntil: now + LOCKDOWN_FRESH_TTL_MS,
         staleUntil: now + LOCKDOWN_STALE_TTL_MS,
       };
@@ -75,8 +76,8 @@ async function refreshLockdownState() {
     if (!supabaseUrl || !serviceRoleKey) return false;
 
     try {
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/platform_settings?id=eq.global&select=lockdown_enabled`,
+      let response = await fetch(
+        `${supabaseUrl}/rest/v1/platform_settings?id=eq.global&select=lockdown_enabled,lockdown_mode`,
         {
           cache: "no-store",
           headers: {
@@ -86,23 +87,30 @@ async function refreshLockdownState() {
           signal: AbortSignal.timeout(LOCKDOWN_FETCH_TIMEOUT_MS),
         }
       );
-      if (!response.ok) return lockdownCache?.enabled || false;
+      if (!response.ok) {
+        response = await fetch(
+          `${supabaseUrl}/rest/v1/platform_settings?id=eq.global&select=lockdown_enabled`,
+          { cache: "no-store", headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` }, signal: AbortSignal.timeout(800) }
+        );
+      }
+      if (!response.ok) return lockdownCache?.mode !== "normal";
 
       const rows = (await response.json()) as Array<{
         lockdown_enabled?: boolean;
+        lockdown_mode?: "maintenance" | "competition" | null;
       }>;
-      const enabled = rows[0]?.lockdown_enabled === true;
+      const mode = rows[0]?.lockdown_enabled === true ? (rows[0]?.lockdown_mode || "maintenance") : "normal";
       const now = Date.now();
       lockdownCache = {
-        enabled,
+        mode,
         freshUntil: now + LOCKDOWN_FRESH_TTL_MS,
         staleUntil: now + LOCKDOWN_STALE_TTL_MS,
       };
-      return enabled;
+      return mode !== "normal";
     } catch {
       // A maintenance switch must not make the entire platform unavailable when
       // its backing store is temporarily slow. Keep the last known value.
-      return lockdownCache?.enabled || false;
+      return lockdownCache?.mode !== "normal";
     }
   })().finally(() => {
     lockdownRefresh = null;
@@ -114,15 +122,32 @@ async function refreshLockdownState() {
 async function readLockdownState({ allowStale }: { allowStale: boolean }) {
   const now = Date.now();
   if (lockdownCache && lockdownCache.freshUntil > now) {
-    return lockdownCache.enabled;
+    return lockdownCache.mode !== "normal";
   }
 
   if (allowStale && lockdownCache && lockdownCache.staleUntil > now) {
     void refreshLockdownState();
-    return lockdownCache.enabled;
+    return lockdownCache.mode !== "normal";
   }
 
   return refreshLockdownState();
+}
+
+async function isActiveParticipant(userId: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return false;
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/competition_participants?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&select=user_id&limit=1`,
+      { cache: "no-store", headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` }, signal: AbortSignal.timeout(800) }
+    );
+    if (!response.ok) return false;
+    const rows = (await response.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 export async function proxy(request: NextRequest) {
@@ -143,7 +168,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(destination);
   }
 
-  const cachedLockdown = lockdownCache?.enabled === true;
+  const cachedLockdown = lockdownCache?.mode !== "normal";
+  if (pathname === "/") {
+    const session = await verifyPlatformAccessToken(
+      request.cookies.get(PLATFORM_ACCESS_COOKIE)?.value,
+      getPlatformAccessSecret()
+    );
+    const destination = request.nextUrl.clone();
+    destination.pathname = session ? "/dashboard" : "/login";
+    return NextResponse.redirect(destination);
+  }
   const apiRequest = pathname.startsWith("/api/");
 
   // Never put an external database round-trip in front of a document, App
@@ -166,6 +200,42 @@ export async function proxy(request: NextRequest) {
     getPlatformAccessSecret()
   );
   if (payload?.role === "admin") return NextResponse.next();
+
+  const mode = lockdownCache?.mode || "maintenance";
+  let verifiedUserId = payload?.userId;
+  const authorization = request.headers.get("authorization");
+  if (apiRequest && authorization?.startsWith("Bearer ")) {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+        cache: "no-store", signal: AbortSignal.timeout(4000),
+        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, Authorization: authorization },
+      });
+      const account = response.ok ? await response.json() : null;
+      verifiedUserId = typeof account?.id === "string" ? account.id : undefined;
+    } catch { verifiedUserId = undefined; }
+  }
+  if (verifiedUserId) {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/platform_user_permissions`, {
+        method: "POST", cache: "no-store", signal: AbortSignal.timeout(4000),
+        headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_user_id: verifiedUserId }),
+      });
+      const permissions = response.ok ? await response.json() : [];
+      if (Array.isArray(permissions) && permissions.includes(mode === "maintenance" ? "maintenance.bypass" : "competition.bypass")) return NextResponse.next();
+    } catch { /* A failed permission lookup must not bypass lockdown. */ }
+  }
+
+  if (mode === "competition") {
+    if (!(await isActiveParticipant(verifiedUserId || ""))) return NextResponse.next();
+    const allowed = pathname.startsWith("/competitions") || pathname.startsWith("/docs") || pathname.startsWith("/examples") || pathname.startsWith("/api/competitions") || pathname.startsWith("/api/docs") || pathname.startsWith("/api/examples");
+    if (allowed) return NextResponse.next();
+    if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Platform is in competition mode" }, { status: 423 });
+    const destination = request.nextUrl.clone();
+    destination.pathname = "/competitions";
+    destination.search = "";
+    return NextResponse.redirect(destination);
+  }
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json(

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { canAccessAdminPage } from "@/lib/permissions";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,7 +19,9 @@ export default function RouteGuard({
   requireAuth?: boolean;
   requireAdmin?: boolean;
 }) {
-  const { user, loading, isAdmin, isBanned } = useAuth();
+  const { user, loading: authLoading, isAdmin, isBanned, can, canAccessAdmin, permissionsLoading } = useAuth();
+  const adminAllowed = canAccessAdminPage(usePathname(), can, isAdmin, canAccessAdmin);
+  const loading = authLoading || Boolean(requireAdmin && permissionsLoading);
   const router = useRouter();
   const verified = isEmailVerified(user);
 
@@ -41,14 +44,14 @@ export default function RouteGuard({
       return;
     }
 
-    if (requireAdmin && !isAdmin) {
+    if (requireAdmin && !adminAllowed) {
       router.replace("/");
       return;
     }
   }, [
     user,
     loading,
-    isAdmin,
+    adminAllowed,
     isBanned,
     requireAuth,
     requireAdmin,
@@ -70,7 +73,7 @@ export default function RouteGuard({
     isBanned ||
     (requireAuth && !user) ||
     (requireAuth && !verified) ||
-    (requireAdmin && !isAdmin)
+    (requireAdmin && !adminAllowed)
   ) {
     return null;
   }

@@ -4,7 +4,7 @@ import { StudentWorkspaceHome } from "@/components/workspaces/StudentWorkspaceHo
 export default function StudentWorkspacePage() {
   return (
     <RouteGuard requireAuth>
-      <StudentWorkspaceHome />
+      <div data-tour="student-overview"><StudentWorkspaceHome /></div>
     </RouteGuard>
   );
 }

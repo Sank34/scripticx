@@ -11,8 +11,9 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
-import { isGameRoute } from "@/lib/game-routes";
+import { useRouter } from "next/navigation";
+import { openCommandMenuEvent, useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { formatShortcut } from "@/lib/keyboard-shortcuts";
 import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -32,7 +33,7 @@ import { startShellRouteProgress } from "@/components/navigation/ShellRouteProgr
 
 export function GlobalContextMenu({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
+  const { bindings } = useKeyboardShortcuts();
   const { locale } = useLanguage();
   const ro = locale === "ro";
   const copy = ro
@@ -69,25 +70,12 @@ export function GlobalContextMenu({ children }: { children: React.ReactNode }) {
   }
 
   function openSearch() {
-    const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        bubbles: true,
-        ctrlKey: !isMac,
-        key: "k",
-        metaKey: isMac,
-      })
-    );
+    window.dispatchEvent(new Event(openCommandMenuEvent));
   }
 
   async function copyPageLink() {
     await navigator.clipboard.writeText(window.location.href);
     toast.success(copy.copied);
-  }
-
-  // Do not mount the platform trigger or its portal in the fullscreen game.
-  if (isGameRoute(pathname)) {
-    return <div className="contents" onContextMenu={event => event.preventDefault()}>{children}</div>;
   }
 
   return (
@@ -102,7 +90,7 @@ export function GlobalContextMenu({ children }: { children: React.ReactNode }) {
         <ContextMenuItem onSelect={openSearch}>
           <Search />
           {copy.search}
-          <ContextMenuShortcut>⌘/Ctrl K</ContextMenuShortcut>
+          {bindings.search && <ContextMenuShortcut>{formatShortcut(bindings.search)}</ContextMenuShortcut>}
         </ContextMenuItem>
 
         <ContextMenuSeparator />

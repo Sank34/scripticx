@@ -44,7 +44,8 @@ import {
 import { PageHeader } from "@/components/common/PageHeader";
 
 function FeedContent() {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, can } = useAuth();
+  const isAdmin = can("admin.moderation");
   const { locale, t } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();

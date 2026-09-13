@@ -26,7 +26,7 @@ type HighlightedCodeBlockProps = {
   showLineNumbers?: boolean;
 };
 
-type TokenKind = "comment" | "keyword" | "number" | "operator" | "string" | "text";
+type TokenKind = "function" | "comment" | "keyword" | "number" | "operator" | "string" | "text";
 type CodeToken = { kind: TokenKind; value: string };
 type HighlightNode =
   | { type: "text"; value: string }
@@ -39,7 +39,7 @@ type HighlightSegment = { className?: string; value: string };
 
 const KEYWORDS = new Set([
   "AND", "DIV", "ELSE", "END", "FALSE", "FOR", "IF", "INPUT", "MOD",
-  "NOT", "OR", "PRINT", "STEP", "THEN", "TO", "TRUE", "WHILE",
+  "FROM", "INCR", "RETURN", "NOT", "OR", "PRINT", "STEP", "THEN", "TO", "TRUE", "WHILE",
 ]);
 const FUNCTIONS = new Set([
   "ABS", "CEIL", "FLOOR", "INT", "MAX", "MIN", "ROUND", "SQRT", "TRUNC",
@@ -63,6 +63,7 @@ const LANGUAGE_MARK: Partial<Record<EditorLanguageKey, string>> = {
 
 function getTokenClass(kind: TokenKind) {
   switch (kind) {
+    case "function": return "font-medium text-[#56b6c2]";
     case "comment": return "text-[#7f9f71] italic";
     case "keyword": return "font-medium text-[#c8a0df]";
     case "number": return "text-[#8dcbd1]";
@@ -107,7 +108,7 @@ function tokenizeLine(line: string): CodeToken[] {
       const value = wordMatch[0];
       const upper = value.toUpperCase();
       tokens.push({
-        kind: KEYWORDS.has(upper) || FUNCTIONS.has(upper) ? "keyword" : "text",
+        kind: upper === "FUNCTION" ? "function" : KEYWORDS.has(upper) || FUNCTIONS.has(upper) ? "keyword" : "text",
         value,
       });
       index += value.length;

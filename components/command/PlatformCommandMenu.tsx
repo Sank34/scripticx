@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@/hooks/useAuth";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -35,6 +36,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { openCommandMenuEvent, useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts";
+import { formatShortcut, matchesShortcut, type ShortcutId } from "@/lib/keyboard-shortcuts";
+
 
 import { useLanguage } from "@/components/LanguageProvider";
 import {
@@ -67,16 +71,18 @@ type CommandEntry = {
   icon: LucideIcon;
   keywords?: string[];
   label: string;
-  shortcut?: string;
-  shortcutKey?: string;
+  shortcutId?: ShortcutId;
 };
 
 export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps) {
+  const { canAccessAdmin } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [isSafari, setIsSafari] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(720);
+  const { bindings } = useKeyboardShortcuts();
+  useShortcut("search", () => setOpen(value => !value));
 
   const { data: liveCodeData } = useQuery<LiveCodeData>({
     queryKey: ["command-menu", "livecode", user?.id],
@@ -86,18 +92,9 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
   });
 
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        if (!window.matchMedia("(min-width: 640px)").matches) return;
-
-        event.preventDefault();
-        setOpen((value) => !value);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    const show = () => setOpen(true);
+    window.addEventListener(openCommandMenuEvent, show);
+    return () => window.removeEventListener(openCommandMenuEvent, show);
   }, []);
 
   useEffect(() => {
@@ -123,24 +120,21 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/problems",
         icon: List,
         label: t("nav.problems"),
-        shortcut: "⌘ P",
-        shortcutKey: "p",
+        shortcutId: "problems",
         keywords: ["tasks", "exercises", "problems"],
       },
       {
         href: "/leaderboard",
         icon: Trophy,
         label: t("nav.leaderboard"),
-        shortcut: "⌘ L",
-        shortcutKey: "l",
+        shortcutId: "leaderboard",
         keywords: ["ranking", "score"],
       },
       {
         href: "/docs/basics",
         icon: BookOpen,
         label: t("nav.docs"),
-        shortcut: "⌘ D",
-        shortcutKey: "d",
+        shortcutId: "docs",
         keywords: ["documentation", "learn", "syntax"],
       },
       {
@@ -170,8 +164,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/dashboard",
         icon: LayoutDashboard,
         label: t("nav.dashboard"),
-        shortcut: "⌘ H",
-        shortcutKey: "h",
+        shortcutId: "dashboard",
         keywords: ["home", "overview"],
       },
       {
@@ -190,16 +183,14 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/editor",
         icon: Code,
         label: t("nav.editor"),
-        shortcut: "⌘ E",
-        shortcutKey: "e",
+        shortcutId: "editor",
         keywords: ["miniscript", "snippet", "code"],
       },
       {
         href: "/editor?view=live",
         icon: SquareTerminal,
         label: t("nav.livecode"),
-        shortcut: "⌘ V",
-        shortcutKey: "v",
+        shortcutId: "live",
         keywords: ["session", "collaboration"],
       },
       {
@@ -224,15 +215,13 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/profile",
         icon: User,
         label: t("user.profile"),
-        shortcut: "⌘ U",
-        shortcutKey: "u",
+        shortcutId: "profile",
       },
       {
         href: "/settings",
         icon: Settings,
         label: t("user.settings"),
-        shortcut: "⌘ S",
-        shortcutKey: "s",
+        shortcutId: "settings",
       }
     );
 
@@ -248,19 +237,18 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
       });
     }
 
-    if (isAdmin) {
+    if (canAccessAdmin) {
       commands.push({
         href: "/admin",
         icon: Shield,
         label: t("nav.admin"),
-        shortcut: "⌘ A",
-        shortcutKey: "a",
+        shortcutId: "admin",
         keywords: ["manage", "panel"],
       });
     }
 
     return commands;
-  }, [isAdmin, t, user]);
+  }, [isAdmin, canAccessAdmin, t, user]);
 
   const liveSessionCommands = useMemo<CommandEntry[]>(() => {
     const rooms = liveCodeData?.rooms || [];
@@ -399,21 +387,19 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     if (!open) return;
 
     function handleMenuShortcut(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.altKey || event.shiftKey) return;
-
-      const key = event.key.toLowerCase();
-      const command = pageCommands.find((entry) => entry.shortcutKey === key);
+      if (event.defaultPrevented || (event.target instanceof Element && event.target.closest("[data-shortcut-recorder]"))) return;
+      const command = pageCommands.find((entry) => entry.shortcutId && matchesShortcut(event, bindings[entry.shortcutId]));
       if (!command) return;
 
       event.preventDefault();
+      event.stopPropagation();
       runCommand(command.href);
     }
 
-    window.addEventListener("keydown", handleMenuShortcut);
+    window.addEventListener("keydown", handleMenuShortcut, true);
 
-    return () => window.removeEventListener("keydown", handleMenuShortcut);
-  }, [open, pageCommands, runCommand]);
+    return () => window.removeEventListener("keydown", handleMenuShortcut, true);
+  }, [bindings, open, pageCommands, runCommand]);
 
   const safariDialogMaxHeight = Math.max(
     280,
@@ -436,7 +422,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
           <Search className="h-4 w-4 shrink-0" />
           <span className="truncate">{t("command.placeholder")}</span>
         </span>
-        <ShortcutKeys shortcut="⌘ K" />
+        {bindings.search && <ShortcutKeys shortcut={formatShortcut(bindings.search)} />}
       </button>
 
       <CommandDialog
@@ -563,6 +549,8 @@ function CommandMenuItem({
   onSelect: (href: string) => void;
 }) {
   const Icon = command.icon;
+  const { bindings } = useKeyboardShortcuts();
+  const shortcut = command.shortcutId ? formatShortcut(bindings[command.shortcutId]) : "";
   const value = [
     command.label,
     command.href,
@@ -581,9 +569,9 @@ function CommandMenuItem({
           </div>
         )}
       </div>
-      {command.shortcut && (
+      {shortcut && (
         <CommandShortcut>
-          <ShortcutKeys shortcut={command.shortcut} />
+          <ShortcutKeys shortcut={shortcut} />
         </CommandShortcut>
       )}
     </CommandItem>
@@ -593,7 +581,7 @@ function CommandMenuItem({
 function ShortcutKeys({ shortcut }: { shortcut: string }) {
   return (
     <KbdGroup>
-      {shortcut.split(" ").map((key) => (
+      {shortcut.split(" + ").map((key) => (
         <Kbd key={key}>
           {key === "⌘" ? <CommandIcon className="h-3 w-3" /> : key}
         </Kbd>

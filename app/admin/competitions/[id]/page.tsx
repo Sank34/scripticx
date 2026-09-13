@@ -5,6 +5,7 @@ import {
   CalendarPlus,
   Copy,
   FileCode2,
+  FileSpreadsheet,
   Link2,
   Plus,
   Save,
@@ -13,11 +14,12 @@ import {
   Trophy,
 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import RouteGuard from "@/components/RouteGuard";
+import { CompetitionInviteeSearch } from "@/components/admin/CompetitionInviteeSearch";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +82,12 @@ function AdminCompetitionDetailContent() {
         breakAdded: "Pauza a fost adăugată.",
         inviteCreated: "Invitația a fost creată. Linkul este afișat o singură dată.",
         inviteRevoked: "Invitația a fost revocată.",
+        inviteesTitle: "Lista de usernames invitate",
+        inviteesDescription: "Încarcă un CSV cu o coloană username. Utilizatorii găsiți vor fi adăugați automat pe lista competiției.",
+        uploadCsv: "Încarcă CSV",
+        csvHint: "Format: username sau usernames, câte unul pe rând.",
+        inviteesImported: (count: number) => `${count} usernames adăugate pe lista de invitați.`,
+        inviteesMissing: (count: number) => `${count} usernames nu au fost găsite.`,
         problemRemoved: "Problema a fost eliminată.",
         pointsUpdated: "Punctajul a fost actualizat.",
         breakRemoved: "Pauza a fost eliminată.",
@@ -148,6 +156,12 @@ function AdminCompetitionDetailContent() {
         breakAdded: "Break added.",
         inviteCreated: "Invite created. The link is shown only once.",
         inviteRevoked: "Invite revoked.",
+        inviteesTitle: "Invited usernames",
+        inviteesDescription: "Upload a CSV with a username column. Matching users are added automatically to the competition allowlist.",
+        uploadCsv: "Upload CSV",
+        csvHint: "Format: username or usernames, one per line.",
+        inviteesImported: (count: number) => `${count} usernames added to the invite list.`,
+        inviteesMissing: (count: number) => `${count} usernames were not found.`,
         problemRemoved: "Problem removed.",
         pointsUpdated: "Points updated.",
         breakRemoved: "Break removed.",
@@ -214,6 +228,7 @@ function AdminCompetitionDetailContent() {
   const [existingPoints, setExistingPoints] = useState("100");
   const [breakForm, setBreakForm] = useState({ title: copy.breakDefault, startsAt: "", endsAt: "" });
   const [inviteForm, setInviteForm] = useState({ label: copy.inviteDefault, maxUses: "", expiresAt: "" });
+  const [inviteeImport, setInviteeImport] = useState<{ added: number; missing: string[] } | null>(null);
   const [form, setForm] = useState({
     description: "",
     endsAt: "",
@@ -356,6 +371,20 @@ function AdminCompetitionDetailContent() {
     onSuccess: async ({ token }) => { setInviteToken(token); toast.success(copy.inviteCreated); await refresh(); },
     onError: (error) => toast.error(error.message),
   });
+  const inviteeImportMutation = useMutation({
+    mutationFn: (usernames: string[]) =>
+      competitionApiFetch<{ added: number; missing: string[] }>(`/api/competitions/${id}/invitees`, {
+        method: "POST",
+        body: JSON.stringify({ usernames }),
+      }),
+    onSuccess: (result) => {
+      setInviteeImport(result);
+      toast.success(copy.inviteesImported(result.added));
+      void queryClient.invalidateQueries({ queryKey: ["competition-invitees", id] });
+      if (result.missing.length) toast.warning(copy.inviteesMissing(result.missing.length));
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const revokeInviteMutation = useMutation({
     mutationFn: (inviteId: string) =>
       competitionApiFetch(`/api/competitions/${id}/invites`, {
@@ -395,6 +424,26 @@ function AdminCompetitionDetailContent() {
   const availableProblems = (query.data?.availableProblems || []).filter((problem) => !usedIds.has(problem.id) && !problem.competition_origin_id);
   const inviteUrl = inviteToken && typeof window !== "undefined" ? `${window.location.origin}/competitions/${id}?invite=${encodeURIComponent(inviteToken)}` : null;
 
+  async function importInviteeCsv(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const rows = (await file.text())
+      .split(/\r?\n/)
+      .map((row) => row.trim())
+      .filter(Boolean);
+    const header = rows[0]?.split(",").map((value) => value.trim().toLocaleLowerCase());
+    const usernameColumn = header?.findIndex((value) => value === "username" || value === "usernames" || value === "user");
+    const values = rows.slice(usernameColumn !== undefined && usernameColumn >= 0 ? 1 : 0)
+      .map((row) => (row.split(",")[usernameColumn !== undefined && usernameColumn >= 0 ? usernameColumn : 0] || "").replace(/^"|"$/g, ""));
+    const usernames = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+    if (!usernames.length) {
+      toast.error(copy.csvHint);
+      return;
+    }
+    inviteeImportMutation.mutate(usernames);
+  }
+
   if (query.isPending) return <div className="space-y-4 p-4"><Skeleton className="h-32 rounded-2xl" /><Skeleton className="h-96 rounded-2xl" /></div>;
   if (query.isError || !competition) return <div className="p-8 text-center text-sm text-destructive">{copy.loadFailed}</div>;
 
@@ -415,6 +464,28 @@ function AdminCompetitionDetailContent() {
           </div>
           <Card>
             <CardContent className="space-y-3 p-5">
+              <CompetitionInviteeSearch competitionId={id} ro={ro} />
+              <div className="rounded-xl border border-dashed bg-muted/30 p-3">
+                <div className="flex items-start gap-3">
+                  <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{copy.inviteesTitle}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.inviteesDescription}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{copy.csvHint}</p>
+                  </div>
+                </div>
+                <label className="mt-3 flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium transition hover:bg-muted">
+                  <FileSpreadsheet className="size-4" />
+                  {inviteeImportMutation.isPending ? "..." : copy.uploadCsv}
+                  <input type="file" accept=".csv,text/csv" className="sr-only" onChange={importInviteeCsv} disabled={inviteeImportMutation.isPending} />
+                </label>
+                {inviteeImport && (
+                  <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground">{copy.inviteesImported(inviteeImport.added)}</p>
+                    {inviteeImport.missing.length > 0 && <p>{copy.inviteesMissing(inviteeImport.missing.length)} {inviteeImport.missing.slice(0, 6).join(", ")}</p>}
+                  </div>
+                )}
+              </div>
               <Input value={inviteForm.label} onChange={(event) => setInviteForm((current) => ({ ...current, label: event.target.value }))} />
               <div className="grid grid-cols-2 gap-3">
                 <Input type="number" min={1} placeholder={copy.maxUses} value={inviteForm.maxUses} onChange={(event) => setInviteForm((current) => ({ ...current, maxUses: event.target.value }))} />

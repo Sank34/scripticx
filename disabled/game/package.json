@@ -1,0 +1,12 @@
+{
+  "name": "scripticx-disabled-game",
+  "private": true,
+  "dependencies": {
+    "@fontsource/amatic-sc": "^5.3.0",
+    "@fontsource/nunito": "^5.3.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4"
+  }
+}

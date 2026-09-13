@@ -46,7 +46,8 @@ async function countRows(
 
 export async function GET(request: Request) {
   try {
-    const { user } = await requireAdmin(request);
+    const { user, role, permissions } = await requireAdmin(request);
+    const allowed = (permission: string) => role === "admin" || permissions.includes(permission as typeof permissions[number]);
     const admin = createAdminSupabase();
     const [
       userCount,
@@ -90,17 +91,17 @@ export async function GET(request: Request) {
         .order("created_at", { ascending: false })
         .limit(80)
         .returns<ReportRow[]>(),
-      admin
+      allowed("admin.analytics") ? admin
         .from("system_job_runs")
         .select("id,job,status,started_at,completed_at,result,error")
         .order("started_at", { ascending: false })
-        .limit(30),
-      admin
+        .limit(30) : Promise.resolve({ data: [], error: null }),
+      allowed("admin.email") ? admin
         .from("email_outbox")
         .select("id,recipient,subject,kind,status,attempts,last_error,created_at,sent_at")
         .order("created_at", { ascending: false })
-        .limit(20),
-      listCompetitionSummaries(admin, user.id, true),
+        .limit(20) : Promise.resolve({ data: [], error: null }),
+      allowed("admin.competitions") ? listCompetitionSummaries(admin, user.id, true) : Promise.resolve([]),
     ]);
 
     for (const result of [profilesResult, reportsResult, jobsResult, emailsResult]) {
@@ -127,32 +128,32 @@ export async function GET(request: Request) {
     ).length;
 
     return NextResponse.json({
-      competitions,
-      email: {
+      competitions: allowed("admin.competitions") ? competitions : [],
+      email: allowed("admin.email") ? {
         failed: failedEmailCount,
         messages: emailsResult.data || [],
         queued: queuedEmailCount,
-      },
-      jobs: {
+      } : null,
+      jobs: allowed("admin.analytics") ? {
         configuration: {
           cron: Boolean(process.env.CRON_SECRET?.trim()),
           emailWorker: isEmailWorkerConfigured(),
         },
-        enabledPushDevices: enabledPushDeviceCount,
+        enabledPushDevices: allowed("admin.analytics") ? enabledPushDeviceCount : 0,
         runs: jobsResult.data || [],
-      },
+      } : null,
       overview: {
-        activeCompetitions: activeCompetitionCount,
+        activeCompetitions: allowed("admin.competitions") ? activeCompetitionCount : 0,
         bannedUsers: bannedCount,
         classes: classCount,
-        enabledPushDevices: enabledPushDeviceCount,
-        failedEmails: failedEmailCount,
+        enabledPushDevices: allowed("admin.analytics") ? enabledPushDeviceCount : 0,
+        failedEmails: allowed("admin.email") ? failedEmailCount : 0,
         groups: groupCount,
         openReports: openReportCount,
-        openSupport: openSupportCount,
+        openSupport: allowed("admin.contact") ? openSupportCount : 0,
         posts: postCount,
         problems: problemCount,
-        queuedEmails: queuedEmailCount,
+        queuedEmails: allowed("admin.email") ? queuedEmailCount : 0,
         users: userCount,
       },
       reports: reports.map((report) => ({

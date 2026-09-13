@@ -1,4 +1,5 @@
 export type EditorPreferences = {
+  liveErrors: boolean;
   autoCompletion: boolean;
   bracketPairColorization: boolean;
   fontLigatures: boolean;
@@ -17,6 +18,7 @@ export type EditorPreferences = {
 export const EDITOR_PREFERENCES_STORAGE_KEY = "scripticx.editor.preferences.v1";
 
 export const DEFAULT_EDITOR_PREFERENCES: EditorPreferences = {
+  liveErrors: true,
   autoCompletion: true,
   bracketPairColorization: true,
   fontLigatures: false,
@@ -44,6 +46,7 @@ export function normalizeEditorPreferences(value: unknown): EditorPreferences {
   const rawTabSize = Number(candidate.tabSize);
 
   return {
+    liveErrors: booleanValue("liveErrors", true),
     autoCompletion: booleanValue("autoCompletion", true),
     bracketPairColorization: booleanValue("bracketPairColorization", true),
     fontLigatures: booleanValue("fontLigatures", false),

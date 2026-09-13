@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Lightbulb, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { ArrowRight, Lightbulb } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { Button } from "@/components/ui/button";
 
 type OnboardingPreparingProps = {
   onComplete: () => void;
+  onStart: () => void;
+  ready: boolean;
 };
 
 const preparationDuration = 20000;
-const exitDuration = 700;
 
 const content = {
   en: {
@@ -49,63 +52,61 @@ const content = {
   },
 } as const;
 
-export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
+export function OnboardingPreparing({ onComplete, onStart, ready }: OnboardingPreparingProps) {
   const { locale } = useLanguage();
   const language = locale === "ro" ? "ro" : "en";
   const c = content[language];
   const [messageIndex, setMessageIndex] = useState(0);
   const [factIndex, setFactIndex] = useState(0);
-  const [visible, setVisible] = useState(false);
+  const readyTitleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    let enterFrame = 0;
-    let visibleFrame = 0;
-    enterFrame = window.requestAnimationFrame(() => {
-      visibleFrame = window.requestAnimationFrame(() => setVisible(true));
-    });
+    if (!ready) return;
+    const timer = window.setTimeout(() => readyTitleRef.current?.focus({ preventScroll: true }), 1000);
+    return () => window.clearTimeout(timer);
+  }, [ready]);
+
+  useEffect(() => {
+    if (ready) return;
     const messageTimers = c.messages.slice(1).map((_, index) =>
       window.setTimeout(() => setMessageIndex(index + 1), (index + 1) * 4000)
     );
     const factTimers = c.facts.slice(1).map((_, index) =>
       window.setTimeout(() => setFactIndex(index + 1), (index + 1) * 5000)
     );
-    const exitTimer = window.setTimeout(() => setVisible(false), preparationDuration);
     const completionTimer = window.setTimeout(
       onComplete,
-      preparationDuration + exitDuration
+      preparationDuration
     );
 
     return () => {
-      window.cancelAnimationFrame(enterFrame);
-      window.cancelAnimationFrame(visibleFrame);
       messageTimers.forEach(window.clearTimeout);
       factTimers.forEach(window.clearTimeout);
-      window.clearTimeout(exitTimer);
       window.clearTimeout(completionTimer);
     };
-  }, [c.facts, c.messages, onComplete]);
+  }, [c.facts, c.messages, onComplete, ready]);
 
   return (
     <div
-      className={`fixed inset-0 z-[120] overflow-y-auto bg-background text-foreground transition-opacity duration-700 ease-out ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
+      className="fixed inset-0 z-[120] overflow-y-auto bg-background text-foreground"
     >
       <div className="pointer-events-none absolute inset-0 bg-muted/20" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-primary" />
 
-      <div className="relative flex min-h-[100dvh] flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)] sm:px-8">
-        <header className="flex items-center justify-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logoSCX.svg" alt="ScripticX" className="h-9 w-9 dark:invert" />
-          <span className="text-lg font-semibold">ScripticX</span>
+      <div className="relative flex min-h-[max(100dvh,32rem)] flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)] sm:px-8">
+        <header
+          className="absolute left-1/2 z-10 -translate-x-1/2 transition-[top] duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          style={{ top: ready ? "calc(50% - 10rem)" : "calc(env(safe-area-inset-top) + 1.5rem)" }}
+        >
+          <Image src="/logo-text.svg" alt="ScripticX" width={203} height={41} className="h-auto w-44 dark:invert" />
         </header>
 
-        <main className="relative z-[1] flex min-h-80 flex-1 items-center justify-center py-10 sm:py-12">
-          <div className="w-full max-w-3xl text-center" role="status" aria-live="polite" aria-label={c.status}>
-            <div className="mx-auto mb-7 flex h-11 w-11 items-center justify-center rounded-lg border bg-card text-foreground shadow-sm">
-              <Sparkles className="h-5 w-5 animate-pulse" />
-            </div>
+        <main
+          aria-hidden={ready}
+          inert={ready}
+          className={`relative z-[1] flex min-h-80 flex-1 items-center justify-center py-10 transition-[opacity,transform] duration-500 motion-reduce:transition-none sm:py-12 ${ready ? "-translate-y-3 opacity-0" : "translate-y-0 opacity-100"}`}
+        >
+          <div className="w-full max-w-3xl text-center" role={ready ? undefined : "status"} aria-live={ready ? "off" : "polite"} aria-label={c.status}>
             <div className="flex min-h-28 items-center justify-center sm:min-h-32">
               <h1
                 key={`${language}-${messageIndex}`}
@@ -120,7 +121,7 @@ export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
           </div>
         </main>
 
-        <aside className="relative z-[1] shrink-0 px-1 pb-2 text-center sm:px-8">
+        <aside aria-hidden={ready} className={`relative z-[1] shrink-0 px-1 pb-2 text-center transition-opacity duration-500 motion-reduce:transition-none sm:px-8 ${ready ? "opacity-0" : "opacity-100"}`}>
           <div className="mx-auto max-w-2xl">
             <p className="flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground">
               <Lightbulb className="h-3.5 w-3.5" />
@@ -134,6 +135,25 @@ export function OnboardingPreparing({ onComplete }: OnboardingPreparingProps) {
             </p>
           </div>
         </aside>
+        <section
+          aria-hidden={!ready}
+          inert={!ready}
+          aria-labelledby="onboarding-ready-title"
+          className={`absolute inset-0 flex items-center justify-center px-6 pt-12 transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none ${ready ? "translate-y-0 opacity-100 delay-200" : "pointer-events-none translate-y-5 opacity-0"}`}
+        >
+          <div className="w-full max-w-lg text-center">
+            <h1 ref={readyTitleRef} tabIndex={-1} id="onboarding-ready-title" className="text-3xl font-semibold tracking-tight outline-none sm:text-4xl">
+              {language === "ro" ? "Contul tău este pregătit." : "Your account is ready."}
+            </h1>
+            <p className="mt-4 text-base leading-7 text-muted-foreground">
+              {language === "ro" ? "Preferințele tale sunt salvate. Hai să descoperim workspace-ul tău împreună." : "Your preferences are saved. Let’s take a tour of your workspace."}
+            </p>
+            <Button onClick={onStart} size="lg" className="mt-8 gap-2">
+              {language === "ro" ? "Să începem turul" : "Let’s start the tour"}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </section>
       </div>
     </div>
   );

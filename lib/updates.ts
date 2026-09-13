@@ -1,3 +1,4 @@
+import { updatePublicationDate } from "@/lib/update-publication";
 import { supabase } from "@/lib/supabase";
 
 export type UpdateTag = "new" | "fix" | "improved";
@@ -19,7 +20,7 @@ type FetchUpdatesOptions = {
 };
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return updatePublicationDate();
 }
 
 export async function fetchUpdates(options: FetchUpdatesOptions = {}): Promise<UpdateEntry[]> {

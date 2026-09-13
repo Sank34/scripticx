@@ -2817,12 +2817,13 @@ class StudyGroupsApi {
       .from("study_group_messages")
       .select("*, profiles(*)")
       .eq("channel_id", channelId)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(200);
 
     if (error) throw error;
 
-    return this.enrichMessages((data || []) as StudyGroupMessage[]);
+    return this.enrichMessages(((data || []) as StudyGroupMessage[]).reverse());
   }
 
   async sendMessage(input: {

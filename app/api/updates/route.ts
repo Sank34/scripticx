@@ -1,3 +1,4 @@
+import { updatePublicationDate } from "@/lib/update-publication";
 import { NextResponse } from "next/server";
 
 import { createAdminSupabase } from "@/lib/supabaseServer";
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = updatePublicationDate();
     const { data, error } = await createAdminSupabase()
       .from("updates")
       .select("id, slug, title_i18n, content_i18n, date, tag, created_at")

@@ -10,6 +10,9 @@ function expression(raw: string) {
 }
 
 function statementLabel(statement: MspStatement) {
+  if (statement.type === "return" || statement.type === "call") {
+    return `${statement.type === "return" ? "Return" : "Call"}: ${expression(statement.expression.raw)}`;
+  }
   if (statement.type === "assignment") {
     return `Assignment: ${statement.variable} = ${expression(statement.expression.raw)}`;
   }
@@ -76,6 +79,11 @@ function collectFlowLines(
   lines: TreeLine[]
 ) {
   for (const statement of statements) {
+    if (statement.type === "return" || statement.type === "call") {
+      lines.push({ depth, label: statementLabel(statement) });
+      if (statement.type === "return") break;
+      continue;
+    }
     if (statement.type === "assignment") {
       lines.push({
         depth,

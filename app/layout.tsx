@@ -4,16 +4,17 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AccessibilityProvider } from "@/components/AccessibilityProvider";
 import { Topbar } from "@/components/Topbar";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { MainWrapper } from "@/components/MainWrapper";
-import { PlayShellBoundary, OutsideGame } from "@/components/PlayShellBoundary";
 import Providers from "@/components/Providers";
 import { DeferredShellFeatures } from "@/components/DeferredShellFeatures";
 import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
 import { EmailVerificationBanner } from "@/components/account/EmailVerification";
 import { EmailVerificationAccessGate } from "@/components/account/EmailVerificationAccessGate";
+import { EntrySessionGate } from "@/components/auth/EntrySessionGate";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
@@ -48,17 +49,18 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
+    apple: [{ url: "/apple-icon.png?v=2", sizes: "180x180", type: "image/png" }],
     icon: [
-      { url: "/favicon.ico" },
+      { url: "/favicon.ico?v=2", sizes: "16x16 32x32 48x48", type: "image/x-icon" },
       {
-        url: "/icons/notification-icon-72.png",
-        sizes: "72x70",
+        url: "/icons/app-icon-v2-32.png",
+        sizes: "32x32",
         type: "image/png",
       },
       {
-        url: "/icons/notification-icon-512.png",
-        sizes: "512x499",
-        type: "image/png",
+        url: "/icons/favicon-v2.svg",
+        sizes: "any",
+        type: "image/svg+xml",
       },
     ],
   },
@@ -70,13 +72,13 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     locale: "en_US",
     type: "website",
-    images: [absoluteUrl(siteConfig.socialImage)],
+    images: [absoluteUrl(`/api/social-image?title=${encodeURIComponent("ScripticX | Learn Programming Interactively")}&description=${encodeURIComponent(siteConfig.description)}&section=ScripticX&path=/`)],
   },
   twitter: {
     card: "summary_large_image",
     title: "ScripticX | Learn Programming Interactively",
     description: siteConfig.description,
-    images: [absoluteUrl(siteConfig.socialImage)],
+    images: [absoluteUrl(`/api/social-image?title=${encodeURIComponent("ScripticX | Learn Programming Interactively")}&description=${encodeURIComponent(siteConfig.description)}&section=ScripticX&path=/`)],
   },
   robots: {
     index: true,
@@ -103,7 +105,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body
-        className={`${geistSans.className} h-screen overflow-hidden bg-background text-foreground antialiased`}
+        className={`${geistSans.className} h-svh overflow-hidden bg-background text-foreground antialiased md:h-dvh`}
       >
         <script
           type="application/ld+json"
@@ -138,43 +140,39 @@ export default function RootLayout({
           }}
         />
         <ThemeProvider>
-          <Providers>
-            <LanguageProvider>
-              <EmailVerificationAccessGate />
-              <GlobalContextMenu>
-                <SidebarProvider>
-                  <PlayShellBoundary game={children}>
-                  <div
-                    data-shell-root
-                    className="h-screen w-full overflow-hidden bg-sidebar p-2"
-                  >
+          <AccessibilityProvider>
+            <Providers>
+              <LanguageProvider>
+                <EmailVerificationAccessGate />
+                <EntrySessionGate>
+                <GlobalContextMenu>
+                  <SidebarProvider>
                     <div
-                      data-shell-frame
-                      className="flex h-full w-full gap-2 overflow-hidden rounded-[var(--sx-radius-shell)] bg-sidebar"
+                      data-shell-root
+                      className="h-svh w-full overflow-hidden bg-sidebar p-2 md:h-dvh"
                     >
-
-                      <AppSidebar />
-
                       <div
-                        data-shell-surface
-                        className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--sx-radius-shell)] border border-border/70 bg-background shadow-sm"
+                        data-shell-frame
+                        className="flex h-full w-full gap-2 overflow-hidden rounded-[var(--sx-radius-shell)] bg-sidebar"
                       >
-
-                        <Topbar />
-
-                        <EmailVerificationBanner />
-
-                        <MainWrapper>{children}</MainWrapper>
-
+                        <AppSidebar />
+                        <div
+                          data-shell-surface
+                          className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--sx-radius-shell)] border border-border/70 bg-background shadow-sm"
+                        >
+                          <Topbar />
+                          <EmailVerificationBanner />
+                          <MainWrapper>{children}</MainWrapper>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  </PlayShellBoundary>
-                </SidebarProvider>
-                <OutsideGame><DeferredShellFeatures /></OutsideGame>
-              </GlobalContextMenu>
-            </LanguageProvider>
-          </Providers>
+                  </SidebarProvider>
+                  <DeferredShellFeatures />
+                </GlobalContextMenu>
+                </EntrySessionGate>
+              </LanguageProvider>
+            </Providers>
+          </AccessibilityProvider>
 
           <Toaster
             position="top-center"

@@ -72,7 +72,7 @@ const copy = {
 
 export default function LearningPathSelectionPage() {
   const { locale } = useLanguage();
-  const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
+  const lessonLocale: LessonLocale = locale === "ro" ? "ro" : "en";
   const c = copy[lessonLocale];
   const roadmap = useRoadmapConfig();
   const { enrollments, user } = useLearningPaths();

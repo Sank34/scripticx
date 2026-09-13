@@ -255,11 +255,11 @@ function DashboardContent() {
                   value: stats.solved,
                 },
                 {
-                  label: t("dashboard.stats.score"),
+                  label: t("dashboard.stats.attempted"),
                   value: stats.total,
                 },
                 {
-                  label: t("dashboard.stats.streak"),
+                  label: t("dashboard.stats.average"),
                   value: `${stats.average}%`,
                 },
               ].map((item) => (

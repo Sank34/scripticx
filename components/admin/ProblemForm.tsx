@@ -394,9 +394,11 @@ export function ProblemForm({
       test_cases: testCases,
     };
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Authentication required");
       const result = initialData?.id
         ? await supabase.from("problems").update(payload).eq("id", initialData.id)
-        : await supabase.from("problems").insert([payload]);
+        : await supabase.from("problems").insert([{ ...payload, author_id: user.id }]);
       if (result.error) throw result.error;
     } catch {
       toast.error(t("admin.problems.form.toast.saveError"));

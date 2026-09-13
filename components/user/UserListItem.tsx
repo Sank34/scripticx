@@ -7,6 +7,7 @@ import type { EquippedRewards } from "@/lib/rewards";
 
 type UserListItemProps = {
   avatarUrl?: string | null;
+  className?: string;
   description?: string | null;
   equippedRewards?: EquippedRewards | null;
   href: string;
@@ -19,6 +20,7 @@ type UserListItemProps = {
 
 export function UserListItem({
   avatarUrl,
+  className,
   description,
   equippedRewards,
   href,
@@ -62,7 +64,7 @@ export function UserListItem({
 
   if (variant === "row") {
     return (
-      <Link href={href} className="block rounded-md p-2 transition hover:bg-muted/60">
+      <Link href={href} className={`block rounded-md p-2 transition hover:bg-muted/60 ${className || ""}`}>
         {content}
       </Link>
     );

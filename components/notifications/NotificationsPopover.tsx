@@ -667,7 +667,9 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                       unread && "bg-red-50/40 dark:bg-red-950/20"
                     )}
                   >
-                    {notification.type === "birthday_surprise" ? (
+                    {notification.type === "platform_announcement" ? (
+                      <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-background"><img src="/logoSCX.svg" alt="ScripticX" className="size-7 object-contain dark:invert" /></span>
+                    ) : notification.type === "birthday_surprise" ? (
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted">
                         <Gift className="size-4" />
                       </span>

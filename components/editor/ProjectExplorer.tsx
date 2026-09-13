@@ -114,7 +114,7 @@ export function ProjectExplorer({
               <button
                 type="button"
                 onClick={() => toggleDirectory(node.path)}
-                className="group flex h-7 w-full items-center gap-1.5 pr-2 text-left text-xs text-foreground transition-colors hover:bg-muted"
+                className="group flex h-11 w-full items-center gap-1.5 pr-2 text-left text-xs text-foreground transition-colors hover:bg-muted md:h-7"
                 style={{ paddingLeft: 8 + depth * 12 }}
               >
                 {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -169,7 +169,7 @@ export function ProjectExplorer({
             onClick={() => onOpenFile(file.id)}
             onDoubleClick={() => onRenameFile(file.id)}
             className={cn(
-              "group flex h-7 w-full items-center gap-1.5 pr-2 text-left text-xs transition-colors",
+              "group flex h-11 w-full items-center gap-1.5 pr-2 text-left text-xs transition-colors md:h-7",
               active
                 ? "bg-muted font-medium text-foreground"
                 : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -222,7 +222,7 @@ export function ProjectExplorer({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3 md:h-9">
         <span className="text-xs font-semibold">{isRo ? "Explorer" : "Explorer"}</span>
         <div className="flex items-center gap-0.5">
           <Tooltip>
@@ -230,7 +230,7 @@ export function ProjectExplorer({
               <button
                 type="button"
                 onClick={() => onNewFile()}
-                className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="grid size-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:size-7"
                 aria-label={isRo ? "Fișier nou" : "New file"}
               >
                 <FilePlus2 size={14} />
@@ -243,7 +243,7 @@ export function ProjectExplorer({
               <button
                 type="button"
                 onClick={() => onNewDirectory()}
-                className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="grid size-11 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:size-7"
                 aria-label={isRo ? "Director nou" : "New folder"}
               >
                 <FolderPlus size={14} />

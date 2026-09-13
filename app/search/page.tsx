@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -37,6 +37,7 @@ function SearchContent() {
   const [query, setQuery] = useState(routeQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(routeQuery.trim());
   const [recent, setRecent] = useState<string[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     setQuery(routeQuery);
@@ -110,6 +111,10 @@ function SearchContent() {
     placeholderData: (previous) => previous ?? [],
   });
 
+  useEffect(() => {
+    setSelectedIndex((current) => results.length ? Math.min(current, results.length - 1) : 0);
+  }, [results.length]);
+
   function handleSearch(value: string) {
     setQuery(value);
   }
@@ -125,6 +130,20 @@ function SearchContent() {
     setDebouncedQuery(normalizedQuery);
 
     router.push(`/search?q=${encodeURIComponent(normalizedQuery)}`);
+  }
+
+  function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!results.length) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedIndex((current) => (current + 1) % results.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedIndex((current) => (current - 1 + results.length) % results.length);
+    } else if (event.key === "Enter" && results[selectedIndex]?.username) {
+      event.preventDefault();
+      router.push(`/u/${encodeURIComponent(results[selectedIndex].username)}`);
+    }
   }
 
   function selectRecent(value: string) {
@@ -168,6 +187,7 @@ function SearchContent() {
               aria-label={t("search.placeholder")}
               value={query}
               onChange={(event) => handleSearch(event.target.value)}
+              onKeyDown={handleInputKeyDown}
               placeholder={t("search.placeholder")}
               className="h-10 pl-9 pr-10"
               autoComplete="off"
@@ -241,6 +261,7 @@ function SearchContent() {
                       rank={index + 1}
                       username={user.username}
                       variant="row"
+                      className={index === selectedIndex ? "bg-accent" : undefined}
                     />
                   ))}
                 </div>

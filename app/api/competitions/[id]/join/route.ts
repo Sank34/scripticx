@@ -39,12 +39,13 @@ export async function POST(request: Request, context: RouteContext) {
 
     const { data: competition, error: competitionError } = await createAdminSupabase()
       .from("competitions")
-      .select("status, ends_at, registration_ends_at")
+      .select("status, ends_at, registration_ends_at, visibility")
       .eq("id", safeCompetitionId)
       .maybeSingle<{
         ends_at: string;
         registration_ends_at: string | null;
         status: string;
+        visibility: "public" | "private";
       }>();
     if (competitionError) throw competitionError;
     if (!competition) throw new HttpError(404, "Competition not found");
@@ -61,6 +62,17 @@ export async function POST(request: Request, context: RouteContext) {
         throw new HttpError(400, "Competition registration deadline has passed");
       }
       throw new HttpError(400, "Competition is not open for registration");
+    }
+
+    if (competition.visibility === "private" && !inviteCode) {
+      const { data: invitee, error: inviteeError } = await createAdminSupabase()
+        .from("competition_invitees")
+        .select("user_id")
+        .eq("competition_id", safeCompetitionId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (inviteeError) throw inviteeError;
+      if (!invitee) throw new HttpError(400, "An invitation is required for this competition");
     }
 
     const inviteHash = inviteCode

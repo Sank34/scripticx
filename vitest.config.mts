@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 const rootDirectory = fileURLToPath(new URL(".", import.meta.url));
 
@@ -14,5 +14,6 @@ export default defineConfig({
     environment: "node",
     globals: false,
     include: ["**/*.{test,spec}.ts"],
+    exclude: [...configDefaults.exclude, "disabled/**"],
   },
 });

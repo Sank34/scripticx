@@ -1,4 +1,6 @@
 import "server-only";
+import { getUserPermissions } from "@/lib/server/permissions";
+import { adminApiPermission, hasPermission, type Permission } from "@/lib/permissions";
 
 import { createHash, createHmac } from "node:crypto";
 import type { User } from "@supabase/supabase-js";
@@ -25,6 +27,7 @@ export async function requireUser(request: Request): Promise<{
   user: User;
   accessToken: string;
   role: string;
+  permissions: Permission[];
 }> {
   const accessToken = getBearerToken(request);
   if (!accessToken) throw new HttpError(401, "Authentication required");
@@ -47,9 +50,9 @@ export async function requireUser(request: Request): Promise<{
         .maybeSingle<{ role: string | null; banned: boolean | null }>(),
       admin
         .from("platform_settings")
-        .select("lockdown_enabled")
+        .select("lockdown_enabled, lockdown_mode")
         .eq("id", "global")
-        .maybeSingle<{ lockdown_enabled: boolean }>(),
+            .maybeSingle<{ lockdown_enabled: boolean; lockdown_mode: "maintenance" | "competition" | null }>(),
     ]);
 
   if (profileError || !profile) {
@@ -66,16 +69,37 @@ export async function requireUser(request: Request): Promise<{
   }
 
   const role = profile.role || "user";
-  if (settings?.lockdown_enabled && role !== "admin") {
+  const permissions = role === "admin" ? [] : await getUserPermissions(user.id);
+  const mode = settings?.lockdown_enabled ? settings.lockdown_mode || "maintenance" : null;
+  if (mode === "maintenance" && !hasPermission(role, permissions, "maintenance.bypass")) {
     throw new HttpError(423, "Platform is currently locked");
   }
+  if (mode === "competition" && !hasPermission(role, permissions, "competition.bypass") && !isCompetitionSurface(request.url)) {
+    const { data: participant, error: participantError } = await admin
+      .from("competition_participants")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (participantError) throw new HttpError(503, "Could not verify competition access");
+    if (participant) throw new HttpError(423, "Platform is in competition mode");
+  }
 
-  return { user, accessToken, role };
+  return { user, accessToken, role, permissions };
+}
+
+function isCompetitionSurface(url: string) {
+  const pathname = new URL(url).pathname;
+  return ["/api/competitions", "/api/docs", "/api/examples"].some(path => pathname === path || pathname.startsWith(path + "/"));
 }
 
 export async function requireAdmin(request: Request) {
   const session = await requireUser(request);
-  if (session.role !== "admin") throw new HttpError(403, "Admin access required");
+  const permission = adminApiPermission(new URL(request.url).pathname);
+  if (session.role !== "admin" && (!permission || !session.permissions.includes(permission))) {
+    throw new HttpError(403, "Permission required");
+  }
   return session;
 }
 

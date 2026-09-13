@@ -276,6 +276,12 @@ const ruleStyles = {
     icon: "bg-amber-400",
     node: "bg-amber-50/50 dark:bg-amber-950/30",
   },
+  assessment: {
+    badge: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300",
+    border: "border-violet-100 dark:border-violet-900",
+    icon: "bg-violet-500",
+    node: "bg-violet-50/50 dark:bg-violet-950/30",
+  },
   theory: {
     badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
     border: "border-emerald-100 dark:border-emerald-900",
@@ -287,12 +293,6 @@ const ruleStyles = {
     border: "border-blue-100 dark:border-blue-900",
     icon: "bg-blue-500",
     node: "bg-blue-50/50 dark:bg-blue-950/30",
-  },
-  assessment: {
-    badge: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300",
-    border: "border-violet-100 dark:border-violet-900",
-    icon: "bg-violet-500",
-    node: "bg-violet-50/50 dark:bg-violet-950/30",
   },
 } as const;
 
@@ -417,6 +417,14 @@ const copy = {
     contentLanguage: "Content language",
     english: "English",
     romanian: "Romanian",
+    zoomOut: "Zoom out",
+    zoomIn: "Zoom in",
+    slug: "Slug",
+    pathKinds: { foundation: "Foundation", specialization: "Specialization", supplemental: "Supplemental" },
+    availabilityValues: { draft: "Draft", coming_soon: "Coming soon", published: "Published", archived: "Archived" },
+    levelValues: { beginner: "Beginner", practice: "Practice", challenge: "Challenge" },
+    requirementValues: { required: "Required", capstone: "Capstone", optional: "Optional", bonus: "Bonus" },
+    ruleKinds: { required: "Required", bonus: "Bonus", challenge: "Challenge", theory: "Theory", video: "Video", assessment: "Assessment" },
   },
   ro: {
     title: "Configurator Roadmap Lecții",
@@ -538,6 +546,14 @@ const copy = {
     contentLanguage: "Limba conținutului",
     english: "Engleză",
     romanian: "Română",
+    zoomOut: "Micșorează",
+    zoomIn: "Mărește",
+    slug: "Slug",
+    pathKinds: { foundation: "Fundație", specialization: "Specializare", supplemental: "Suplimentar" },
+    availabilityValues: { draft: "Draft", coming_soon: "În curând", published: "Publicat", archived: "Arhivat" },
+    levelValues: { beginner: "Începător", practice: "Practică", challenge: "Challenge" },
+    requirementValues: { required: "Obligatoriu", capstone: "Capstone", optional: "Opțional", bonus: "Bonus" },
+    ruleKinds: { required: "Obligatoriu", bonus: "Bonus", challenge: "Challenge", theory: "Teorie", video: "Video", assessment: "Evaluare" },
   },
 } as const;
 
@@ -1010,6 +1026,9 @@ function LessonsAdminContent() {
     buildAdminState().drafts
   );
   const [contentLocale, setContentLocale] = useState<LessonLocale>(lessonLocale);
+  useEffect(() => {
+    setContentLocale(lessonLocale);
+  }, [lessonLocale]);
   const [selectedId, setSelectedId] = useState(nodes[0]?.id ?? "");
   const [selectedIds, setSelectedIds] = useState<string[]>(
     nodes[0]?.id ? [nodes[0].id] : []
@@ -1197,12 +1216,13 @@ function LessonsAdminContent() {
   );
 
   useEffect(() => {
-    if (!remoteConfig) {
-      if (remoteConfigFailed && readRoadmapConfig()) {
-        toast.warning(c.localFallback);
-      }
-      return;
+    if (remoteConfigFailed && !remoteConfig && readRoadmapConfig()) {
+      toast.warning(c.localFallback);
     }
+  }, [c.localFallback, remoteConfig, remoteConfigFailed]);
+
+  useEffect(() => {
+    if (!remoteConfig) return;
 
     writeRoadmapConfig(remoteConfig);
     const { categories, lessons, sections } = getRoadmapConfigData(remoteConfig);
@@ -1261,10 +1281,7 @@ function LessonsAdminContent() {
     setSelectedConnectionId("");
     setSelectedSectionFrameId("");
   }, [
-    c.localFallback,
-    lessonLocale,
     remoteConfig,
-    remoteConfigFailed,
     resetConfiguratorHistory,
   ]);
 
@@ -1691,14 +1708,19 @@ function LessonsAdminContent() {
     field: "markdown" | "summary" | "title" | "transcript",
     value: string
   ) {
-    const draft = drafts[id];
-    if (!draft) return;
-
-    updateDraft(id, {
-      [field]: {
-        ...draft[field],
-        [contentLocale]: value,
-      },
+    setDrafts((current) => {
+      const draft = current[id];
+      if (!draft) return current;
+      return {
+        ...current,
+        [id]: {
+          ...draft,
+          [field]: {
+            ...draft[field],
+            [contentLocale]: value,
+          },
+        },
+      };
     });
   }
 
@@ -1807,24 +1829,48 @@ function LessonsAdminContent() {
   }
 
   function updateQuizQuestion(questionIndex: number, patch: Partial<QuizDraft>) {
-    if (!selectedLesson || !selectedDraft) return;
+    if (!selectedLesson) return;
 
-    updateDraft(selectedLesson.id, {
-      quiz: selectedDraft.quiz.map((question, index) =>
-        index === questionIndex ? { ...question, ...patch } : question
-      ),
+    setDrafts((current) => {
+      const draft = current[selectedLesson.id];
+      if (!draft) return current;
+      return {
+        ...current,
+        [selectedLesson.id]: {
+          ...draft,
+          quiz: draft.quiz.map((question, index) =>
+            index === questionIndex ? { ...question, ...patch } : question
+          ),
+        },
+      };
     });
   }
 
   function updateQuizOption(questionIndex: number, optionIndex: number, value: string) {
-    if (!selectedLesson || !selectedDraft) return;
+    if (!selectedLesson) return;
 
-    updateQuizQuestion(questionIndex, {
-      options: selectedDraft.quiz[questionIndex].options.map((option, index) =>
-        index === optionIndex
-          ? { ...option, [contentLocale]: value }
-          : option
-      ),
+    setDrafts((current) => {
+      const draft = current[selectedLesson.id];
+      const question = draft?.quiz[questionIndex];
+      if (!draft || !question) return current;
+      return {
+        ...current,
+        [selectedLesson.id]: {
+          ...draft,
+          quiz: draft.quiz.map((item, index) =>
+            index === questionIndex
+              ? {
+                  ...item,
+                  options: question.options.map((option, currentOptionIndex) =>
+                    currentOptionIndex === optionIndex
+                      ? { ...option, [contentLocale]: value }
+                      : option
+                  ),
+                }
+              : item
+          ),
+        },
+      };
     });
   }
 
@@ -2970,12 +3016,12 @@ function LessonsAdminContent() {
                     variant="outline"
                     size="icon"
                     onClick={() => setZoom(([value]) => [clampZoom(value - 10)])}
-                    aria-label="Zoom out"
+                    aria-label={c.zoomOut}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Zoom out</TooltipContent>
+                <TooltipContent>{c.zoomOut}</TooltipContent>
               </Tooltip>
               <div className="hidden w-28 px-1 md:block">
                 <Slider value={zoom} min={MIN_ZOOM} max={MAX_ZOOM} step={5} onValueChange={setZoom} />
@@ -2986,12 +3032,12 @@ function LessonsAdminContent() {
                     variant="outline"
                     size="icon"
                     onClick={() => setZoom(([value]) => [clampZoom(value + 10)])}
-                    aria-label="Zoom in"
+                    aria-label={c.zoomIn}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Zoom in</TooltipContent>
+                <TooltipContent>{c.zoomIn}</TooltipContent>
               </Tooltip>
               <Button variant="outline" size="icon" onClick={resetLayout} className="hidden xl:inline-flex">
                 <Shuffle className="h-3.5 w-3.5" />
@@ -3324,7 +3370,7 @@ function LessonsAdminContent() {
                         {nodeDraft?.minutes ?? node.lesson.minutes} min
                       </span>
                       <Badge variant="outline" className={cn("rounded-full", styles.badge)}>
-                        {nodeRuleKind}
+                        {c.ruleKinds[nodeRuleKind]}
                       </Badge>
                     </span>
                     {HANDLE_SIDES.map((side) => {
@@ -3396,7 +3442,7 @@ function LessonsAdminContent() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="min-w-0 rounded-lg border bg-muted/30 p-3">
                     <p className="text-xs text-muted-foreground">{c.from}</p>
                     <p className="mt-1 truncate text-sm font-medium">{selectedConnection.sourceId}</p>
@@ -3406,7 +3452,7 @@ function LessonsAdminContent() {
                     <p className="mt-1 truncate text-sm font-medium">{selectedConnection.targetId}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
                     {c.startSide}
                     <Select
@@ -3484,8 +3530,8 @@ function LessonsAdminContent() {
                     onChange={(event) =>
                       updateCategory(selectedCategoryDetails.id, {
                         title: {
-                          en: event.target.value,
-                          ro: event.target.value,
+                          ...selectedCategoryDetails.title,
+                          [lessonLocale]: event.target.value,
                         },
                       })
                     }
@@ -3498,15 +3544,15 @@ function LessonsAdminContent() {
                     onChange={(event) =>
                       updateCategory(selectedCategoryDetails.id, {
                         description: {
-                          en: event.target.value,
-                          ro: event.target.value,
+                          ...selectedCategoryDetails.description,
+                          [lessonLocale]: event.target.value,
                         },
                       })
                     }
                     className="min-h-24"
                   />
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.pathKind}
                     <Select
@@ -3521,9 +3567,9 @@ function LessonsAdminContent() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="foundation">foundation</SelectItem>
-                        <SelectItem value="specialization">specialization</SelectItem>
-                        <SelectItem value="supplemental">supplemental</SelectItem>
+                        <SelectItem value="foundation">{c.pathKinds.foundation}</SelectItem>
+                        <SelectItem value="specialization">{c.pathKinds.specialization}</SelectItem>
+                        <SelectItem value="supplemental">{c.pathKinds.supplemental}</SelectItem>
                       </SelectContent>
                     </Select>
                   </label>
@@ -3541,15 +3587,15 @@ function LessonsAdminContent() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="draft">draft</SelectItem>
-                        <SelectItem value="coming_soon">coming soon</SelectItem>
-                        <SelectItem value="published">published</SelectItem>
-                        <SelectItem value="archived">archived</SelectItem>
+                        <SelectItem value="draft">{c.availabilityValues.draft}</SelectItem>
+                        <SelectItem value="coming_soon">{c.availabilityValues.coming_soon}</SelectItem>
+                        <SelectItem value="published">{c.availabilityValues.published}</SelectItem>
+                        <SelectItem value="archived">{c.availabilityValues.archived}</SelectItem>
                       </SelectContent>
                     </Select>
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-4">
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.programmingLanguage}
                     <Input
@@ -3565,7 +3611,7 @@ function LessonsAdminContent() {
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-sm font-medium">
-                    Slug
+                    {c.slug}
                     <Input
                       value={selectedCategoryDetails.slug}
                       onChange={(event) =>
@@ -3603,7 +3649,7 @@ function LessonsAdminContent() {
                     </SelectContent>
                   </Select>
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-4">
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     {c.estimatedHours}
                     <Input
@@ -3676,8 +3722,8 @@ function LessonsAdminContent() {
                     onChange={(event) =>
                       updateSection(selectedSectionDetails.id, {
                         title: {
-                          en: event.target.value,
-                          ro: event.target.value,
+                          ...selectedSectionDetails.title,
+                          [lessonLocale]: event.target.value,
                         },
                       })
                     }
@@ -3732,8 +3778,8 @@ function LessonsAdminContent() {
                     onChange={(event) =>
                       updateSection(selectedSectionDetails.id, {
                         label: {
-                          en: event.target.value,
-                          ro: event.target.value,
+                          ...selectedSectionDetails.label,
+                          [lessonLocale]: event.target.value,
                         },
                       })
                     }
@@ -3746,8 +3792,8 @@ function LessonsAdminContent() {
                     onChange={(event) =>
                       updateSection(selectedSectionDetails.id, {
                         description: {
-                          en: event.target.value,
-                          ro: event.target.value,
+                          ...selectedSectionDetails.description,
+                          [lessonLocale]: event.target.value,
                         },
                       })
                     }
@@ -3789,13 +3835,13 @@ function LessonsAdminContent() {
                           ruleStyles[getDraftRuleKind(selectedLesson, selectedDraft)].badge
                         )}
                       >
-                        {getDraftRuleKind(selectedLesson, selectedDraft)}
+                        {c.ruleKinds[getDraftRuleKind(selectedLesson, selectedDraft)]}
                       </Badge>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="rounded-lg border bg-background/80 p-4">
                       <p className="text-xs text-muted-foreground">{c.requiredQuiz}</p>
                       <p className="mt-1 flex items-center gap-1.5 font-medium">
@@ -3855,7 +3901,7 @@ function LessonsAdminContent() {
                           className="min-h-20"
                         />
                       </label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-4">
                         <label className="flex flex-col gap-2 text-sm font-medium">
                           {c.section}
                           <Select
@@ -3888,14 +3934,14 @@ function LessonsAdminContent() {
                             <Input
                               value={text(selectedSection.title, lessonLocale)}
                               onChange={(event) =>
-                                updateSection(selectedSection.id, {
-                                  title: {
-                                    en: event.target.value,
-                                    ro: event.target.value,
+                              updateSection(selectedSection.id, {
+                                title: {
+                                    ...selectedSection.title,
+                                    [lessonLocale]: event.target.value,
                                   },
                                   label: {
-                                    en: event.target.value,
-                                    ro: event.target.value,
+                                    ...selectedSection.label,
+                                    [lessonLocale]: event.target.value,
                                   },
                                 })
                               }
@@ -3943,9 +3989,9 @@ function LessonsAdminContent() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="beginner">beginner</SelectItem>
-                              <SelectItem value="practice">practice</SelectItem>
-                              <SelectItem value="challenge">challenge</SelectItem>
+                              <SelectItem value="beginner">{c.levelValues.beginner}</SelectItem>
+                              <SelectItem value="practice">{c.levelValues.practice}</SelectItem>
+                              <SelectItem value="challenge">{c.levelValues.challenge}</SelectItem>
                             </SelectContent>
                           </Select>
                         </label>
@@ -3964,10 +4010,10 @@ function LessonsAdminContent() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="required">required</SelectItem>
-                              <SelectItem value="capstone">capstone</SelectItem>
-                              <SelectItem value="optional">optional</SelectItem>
-                              <SelectItem value="bonus">bonus</SelectItem>
+                              <SelectItem value="required">{c.requirementValues.required}</SelectItem>
+                              <SelectItem value="capstone">{c.requirementValues.capstone}</SelectItem>
+                              <SelectItem value="optional">{c.requirementValues.optional}</SelectItem>
+                              <SelectItem value="bonus">{c.requirementValues.bonus}</SelectItem>
                             </SelectContent>
                           </Select>
                         </label>

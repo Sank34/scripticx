@@ -1,5 +1,8 @@
 "use client";
 
+import { useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts";
+import { formatShortcut } from "@/lib/keyboard-shortcuts";
+
 import {
   Suspense,
   useCallback,
@@ -58,6 +61,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { PromptDialog } from "@/components/ui/prompt-dialog";
 import {
   ResizableHandle,
@@ -132,6 +137,7 @@ import {
 } from "@/lib/github-integration";
 import {
   ChevronDown,
+  MoreHorizontal,
   FileDown,
   FileCode2,
   Files,
@@ -371,6 +377,7 @@ END
   const [program, setProgram] = useState<ProgramInstruction[]>([]);
   const [variables, setVariables] = useState<Record<string, Value>>({});
   const [executedLine, setExecutedLine] = useState(0);
+  const [nextExecutionLine, setNextExecutionLine] = useState<number | null>(null);
   const [output, setOutput] = useState<string[]>([]);
   const [stopped, setStopped] = useState(false);
   const [errorLine, setErrorLine] = useState<number | null>(null);
@@ -417,7 +424,13 @@ END
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
-    const synchronize = () => setCompactLayout(media.matches);
+    const synchronize = () => {
+      setCompactLayout(media.matches);
+      if (media.matches) {
+        setSidePanelOpen(Boolean(searchParams.get("view")));
+        setBottomPanelOpen(false);
+      }
+    };
     synchronize();
     media.addEventListener("change", synchronize);
     return () => media.removeEventListener("change", synchronize);
@@ -465,6 +478,7 @@ END
     setProgram([]);
     setVariables({});
     setExecutedLine(0);
+    setNextExecutionLine(null);
     setOutput([]);
     setStopped(false);
     setErrorLine(null);
@@ -594,7 +608,7 @@ END
     void terminalRef.current.runActiveFile();
   }, [activePanel, bottomPanelOpen, pendingTerminalRun]);
   const executionLine =
-    errorLine ?? (program.length > 0 && !stopped && executedLine > 0 ? executedLine : null);
+    errorLine ?? (program.length > 0 && !stopped ? nextExecutionLine : null);
   const complexityAnalysis = useMemo<ComplexityAnalysis | null>(() => {
     if (!complexityEnabled) return null;
     return analyzeMiniScriptComplexity(code, locale);
@@ -651,6 +665,7 @@ END
       setProgram([]);
       setVariables({});
       setExecutedLine(0);
+      setNextExecutionLine(null);
       setOutput([]);
       setStopped(false);
       setErrorLine(null);
@@ -768,6 +783,7 @@ END
     setProgram(parsed);
     setVariables({});
     setExecutedLine(0);
+    setNextExecutionLine(null);
     setOutput([]);
     setStopped(false);
     setErrorLine(null);
@@ -784,6 +800,7 @@ END
     }
 
     setExecutedLine(result.executedLine);
+    setNextExecutionLine(result.currentLine < code.split("\n").length ? result.currentLine + 1 : null);
 
     if (result.inputRequest) {
       setInputVar(result.inputRequest);
@@ -857,6 +874,10 @@ END
   }
 
   function handleRun() {
+    if (compactLayout) {
+      setSidePanelOpen(false);
+      setBottomPanelOpen(true);
+    }
     if (isCloudRuntime) {
       setActivePanel("terminal");
       setBottomPanelOpen(true);
@@ -873,6 +894,9 @@ END
     runProgram(activeProgram);
   }
 
+  const { bindings: shortcuts } = useKeyboardShortcuts();
+  useShortcut("run", handleRun, isRunnable && !(isRunning && !stopped) && !remoteRunning, true);
+
   function handleSubmitInput() {
     if (!inputVar) return;
 
@@ -887,6 +911,7 @@ END
     setInputValue("");
 
     advanceLine();
+    setNextExecutionLine(executedLine < program.length ? executedLine + 1 : null);
 
     if (isRunning) {
       runProgram(program);
@@ -897,6 +922,7 @@ END
     setProgram([]);
     setVariables({});
     setExecutedLine(0);
+    setNextExecutionLine(null);
     if (clearOutput) setOutput([]);
     setStopped(false);
     setErrorLine(null);
@@ -2118,7 +2144,7 @@ END
   })();
 
   const editorTabs = (
-    <div className="flex h-9 shrink-0 items-center overflow-x-auto border-b bg-muted/30 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex h-11 shrink-0 items-center overflow-x-auto border-b bg-muted/30 md:h-9 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {openFiles.map((file) => {
         const active = file.id === activeFile?.id;
         return (
@@ -2135,7 +2161,7 @@ END
                   type="button"
                   onClick={() => switchEditorFile(file.id)}
                   onDoubleClick={() => renameEditorFile(file.id)}
-                  className="max-w-[190px] truncate px-3"
+                  className="h-full max-w-[190px] truncate px-3"
                   title={file.path}
                 >
                   {file.name}
@@ -2143,7 +2169,7 @@ END
                 <button
                   type="button"
                   onClick={() => closeEditorTab(file.id)}
-                  className="mr-1 grid size-6 place-items-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="mr-1 grid size-11 place-items-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground md:size-6"
                   aria-label={`Close ${file.name}`}
                 >
                   <X size={12} />
@@ -2165,7 +2191,7 @@ END
       <button
         type="button"
         onClick={() => createEditorFile(getProjectParentPath(activeFile?.path ?? ""))}
-        className="grid size-8 shrink-0 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="grid size-11 shrink-0 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground md:size-8"
         aria-label={locale === "ro" ? "Fișier nou" : "New file"}
       >
         <Plus size={14} />
@@ -2175,15 +2201,15 @@ END
 
   const bottomTools = (
     <Tabs value={activePanel} onValueChange={setActivePanel} className="flex h-full min-h-0 flex-col gap-0 bg-background">
-      <div className="flex h-9 shrink-0 items-center justify-between border-b px-2">
-        <TabsList variant="line" className="h-8 justify-start bg-transparent p-0">
-          <TabsTrigger value="console" className="h-8 px-2 text-xs">{locale === "ro" ? "Output" : "Output"}</TabsTrigger>
-          <TabsTrigger value="terminal" className="h-8 px-2 text-xs">{locale === "ro" ? "Terminal" : "Terminal"}</TabsTrigger>
-          <TabsTrigger value="debugger" className="h-8 px-2 text-xs">{locale === "ro" ? "Debugger" : "Debugger"}</TabsTrigger>
-          <TabsTrigger value="analysis" className="h-8 px-2 text-xs">{locale === "ro" ? "Complexitate" : "Complexity"}</TabsTrigger>
+      <div className="flex h-12 min-w-0 shrink-0 items-center justify-between border-b px-2 md:h-9">
+        <TabsList variant="line" className="min-w-0 max-w-full justify-start overflow-x-auto overflow-y-hidden bg-transparent p-0 group-data-horizontal/tabs:h-11 md:group-data-horizontal/tabs:h-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsTrigger value="console" className="h-11 flex-none px-2 text-xs md:h-8">{locale === "ro" ? "Output" : "Output"}</TabsTrigger>
+          <TabsTrigger value="terminal" className="h-11 flex-none px-2 text-xs md:h-8">{locale === "ro" ? "Terminal" : "Terminal"}</TabsTrigger>
+          <TabsTrigger value="debugger" className="h-11 flex-none px-2 text-xs md:h-8">{locale === "ro" ? "Debugger" : "Debugger"}</TabsTrigger>
+          <TabsTrigger value="analysis" className="h-11 flex-none px-2 text-xs md:h-8">{locale === "ro" ? "Complexitate" : "Complexity"}</TabsTrigger>
           <TabsTrigger
             value="visual"
-            className="h-8 px-2 text-xs"
+            className="h-11 flex-none px-2 text-xs md:h-8"
             data-tour="editor-visualize"
           >
             {locale === "ro" ? "Structură" : "Structure"}
@@ -2192,7 +2218,7 @@ END
         <button
           type="button"
           onClick={() => setBottomPanelOpen(false)}
-          className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="grid size-11 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:size-7"
           aria-label={locale === "ro" ? "Închide panoul" : "Close panel"}
         >
           <ChevronDown size={14} />
@@ -2210,7 +2236,7 @@ END
     <div data-tour="editor-workspace" className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <TooltipProvider>
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-          <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b bg-background px-3">
+          <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-2 md:h-12 md:gap-3 md:px-3">
             <div className="flex min-w-0 items-center">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-1.5 text-sm">
@@ -2232,7 +2258,22 @@ END
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1 md:hidden">
+              {isRunnable && <Button className="h-11 gap-1.5 px-3" onClick={handleRun} disabled={(isRunning && !stopped) || remoteRunning}><Play size={16} />{locale === "ro" ? "Rulează" : "Run"}</Button>}
+              <Button variant="ghost" className="size-11" aria-label={locale === "ro" ? "Deschide Output" : "Open output"} onClick={() => { setActivePanel("console"); setBottomPanelOpen(value => !value); }}><Terminal size={18} /></Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button variant="ghost" className="size-11" aria-label={locale === "ro" ? "Acțiuni proiect" : "Project actions"}><MoreHorizontal size={20} /></Button></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60 [&_[role=menuitem]]:min-h-11">
+                  <DropdownMenuItem disabled={saving} onSelect={() => void saveSnippet(false)}><Save />{locale === "ro" ? "Salvează proiectul" : "Save project"}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleSaveFile}><FileDown />{locale === "ro" ? "Descarcă fișierul" : "Download file"}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void handleShare()}><Share2 />{locale === "ro" ? "Distribuie" : "Share"}</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => activeLiveRoomId ? selectActivityView("live") : requestLiveShare()}><RadioTower />{activeLiveRoomId ? "Live Share" : locale === "ro" ? "Pornește Live Share" : "Start Live Share"}</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => selectActivityView("settings")}><Settings2 />{locale === "ro" ? "Setările editorului" : "Editor settings"}</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="hidden shrink-0 items-center gap-1.5 md:flex">
               {activeLiveRoomId ? (
                 <div className="flex items-center rounded-md border bg-background p-0.5">
                   <Button
@@ -2341,7 +2382,7 @@ END
                 </Button>
               )}
               {isRunnable && (
-                <Button size="sm" onClick={handleRun} disabled={(isRunning && !stopped) || remoteRunning} className="h-8 gap-1.5 px-3" data-tour="editor-run">
+                <Button size="sm" onClick={handleRun} title={formatShortcut(shortcuts.run) || undefined} disabled={(isRunning && !stopped) || remoteRunning} className="h-8 gap-1.5 px-3" data-tour="editor-run">
                   <Play size={14} />
                   <span className="hidden sm:inline">{locale === "ro" ? "Rulează" : "Run"}</span>
                 </Button>
@@ -2387,12 +2428,12 @@ END
             </div>
           </header>
 
-          <div className="relative flex min-h-0 flex-1">
+          <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
             <nav
-              className="flex w-12 shrink-0 flex-col items-center justify-between border-r bg-muted/20 py-1.5"
+              className="flex h-12 w-full shrink-0 items-center justify-between overflow-x-auto border-b bg-muted/20 px-1 md:h-auto md:w-12 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:px-0 md:py-1.5"
               data-tour="editor-activity-bar"
             >
-              <div className="flex w-full flex-col items-center gap-0.5">
+              <div className="flex items-center gap-0.5 md:w-full md:flex-col">
                 {activityItems.map((item) => (
                   <Tooltip key={item.id}>
                     <TooltipTrigger asChild>
@@ -2400,7 +2441,7 @@ END
                         type="button"
                         data-tour={`editor-activity-${item.id}`}
                         onClick={() => selectActivityView(item.id)}
-                        className={`relative grid size-10 place-items-center rounded-md transition-colors ${
+                        className={`relative grid size-11 shrink-0 place-items-center rounded-md transition-colors md:size-10 ${
                           activityView === item.id && sidePanelOpen
                             ? "bg-muted text-foreground"
                             : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -2424,7 +2465,7 @@ END
                     type="button"
                     data-tour="editor-activity-settings"
                     onClick={() => selectActivityView("settings")}
-                    className={`relative grid size-10 place-items-center rounded-md transition-colors ${
+                    className={`relative grid size-11 shrink-0 place-items-center rounded-md transition-colors md:size-10 ${
                       activityView === "settings" && sidePanelOpen
                         ? "bg-muted text-foreground"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -2442,13 +2483,24 @@ END
               </Tooltip>
             </nav>
 
-            {compactLayout && sidePanelOpen && (
-              <aside className="absolute inset-y-0 left-12 z-30 w-[min(78vw,310px)] overflow-hidden border-r bg-background shadow-xl">
-                {sidePanelContent}
-              </aside>
-            )}
+            <Sheet open={compactLayout && sidePanelOpen} onOpenChange={setSidePanelOpen}>
+              <SheetContent side="left" className="flex flex-col gap-0 p-0 data-[side=left]:h-dvh data-[side=left]:w-[min(90vw,360px)] [&>button]:size-11" onOpenAutoFocus={event => {
+                event.preventDefault();
+                if (event.target instanceof HTMLElement) event.target.querySelector<HTMLButtonElement>('[data-slot="sheet-close"]')?.focus();
+              }}>
+                <SheetHeader className="shrink-0 border-b p-4 pr-14">
+                  <SheetTitle>{activityItems.find(item => item.id === activityView)?.label || (locale === "ro" ? "Setările editorului" : "Editor settings")}</SheetTitle>
+                  <SheetDescription className={activityView === "settings" ? "text-xs" : "sr-only"}>
+                    {activityView === "settings"
+                      ? locale === "ro" ? "Pe mobil, fontul are minimum 16 px, liniile se încadrează în ecran, iar minimap-ul este ascuns. Preferințele pentru desktop rămân salvate." : "On mobile, the font is at least 16 px, lines wrap to fit, and the minimap is hidden. Your desktop preferences stay saved."
+                      : locale === "ro" ? "Instrumentele proiectului curent" : "Current project tools"}
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="min-h-0 flex-1 overflow-auto">{compactLayout && sidePanelOpen ? sidePanelContent : null}</div>
+              </SheetContent>
+            </Sheet>
 
-            <ResizablePanelGroup orientation="horizontal" className="min-w-0 flex-1">
+            <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1">
               {!compactLayout && sidePanelOpen && (
                 <>
                   <ResizablePanel id="editor-sidebar" defaultSize="19%" minSize="200px" maxSize="380px">
@@ -2473,17 +2525,18 @@ END
                 </>
               )}
 
-              <ResizablePanel id="editor-main" defaultSize={!compactLayout && sidePanelOpen ? "81%" : "100%"} minSize="260px">
-                <div className="flex h-full min-h-0 min-w-0 flex-col">
+              <ResizablePanel id="editor-main" defaultSize={!compactLayout && sidePanelOpen ? "81%" : "100%"} minSize="260px" style={{ overflow: "hidden" }}>
+                <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
                   <ResizablePanelGroup orientation="vertical" className="min-h-0 flex-1">
-                    <ResizablePanel id="editor-surface" defaultSize={bottomPanelOpen ? "72%" : "100%"} minSize="240px">
-                      <main className="flex h-full min-h-0 min-w-0 flex-col bg-background">
+                    <ResizablePanel id="editor-surface" defaultSize={!compactLayout && bottomPanelOpen ? "72%" : "100%"} minSize={compactLayout ? "0%" : "240px"}>
+                      <main inert={compactLayout && bottomPanelOpen} className="flex h-full min-h-0 min-w-0 flex-col bg-background">
                         {editorTabs}
                         <CodeEditorContextMenu
                           code={code}
                           fileName={activeFile?.path ?? fileName}
                           onChange={handleCodeChange}
                           onRun={isRunnable ? handleRun : undefined}
+                          runShortcut={formatShortcut(shortcuts.run)}
                         >
                           <div data-tour="editor-code" className="min-h-0 flex-1 overflow-hidden">
                             <MiniScriptMonacoEditor
@@ -2492,21 +2545,26 @@ END
                               height="100%"
                               language={activeFile?.language ?? "text"}
                               path={activeFile?.path ?? fileName}
+                              modelScope={`workspace/${user?.id ?? "local"}/${savedId ?? "unsaved"}`}
+                              retainModels
                               value={code}
+                              liveErrors={editorPreferences.liveErrors}
                               onChange={handleCodeChange}
                               options={{
                                 contextmenu: false,
                                 padding: { top: 14, bottom: 20 },
                                 smoothScrolling: true,
-                                wordWrap: editorPreferences.wordWrap ? "on" : "off",
+                                wordWrap: compactLayout || editorPreferences.wordWrap ? "on" : "off",
                                 automaticLayout: true,
                                 cursorSmoothCaretAnimation: "on",
                                 cursorBlinking: "smooth",
-                                glyphMargin: isMiniScriptRuntime,
-                                fontSize: editorPreferences.fontSize,
+                                glyphMargin: !compactLayout && isMiniScriptRuntime,
+                                lineNumbersMinChars: compactLayout ? 3 : 5,
+                                folding: !compactLayout,
+                                fontSize: compactLayout ? Math.max(16, editorPreferences.fontSize) : editorPreferences.fontSize,
                                 fontLigatures: editorPreferences.fontLigatures,
                                 minimap: {
-                                  enabled: editorPreferences.minimap,
+                                  enabled: !compactLayout && editorPreferences.minimap,
                                   maxColumn: 90,
                                   showSlider: "mouseover",
                                   scale: 0.8,
@@ -2554,7 +2612,7 @@ END
                       </main>
                     </ResizablePanel>
 
-                    {bottomPanelOpen && (
+                    {!compactLayout && bottomPanelOpen && (
                       <>
                         <ResizableHandle />
                         <ResizablePanel id="editor-bottom-panel" defaultSize="28%" minSize="140px" maxSize="58%">
@@ -2563,8 +2621,9 @@ END
                       </>
                     )}
                   </ResizablePanelGroup>
+                  {compactLayout && bottomPanelOpen && <section aria-label={locale === "ro" ? "Rezultate și instrumente" : "Output and tools"} className="absolute inset-0 z-20 bg-background">{bottomTools}</section>}
 
-                  <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-muted/40 px-3 text-[11px] text-muted-foreground">
+                  <footer inert={compactLayout && bottomPanelOpen} className="flex h-11 shrink-0 items-center justify-between border-t bg-muted/40 px-3 pb-[env(safe-area-inset-bottom)] text-[11px] text-muted-foreground md:h-7 md:pb-0">
                     <div className="flex min-w-0 items-center gap-3">
                       <button
                         type="button"
@@ -2573,7 +2632,7 @@ END
                           setActivePanel("terminal");
                           setBottomPanelOpen(true);
                         }}
-                        className="inline-flex items-center gap-1 hover:text-foreground"
+                        className="inline-flex h-11 items-center gap-1 hover:text-foreground md:h-auto"
                       >
                         <Terminal size={12} />
                         {locale === "ro" ? "Terminal" : "Terminal"}

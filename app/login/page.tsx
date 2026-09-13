@@ -31,6 +31,8 @@ import {
 } from "@/lib/email-verification";
 import {
   getOnboardingPersona,
+  isValidUsername,
+  isValidUsernameInput,
   normalizeOnboardingUsername,
   productTourStorageKey,
   type OnboardingDraft,
@@ -650,6 +652,10 @@ export default function LoginPage() {
       showModal(t("common.error"), t("login.modal.usernameRequired"), "error");
       return;
     }
+    if (!isValidUsername(username.trim().toLowerCase())) {
+      showModal(t("common.error"), "Username: 3-24 caractere, doar litere, cifre, - și _.", "error");
+      return;
+    }
 
     if (!email.trim() || !password || loginTransitioning) return;
 
@@ -677,8 +683,12 @@ export default function LoginPage() {
   async function completeRegistrationOnboarding(draft: OnboardingDraft) {
     if (!registration) return false;
 
+    if (!isValidUsernameInput(draft.username)) {
+      toast.error("Username: 3-24 caractere, doar litere, cifre, - și _.");
+      return false;
+    }
     const normalizedUsername = normalizeOnboardingUsername(draft.username);
-    if (normalizedUsername.length < 3) {
+    if (!isValidUsername(normalizedUsername)) {
       toast.error(t("login.modal.usernameRequired"));
       return false;
     }
@@ -869,7 +879,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className={`fixed inset-0 z-40 overflow-y-auto bg-background ${
+      className={`absolute inset-0 z-40 overflow-y-auto bg-background ${
         loginTransitioning ? "login-screen-leave" : ""
       }`}
     >

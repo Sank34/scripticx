@@ -7,7 +7,6 @@ import {
   Download,
   LockKeyhole,
   Plus,
-  ShieldAlert,
   Trophy,
   Users,
 } from "lucide-react";
@@ -17,16 +16,7 @@ import { toast } from "sonner";
 
 import { useLanguage } from "@/components/LanguageProvider";
 import RouteGuard from "@/components/RouteGuard";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,11 +37,6 @@ import { competitionApiFetch } from "@/lib/competitionClient";
 import type { CompetitionSummary } from "@/lib/competitionTypes";
 import { supabase } from "@/lib/supabase";
 
-type PlatformStatus = {
-  lockdownEnabled: boolean;
-  message?: string | null;
-};
-
 function datetimeLocal(date: Date) {
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
@@ -65,14 +50,6 @@ function AdminCompetitionsContent() {
         title: "Competiții",
         subtitle: "Configurează programul, problemele, invitațiile, pauzele și clasamentele.",
         new: "Nouă",
-        maintenance: "Maintenance",
-        on: "Pornit",
-        off: "Oprit",
-        maintenanceDescription: "Oprește temporar accesul utilizatorilor. Administratorii rămân conectați.",
-        maintenanceMessage: "Mesaj de mentenanță",
-        maintenanceDefault: "Maintenance",
-        enable: "Pornește",
-        disable: "Oprește",
         emptyTitle: "Nicio competiție configurată",
         emptyDescription: "Creează un draft, adaugă probleme și publică-l când este gata.",
         participants: "participanți",
@@ -98,24 +75,12 @@ function AdminCompetitionsContent() {
         create: "Creează",
         creating: "Se creează...",
         created: "Competiția a fost creată ca draft.",
-        enabled: "Maintenance a fost pornit.",
-        disabled: "Platforma a fost redeschisă.",
         exportFailed: "Exportul nu a putut fi generat.",
-        warningTitle: "Pornești maintenance?",
-        warningDescription: "Accesul utilizatorilor va fi blocat imediat în pagini, API și RLS. Doar administratorii vor putea continua.",
       }
     : {
         title: "Competitions",
         subtitle: "Configure schedules, problems, invites, breaks, and leaderboards.",
         new: "New",
-        maintenance: "Maintenance",
-        on: "On",
-        off: "Off",
-        maintenanceDescription: "Temporarily pause user access. Administrators stay signed in.",
-        maintenanceMessage: "Maintenance message",
-        maintenanceDefault: "Maintenance",
-        enable: "Enable",
-        disable: "Disable",
         emptyTitle: "No competitions yet",
         emptyDescription: "Create a draft, add problems, and publish it when ready.",
         participants: "participants",
@@ -141,18 +106,10 @@ function AdminCompetitionsContent() {
         create: "Create",
         creating: "Creating...",
         created: "Competition created as a draft.",
-        enabled: "Maintenance enabled.",
-        disabled: "Platform reopened.",
         exportFailed: "Could not generate the export.",
-        warningTitle: "Enable maintenance?",
-        warningDescription: "User access will be blocked immediately across pages, APIs, and RLS. Only administrators will retain access.",
       };
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
-  const [lockdownWarningOpen, setLockdownWarningOpen] = useState(false);
-  const [lockdownMessage, setLockdownMessage] = useState(
-    copy.maintenanceDefault
-  );
   const [form, setForm] = useState(() => {
     const startsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     return {
@@ -171,16 +128,6 @@ function AdminCompetitionsContent() {
     queryFn: () => competitionApiFetch("/api/competitions?scope=admin"),
     staleTime: 30_000,
   });
-  const statusQuery = useQuery<PlatformStatus>({
-    queryKey: ["platform-status"],
-    queryFn: async () => {
-      const response = await fetch("/api/platform/status", { cache: "no-store" });
-      if (!response.ok) throw new Error("Could not read platform status");
-      return response.json();
-    },
-    staleTime: 10_000,
-  });
-
   const createMutation = useMutation({
     mutationFn: () =>
       competitionApiFetch<{ competition: { id: string } }>("/api/competitions", {
@@ -200,20 +147,6 @@ function AdminCompetitionsContent() {
       toast.success(copy.created);
       setCreateOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["admin", "competitions"] });
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const lockdownMutation = useMutation({
-    mutationFn: (enabled: boolean) =>
-      competitionApiFetch<{ settings: unknown }>("/api/admin/platform/lockdown", {
-        method: "POST",
-        body: JSON.stringify({ enabled, message: lockdownMessage }),
-      }),
-    onSuccess: async (_, enabled) => {
-      toast.success(enabled ? copy.enabled : copy.disabled);
-      setLockdownWarningOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ["platform-status"] });
     },
     onError: (error) => toast.error(error.message),
   });
@@ -238,7 +171,6 @@ function AdminCompetitionsContent() {
   }
 
   const competitions = competitionsQuery.data?.competitions || [];
-  const lockdownEnabled = statusQuery.data?.lockdownEnabled === true;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -251,18 +183,7 @@ function AdminCompetitionsContent() {
         <Button onClick={() => setCreateOpen(true)} className="gap-2"><Plus className="size-4" />{copy.new}</Button>
       </header>
 
-      <Card className={`border-2 ${lockdownEnabled ? "border-red-300 dark:border-red-800" : "border-border"}`}>
-        <CardContent className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex gap-4">
-            <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${lockdownEnabled ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300" : "bg-muted text-muted-foreground"}`}><ShieldAlert className="size-5" /></div>
-            <div>
-              <div className="flex items-center gap-2"><h2 className="font-semibold">{copy.maintenance}</h2><Badge variant={lockdownEnabled ? "destructive" : "secondary"}>{lockdownEnabled ? copy.on : copy.off}</Badge></div>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{copy.maintenanceDescription}</p>
-            </div>
-          </div>
-          <div className="flex min-w-0 flex-col gap-2 sm:min-w-[300px] sm:flex-row"><Input aria-label={copy.maintenanceMessage} value={lockdownMessage} onChange={(event) => setLockdownMessage(event.target.value)} maxLength={500} /><Button className="shrink-0" variant={lockdownEnabled ? "outline" : "destructive"} disabled={lockdownMutation.isPending} onClick={() => lockdownEnabled ? lockdownMutation.mutate(false) : setLockdownWarningOpen(true)}>{lockdownEnabled ? copy.disable : copy.enable}</Button></div>
-        </CardContent>
-      </Card>
+
 
       {competitionsQuery.isPending ? (
         <div className="space-y-3"><Skeleton className="h-28 rounded-2xl" /><Skeleton className="h-28 rounded-2xl" /></div>
@@ -289,9 +210,7 @@ function AdminCompetitionsContent() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={lockdownWarningOpen} onOpenChange={setLockdownWarningOpen}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle className="flex items-center gap-2"><ShieldAlert className="size-5 text-destructive" />{copy.warningTitle}</AlertDialogTitle><AlertDialogDescription>{copy.warningDescription}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{copy.cancel}</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => lockdownMutation.mutate(true)}>{copy.enable}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-      </AlertDialog>
+
     </div>
   );
 }

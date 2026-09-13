@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { BIRTHDAY_REWARD_IDS } from "@/lib/birthday";
+import { isRewardVisibleInShop } from "@/lib/rewards";
 import type {
   BadgeAutomaticRule,
   BadgeDefinition,
@@ -6,6 +8,8 @@ import type {
   RewardInventoryItem,
   RewardProduct,
 } from "@/lib/rewards";
+
+const INVENTORY_ONLY_REWARD_IDS = new Set<string>(BIRTHDAY_REWARD_IDS);
 
 type BadgeRow = {
   active: boolean | null;
@@ -352,7 +356,12 @@ export async function fetchRewardsShop(userId: string): Promise<RewardsShopData>
   if (inventoryResult.error) throw inventoryResult.error;
   if (profileResult.error) throw profileResult.error;
 
-  const products = ((productsResult.data || []) as RewardProductRow[]).map(normalizeProduct);
+  const products = ((productsResult.data || []) as RewardProductRow[])
+    .map(normalizeProduct)
+    .filter(
+      (product) =>
+        isRewardVisibleInShop(product) && !INVENTORY_ONLY_REWARD_IDS.has(product.id)
+    );
   const inventory = (inventoryResult.data || []).flatMap((row) => {
     const relation = Array.isArray(row.product) ? row.product[0] : row.product;
     if (!relation) return [];

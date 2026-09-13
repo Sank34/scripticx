@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import { calculateCompetitionPoints, getCompetitionPhase } from "@/lib/competitions";
@@ -33,17 +34,18 @@ type CompetitionProblemRow = {
 
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const { user, role } = await requireUser(request);
+    const { user, role, permissions } = await requireUser(request);
+    const managesCompetitions = hasPermission(role, permissions, "admin.competitions");
     const { id } = await context.params;
     const safeId = competitionId(id);
     const requestedUserId = new URL(request.url).searchParams.get("userId");
-    const userId = role === "admin" && requestedUserId ? requestedUserId : user.id;
-    if (userId !== user.id && role !== "admin") {
+    const userId = managesCompetitions && requestedUserId ? requestedUserId : user.id;
+    if (userId !== user.id && !managesCompetitions) {
       throw new HttpError(403, "Submission history is private");
     }
 
     const admin = createAdminSupabase();
-    if (role !== "admin") {
+    if (!managesCompetitions) {
       const { data: participant, error: participantError } = await admin
         .from("competition_participants")
         .select("status")

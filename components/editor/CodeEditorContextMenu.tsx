@@ -23,6 +23,7 @@ type CodeEditorContextMenuProps = {
   fileName?: string;
   onChange?: (code: string) => void;
   onRun?: () => void;
+  runShortcut?: string;
   onSubmit?: () => void;
   readOnly?: boolean;
   submitDisabled?: boolean;
@@ -36,6 +37,7 @@ export function CodeEditorContextMenu({
   fileName = "main.msp",
   onChange,
   onRun,
+  runShortcut,
   onSubmit,
   readOnly = false,
   submitDisabled = false,
@@ -110,6 +112,7 @@ export function CodeEditorContextMenu({
           <ContextMenuItem onSelect={onRun}>
             <Play size={14} />
             Run
+            {runShortcut && <ContextMenuShortcut>{runShortcut}</ContextMenuShortcut>}
           </ContextMenuItem>
         )}
 

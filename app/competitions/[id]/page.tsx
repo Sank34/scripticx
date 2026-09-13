@@ -1,5 +1,8 @@
 "use client";
 
+import { useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts";
+import { formatShortcut } from "@/lib/keyboard-shortcuts";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlarmClock,
@@ -165,7 +168,7 @@ function CompetitionDetailContent() {
   const copy = ro
     ? {
         loadFailed: "Competiția nu a putut fi încărcată.",
-        privateDescription: "Această competiție este privată. Introdu codul primit de la organizator.",
+        privateDescription: "Această competiție este doar pe bază de invitație. Folosește codul primit sau cere organizatorului să-ți adauge username-ul.",
         inviteCode: "Cod de invitație",
         checking: "Se verifică...",
         accept: "Acceptă",
@@ -225,7 +228,7 @@ function CompetitionDetailContent() {
       }
     : {
         loadFailed: "Could not load the competition.",
-        privateDescription: "This competition is private. Enter the code provided by the organizer.",
+        privateDescription: "This competition is invite-only. Use an organizer code, or ask the organizer to add your username.",
         inviteCode: "Invite code",
         checking: "Checking...",
         accept: "Accept",
@@ -474,18 +477,8 @@ function CompetitionDetailContent() {
     submitSolution(selectedProblem.id);
   }, [canSubmitSelectedProblem, selectedProblem, submitSolution]);
 
-  useEffect(() => {
-    function handleSubmitShortcut(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") return;
-      if (!canSubmitSelectedProblem) return;
-
-      event.preventDefault();
-      submitSelectedProblem();
-    }
-
-    window.addEventListener("keydown", handleSubmitShortcut);
-    return () => window.removeEventListener("keydown", handleSubmitShortcut);
-  }, [canSubmitSelectedProblem, submitSelectedProblem]);
+  const { bindings: shortcuts } = useKeyboardShortcuts();
+  useShortcut("submit", submitSelectedProblem, canSubmitSelectedProblem, true);
 
   const remaining = competition
     ? formatCompetitionDuration(getRemainingMilliseconds(competition.ends_at, now))
@@ -545,7 +538,7 @@ function CompetitionDetailContent() {
             {registrationOpen && (
               <>
                 <Input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} placeholder={copy.inviteCode} />
-                <Button className="w-full" onClick={() => joinMutation.mutate()} disabled={!inviteCode.trim() || joinMutation.isPending}>
+                <Button className="w-full" onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>
                   {joinMutation.isPending ? copy.checking : copy.accept}
                 </Button>
               </>
@@ -703,7 +696,7 @@ function CompetitionDetailContent() {
                     onChange={(value) => selectedProblem && setCodeByProblem((current) => ({ ...current, [selectedProblem.id]: value }))}
                     onSubmit={submitSelectedProblem}
                     submitDisabled={!canSubmitSelectedProblem}
-                    submitShortcut="⌘/Ctrl ↵"
+                    submitShortcut={formatShortcut(shortcuts.submit)}
                   >
                     <div className="min-h-0 flex-1">
                       <MiniScriptMonacoEditor
@@ -735,7 +728,7 @@ function CompetitionDetailContent() {
                     >
                       {submitMutation.isPending ? <Clock3 className="size-4 animate-spin" /> : <Play className="size-4" />}
                       {competition.phase === "break" ? copy.paused : copy.submit}
-                      <Kbd className="ml-1 hidden bg-white/15 text-[10px] text-white sm:inline-flex">⌘/Ctrl ↵</Kbd>
+                      {shortcuts.submit && <Kbd className="ml-1 hidden sm:inline-flex">{formatShortcut(shortcuts.submit)}</Kbd>}
                     </Button>
                   </div>
                 </div>

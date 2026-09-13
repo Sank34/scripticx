@@ -7,9 +7,19 @@ import {
   needsOnboarding,
   normalizeOnboardingUsername,
   onboardingMetadataKeys,
+  shouldShowLegacyAlphaWelcome,
+  legacyAlphaCohortKey,
 } from "@/lib/onboarding";
 
 describe("onboarding metadata", () => {
+  it("welcomes only the server-marked legacy cohort with unfinished onboarding", () => {
+    const legacy = { app_metadata: { [legacyAlphaCohortKey]: true }, user_metadata: { [onboardingMetadataKeys.required]: true } };
+    expect(shouldShowLegacyAlphaWelcome(legacy)).toBe(true);
+    expect(shouldShowLegacyAlphaWelcome({ user_metadata: legacy.user_metadata })).toBe(false);
+    expect(shouldShowLegacyAlphaWelcome({ app_metadata: legacy.app_metadata, user_metadata: { ...legacy.user_metadata, [onboardingMetadataKeys.completedAt]: "2026-09-13" } })).toBe(false);
+    expect(shouldShowLegacyAlphaWelcome({ app_metadata: legacy.app_metadata, user_metadata: { ...legacy.user_metadata, [onboardingMetadataKeys.legacyWelcomeSeenAt]: "2026-09-13" } })).toBe(false);
+    expect(shouldShowLegacyAlphaWelcome({ user_metadata: { ...legacy.user_metadata, [legacyAlphaCohortKey]: true } })).toBe(false);
+  });
   it("only requires onboarding for explicitly marked unfinished accounts", () => {
     expect(needsOnboarding(undefined)).toBe(false);
     expect(

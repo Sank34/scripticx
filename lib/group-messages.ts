@@ -5,9 +5,23 @@ export type GroupMessageToken =
   | { type: "sticker"; token: string; value: string };
 
 const groupMessagePattern =
-  /(^|[^\w@])@([a-zA-Z0-9_-]+)|(\/(?:editor\/)?live\/[a-f0-9-]+)|(:sticker-[a-f0-9-]+:)/gi;
+  /(^|[^\w@])@([a-zA-Z0-9_-]+)|(\/(?:editor\/)?live\/[a-f0-9-]+)|(:[a-z0-9][a-z0-9_-]{0,63}:)/gi;
 
-export function getInlineStickerToken(sticker: { id: string }) {
+export function emojiShortcode(name: string) {
+  return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^[_-]+|[_-]+$/g, "").slice(0, 32);
+}
+
+export const GROUP_EMOJI_SHORTCODES: Record<string, string> = {
+  smile: "😃", grinning: "😀", laugh: "😄", joy: "😂", rofl: "🤣", blush: "😊",
+  heart: "❤️", heart_eyes: "😍", sunglasses: "😎", thinking: "🤔", sob: "😭",
+  cry: "😢", fire: "🔥", tada: "🎉", clap: "👏", thumbsup: "👍", thumbsdown: "👎",
+  wave: "👋", rocket: "🚀", eyes: "👀", check: "✅", white_check_mark: "✅",
+  star: "⭐", sparkles: "✨", pray: "🙏", muscle: "💪",100: "💯", party: "🥳",
+};
+
+export function getInlineStickerToken(sticker: { id: string; name?: string }) {
+  const name = sticker.name ? emojiShortcode(sticker.name) : "";
+  if (name) return `:${name}:`;
   return `:sticker-${sticker.id}:`;
 }
 

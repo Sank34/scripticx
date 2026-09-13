@@ -55,3 +55,13 @@ await cp(excalidrawFontsSource, excalidrawFontsTarget, {
 });
 
 console.log("Prepared same-origin Monaco and Excalidraw assets.");
+const syntaxTarget = path.join(projectRoot, "public", "syntax");
+await mkdir(syntaxTarget, { recursive: true });
+for (const file of ["tree-sitter.js", "tree-sitter.wasm"]) {
+  await cp(path.join(projectRoot, "node_modules", "web-tree-sitter", file), path.join(syntaxTarget, file));
+}
+await cp(path.join(projectRoot, "node_modules", "js-yaml", "dist", "js-yaml.min.js"), path.join(syntaxTarget, "js-yaml.js"));
+for (const language of ["python", "c", "cpp", "java", "c_sharp", "go", "rust", "html", "bash"]) {
+  const file = `tree-sitter-${language}.wasm`;
+  await cp(path.join(projectRoot, "node_modules", "tree-sitter-wasms", "out", file), path.join(syntaxTarget, file));
+}

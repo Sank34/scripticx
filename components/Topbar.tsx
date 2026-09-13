@@ -89,13 +89,15 @@ export function Topbar() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [themeMounted, setThemeMounted] = useState(false);
   const themeTransitionId = useRef(0);
+  const themeTransitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestedTheme = useRef<string | undefined>(theme);
 
   useEffect(() => {
     setThemeMounted(true);
 
     return () => {
-      document.documentElement.classList.remove("theme-transition");
+      if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
+      document.documentElement.classList.remove("theme-transition", "theme-color-transition");
     };
   }, []);
 
@@ -140,12 +142,32 @@ export function Topbar() {
       setTheme(nextTheme);
     };
 
-    if (reduceMotion || !viewTransitionDocument.startViewTransition) {
+    const transitionId = ++themeTransitionId.current;
+    if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
+    root.classList.remove("theme-color-transition");
+
+    if (reduceMotion) {
+      root.classList.remove("theme-transition");
       applyTheme();
       return;
     }
 
-    const transitionId = ++themeTransitionId.current;
+    const applyWithColorTransition = () => {
+      root.classList.remove("theme-transition");
+      root.classList.add("theme-color-transition");
+      // Commit the transition rules before changing the theme colors.
+      void getComputedStyle(root).backgroundColor;
+      applyTheme();
+      themeTransitionTimer.current = setTimeout(() => {
+        root.classList.remove("theme-color-transition");
+      }, 400);
+    };
+
+    if (!viewTransitionDocument.startViewTransition) {
+      applyWithColorTransition();
+      return;
+    }
+
     const finishTransition = () => {
       if (themeTransitionId.current === transitionId) {
         root.classList.remove("theme-transition");
@@ -162,7 +184,7 @@ export function Topbar() {
       void transition.finished.then(finishTransition, finishTransition);
     } catch {
       if (themeTransitionId.current === transitionId) {
-        applyTheme();
+        applyWithColorTransition();
       }
       finishTransition();
     }
@@ -265,7 +287,7 @@ export function Topbar() {
 
         {user ? (
           <>
-            <AttentionPopover isAdmin={profile?.role === "admin"} />
+            <AttentionPopover />
 
             <NotificationsPopover user={user} />
 

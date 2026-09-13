@@ -82,6 +82,9 @@ export function EditorSettingsPanel({
           <h3 id="editor-settings-intelligence" className="text-[11px] font-semibold text-foreground">
             {ro ? "Inteligența editorului" : "Editor intelligence"}
           </h3>
+          <SettingRow checked={preferences.liveErrors} onCheckedChange={(value) => update("liveErrors", value)}
+            label={ro ? "Evidențiere erori live" : "Live error highlighting"}
+            description={ro ? "Verifică sintaxa în timp ce scrii, fără a executa codul." : "Check syntax as you type, without running code."} />
           <SettingRow
             label={ro ? "Completare automată" : "Auto completion"}
             description={ro ? "Sugerează sintaxă, funcții și snippets în timp ce scrii." : "Suggest syntax, functions and snippets while you type."}

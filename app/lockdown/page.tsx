@@ -21,7 +21,8 @@ function LockdownContent() {
   const ro = locale === "ro";
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAdmin, loading } = useAuth();
+  const { can, canAccessAdmin, loading } = useAuth();
+  const isAdmin = can("maintenance.bypass");
   const [checking, setChecking] = useState(false);
   const statusQuery = useQuery<PlatformStatus>({
     queryKey: ["platform-status"],
@@ -61,7 +62,7 @@ function LockdownContent() {
         isAdmin && next?.startsWith("/") && !next.startsWith("//")
           ? next
           : isAdmin
-            ? "/admin"
+            ? (canAccessAdmin ? "/admin" : "/dashboard")
             : "/"
       );
       router.refresh();
@@ -109,7 +110,7 @@ function LockdownContent() {
 
           <Button onClick={retryAccess} disabled={checking || loading} className="gap-2">
             <RefreshCw className={`size-4 ${checking ? "animate-spin" : ""}`} />
-            {isAdmin ? "Admin" : ro ? "Reîncearcă" : "Retry"}
+            {isAdmin ? (ro ? "Continuă" : "Continue") : ro ? "Reîncearcă" : "Retry"}
           </Button>
         </CardContent>
       </Card>

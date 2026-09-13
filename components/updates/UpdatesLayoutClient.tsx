@@ -40,6 +40,8 @@ export default function UpdatesLayoutClient({ children }: { children: React.Reac
   const { data: updates = [], isLoading, isError } = useQuery({
     queryKey: ["updates"],
     queryFn: () => fetchUpdates(),
+    staleTime: 60_000,
+    refetchOnMount: "always",
   });
   const latestSlug = updates[0]?.slug;
 

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
+import { resolveCodeBlockLanguage } from "@/lib/code-block-language";
+import { getNoteCodeLanguageLabel } from "@/lib/note-code-languages";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -22,12 +25,16 @@ export function Markdown({
   className,
   eagerImages = false,
   headingAnchors = false,
+  highlightCode = false,
+  codeLocale = "en",
   workspaceImageUserId,
 }: {
   children: string;
   className?: string;
   eagerImages?: boolean;
   headingAnchors?: boolean;
+  highlightCode?: boolean;
+  codeLocale?: string;
   workspaceImageUserId?: string;
 }) {
   return (
@@ -158,11 +165,35 @@ export function Markdown({
               </code>
             );
           },
-          pre: ({ children }) => (
-            <pre className="overflow-x-auto rounded-xl bg-zinc-900 p-4 text-sm leading-6">
-              {children}
-            </pre>
-          ),
+          pre: ({ children, node }) => {
+            const codeNode = node?.children.find(
+              (child) => child.type === "element" && child.tagName === "code",
+            );
+            if (highlightCode && codeNode?.type === "element") {
+              const classes = codeNode.properties.className;
+              const rawLanguage = (Array.isArray(classes) ? classes.join(" ") : String(classes ?? ""))
+                .match(/language-([^\s]+)/)?.[1];
+              const code = codeNode.children
+                .map((child) => child.type === "text" ? child.value : "")
+                .join("").replace(/\n$/, "");
+              return (
+                <HighlightedCodeBlock
+                  code={code}
+                  language={resolveCodeBlockLanguage(rawLanguage)}
+                  languageLabel={getNoteCodeLanguageLabel(rawLanguage)}
+                  copiedLabel={codeLocale === "ro" ? "Cod copiat" : "Code copied"}
+                  copyLabel={codeLocale === "ro" ? "Copiază codul" : "Copy code"}
+                  copyErrorLabel={codeLocale === "ro" ? "Codul nu a putut fi copiat" : "Could not copy code"}
+                  emptyLabel={codeLocale === "ro" ? "Bloc de cod gol" : "Empty code block"}
+                />
+              );
+            }
+            return (
+              <pre className="overflow-x-auto rounded-xl bg-zinc-900 p-4 text-sm leading-6">
+                {children}
+              </pre>
+            );
+          },
           hr: () => <Separator className="my-8" />,
           table: ({ children }) => (
             <div

@@ -1,5 +1,7 @@
 "use client";
 
+import { updatePublicationDate } from "@/lib/update-publication";
+
 import { useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -129,6 +131,7 @@ function UpdatePreview({
   tagLabel: string;
   title: string;
 }) {
+  const { locale } = useLanguage();
   return (
     <article className="mx-auto w-full max-w-3xl px-6 py-10 sm:px-10 lg:py-14">
       <div className="border-b pb-7">
@@ -142,7 +145,7 @@ function UpdatePreview({
       </div>
       <div className="pt-7">
         {content.trim() ? (
-          <Markdown className="text-[15px] leading-7 sm:text-base sm:leading-8">
+          <Markdown highlightCode codeLocale={locale} className="text-[15px] leading-7 sm:text-base sm:leading-8">
             {content}
           </Markdown>
         ) : (
@@ -274,7 +277,7 @@ export function UpdateForm({
   const [contentI18n, setContentI18n] = useState<LocalizedString>(normalizedContent);
   const [slug, setSlug] = useState(initialData?.slug || "");
   const [slugTouched, setSlugTouched] = useState(Boolean(initialData?.id));
-  const [date, setDate] = useState(initialData?.date || new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(initialData?.date || updatePublicationDate());
   const [tag, setTag] = useState<UpdateTag | "">(initialData?.tag || "");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [inlineMode, setInlineMode] = useState<EditorMode>("split");

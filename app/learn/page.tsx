@@ -237,7 +237,7 @@ function calculateLessonStreak(progress: StoredProgress) {
 export default function LearnRoadmapPage() {
   const { locale } = useLanguage();
   const { user, loading: authLoading } = useAuth();
-  const lessonLocale = locale as LessonLocale;
+  const lessonLocale: LessonLocale = locale === "ro" ? "ro" : "en";
   const c = copy[lessonLocale] ?? copy.en;
   const [progress, setProgress] = useState<StoredProgress>({});
   const [solvedProblemCodes, setSolvedProblemCodes] = useState<number[]>([]);

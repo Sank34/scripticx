@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@/hooks/useAuth";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -244,7 +245,9 @@ function AttentionEntryRow({
   );
 }
 
-export function AttentionPopover({ isAdmin }: { isAdmin: boolean }) {
+export function AttentionPopover() {
+  const { can } = useAuth();
+  const isAdmin = can("admin.tasks");
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -259,14 +262,14 @@ export function AttentionPopover({ isAdmin }: { isAdmin: boolean }) {
   const countsQuery = useQuery({
     queryKey: ["admin", "counts"],
     queryFn: fetchAdminCounts,
-    enabled: isAdmin,
+    enabled: isAdmin && can("admin.analytics"),
     staleTime: STALE_TIME,
   });
 
   const overviewQuery = useQuery({
     queryKey: ["admin", "overview"],
     queryFn: fetchAdminOverview,
-    enabled: isAdmin,
+    enabled: isAdmin && can("admin.analytics"),
     staleTime: STALE_TIME,
   });
 

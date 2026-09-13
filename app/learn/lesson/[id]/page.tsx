@@ -93,7 +93,7 @@ async function persistLessonProgress(userId: string, lessonId: string, progress:
 export default function LessonPage() {
   const { locale } = useLanguage();
   const { user, loading: authLoading } = useAuth();
-  const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
+  const lessonLocale: LessonLocale = locale === "ro" ? "ro" : "en";
   const c = copy[lessonLocale];
   const lessonId = useLessonId();
   const roadmap = useRoadmapConfig();

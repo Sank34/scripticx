@@ -1,3 +1,4 @@
+import { updatePublicationDate } from "@/lib/update-publication";
 import type { Metadata } from "next";
 
 import {
@@ -15,7 +16,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const supabase = createServerSupabase();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = updatePublicationDate();
   const { data: update } = await supabase
     .from("updates")
     .select("title_i18n, content_i18n")

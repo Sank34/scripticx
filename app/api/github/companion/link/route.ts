@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import {
@@ -26,7 +27,7 @@ export const runtime = "nodejs";
 
 type TargetKind = "class" | "project";
 
-async function requireManagedClass(userId: string, role: string, classId: string) {
+async function requireManagedClass(userId: string, managesClasses: boolean, classId: string) {
   const admin = createAdminSupabase();
   const { data: classRow, error: classError } = await admin
     .from("classes")
@@ -35,7 +36,7 @@ async function requireManagedClass(userId: string, role: string, classId: string
     .maybeSingle<{ id: string; teacher_id: string }>();
   if (classError) throw classError;
   if (!classRow) throw new HttpError(404, "Class not found");
-  if (role === "admin" || classRow.teacher_id === userId) return classRow;
+  if (managesClasses || classRow.teacher_id === userId) return classRow;
   const { data: membership, error: membershipError } = await admin
     .from("class_members")
     .select("role")
@@ -57,7 +58,8 @@ function parseTargetKind(value: unknown): TargetKind {
 
 export async function POST(request: Request) {
   try {
-    const { role, user } = await requireUser(request);
+    const { role, user, permissions } = await requireUser(request);
+    const managesClasses = hasPermission(role, permissions, "admin.classes");
     const body = jsonObject(await readJsonBody(request, 8_000));
     const targetKind = parseTargetKind(body.targetKind);
     const targetId = stringField(body.targetId, { min: 1, max: 100 });
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
     }
 
     if (targetKind === "project") await requireOwnedProject(user.id, targetId);
-    else await requireManagedClass(user.id, role, targetId);
+    else await requireManagedClass(user.id, managesClasses, targetId);
 
     const { repository, token } = await requireRepositoryForUser({
       installationId,
@@ -175,7 +177,8 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const { role, user } = await requireUser(request);
+    const { role, user, permissions } = await requireUser(request);
+    const managesClasses = hasPermission(role, permissions, "admin.classes");
     const params = new URL(request.url).searchParams;
     const targetKind = parseTargetKind(params.get("targetKind"));
     const targetId = params.get("targetId")?.trim() || "";
@@ -192,7 +195,7 @@ export async function DELETE(request: Request) {
         .eq("user_id", user.id);
       if (error) throw error;
     } else {
-      await requireManagedClass(user.id, role, targetId);
+      await requireManagedClass(user.id, managesClasses, targetId);
       if (!Number.isSafeInteger(repositoryId) || repositoryId <= 0) {
         throw new HttpError(400, "Repository ID is required");
       }

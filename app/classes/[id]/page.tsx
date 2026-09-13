@@ -113,7 +113,7 @@ function AssignmentDialog({ classId, className, userId, locale, onCreated }: { c
 }
 
 export default function ClassPage() {
-  const params = useParams<{ id: string }>(); const router = useRouter(); const queryClient = useQueryClient(); const { user, isAdmin, loading: authLoading } = useAuth(); const { locale: activeLocale } = useLanguage(); const locale: Locale = activeLocale === "ro" ? "ro" : "en"; const c = copy[locale]; const classId = params.id;
+  const params = useParams<{ id: string }>(); const router = useRouter(); const queryClient = useQueryClient(); const { user, can, loading: authLoading } = useAuth(); const isAdmin = can("admin.classes"); const { locale: activeLocale } = useLanguage(); const locale: Locale = activeLocale === "ro" ? "ro" : "en"; const c = copy[locale]; const classId = params.id;
   const hubQuery = useQuery({ queryKey: ["classes", "hub", classId, user?.id, isAdmin], queryFn: () => loadClassHub(supabase, { classId, userId: user!.id, isAdmin }), enabled: Boolean(classId && user?.id) && !authLoading, staleTime: 60_000 });
   const hub = hubQuery.data; const refresh = () => queryClient.invalidateQueries({ queryKey: ["classes", "hub", classId] });
   const [announcementOpen, setAnnouncementOpen] = useState(false); const [announcementTitle, setAnnouncementTitle] = useState(""); const [announcementBody, setAnnouncementBody] = useState("");

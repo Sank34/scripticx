@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     if (typeof body.enabled !== "boolean") {
       throw new HttpError(400, "Invalid lockdown state");
     }
+    const mode = body.mode === "competition" ? "competition" : "maintenance";
     const message = stringField(
       body.message || "Maintenance",
       { min: 3, max: 500 }
@@ -30,12 +31,13 @@ export async function POST(request: Request) {
       .upsert({
         id: "global",
         lockdown_enabled: body.enabled,
+        lockdown_mode: mode,
         lockdown_message: message,
         lockdown_enabled_at: body.enabled ? now : null,
         lockdown_enabled_by: body.enabled ? user.id : null,
         updated_at: now,
       })
-      .select("lockdown_enabled, lockdown_message, lockdown_enabled_at, updated_at")
+      .select("lockdown_enabled, lockdown_mode, lockdown_message, lockdown_enabled_at, updated_at")
       .single();
     if (error) throw error;
 

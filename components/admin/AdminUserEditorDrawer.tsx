@@ -1,4 +1,6 @@
 "use client";
+import { useAuth } from "@/hooks/useAuth";
+import { normalizeAdminPoints } from "@/lib/admin-points";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -44,6 +46,7 @@ export type AdminManagedUser = {
   pronouns: string | null;
   reward_points: number | null;
   role: string;
+  platform_user_roles?: { role_id: string; platform_roles: { name: string } | null }[];
   total_score: number | null;
   username: string | null;
 };
@@ -69,6 +72,7 @@ export function AdminUserEditorDrawer({
   saving,
   user,
 }: AdminUserEditorDrawerProps) {
+  const { isAdmin: fullAdmin } = useAuth();
   const ro = locale === "ro";
   const copy = ro
     ? {
@@ -126,6 +130,7 @@ export function AdminUserEditorDrawer({
   const [pronouns, setPronouns] = useState("");
   const [role, setRole] = useState("user");
   const [banned, setBanned] = useState(false);
+  const lastPointsEdit = useRef<"total" | "available">("available");
   const [totalScore, setTotalScore] = useState("0");
   const [rewardPoints, setRewardPoints] = useState("0");
 
@@ -140,6 +145,7 @@ export function AdminUserEditorDrawer({
     setRole(user.role || "user");
     setBanned(Boolean(user.banned));
     setTotalScore(String(user.total_score || 0));
+    lastPointsEdit.current = "available";
     setRewardPoints(String(user.reward_points || 0));
   }, [open, user]);
 
@@ -174,6 +180,7 @@ export function AdminUserEditorDrawer({
   }
 
   async function submit() {
+    const points = normalizeAdminPoints(totalScore, rewardPoints, lastPointsEdit.current);
     const formData = new FormData();
     formData.set("username", username);
     formData.set("avatar_url", avatarUrl);
@@ -181,8 +188,8 @@ export function AdminUserEditorDrawer({
     formData.set("pronouns", pronouns);
     formData.set("role", role);
     formData.set("banned", String(banned));
-    formData.set("total_score", totalScore);
-    formData.set("reward_points", rewardPoints);
+    formData.set("total_score", String(points.totalScore));
+    formData.set("reward_points", String(points.rewardPoints));
     if (avatarFile) formData.set("avatar", avatarFile);
     await onSave(userId, formData);
   }
@@ -281,7 +288,7 @@ export function AdminUserEditorDrawer({
               <section className="space-y-4">
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   {copy.role}
-                  <Select value={role} onValueChange={setRole} disabled={isSelf}>
+                  <Select value={role} onValueChange={setRole} disabled={isSelf || !fullAdmin}>
                     <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="user">User</SelectItem>
@@ -308,13 +315,20 @@ export function AdminUserEditorDrawer({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     {copy.totalScore}
-                    <Input type="number" min={0} step={1} value={totalScore} onChange={(event) => setTotalScore(event.target.value)} />
+                    <Input type="number" min={0} max={1_000_000_000} step={1} value={totalScore} onChange={(event) => { lastPointsEdit.current = "total"; setTotalScore(event.target.value); }} onBlur={() => {
+                      const points = normalizeAdminPoints(totalScore, rewardPoints, "total");
+                      setTotalScore(String(points.totalScore)); setRewardPoints(String(points.rewardPoints));
+                    }} />
                   </label>
                   <label className="flex flex-col gap-2 text-sm font-medium">
                     {copy.rewardPoints}
-                    <Input type="number" min={0} step={1} value={rewardPoints} onChange={(event) => setRewardPoints(event.target.value)} />
+                    <Input type="number" min={0} max={1_000_000_000} step={1} value={rewardPoints} onChange={(event) => { lastPointsEdit.current = "available"; setRewardPoints(event.target.value); }} onBlur={() => {
+                      const points = normalizeAdminPoints(totalScore, rewardPoints, "available");
+                      setTotalScore(String(points.totalScore)); setRewardPoints(String(points.rewardPoints));
+                    }} />
                   </label>
                 </div>
+                <p className="text-xs text-muted-foreground">{ro ? "La ieșirea din câmp, valorile se ajustează automat: disponibilul nu poate depăși scorul total." : "Values adjust when you leave the field: available points cannot exceed the total score."}</p>
               </section>
 
               <Separator />

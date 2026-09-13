@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@source not "../disabled";
+
 @custom-variant dark (&:is(.dark *));
 
 nextjs-portal {
@@ -176,6 +178,101 @@ nextjs-portal {
   --sx-shadow-overlay: 0 26px 72px -24px oklch(0 0 0 / 0.72);
 }
 
+/* Optional presentation mode for projectors and color-vision differences.
+ * The palette changes through the same semantic tokens as the regular theme,
+ * so components keep their shape and hierarchy while surfaces separate clearly.
+ */
+html.accessibility-mode {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #123b73;
+  --primary-foreground: #ffffff;
+  --secondary: #e2e8f0;
+  --secondary-foreground: #172033;
+  --muted: #eef2f7;
+  --muted-foreground: #334155;
+  --accent: #dbeafe;
+  --accent-foreground: #123b73;
+  --border: #64748b;
+  --input: #64748b;
+  --ring: #0f5bd3;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #123b73;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dbeafe;
+  --sidebar-accent-foreground: #123b73;
+  --sidebar-border: #64748b;
+  --sidebar-ring: #0f5bd3;
+  --sx-success: #166534;
+  --sx-success-soft: #dcfce7;
+  --sx-warning: #854d0e;
+  --sx-warning-soft: #fef3c7;
+  --sx-info: #075985;
+  --sx-info-soft: #e0f2fe;
+}
+
+html.dark.accessibility-mode {
+  color-scheme: dark;
+  --background: #0b1220;
+  --foreground: #f8fafc;
+  --card: #111c2e;
+  --card-foreground: #f8fafc;
+  --popover: #111c2e;
+  --popover-foreground: #f8fafc;
+  --primary: #bfdbfe;
+  --primary-foreground: #102a4c;
+  --secondary: #24344d;
+  --secondary-foreground: #f8fafc;
+  --muted: #1b2a40;
+  --muted-foreground: #d1d9e6;
+  --accent: #263f68;
+  --accent-foreground: #f8fafc;
+  --border: #94a3b8;
+  --input: #94a3b8;
+  --ring: #93c5fd;
+  --sidebar: #0f1a2d;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #bfdbfe;
+  --sidebar-primary-foreground: #102a4c;
+  --sidebar-accent: #263f68;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #94a3b8;
+  --sidebar-ring: #93c5fd;
+  --sx-success: #86efac;
+  --sx-success-soft: #153b2a;
+  --sx-warning: #fcd34d;
+  --sx-warning-soft: #493713;
+  --sx-info: #7dd3fc;
+  --sx-info-soft: #123653;
+}
+
+html.accessibility-mode :where(.sx-surface, [data-slot="card"], [data-slot="popover"], [data-slot="dialog-content"]) {
+  border-width: 2px;
+  box-shadow: 0 2px 0 color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+html.accessibility-mode :where(a:not([data-slot="button"]), [role="link"]) {
+  text-decoration-line: underline;
+  text-decoration-thickness: 0.1em;
+  text-underline-offset: 0.16em;
+}
+
+html.accessibility-mode :where(button, [role="button"], input, textarea, select):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+html.accessibility-mode [data-slot="badge"] {
+  border-width: 1px;
+  font-weight: 700;
+}
+
 /* Small, composable contracts used by new and migrated product screens. */
 .sx-page {
   margin-inline: auto;
@@ -203,6 +300,27 @@ nextjs-portal {
 
 .sx-overlay {
   box-shadow: var(--sx-shadow-overlay);
+}
+
+/* The tour keeps page scrolling available while removing browser chrome that
+   competes with the guided card. The class is mounted only for ProductTour. */
+.sx-tour-active,
+.sx-tour-active body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sx-tour-active::-webkit-scrollbar,
+.sx-tour-active body::-webkit-scrollbar,
+.sx-tour-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sx-tour-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 /* Functional patterns: transparency and canvas grids are tools, not decoration. */
@@ -260,25 +378,35 @@ html.theme-transition *::after {
 
 html.theme-transition::view-transition-old(root),
 html.theme-transition::view-transition-new(root) {
-  animation-duration: 220ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   mix-blend-mode: normal;
 }
 
 html.theme-transition::view-transition-old(root) {
-  animation-name: theme-fade-out;
+  animation: none;
+  opacity: 1;
 }
 
 html.theme-transition::view-transition-new(root) {
   animation-name: theme-fade-in;
 }
 
-@keyframes theme-fade-out {
-  to { opacity: 0; }
-}
-
 @keyframes theme-fade-in {
   from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-color-transition,
+  html.theme-color-transition *,
+  html.theme-color-transition *::before,
+  html.theme-color-transition *::after {
+    transition-property: background-color, color, border-color, box-shadow, fill, stroke !important;
+    transition-duration: 360ms !important;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition-delay: 0s !important;
+  }
 }
 
 /*

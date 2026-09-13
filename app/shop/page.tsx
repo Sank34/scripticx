@@ -402,7 +402,7 @@ function ShopContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="rewards-shop">
       <section className="rounded-[var(--sx-radius-panel)] border bg-muted/40 p-6 sm:p-8">
         <div className="grid gap-7 lg:grid-cols-[1fr_310px] lg:items-end">
           <div className="max-w-2xl">

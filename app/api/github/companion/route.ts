@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import {
@@ -22,7 +23,8 @@ type ClassRow = {
 
 export async function GET(request: Request) {
   try {
-    const { role, user } = await requireUser(request);
+    const { role, user, permissions } = await requireUser(request);
+    const managesClasses = hasPermission(role, permissions, "admin.classes");
     getGitHubAppConfig();
     const admin = createAdminSupabase();
 
@@ -37,7 +39,7 @@ export async function GET(request: Request) {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(100),
-      role === "admin"
+      managesClasses
         ? Promise.resolve({ data: [], error: null })
         : admin
             .from("class_members")
@@ -63,7 +65,7 @@ export async function GET(request: Request) {
     if (installationsResult.error) throw installationsResult.error;
 
     let classes: ClassRow[] = [];
-    if (role === "admin") {
+    if (managesClasses) {
       const { data, error } = await admin
         .from("classes")
         .select("id,name,subject,teacher_id,archived_at")

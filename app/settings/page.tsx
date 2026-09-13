@@ -19,6 +19,8 @@ import {
 
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
+import { KeyboardShortcutsCard } from "@/components/settings/KeyboardShortcutsCard";
+import { AccessibilityModeCard } from "@/components/settings/AccessibilityModeCard";
 import type { EquippedRewards } from "@/lib/rewards";
 import {
   MAX_PROFILE_PRONOUNS_LENGTH,
@@ -739,6 +741,8 @@ function SettingsContent() {
       <div id="email-preferences" className="scroll-mt-24">
         <EmailPreferencesCard />
       </div>
+      <KeyboardShortcutsCard />
+      <AccessibilityModeCard />
         </main>
 
         <aside className="lg:sticky lg:top-24">

@@ -16,7 +16,8 @@ export function ClassesAccessGuard({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const router = useRouter();
-  const { isAdmin, loading, user } = useAuth();
+  const { can, loading: authLoading, permissionsLoading, user } = useAuth();
+  const loading = authLoading || permissionsLoading; const isAdmin = can("admin.classes");
   const metadata = user?.user_metadata as Record<string, unknown> | undefined;
   const persona = getWorkspacePersonaFromMetadata(metadata) || "learner";
   const allowed = !user || canAccessClassesForAccount(persona, isAdmin);

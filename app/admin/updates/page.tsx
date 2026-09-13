@@ -1,5 +1,7 @@
 "use client";
 
+import { updatePublicationDate } from "@/lib/update-publication";
+
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -136,7 +138,7 @@ function AdminUpdatesContent() {
     staleTime: 2 * 60 * 1000,
   });
   const updates = useMemo(() => updatesQuery.data || [], [updatesQuery.data]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = updatePublicationDate();
   const monthKey = today.slice(0, 7);
 
   const searchNeedle = search.trim().toLocaleLowerCase(locale);
@@ -185,6 +187,7 @@ function AdminUpdatesContent() {
       current?.filter((update) => update.id !== deleting.id) || []
     );
     void queryClient.invalidateQueries({ queryKey: ["updates"] });
+    void queryClient.invalidateQueries({ queryKey: ["update"] });
     setDeleting(null);
     toast.success(t("admin.updates.toast.deleted"));
   }
@@ -332,6 +335,7 @@ function AdminUpdatesContent() {
               closeForm();
               void queryClient.invalidateQueries({ queryKey: updatesQueryKey });
               void queryClient.invalidateQueries({ queryKey: ["updates"] });
+              void queryClient.invalidateQueries({ queryKey: ["update"] });
             }}
           />
         </DialogContent>

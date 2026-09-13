@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -27,6 +28,7 @@ import {
   Lock,
   LogOut,
   MessageSquare,
+  MoreHorizontal,
   Paperclip,
   Pencil,
   Pin,
@@ -57,10 +59,14 @@ import {
 import { resolveAvatarUrl } from "@/lib/avatar";
 import {
   getInlineStickerToken,
+  emojiShortcode,
+  GROUP_EMOJI_SHORTCODES,
   isStickerOnlyMessage,
   tokenizeGroupMessage,
 } from "@/lib/group-messages";
 import { supabase } from "@/lib/supabase";
+import { ChatMediaPreview } from "@/components/groups/ChatMediaPreview";
+import { GroupGifPicker } from "@/components/groups/GroupGifPicker";
 import { useLanguage } from "@/components/LanguageProvider";
 import { EmptyState } from "@/components/common/EmptyState";
 import { InvitePeoplePicker } from "@/components/collaboration/InvitePeoplePicker";
@@ -86,6 +92,8 @@ import { Button } from "@/components/ui/button";
 import { Bubble, BubbleContent, BubbleReactions } from "@/components/ui/bubble";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import {
   Message,
@@ -358,7 +366,10 @@ function renderMessageContent(
 
     if (token.type === "sticker") {
       const sticker = stickersByToken.get(token.token);
-      if (!sticker) return token.value;
+      if (!sticker) {
+        const name = token.token.slice(1, -1);
+        return Object.hasOwn(GROUP_EMOJI_SHORTCODES, name) ? GROUP_EMOJI_SHORTCODES[name] : token.value;
+      }
 
       return (
         <img
@@ -558,6 +569,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const chatContentRef = useRef<HTMLDivElement | null>(null);
+  const followingLatestRef = useRef(true);
   const lastAutoScrollChannelRef = useRef<string | null>(null);
   const lastAutoScrollMessageRef = useRef<string | null>(null);
   const jumpUnreadChannelRef = useRef<string | null>(null);
@@ -567,8 +581,13 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const typingStopTimeoutRef = useRef<number | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const gifInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingGif, setPendingGif] = useState<string | null>(null);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [composerCursor, setComposerCursor] = useState(0);
+  const [emojiActiveIndex, setEmojiActiveIndex] = useState(0);
+  const [emojiDismissed, setEmojiDismissed] = useState(false);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, TypingUser>>({});
@@ -589,6 +608,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const [composerEmojiSearch, setComposerEmojiSearch] = useState("");
   const [stickerSearch, setStickerSearch] = useState("");
   const [channelDialogOpen, setChannelDialogOpen] = useState(false);
+  const [mobileChannelsOpen, setMobileChannelsOpen] = useState(false);
+  const [mobileMembersOpen, setMobileMembersOpen] = useState(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("general");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -738,10 +760,30 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
     for (const sticker of stickers) {
       map.set(getInlineStickerToken(sticker).toLowerCase(), sticker);
+      map.set(`:sticker-${sticker.id}:`.toLowerCase(), sticker);
     }
 
     return map;
   }, [stickers]);
+  const emojiMatch = message.slice(0, composerCursor).match(/(?:^|\s):([a-z0-9_-]*)$/i);
+  const emojiQuery = emojiMatch?.[1]?.toLowerCase() ?? null;
+  const emojiCompletions = useMemo(() => {
+    if (emojiQuery === null || emojiDismissed) return [];
+    const custom = stickers.map(sticker => ({ name: emojiShortcode(sticker.name), image: sticker.image_url, emoji: "" }));
+    const standard = Object.entries(GROUP_EMOJI_SHORTCODES).map(([name, emoji]) => ({ name, emoji, image: "" }));
+    return [...custom, ...standard].filter(item => item.name && item.name.includes(emojiQuery)).slice(0, 8);
+  }, [emojiQuery, emojiDismissed, stickers]);
+  useEffect(() => { setEmojiActiveIndex(0); }, [emojiQuery]);
+
+  function insertEmojiShortcode(name: string) {
+    if (emojiQuery === null) return;
+    const start = composerCursor - emojiQuery.length - 1;
+    const insertion = `:${name}: `;
+    setMessage(message.slice(0, start) + insertion + message.slice(composerCursor));
+    setComposerCursor(start + insertion.length);
+    setEmojiDismissed(true);
+    requestAnimationFrame(() => { messageInputRef.current?.focus(); messageInputRef.current?.setSelectionRange(start + insertion.length, start + insertion.length); });
+  }
   const closeComposerPicker = () => {
     setComposerPickerOpen(false);
     setComposerEmojiSearch("");
@@ -1173,36 +1215,38 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const latestMessageId = messagesQuery.data?.at(-1)?.id || null;
 
   useEffect(() => {
+    setPendingGif(null);
+    setEmojiDismissed(true);
+    closeComposerPicker();
+  }, [activeChannel?.id]);
+
+  useLayoutEffect(() => {
     const channelId = activeChannel?.id || null;
-    if (!channelId || !latestMessageId) {
-      lastAutoScrollChannelRef.current = channelId;
-      lastAutoScrollMessageRef.current = latestMessageId;
-      return;
+    const viewport = chatScrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+    if (!channelId || !viewport || messagesQuery.isPending) return;
+    const changedChannel = lastAutoScrollChannelRef.current !== channelId;
+    const ownMessage = messagesQuery.data?.at(-1)?.user_id === userId;
+    if (changedChannel || followingLatestRef.current || (ownMessage && lastAutoScrollMessageRef.current !== latestMessageId)) {
+      viewport.scrollTop = viewport.scrollHeight;
+      followingLatestRef.current = true;
     }
-
-    if (
-      lastAutoScrollChannelRef.current === channelId &&
-      lastAutoScrollMessageRef.current === latestMessageId
-    ) {
-      return;
-    }
-
-    const shouldAnimate =
-      lastAutoScrollChannelRef.current === channelId &&
-      lastAutoScrollMessageRef.current !== null &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     lastAutoScrollChannelRef.current = channelId;
     lastAutoScrollMessageRef.current = latestMessageId;
+  }, [activeChannel?.id, latestMessageId, messagesQuery.isPending, messagesQuery.data, userId]);
 
-    const frame = window.requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({
-        behavior: shouldAnimate ? "smooth" : "auto",
-        block: "end",
-      });
+  useEffect(() => {
+    const viewport = chatScrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+    const content = chatContentRef.current;
+    if (!viewport || !content) return;
+    const trackScroll = () => { followingLatestRef.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80; };
+    const observer = new ResizeObserver(() => {
+      if (followingLatestRef.current) viewport.scrollTop = viewport.scrollHeight;
     });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeChannel?.id, latestMessageId]);
+    observer.observe(content);
+    observer.observe(viewport);
+    viewport.addEventListener("scroll", trackScroll, { passive: true });
+    return () => { observer.disconnect(); viewport.removeEventListener("scroll", trackScroll); };
+  }, [activeChannel?.id, messagesQuery.isPending]);
 
   useEffect(() => {
     setMentionActiveIndex(0);
@@ -1252,6 +1296,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
   function handleMessageChange(value: string, cursor = value.length) {
     setMessage(value);
+    setComposerCursor(cursor);
+    setEmojiDismissed(false);
     updateMentionSearch(value, cursor);
 
     if (!value.trim()) {
@@ -1335,6 +1381,18 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   }
 
   function handleMessageKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.nativeEvent.isComposing) return;
+    if (emojiCompletions.length) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        setEmojiActiveIndex(index => (index + (event.key === "ArrowDown" ? 1 : -1) + emojiCompletions.length) % emojiCompletions.length);
+        return;
+      }
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault(); insertEmojiShortcode((emojiCompletions[emojiActiveIndex] ?? emojiCompletions[0]).name); return;
+      }
+      if (event.key === "Escape") { event.preventDefault(); setEmojiDismissed(true); return; }
+    }
     if (mentionOpen) {
       if (event.key === "ArrowDown") {
         event.preventDefault();
@@ -1400,11 +1458,13 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   }
 
   async function sendMessage() {
-    if (!group || !activeChannel || !userId || (!message.trim() && !attachmentFiles.length) || sending) return;
+    if (!group || !activeChannel || !userId || (!message.trim() && !attachmentFiles.length && !pendingGif) || sending) return;
 
     const files = attachmentFiles;
+    const gif = pendingGif;
     const caption = message.trim();
-    const content = caption || ATTACHMENT_ONLY_MESSAGE_CONTENT;
+    const content = caption || (gif ? "Shared a GIF" : ATTACHMENT_ONLY_MESSAGE_CONTENT);
+    const mediaMetadata = gif ? { expressionType: "gif", gifUrl: gif, stickerUrl: gif, stickerName: "GIF", caption } : {};
     const optimisticMessage: StudyGroupMessage = {
       id: `optimistic-${Date.now()}`,
       group_id: group.id,
@@ -1412,7 +1472,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       user_id: userId,
       content,
       kind: "message",
-      metadata: { optimistic: true },
+      metadata: { ...mediaMetadata, optimistic: true },
       created_at: new Date().toISOString(),
       profiles: currentProfile,
       reactions: [],
@@ -1422,6 +1482,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
     setMessage("");
     setAttachmentFiles([]);
+    setPendingGif(null);
     setMentionOpen(false);
     setMentionStart(null);
     setMentionQuery("");
@@ -1438,6 +1499,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         channelId: activeChannel.id,
         userId,
         content,
+        kind: gif ? "sticker" : "message",
+        metadata: mediaMetadata,
         locale,
         files,
       });
@@ -1454,6 +1517,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       );
       setMessage((current) => current || caption);
       setAttachmentFiles(files);
+      setPendingGif(gif);
       toast.error(t("groups.toasts.messageFailed"));
     } finally {
       setSending(false);
@@ -1565,10 +1629,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   function jumpToMessage(messageId: string) {
     setContentBrowserOpen(false);
     window.requestAnimationFrame(() => {
-      document.getElementById(`group-message-${messageId}`)?.scrollIntoView({
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        block: "center",
-      });
+      const viewport = chatScrollRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+      const target = document.getElementById(`group-message-${messageId}`);
+      if (!viewport || !target) return;
+      followingLatestRef.current = false;
+      viewport.scrollTo({ top: viewport.scrollTop + target.getBoundingClientRect().top - viewport.getBoundingClientRect().top - viewport.clientHeight / 2, behavior: "auto" });
     });
   }
 
@@ -1803,13 +1868,18 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       return;
     }
 
+    const shortcode = emojiShortcode(stickerName);
+    if (!shortcode || GROUP_EMOJI_SHORTCODES[shortcode] || stickers.some(item => emojiShortcode(item.name) === shortcode)) {
+      toast.error(locale === "ro" ? "Alege un nume de emoji unic, cu litere, cifre sau underscore." : "Choose a unique emoji name using letters, numbers or underscores.");
+      return;
+    }
     setSavingSticker(true);
 
     try {
       await api.groups.createSticker({
         groupId: group.id,
         userId,
-        name: stickerName,
+        name: shortcode,
         file: stickerFile,
       });
       setStickerName("");
@@ -1989,7 +2059,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
   return (
     <div className="grid h-full min-h-0 grid-cols-1 overflow-hidden md:grid-cols-[230px_1fr] xl:grid-cols-[240px_1fr_260px]">
-      <aside className="flex min-h-0 flex-col border-b bg-muted/45 md:border-b-0 md:border-r">
+      <aside className="hidden min-h-0 flex-col border-r bg-muted/45 md:flex">
         <div className="border-b p-4">
           <div className="flex items-start justify-between gap-2">
             <p className="truncate text-lg font-semibold">{group.name}</p>
@@ -2122,9 +2192,9 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         </ScrollArea>
       </aside>
 
-      <main className="flex min-h-0 flex-col">
+      <main className="flex min-h-0 min-w-0 flex-col">
         <header className="flex min-h-16 items-center justify-between gap-3 border-b px-4">
-          <div className="min-w-0">
+          <div className="hidden min-w-0 md:block">
             <p className="flex items-center gap-2 truncate text-sm font-semibold">
               <Hash className="size-4" />
               {activeChannel?.name || t("groups.workspace.noChannel")}
@@ -2134,40 +2204,82 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <Sheet open={mobileChannelsOpen} onOpenChange={setMobileChannelsOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" className="h-auto min-h-11 min-w-0 flex-1 justify-start gap-3 px-0 text-left md:hidden" aria-label={locale === "ro" ? "Schimbă canalul" : "Switch channel"}>
+                <span className="min-w-0"><span className="block truncate text-xs font-normal text-muted-foreground">{group.name}</span><span className="flex items-center gap-1.5"><Hash className="size-4 shrink-0" /><span className="truncate">{activeChannel?.name || t("groups.workspace.noChannel")}</span><ChevronDown className="size-4 shrink-0" /></span></span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" aria-describedby={undefined} className="max-h-[80dvh] gap-0 rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <SheetHeader className="pr-14"><SheetTitle>{group.name}</SheetTitle><p className="text-sm text-muted-foreground">{t("groups.workspace.channels")}</p></SheetHeader>
+              <div className="min-h-0 overflow-y-auto overscroll-contain px-3">
+                {channels.map(channel => {
+                  const unread = unreadByChannel.get(channel.id)?.unread_count || 0;
+                  const mentions = groupActivity.mentionCountsByChannel.get(channel.id) || 0;
+                  const active = channel.id === activeChannel?.id;
+                  return <Button key={channel.id} variant={active ? "secondary" : "ghost"} aria-current={active ? "page" : undefined} className="mb-1 min-h-12 w-full justify-start gap-3" onClick={() => { setActiveChannelId(channel.id); setMobileChannelsOpen(false); }}>
+                    <Hash className="size-4 shrink-0" /><span className="min-w-0 truncate">{channel.name}</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-2">{unread || mentions ? <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground" aria-label={`${unread || mentions} ${locale === "ro" ? "necitite" : "unread"}`}>{Math.min(unread || mentions, 99)}{(unread || mentions) > 99 ? "+" : ""}</span> : groupActivity.activityChannelIds.has(channel.id) ? <span className="size-2 rounded-full bg-primary" aria-label={t("groups.activity.newActivity")} /> : null}{active ? <Check className="size-4" /> : null}</span>
+                  </Button>;
+                })}
+                {canManageChannels ? <Button variant="ghost" className="mt-2 min-h-11 w-full justify-start gap-3" onClick={() => { setMobileChannelsOpen(false); setChannelDialogOpen(true); }}><Plus className="size-4" />{t("groups.actions.newChannel")}</Button> : null}
+              </div>
+            </SheetContent>
+          </Sheet>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-11 shrink-0 md:hidden" aria-label={locale === "ro" ? "Acțiunile grupului" : "Group actions"}><MoreHorizontal className="size-5" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-52 [&_[role=menuitem]]:min-h-11">
+              <DropdownMenuItem onSelect={() => setContentBrowserOpen(true)}><Search />{locale === "ro" ? "Caută în conversație" : "Search conversation"}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setMobileMembersOpen(true)}><Users />{t("groups.workspace.members")} ({members.length})</DropdownMenuItem>
+              {canInvite ? <DropdownMenuItem onSelect={() => setInviteDialogOpen(true)}><UserPlus />{t("groups.actions.invite")}</DropdownMenuItem> : null}
+              <DropdownMenuItem disabled={!activeChannel || startingLive} onSelect={() => void startLiveSession()}><Radio />{t("groups.actions.startLive")}</DropdownMenuItem>
+              {canManage ? <DropdownMenuItem onSelect={() => setSettingsDialogOpen(true)}><Settings />{t("groups.actions.settings")}</DropdownMenuItem> : null}
+              {activeMembership && !isGroupOwner ? <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" disabled={leavingGroup} onSelect={() => setLeaveDialogOpen(true)}><LogOut />{t("groups.actions.leaveServer")}</DropdownMenuItem></> : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Sheet open={mobileMembersOpen} onOpenChange={setMobileMembersOpen}>
+            <SheetContent side="bottom" aria-describedby={undefined} className="max-h-[80dvh] rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <SheetHeader><SheetTitle>{t("groups.workspace.members")} ({members.length})</SheetTitle></SheetHeader>
+              <div className="min-h-0 space-y-2 overflow-y-auto overscroll-contain px-4">{members.map(member => <StudyGroupMemberPreview key={member.user_id} member={member} profile={api.groups.getMemberProfile(member)} t={t} />)}</div>
+            </SheetContent>
+          </Sheet>
+          <div className="hidden items-center gap-2 md:flex">
             <Button
               size="sm"
               variant="outline"
               onClick={() => setContentBrowserOpen(true)}
+              aria-label={locale === "ro" ? "Caută în conversație" : "Search conversation"}
               className="gap-2"
             >
               <Search className="size-4" />
-              <span className="hidden sm:inline">Search</span>
+              <span className="hidden 2xl:inline">Search</span>
             </Button>
             {canInvite && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setInviteDialogOpen(true)}
+                aria-label={t("groups.actions.invite")}
                 className="gap-2"
               >
                 <UserPlus className="size-4" />
-                <span className="hidden sm:inline">
+                <span className="hidden 2xl:inline">
                   {t("groups.actions.invite")}
                 </span>
               </Button>
             )}
             {activeMembership && !isGroupOwner ? (
-              <AlertDialog>
+              <AlertDialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
                 <AlertDialogTrigger asChild>
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={leavingGroup}
+                    aria-label={t("groups.actions.leaveServer")}
                     className="gap-2 border-red-500/25 text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                   >
                     <LogOut className="size-4" />
-                    <span className="hidden sm:inline">
+                    <span className="hidden 2xl:inline">
                       {leavingGroup
                         ? t("groups.actions.leavingServer")
                         : t("groups.actions.leaveServer")}
@@ -2202,11 +2314,12 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               size="sm"
               variant="outline"
               onClick={startLiveSession}
+              aria-label={t("groups.actions.startLive")}
               disabled={!activeChannel || startingLive}
               className="gap-2"
             >
               <Radio className="size-4" />
-              <span className="hidden sm:inline">{t("groups.actions.startLive")}</span>
+              <span className="hidden 2xl:inline">{t("groups.actions.startLive")}</span>
             </Button>
           </div>
         </header>
@@ -2225,8 +2338,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             </Button>
           </div>
         ) : null}
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="space-y-4 p-4">
+        <ScrollArea ref={chatScrollRef} className="min-h-0 flex-1">
+          <div ref={chatContentRef} className="space-y-4 p-4">
             {messagesQuery.isLoading ? (
               <>
                 <Skeleton className="h-14 w-2/3" />
@@ -2243,6 +2356,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                     : null;
                   const isEditing = editingMessageId === item.id;
                   const isStickerMessage = item.kind === "sticker";
+                  const gifUrl = item.metadata?.expressionType === "gif" && typeof item.metadata.gifUrl === "string" && /^https?:\/\//i.test(item.metadata.gifUrl) ? item.metadata.gifUrl : null;
                   const stickerData = isStickerMessage
                     ? getStickerMessageData(item)
                     : null;
@@ -2250,7 +2364,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   const inlineStickerOnly =
                     !isStickerMessage &&
                     !item.attachments?.length &&
-                    isStickerOnlyMessage(messageContent);
+                    isStickerOnlyMessage(messageContent) && stickersByInlineToken.has(messageContent.trim().toLowerCase());
+                  const mediaOnly = Boolean(item.attachments?.length) && item.attachments!.every(a => a.kind === "image");
                   const canEditMessage = isMine && item.kind === "message";
                   const canDeleteMessage =
                     item.kind !== "system" && (isMine || canManage);
@@ -2394,23 +2509,23 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           ) : (
                             <Bubble
                               align={isMine ? "end" : "start"}
-                              variant={isMine ? "default" : "muted"}
+                              variant={isStickerMessage || gifUrl || inlineStickerOnly || mediaOnly ? "ghost" : isMine ? "default" : "muted"}
                               className="max-w-full"
                             >
                               <BubbleContent
                                 className={`min-w-[2.25rem] rounded-2xl border-transparent ${
-                                  isStickerMessage || inlineStickerOnly
-                                    ? "bg-transparent p-0 shadow-none"
+                                  isStickerMessage || gifUrl || inlineStickerOnly || mediaOnly
+                                    ? "bg-transparent p-0 text-foreground shadow-none"
                                     : isMine
                                     ? "bg-zinc-950 text-white"
                                     : "bg-muted text-foreground"
                                 }`}
                               >
-                                {isStickerMessage && stickerData?.stickerUrl ? (
+                                {gifUrl ? <div className="space-y-2"><ChatMediaPreview url={gifUrl} name="GIF" />{typeof item.metadata?.caption === "string" && item.metadata.caption ? <p>{item.metadata.caption}</p> : null}</div> : isStickerMessage && stickerData?.stickerUrl ? (
                                   <img
                                     src={stickerData.stickerUrl}
                                     alt={stickerData.stickerName}
-                                    className="max-h-16 max-w-16 rounded-xl object-contain drop-shadow-sm"
+                                    className="size-32 object-contain sm:size-40"
                                   />
                                 ) : (
                                   <div className="space-y-2">
@@ -2421,7 +2536,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                           mentionProfilesByUsername,
                                           stickersByInlineToken,
                                           inlineStickerOnly
-                                            ? "max-h-16 max-w-16 rounded-xl object-contain drop-shadow-sm"
+                                            ? "size-32 object-contain sm:size-40"
                                             : undefined
                                         )}
                                       </div>
@@ -2430,9 +2545,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                                       <div className="grid max-w-sm gap-2">
                                         {item.attachments.map((attachment) =>
                                           attachment.kind === "image" ? (
-                                            <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-white/15 bg-background/10">
-                                              <img src={attachment.url} alt={attachment.file_name} className="max-h-72 w-full object-cover" />
-                                            </a>
+                                            <ChatMediaPreview key={attachment.id} url={attachment.url} name={attachment.file_name} />
                                           ) : (
                                             <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-current/15 bg-background/10 p-3 no-underline">
                                               <FileText className="size-5 shrink-0" />
@@ -2771,6 +2884,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
         </ScrollArea>
 
         <div className="border-t p-3">
+          {pendingGif && <div className="mb-2 flex items-center gap-3"><div className="max-w-48"><ChatMediaPreview url={pendingGif} name="GIF" /></div><Button variant="ghost" size="sm" onClick={() => setPendingGif(null)}>{locale === "ro" ? "Elimină GIF-ul" : "Remove GIF"}</Button></div>}
+          <input ref={gifInputRef} type="file" accept="image/gif" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) { setPendingGif(null); setAttachmentFiles([file]); closeComposerPicker(); } e.target.value = ""; }} />
           {attachmentFiles.length ? (
             <div className="mb-2 flex flex-wrap gap-2">
               {attachmentFiles.map((file, index) => (
@@ -2782,6 +2897,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             </div>
           ) : null}
           <div className="relative flex items-end gap-2">
+            {emojiCompletions.length > 0 && <div role="listbox" id="group-emoji-completions" aria-label={locale === "ro" ? "Emoji-uri" : "Emojis"} className="absolute bottom-full left-0 z-30 mb-2 max-h-64 w-72 max-w-full overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg">
+              {emojiCompletions.map((item, index) => <button id={`group-emoji-option-${index}`} key={item.name} role="option" aria-selected={index === emojiActiveIndex} type="button" onMouseDown={e => e.preventDefault()} onClick={() => insertEmojiShortcode(item.name)} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm ${index === emojiActiveIndex ? "bg-accent" : "hover:bg-accent/50"}`}>
+                {item.image ? <img src={item.image} alt="" className="size-7 object-contain" /> : <span className="text-xl">{item.emoji}</span>}<span>:{item.name}:</span>
+              </button>)}
+            </div>}
             {mentionOpen ? (
               <div className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
                 <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -2827,6 +2947,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             ) : null}
             <Textarea
               ref={messageInputRef}
+              aria-controls={emojiCompletions.length ? "group-emoji-completions" : undefined}
+              aria-activedescendant={emojiCompletions.length ? `group-emoji-option-${emojiActiveIndex}` : undefined}
               value={message}
               onChange={(event) =>
                 handleMessageChange(
@@ -2834,12 +2956,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   event.target.selectionStart
                 )
               }
-              onClick={(event) =>
-                updateMentionSearch(message, event.currentTarget.selectionStart)
-              }
-              onKeyUp={(event) =>
-                updateMentionSearch(message, event.currentTarget.selectionStart)
-              }
+              onClick={(event) => { setComposerCursor(event.currentTarget.selectionStart); updateMentionSearch(message, event.currentTarget.selectionStart); }}
+              onKeyUp={(event) => { setComposerCursor(event.currentTarget.selectionStart); updateMentionSearch(message, event.currentTarget.selectionStart); }}
               onKeyDown={handleMessageKeyDown}
               placeholder={t("groups.workspace.messagePlaceholder")}
               className="max-h-32 min-h-10 resize-none rounded-xl"
@@ -2853,6 +2971,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
               onChange={(event) => {
                 const files = Array.from(event.target.files || []).slice(0, 5);
                 setAttachmentFiles(files);
+                setPendingGif(null);
                 event.currentTarget.value = "";
               }}
             />
@@ -2906,7 +3025,8 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   value={composerPickerTab}
                   onValueChange={setComposerPickerTab}
                 >
-                  <TabsList className="grid w-full grid-cols-2 rounded-xl">
+                  <TabsList className="grid w-full grid-cols-3 rounded-xl">
+                    <TabsTrigger value="gifs">GIFs</TabsTrigger>
                     <TabsTrigger value="emoji" className="rounded-lg">
                       {t("groups.stickers.emojiTab")}
                     </TabsTrigger>
@@ -2943,6 +3063,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                       )}
                     </div>
                   </TabsContent>
+                  <TabsContent value="gifs" className="mt-3"><GroupGifPicker onSelect={url => { setPendingGif(url); setAttachmentFiles([]); closeComposerPicker(); messageInputRef.current?.focus(); }} onUpload={() => gifInputRef.current?.click()} /></TabsContent>
                   <TabsContent value="stickers" className="mt-3 space-y-2">
                     <Input
                       value={stickerSearch}
@@ -2982,7 +3103,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
             <Button
               size="icon"
               onClick={sendMessage}
-              disabled={(!message.trim() && !attachmentFiles.length) || sending}
+              disabled={(!message.trim() && !attachmentFiles.length && !pendingGif) || sending}
             >
               <Send className="size-4" />
             </Button>
@@ -3079,7 +3200,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 }) : <p className="py-12 text-center text-sm text-muted-foreground">No pinned messages in this channel.</p>}
               </TabsContent>
               <TabsContent value="media" className="mt-4">
-                {mediaQuery.isLoading ? <Skeleton className="h-40 w-full" /> : mediaQuery.data?.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{mediaQuery.data.map((item) => item.kind === "image" ? <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-xl border bg-muted"><img src={item.url} alt={item.file_name} className="aspect-square w-full object-cover transition group-hover:scale-105" /><span className="block truncate px-2 py-1.5 text-xs">{item.file_name}</span></a> : <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border bg-muted p-3 text-center"><FileText className="size-7" /><span className="line-clamp-2 text-xs">{item.file_name}</span></a>)}</div> : <p className="py-12 text-center text-sm text-muted-foreground">No images or files have been shared here.</p>}
+                {mediaQuery.isLoading ? <Skeleton className="h-40 w-full" /> : mediaQuery.data?.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{mediaQuery.data.map((item) => item.kind === "image" ? <ChatMediaPreview key={item.id} url={item.url} name={item.file_name} /> : <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border bg-muted p-3 text-center"><FileText className="size-7" /><span className="line-clamp-2 text-xs">{item.file_name}</span></a>)}</div> : <p className="py-12 text-center text-sm text-muted-foreground">No images or files have been shared here.</p>}
               </TabsContent>
             </ScrollArea>
           </Tabs>
@@ -3395,9 +3516,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                           onChange={(event) =>
                             setStickerName(event.target.value)
                           }
-                          placeholder={t("groups.stickers.namePlaceholder")}
+                          aria-label={locale === "ro" ? "Nume emoji" : "Emoji name"}
+                          placeholder={locale === "ro" ? "Nume emoji, ex. happy_cat" : "Emoji name, e.g. happy_cat"}
                           maxLength={32}
                         />
+                        <p className="text-xs text-muted-foreground sm:col-span-3 sm:row-start-2">{locale === "ro" ? "Cod în chat" : "Chat shortcode"}: <code>:{emojiShortcode(stickerName) || "emoji_name"}:</code></p>
                         <Input
                           type="file"
                           accept="image/png,image/jpeg,image/webp,image/gif"

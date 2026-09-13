@@ -68,7 +68,7 @@ function ClassCard({ item, locale, onOpen }: { item: ClassDirectoryItem; locale:
 export default function ClassesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, can, loading: authLoading } = useAuth(); const isAdmin = can("admin.classes");
   const { locale: activeLocale } = useLanguage();
   const locale = activeLocale === "ro" ? "ro" : "en";
   const c = copy[locale];

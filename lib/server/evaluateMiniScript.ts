@@ -1,11 +1,8 @@
 import "server-only";
 
 import {
-  advanceLine,
+  MiniScriptRuntime,
   parseLine,
-  reset,
-  setVariable,
-  step,
 } from "@/lib/engine";
 
 export type ServerTestCase = {
@@ -78,22 +75,22 @@ export function evaluateMiniScript(
 
   const program = code.split("\n").map(parseLine);
   const results = testCases.map((test) => {
-    reset();
+    const runtime = new MiniScriptRuntime();
     const output: string[] = [];
     let outputLength = 0;
     let inputIndex = 0;
 
     try {
       while (true) {
-        const result = step(program);
+        const result = runtime.step(program);
         if (!result) break;
 
         if (result.inputRequest) {
           if (inputIndex >= test.input.length) {
             throw new Error("Not enough test input");
           }
-          setVariable(result.inputRequest, test.input[inputIndex++]);
-          advanceLine();
+          runtime.setVariable(result.inputRequest, test.input[inputIndex++]);
+          runtime.advanceLine();
           continue;
         }
 

@@ -24,7 +24,7 @@ function safeUserId(value: string) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const { user } = await requireAdmin(request);
+    const { user, role } = await requireAdmin(request);
     const { userId } = await context.params;
     const targetId = safeUserId(userId);
     if (targetId === user.id) throw new HttpError(400, "You cannot moderate your own account");
@@ -48,6 +48,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       .maybeSingle();
     if (readError) throw readError;
     if (!current) throw new HttpError(404, "User not found");
+    if (role !== "admin") {
+      const { data: assigned, error } = await admin.from("platform_user_roles").select("role_id").eq("user_id", targetId).limit(1);
+      if (error) throw error;
+      if (assigned?.length) throw new HttpError(403, "Only full administrators can moderate privileged accounts");
+    }
     if (current.role === "admin") throw new HttpError(400, "Another admin cannot be moderated here");
 
     const { data: profile, error: updateError } = await admin

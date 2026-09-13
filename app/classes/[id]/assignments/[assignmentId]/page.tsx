@@ -30,7 +30,7 @@ type Member = ProfileRow & { role?: string };
 type PageData = { assignment: AssignmentRow; problems: Problem[]; isManager: boolean; members: Member[]; submissions: Submission[]; attempts: Attempt[] };
 
 export default function AssignmentPage() {
-  const params = useParams<{ id: string; assignmentId: string }>(); const router = useRouter(); const queryClient = useQueryClient(); const { user, isAdmin, loading: authLoading } = useAuth(); const { locale: activeLocale } = useLanguage(); const locale = activeLocale === "ro" ? "ro" : "en"; const userId = user?.id || null;
+  const params = useParams<{ id: string; assignmentId: string }>(); const router = useRouter(); const queryClient = useQueryClient(); const { user, can, loading: authLoading } = useAuth(); const isAdmin = can("admin.classes"); const { locale: activeLocale } = useLanguage(); const locale = activeLocale === "ro" ? "ro" : "en"; const userId = user?.id || null;
   const [reviewOpen, setReviewOpen] = useState(false); const [reviewStudentId, setReviewStudentId] = useState<string | null>(null); const [reviewProblemId, setReviewProblemId] = useState<string | null>(null); const [reviewStatus, setReviewStatus] = useState("accepted"); const [reviewScore, setReviewScore] = useState("100"); const [reviewFeedback, setReviewFeedback] = useState("");
   const queryKey = ["classes", params.id, "assignments", params.assignmentId, userId, locale, isAdmin] as const;
   const pageQuery = useQuery({ queryKey, queryFn: async (): Promise<PageData> => {

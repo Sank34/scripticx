@@ -14,6 +14,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   Mail,
+  Menu,
   Medal,
   MessageSquare,
   Search,
@@ -60,13 +61,13 @@ type MobileNavItem = {
 
 export function MobileDrawer() {
   const pathname = usePathname();
+  const useHeaderTrigger = pathname === "/editor" || pathname.startsWith("/groups/");
   const { locale, t } = useLanguage();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const {
     hasUnread: hasUnreadUpdates,
-    latestSlug: latestUpdateSlug,
   } = useUnreadUpdates();
-  const { user, isAdmin } = useAuth();
+  const { user, canAccessAdmin: isAdmin } = useAuth();
   const studentWorkspaceActive = isStudentWorkspaceContext(
     pathname,
     user?.user_metadata as Record<string, unknown> | undefined
@@ -214,7 +215,7 @@ export function MobileDrawer() {
 
   const footerItems = [
     {
-      href: latestUpdateSlug ? `/updates/${latestUpdateSlug}` : "/updates",
+      href: "/updates",
       icon: Sparkles,
       label: t("nav.whatsNew"),
       unread: hasUnreadUpdates,
@@ -224,15 +225,15 @@ export function MobileDrawer() {
   ];
 
   return (
-    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 -translate-x-1/2 md:hidden">
+    <div className={useHeaderTrigger ? "fixed left-4 top-3 z-40 md:hidden" : "fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 -translate-x-1/2 md:hidden"}>
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerTrigger asChild>
           <button
             aria-label={t("mobileDrawer.open")}
             data-tour="mobile-menu"
-            className="flex h-8 w-24 items-center justify-center rounded-full border border-border bg-background/95 shadow-md backdrop-blur-xl transition-transform duration-150 active:scale-95"
+            className={useHeaderTrigger ? "flex size-11 items-center justify-center rounded-md text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : "flex h-8 w-24 items-center justify-center rounded-full border border-border bg-background/95 shadow-md backdrop-blur-xl transition-transform duration-150 active:scale-95"}
           >
-            <span className="h-1.5 w-12 rounded-full bg-muted-foreground/60" />
+            {useHeaderTrigger ? <Menu size={20} /> : <span className="h-1.5 w-12 rounded-full bg-muted-foreground/60" />}
           </button>
         </DrawerTrigger>
 
@@ -351,6 +352,7 @@ export function MobileDrawer() {
                       <DrawerClose asChild key={item.href}>
                         <Link
                           href={item.href}
+                          prefetch={item.href === "/updates" ? false : undefined}
                           className={`flex w-full items-center justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 ${
                             active
                               ? "bg-accent text-accent-foreground"

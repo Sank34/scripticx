@@ -8,9 +8,25 @@ export const onboardingMetadataKeys = {
   persona: "scripticx_workspace_persona",
   required: "scripticx_onboarding_required",
   tourCompletedAt: "scripticx_product_tour_completed_at",
+  legacyWelcomeSeenAt: "scripticx_alpha_welcome_seen_at",
 } as const;
 
+export const legacyAlphaCohortKey = "scripticx_v1_alpha_onboarding";
+
+export function shouldShowLegacyAlphaWelcome(user: {
+  app_metadata?: Record<string, unknown>;
+  user_metadata?: Record<string, unknown>;
+}) {
+  return user.app_metadata?.[legacyAlphaCohortKey] === true
+    && needsOnboarding(user.user_metadata)
+    && !user.user_metadata?.[onboardingMetadataKeys.legacyWelcomeSeenAt];
+}
+
 export const productTourStorageKey = "scripticx.productTour.pending.v1";
+
+export function getProductTourScopeKey(scope: string) {
+  return `scripticx.productTour.completed.v1.${scope}`;
+}
 
 export type OnboardingExperienceLevel =
   | "first-steps"
@@ -73,4 +89,12 @@ export function normalizeOnboardingUsername(value: string) {
     .replace(/[^a-z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 24);
+}
+
+export function isValidUsername(value: string) {
+  return /^[a-z0-9][a-z0-9_-]{2,23}$/.test(value);
+}
+
+export function isValidUsernameInput(value: string) {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$/.test(value.trim());
 }

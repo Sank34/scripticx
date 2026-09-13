@@ -23,7 +23,7 @@ import {
   findNoteCodeLanguage,
   getNoteCodeLanguageLabel,
 } from "@/lib/note-code-languages";
-import type { EditorLanguageKey } from "@/lib/editor-project";
+import { resolveCodeBlockLanguage } from "@/lib/code-block-language";
 import { cn } from "@/lib/utils";
 
 type MarkdownAstNode = {
@@ -47,44 +47,6 @@ function remarkDocsCodeMetadata() {
   };
 }
 
-const EDITOR_LANGUAGE_ALIASES: Record<string, EditorLanguageKey> = {
-  bash: "shell",
-  c: "c",
-  "c#": "csharp",
-  "c++": "cpp",
-  cpp: "cpp",
-  cs: "csharp",
-  csharp: "csharp",
-  css: "css",
-  go: "go",
-  html: "html",
-  java: "java",
-  javascript: "javascript",
-  js: "javascript",
-  jsx: "javascriptreact",
-  json: "json",
-  markdown: "markdown",
-  md: "markdown",
-  miniscript: "msp",
-  miniscriptplus: "msp",
-  msp: "msp",
-  plaintext: "text",
-  py: "python",
-  python: "python",
-  rs: "rust",
-  rust: "rust",
-  sass: "scss",
-  scss: "scss",
-  sh: "shell",
-  shell: "shell",
-  sql: "sql",
-  text: "text",
-  ts: "typescript",
-  tsx: "typescriptreact",
-  typescript: "typescript",
-  yaml: "yaml",
-  yml: "yaml",
-};
 
 function reactText(children: ReactNode): string {
   return Children.toArray(children)
@@ -100,10 +62,6 @@ function reactText(children: ReactNode): string {
     .join("");
 }
 
-function docsLanguage(language: string | undefined) {
-  const normalized = language?.trim().toLocaleLowerCase() || "plaintext";
-  return EDITOR_LANGUAGE_ALIASES[normalized] ?? "text";
-}
 
 function codeBlockOptions(meta: string | undefined) {
   const title = meta?.match(/(?:^|\s)title=(?:"([^"]+)"|'([^']+)'|([^\s]+))/i);
@@ -330,7 +288,7 @@ export function DocsMarkdown({
             const code = isValidElement(child)
               ? reactText(child.props.children).replace(/\n$/, "")
               : reactText(children).replace(/\n$/, "");
-            const editorLanguage = docsLanguage(rawLanguage);
+            const editorLanguage = resolveCodeBlockLanguage(rawLanguage);
             const languageDefinition = findNoteCodeLanguage(rawLanguage || "plaintext");
             const options = codeBlockOptions(meta);
             return (

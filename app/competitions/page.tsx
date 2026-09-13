@@ -68,7 +68,7 @@ function CompetitionsContent() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8" data-tour="competitions-overview">
       <header className="rounded-[var(--sx-radius-panel)] border border-foreground/10 bg-foreground px-6 py-7 text-background md:px-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">

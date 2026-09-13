@@ -18,7 +18,6 @@ import {
   Presentation,
   Route,
   ShieldCheck,
-  Sparkles,
   Target,
   Trophy,
 } from "lucide-react";
@@ -38,6 +37,7 @@ import {
 } from "@/lib/birthday";
 import { savePrivateBirthDate } from "@/lib/birthdayData";
 import {
+  isValidUsernameInput,
   normalizeOnboardingUsername,
   onboardingMetadataKeys,
   productTourStorageKey,
@@ -65,7 +65,7 @@ type OnboardingExperienceProps = {
   };
 };
 
-const totalSteps = 9;
+const totalSteps = 8;
 
 type StepTransitionPhase = "entering" | "idle" | "leaving";
 
@@ -78,7 +78,7 @@ const copy = {
     birthdayPrivacy: "We only use this for private, aggregate statistics and a small surprise once a year. Your birthday is never shown on your public profile.",
     birthdaySelected: "Birthday selected",
     birthdayTitle: "When is your birthday?",
-    complete: "Start exploring",
+    complete: "Save preferences",
     createAccount: "Create account",
     continue: "Continue",
     emailVerified: "Signed in as",
@@ -100,8 +100,6 @@ const copy = {
     personaTitle: "What brings you to ScripticX?",
     profileDescription: "This is how classmates and collaborators will recognize you.",
     profileTitle: "Make the space yours",
-    readyDescription: "Your editor, roadmap and practice workspace are ready.",
-    readyTitle: "You are ready to build",
     skipAvatar: "You can add a different photo later from Settings.",
     uploadAvatar: "Upload avatar",
     username: "Username",
@@ -116,7 +114,7 @@ const copy = {
     birthdayPrivacy: "Folosim data doar pentru statistici interne, agregate, și pentru o mică surpriză o dată pe an. Ziua ta de naștere nu apare niciodată pe profilul public.",
     birthdaySelected: "Data selectată",
     birthdayTitle: "Când este ziua ta de naștere?",
-    complete: "Începe explorarea",
+    complete: "Salvează preferințele",
     createAccount: "Creează contul",
     continue: "Continuă",
     emailVerified: "Autentificat ca",
@@ -138,8 +136,6 @@ const copy = {
     personaTitle: "Cum vrei să folosești ScripticX?",
     profileDescription: "Așa te vor recunoaște colegii și colaboratorii.",
     profileTitle: "Personalizează-ți spațiul",
-    readyDescription: "Editorul, roadmap-ul și spațiul de practică sunt pregătite.",
-    readyTitle: "Ești gata să construiești",
     skipAvatar: "Poți schimba fotografia mai târziu din Setări.",
     uploadAvatar: "Încarcă avatar",
     username: "Username",
@@ -219,7 +215,7 @@ const goalOptions: Array<{
   { id: "learn-programming", icon: BookOpen, label: { en: "Learn programming", ro: "Să învăț programare" } },
   { id: "practice-algorithms", icon: Route, label: { en: "Practice algorithms", ro: "Să exersez algoritmi" } },
   { id: "prepare-interviews", icon: Trophy, label: { en: "Prepare for interviews", ro: "Să mă pregătesc pentru interviuri" } },
-  { id: "teach-with-scripticx", icon: Sparkles, label: { en: "Teach with ScripticX", ro: "Să predau cu ScripticX" } },
+  { id: "teach-with-scripticx", icon: GraduationCap, label: { en: "Teach with ScripticX", ro: "Să predau cu ScripticX" } },
 ];
 
 const interestOptions = [
@@ -284,22 +280,13 @@ export function OnboardingExperience({
   const initials = (draft.username || accountEmail || "S").slice(0, 2).toUpperCase();
   const normalizedUsername = normalizeOnboardingUsername(draft.username);
   const canContinue =
-    (step !== 3 || normalizedUsername.length >= 3) &&
+    (step !== 3 || isValidUsernameInput(draft.username)) &&
     (step !== 4 || isAllowedBirthDate(draft.birthDate));
   const today = useMemo(() => new Date(), []);
   const selectedBirthDate = useMemo(
     () => parseStoredBirthDate(draft.birthDate),
     [draft.birthDate]
   );
-  const selectedGoal = useMemo(
-    () => goalOptions.find((option) => option.id === draft.goal),
-    [draft.goal]
-  );
-  const selectedPersona = useMemo(
-    () => personaOptions.find((option) => option.id === draft.persona),
-    [draft.persona]
-  );
-
   function chooseAvatar(file: File | undefined) {
     if (!file) return;
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
@@ -450,7 +437,7 @@ export function OnboardingExperience({
       });
       if (metadataError) throw metadataError;
 
-      localStorage.setItem(productTourStorageKey, "pending");
+      localStorage.setItem(productTourStorageKey, user.id);
       window.dispatchEvent(new Event("profile-updated"));
       onComplete?.(draft.persona);
     } catch (error) {
@@ -464,7 +451,7 @@ export function OnboardingExperience({
   }
 
   return (
-    <div className="onboarding-screen-enter fixed inset-0 z-[120] overflow-hidden bg-background text-foreground">
+    <div className="fixed inset-0 z-[120] overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none fixed inset-x-0 top-0 h-1 bg-primary" />
       <div className="pointer-events-none fixed inset-0 bg-muted/20" />
 
@@ -932,33 +919,7 @@ export function OnboardingExperience({
               </div>
             )}
 
-            {step === 8 && (
-              <div>
-                <div className="text-center">
-                  <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-                    <Sparkles className="h-6 w-6" />
-                  </div>
-                  <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{c.readyTitle}</h1>
-                  <p className="mt-3 text-muted-foreground">{c.readyDescription}</p>
-                </div>
 
-                <div className="mx-auto mt-6 max-w-xl rounded-lg border bg-card p-5 shadow-sm sm:mt-8">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12">
-                      {draft.avatarPreview ? <AvatarImage src={draft.avatarPreview} /> : null}
-                      <AvatarFallback>{initials}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">@{normalizedUsername}</p>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        {selectedPersona?.label[language]} · {selectedGoal?.label[language]}
-                      </p>
-                    </div>
-                    <Sparkles className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </main>
 

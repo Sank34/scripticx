@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts";
+import { formatShortcut } from "@/lib/keyboard-shortcuts";
+
+import { useEffect, useRef, useState } from "react";
 import type { OnMount } from "@monaco-editor/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,6 +11,7 @@ import {
   Beaker,
   CheckCircle2,
   Code2,
+  Download,
   FileText,
   History,
   Loader2,
@@ -130,6 +134,8 @@ function ProblemContent() {
   const id = typeof params?.id === "string" ? params.id : "";
 
   const [activePanel, setActivePanel] = useState<ProblemPanel>("description");
+  const statementRef = useRef<HTMLDivElement>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [code, setCode] = useState("");
   const [compactLayout, setCompactLayout] = useState(false);
   const [editorLine, setEditorLine] = useState(1);
@@ -138,6 +144,14 @@ function ProblemContent() {
   const [, setResult] = useState<string | null>(null);
   const [tabSize, setTabSize] = useState(2);
   const [testResults, setTestResults] = useState<ProblemTestResult[]>([]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setCompactLayout(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
   const problemQueryKey = ["problems", "detail", id, user?.id] as const;
   const problemQuery = useQuery({
@@ -193,7 +207,7 @@ function ProblemContent() {
   });
 
   async function runCode() {
-    if (!problem || !user) return;
+    if (!problem || !user || isSubmitting) return;
 
     const testCaseCount = Array.isArray(problem.test_cases) ? problem.test_cases.length : 0;
     setIsSubmitting(true);
@@ -269,6 +283,9 @@ function ProblemContent() {
       setIsSubmitting(false);
     }
   }
+
+  const { bindings: shortcuts } = useKeyboardShortcuts();
+  useShortcut("submit", () => { void runCode(); }, Boolean(problem && user && !isSubmitting), true);
 
   const handleEditorMount: OnMount = (editor) => {
     const synchronizeLine = () => setEditorLine(editor.getPosition()?.lineNumber ?? 1);
@@ -361,7 +378,7 @@ function ProblemContent() {
         )}
       </div>
 
-      <nav className="grid h-10 shrink-0 grid-cols-3 border-b bg-muted/25 p-1 md:hidden" aria-label={t("problemPage.panelNavigation")}>
+      <nav className="grid h-12 shrink-0 grid-cols-3 gap-1 border-b bg-muted/25 p-1 md:hidden" aria-label={t("problemPage.panelNavigation")}>
         {panelItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -370,7 +387,7 @@ function ProblemContent() {
               key={item.id}
               onClick={() => setActivePanel(item.id)}
               aria-pressed={activePanel === item.id}
-              className={`flex items-center justify-center gap-1.5 rounded-[var(--sx-radius-control)] text-xs font-medium transition-colors ${
+              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--sx-radius-control)] px-1 text-xs font-medium transition-colors ${
                 activePanel === item.id
                   ? "border border-border bg-background text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -385,7 +402,7 @@ function ProblemContent() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activePanel === "description" && (
-          <div className="space-y-5 p-5">
+          <div className="space-y-5 p-4 md:p-5">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 {problem.code != null && (
@@ -405,15 +422,38 @@ function ProblemContent() {
                 )}
               </div>
               <h2 className="mt-4 text-2xl font-semibold tracking-tight">{localizedTitle}</h2>
+              <Button variant="outline" size="sm" className="mt-3 gap-2" disabled={exportingPdf} onClick={async () => {
+                if (!statementRef.current) return;
+                setExportingPdf(true);
+                try {
+                  const { createProblemPdf } = await import("@/lib/problem-pdf");
+                  const { fetchProblemChapters } = await import("@/lib/problem-chapters");
+                  const { chapters } = await fetchProblemChapters();
+                  const category = chapters.flatMap(chapter => chapter.topics.filter(topic => topic.problemIds.includes(id)).map(topic => `${getLocalized(chapter.title, locale)} / ${getLocalized(topic.title, locale)}`)).join("; ");
+                  let addedBy: string | null = null;
+                  if (problem.author_id) {
+                    const { data, error } = await supabase.from("profiles").select("username").eq("id", problem.author_id).maybeSingle();
+                    if (error) throw error;
+                    addedBy = data?.username || null;
+                  }
+                  const pdf = await createProblemPdf(statementRef.current, { title: localizedTitle, code: problem.code, difficulty: t(`problems.filters.${problem.difficulty}`), locale, url: window.location.href, addedBy, chapter: category });
+                  pdf.save(`${slugify(localizedTitle) || "scripticx-problem"}.pdf`);
+                } catch {
+                  toast.error(locale === "ro" ? "PDF-ul nu a putut fi generat. Încearcă din nou." : "Could not generate the PDF. Please try again.");
+                } finally { setExportingPdf(false); }
+              }}>
+                {exportingPdf ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                {exportingPdf ? (locale === "ro" ? "Se generează…" : "Generating…") : (locale === "ro" ? "Descarcă PDF" : "Download PDF")}
+              </Button>
             </div>
-            <div className="text-sm leading-7 text-foreground/90">
+            <div ref={statementRef} className="text-sm leading-7 text-foreground/90">
               <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
             </div>
           </div>
         )}
 
         {activePanel === "solution" && (
-          <div className="space-y-5 p-5">
+          <div className="space-y-5 p-4 md:p-5">
             {isSubmitting ? (
               <>
                 <div>
@@ -497,7 +537,7 @@ function ProblemContent() {
         )}
 
         {activePanel === "submissions" && (
-          <div className="space-y-4 p-5">
+          <div className="space-y-4 p-4 md:p-5">
             <div>
               <h2 className="font-semibold">{t("problemPage.submissions.title")}</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -571,13 +611,13 @@ function ProblemContent() {
           );
         })}
       </nav>
-      <div className="min-w-0 flex-1">{problemPanel}</div>
+      <div className="min-h-0 min-w-0 flex-1">{problemPanel}</div>
     </div>
   );
 
   const editorPanel = (
     <section className="flex h-full min-h-0 min-w-0 flex-col bg-background" aria-label={t("problemPage.editor.label")}>
-      <div className="flex h-9 shrink-0 items-center border-b bg-muted/25">
+      <div className="flex h-11 shrink-0 items-center border-b bg-muted/25 md:h-9">
         <div className="flex h-full min-w-0 items-center border-r border-t-2 border-t-foreground bg-background px-3 text-xs">
           <Code2 className="mr-2 size-3.5 text-muted-foreground" aria-hidden="true" />
           <span className="truncate font-medium">{fileName}</span>
@@ -589,6 +629,7 @@ function ProblemContent() {
         onChange={setCode}
         onSubmit={runCode}
         submitDisabled={isSubmitting}
+        submitShortcut={formatShortcut(shortcuts.submit)}
       >
         <div className="min-h-0 flex-1 overflow-hidden">
           <MiniScriptMonacoEditor
@@ -626,7 +667,7 @@ function ProblemContent() {
           />
         </div>
       </CodeEditorContextMenu>
-      <footer className="flex h-7 shrink-0 items-center justify-between border-t bg-muted/35 px-3 text-[11px] text-muted-foreground">
+      <footer className="flex h-11 shrink-0 items-center justify-between border-t bg-muted/35 px-3 pb-[env(safe-area-inset-bottom)] text-[11px] text-muted-foreground md:h-7 md:pb-0">
         <div className="flex items-center gap-2">
           <span>Ln {editorLine}</span>
           <span>·</span>
@@ -670,14 +711,14 @@ function ProblemContent() {
   return (
     <TooltipProvider>
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b bg-background px-3">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-2 md:h-12 md:gap-3 md:px-3">
           <div className="flex min-w-0 items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   size="icon-sm"
                   variant="outline"
-                  className="size-8 shrink-0 rounded-[var(--sx-radius-control)] bg-background shadow-xs"
+                  className="size-11 shrink-0 rounded-[var(--sx-radius-control)] bg-background shadow-xs md:size-8"
                   asChild
                 >
                   <Link href="/problems" aria-label={t("problemPage.actions.back")}>
@@ -713,7 +754,8 @@ function ProblemContent() {
               size="sm"
               onClick={() => void runCode()}
               disabled={isSubmitting}
-              className="h-8 px-3"
+              title={formatShortcut(shortcuts.submit) || undefined}
+              className="h-11 gap-1.5 px-3 md:h-8"
               aria-label={isSubmitting ? t("problemPage.actions.submitting") : t("problemPage.actions.submit")}
             >
               {isSubmitting ? <Loader2 className="animate-spin" /> : <Send />}
@@ -724,7 +766,7 @@ function ProblemContent() {
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <ResizablePanelGroup
             key={compactLayout ? "problem-compact" : "problem-desktop"}
             orientation={compactLayout ? "vertical" : "horizontal"}
@@ -732,8 +774,8 @@ function ProblemContent() {
           >
             <ResizablePanel
               id="problem-editor"
-              defaultSize={compactLayout ? "58%" : "66%"}
-              minSize={compactLayout ? "280px" : "360px"}
+              defaultSize={compactLayout ? "62%" : "66%"}
+              minSize={compactLayout ? "300px" : "360px"}
             >
               {editorPanel}
             </ResizablePanel>
@@ -747,9 +789,9 @@ function ProblemContent() {
             />
             <ResizablePanel
               id="problem-inspector"
-              defaultSize={compactLayout ? "42%" : "34%"}
-              minSize={compactLayout ? "190px" : "280px"}
-              maxSize={compactLayout ? "64%" : "52%"}
+              defaultSize={compactLayout ? "38%" : "34%"}
+              minSize={compactLayout ? "210px" : "280px"}
+              maxSize={compactLayout ? "52%" : "52%"}
             >
               {inspectorPanel}
             </ResizablePanel>

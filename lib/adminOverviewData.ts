@@ -1,3 +1,4 @@
+import { PERMISSIONS, type Permission } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { fetchUpdates } from "@/lib/updates";
@@ -30,17 +31,23 @@ async function countRows(
   return count ?? 0;
 }
 
-export async function fetchAdminCounts(): Promise<AdminCounts> {
+export function fetchAdminCounts(): Promise<AdminCounts> {
+  return fetchAdminCountsForPermissions(PERMISSIONS.map(permission => permission.key));
+}
+
+export async function fetchAdminCountsForPermissions(permissions: readonly Permission[]): Promise<AdminCounts> {
+  const count = (permission: Permission, table: string, apply?: (query: CountQuery) => CountQuery) =>
+    permissions.includes(permission) ? countRows(table, apply) : Promise.resolve(null);
   const [problems, users, bannedUsers, updates, contactTotal, contactNew, achievements, rewardProducts] =
     await Promise.all([
-      countRows("problems"),
-      countRows("profiles"),
-      countRows("profiles", (query) => query.eq("banned", true)),
-      countRows("updates"),
-      countRows("contact_messages"),
-      countRows("contact_messages", (query) => query.eq("status", "new")),
-      countRows("achievements"),
-      countRows("reward_products"),
+      count("admin.problems", "problems"),
+      count("admin.users", "profiles"),
+      count("admin.users", "profiles", (query) => query.eq("banned", true)),
+      count("admin.updates", "updates"),
+      count("admin.contact", "contact_messages"),
+      count("admin.contact", "contact_messages", (query) => query.eq("status", "new")),
+      count("admin.badges", "achievements"),
+      count("admin.shop", "reward_products"),
     ]);
 
   return {
@@ -88,14 +95,18 @@ async function fetchBannedUsers(): Promise<ProfileLite[]> {
   return (data ?? []) as ProfileLite[];
 }
 
-export async function fetchAdminOverview(): Promise<AdminOverviewRaw> {
+export function fetchAdminOverview(): Promise<AdminOverviewRaw> {
+  return fetchAdminOverviewForPermissions(PERMISSIONS.map(permission => permission.key));
+}
+
+export async function fetchAdminOverviewForPermissions(permissions: readonly Permission[]): Promise<AdminOverviewRaw> {
   const [openMessages, bannedUsers, latestUpdates, todaysChallenge, upcoming] =
     await Promise.allSettled([
-      fetchOpenMessages(),
-      fetchBannedUsers(),
-      fetchUpdates(),
-      api.dailyChallenges.getForDate(),
-      api.dailyChallenges.list(14),
+      permissions.includes("admin.contact") ? fetchOpenMessages() : Promise.resolve([]),
+      permissions.includes("admin.users") ? fetchBannedUsers() : Promise.resolve([]),
+      permissions.includes("admin.updates") ? fetchUpdates() : Promise.resolve([]),
+      permissions.includes("admin.daily") ? api.dailyChallenges.getForDate() : Promise.resolve(null),
+      permissions.includes("admin.daily") ? api.dailyChallenges.list(14) : Promise.resolve([]),
     ]);
 
   return {

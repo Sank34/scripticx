@@ -1,7 +1,7 @@
 "use client";
 
-import { use } from "react";
-import { notFound } from "next/navigation";
+import { use, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
 import { Markdown } from "@/components/Markdown";
@@ -17,14 +17,21 @@ export default function UpdatePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = use(params);
+  const router = useRouter();
   const { locale } = useLanguage();
 
-  const { data: update, isLoading, isError, refetch } = useQuery({
+  const { data: update, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["update", slug],
     queryFn: () => fetchUpdate(slug),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isLoading && !isFetching && !isError && !update) router.replace("/updates");
+  }, [isLoading, isFetching, isError, update, router]);
+
+  if (isLoading || (!isError && !update)) {
     return (
       <article className="mx-auto max-w-3xl space-y-7" aria-label={locale === "ro" ? "Se încarcă noutatea" : "Loading update"}>
         <div className="space-y-3 border-b border-border pb-7">
@@ -56,7 +63,7 @@ export default function UpdatePage({
   }
 
   if (!update) {
-    notFound();
+    return null;
   }
 
   const tagStyle =
@@ -103,7 +110,7 @@ export default function UpdatePage({
       </header>
 
       <div className="pt-7">
-        <Markdown className="space-y-5 text-[15px] leading-7">
+        <Markdown highlightCode codeLocale={locale} className="space-y-5 text-[15px] leading-7">
           {getLocalized(update.content_i18n, locale)}
         </Markdown>
       </div>

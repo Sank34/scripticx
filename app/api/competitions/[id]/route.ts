@@ -1,3 +1,4 @@
+import { hasPermission } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 import {
@@ -27,12 +28,13 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const { user, role } = await requireUser(request);
+    const { user, role, permissions } = await requireUser(request);
+    const managesCompetitions = hasPermission(role, permissions, "admin.competitions");
     const competition = await readCompetitionDetail(
       createAdminSupabase(),
       id,
       user.id,
-      role === "admin"
+      managesCompetitions
     );
     return NextResponse.json({ competition });
   } catch (error) {

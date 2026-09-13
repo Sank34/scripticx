@@ -1,5 +1,5 @@
 import { TeacherDashboard } from "@/components/workspaces/TeacherWorkspace";
 
 export default function TeacherWorkspacePage() {
-  return <TeacherDashboard />;
+  return <div data-tour="teacher-dashboard"><TeacherDashboard /></div>;
 }

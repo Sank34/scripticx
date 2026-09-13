@@ -67,7 +67,7 @@ const realtimeScopesByTable: Record<string, string[]> = {
   workspace_projects: ["student-planner"],
   user_achievements: ["profile", "admin", "community"],
   achievements: ["profile", "admin", "community"],
-  updates: ["updates", "dashboard", "admin"],
+  updates: ["update", "updates", "dashboard", "admin"],
   contact_messages: ["contact_messages", "admin"],
   notifications: ["notifications"],
   study_groups: ["groups", "community", "command-menu"],
@@ -221,13 +221,23 @@ function PlatformAccessSync() {
   const lastStatusRef = useRef<{
     lockdownEnabled: boolean;
     role?: string;
+    competitionRestricted?: boolean;
+    maintenanceBypass?: boolean;
+    lockdownMode?: string | null;
   } | null>(null);
 
   useEffect(() => {
     pathnameRef.current = pathname;
     const status = lastStatusRef.current;
+    if (status?.competitionRestricted && !["/competitions", "/docs", "/examples", "/lockdown"].some(path => pathname === path || pathname.startsWith(path + "/"))) {
+      router.replace("/competitions");
+      return;
+    }
+
     if (
       status?.lockdownEnabled &&
+      status.lockdownMode !== "competition" &&
+      !status.maintenanceBypass &&
       status.role !== "admin" &&
       pathname !== "/lockdown"
     ) {
@@ -274,12 +284,14 @@ function PlatformAccessSync() {
           if (statusResponse.ok) {
             const status = (await statusResponse.json()) as {
               lockdownEnabled?: boolean;
+              lockdownMode?: string | null;
             };
             lastStatusRef.current = {
               lockdownEnabled: status.lockdownEnabled === true,
+              lockdownMode: status.lockdownMode,
             };
             const currentPathname = pathnameRef.current;
-            if (status.lockdownEnabled && currentPathname !== "/lockdown") {
+            if (status.lockdownEnabled && status.lockdownMode !== "competition" && currentPathname !== "/lockdown") {
               router.replace(
                 `/lockdown?next=${encodeURIComponent(currentPathname)}`
               );
@@ -299,17 +311,30 @@ function PlatformAccessSync() {
         const status = (await response.json()) as {
           lockdownEnabled?: boolean;
           role?: string;
+    competitionRestricted?: boolean;
+    maintenanceBypass?: boolean;
+    lockdownMode?: string | null;
         };
         synchronizedToken = token;
         lastSyncAt = now;
         lastStatusRef.current = {
           lockdownEnabled: status.lockdownEnabled === true,
           role: status.role,
+          lockdownMode: status.lockdownMode,
+          competitionRestricted: status.competitionRestricted,
+          maintenanceBypass: status.maintenanceBypass,
         };
 
         const currentPathname = pathnameRef.current;
+        if (status.competitionRestricted && !["/competitions", "/docs", "/examples", "/lockdown"].some(path => currentPathname === path || currentPathname.startsWith(path + "/"))) {
+          router.replace("/competitions");
+          return;
+        }
+
         if (
           status.lockdownEnabled &&
+          status.lockdownMode !== "competition" &&
+          !status.maintenanceBypass &&
           status.role !== "admin" &&
           currentPathname !== "/lockdown"
         ) {

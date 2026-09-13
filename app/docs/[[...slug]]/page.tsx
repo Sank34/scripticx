@@ -57,5 +57,5 @@ export default async function DocsPage({ params }: DocsPageProps) {
   const localizedPage = getDocsLocalizedPage(normalized);
   if (!localizedPage.en && !localizedPage.ro) notFound();
 
-  return <DocsArticle localizedPage={localizedPage} navigation={navigation} />;
+  return <div data-tour="docs-overview"><DocsArticle localizedPage={localizedPage} navigation={navigation} /></div>;
 }

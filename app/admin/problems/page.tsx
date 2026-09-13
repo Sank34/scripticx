@@ -1,9 +1,10 @@
 "use client";
+import { useAuth } from "@/hooks/useAuth";
+import { DailyChallengeScheduler } from "@/components/admin/DailyChallengeScheduler";
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CalendarDays,
   ExternalLink,
   FileCode2,
   FlaskConical,
@@ -33,7 +34,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -42,7 +42,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -51,7 +50,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api, type DailyChallenge } from "@/lib/api";
 import { getLocalized } from "@/lib/getLocalized";
 import { markdownPreview } from "@/lib/markdownPreview";
 import { supabase } from "@/lib/supabase";
@@ -67,21 +65,12 @@ type AdminProblem = {
   title_i18n: Record<string, string> | null;
 };
 
-function formatDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseDateKey(dateKey: string) {
-  return new Date(`${dateKey}T00:00:00`);
-}
-
 function AdminProblemsContent() {
+  const { can, user } = useAuth();
+  const canManageProblems = can("admin.problems");
+  const canManageDaily = can("admin.daily");
   const { locale, t } = useLanguage();
   const queryClient = useQueryClient();
-  const todayKey = api.dailyChallenges.getTodayKey();
   const ro = locale === "ro";
   const copy = ro
     ? {
@@ -139,37 +128,26 @@ function AdminProblemsContent() {
         clearFilters: "Clear filters",
       };
 
-  const [schedulingDaily, setSchedulingDaily] = useState(false);
-  const [dailyDate, setDailyDate] = useState(todayKey);
-  const [dailyProblemId, setDailyProblemId] = useState("");
-  const [dailyBonusPoints, setDailyBonusPoints] = useState(25);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [openCreate, setOpenCreate] = useState(false);
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState("all");
-  const adminProblemsQueryKey = ["admin", "problems"] as const;
+  const adminProblemsQueryKey = ["admin", "problems", user?.id, canManageProblems] as const;
 
   const problemsQuery = useQuery({
     queryKey: adminProblemsQueryKey,
+    enabled: canManageProblems,
     queryFn: async () => {
-      const [{ data: problemRows, error }, scheduled] = await Promise.all([
-        supabase.from("problems").select("*").order("created_at", { ascending: false }),
-        api.dailyChallenges.list(90),
-      ]);
+      const { data: problemRows, error } = await supabase.from("problems").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       return {
         problems: (problemRows || []) as AdminProblem[],
-        dailyChallenges: scheduled,
       };
     },
     staleTime: 2 * 60 * 1000,
   });
 
   const problems = useMemo(() => problemsQuery.data?.problems || [], [problemsQuery.data?.problems]);
-  const dailyChallenges: DailyChallenge[] = problemsQuery.data?.dailyChallenges || [];
-  const scheduledDateKeys = new Set(
-    dailyChallenges.filter((challenge) => challenge.is_active).map((challenge) => challenge.challenge_date)
-  );
   const filteredProblems = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase(locale);
     return problems.filter((problem) => {
@@ -182,7 +160,7 @@ function AdminProblemsContent() {
   }, [difficulty, locale, problems, search]);
 
   async function handleDelete() {
-    if (!deleteId) return;
+    if (!deleteId || !canManageProblems) return;
     const { error } = await supabase.from("problems").delete().eq("id", deleteId);
     if (error) {
       toast.error(t("admin.problems.toast.deleteError"));
@@ -196,128 +174,29 @@ function AdminProblemsContent() {
     toast.success(t("admin.problems.toast.deleted"));
   }
 
-  async function handleScheduleDailyChallenge() {
-    if (!dailyProblemId) {
-      toast.error(copy.selectFirst);
-      return;
-    }
-    if (dailyDate < todayKey) {
-      setDailyDate(todayKey);
-      toast.error(copy.futureOnly);
-      return;
-    }
-    setSchedulingDaily(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Missing user");
-      await api.dailyChallenges.schedule({
-        date: dailyDate,
-        problemId: dailyProblemId,
-        bonusPoints: dailyBonusPoints,
-        createdBy: user.id,
-      });
-      await queryClient.invalidateQueries({ queryKey: adminProblemsQueryKey });
-      void queryClient.invalidateQueries({ queryKey: ["daily-challenge"] });
-      toast.success(copy.scheduleSuccess);
-    } catch {
-      toast.error(copy.scheduleError);
-    } finally {
-      setSchedulingDaily(false);
-    }
-  }
 
   return (
     <main className="sx-page space-y-8 pb-16">
       <PageHeader
         title={t("admin.problems.manageTitle")}
-        subtitle={copy.subtitle}
-        meta={<Badge variant="secondary">{problems.length}</Badge>}
-        action={(
+        subtitle={canManageProblems ? (canManageDaily ? copy.subtitle : copy.libraryDescription) : copy.dailyDescription}
+        meta={canManageProblems ? <Badge variant="secondary">{problems.length}</Badge> : undefined}
+        action={canManageProblems && (
+          <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/problems/chapters">{locale === "ro" ? "Capitole" : "Chapters"}</Link>
+          </Button>
           <Button onClick={() => setOpenCreate(true)}>
             <Plus />
             {t("admin.problems.create")}
           </Button>
+          </div>
         )}
       />
 
-      <section className="sx-surface overflow-hidden">
-        <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-muted-foreground" />
-              <h2 className="font-semibold">{copy.daily}</h2>
-              <Badge variant="outline">{dailyChallenges.length}</Badge>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{copy.dailyDescription}</p>
-          </div>
-        </div>
-        <div className="grid gap-3 p-5 lg:grid-cols-[190px_minmax(260px,1fr)_150px_auto]">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="justify-start font-normal">
-                <CalendarDays className="text-muted-foreground" />
-                {parseDateKey(dailyDate).toLocaleDateString(ro ? "ro-RO" : "en-US")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={parseDateKey(dailyDate)}
-                modifiers={{ scheduled: (date) => scheduledDateKeys.has(formatDateKey(date)) }}
-                modifiersClassNames={{ scheduled: "bg-[var(--sx-success-soft)] font-semibold text-foreground" }}
-                disabled={(date) => formatDateKey(date) < todayKey}
-                onSelect={(date) => {
-                  if (!date) return;
-                  const dateKey = formatDateKey(date);
-                  if (dateKey >= todayKey) setDailyDate(dateKey);
-                }}
-              />
-            </PopoverContent>
-          </Popover>
-          <Select value={dailyProblemId} onValueChange={setDailyProblemId}>
-            <SelectTrigger><SelectValue placeholder={copy.chooseProblem} /></SelectTrigger>
-            <SelectContent>
-              {problems.map((problem) => (
-                <SelectItem key={problem.id} value={problem.id}>
-                  {problem.code != null ? `#${problem.code} ` : ""}{getLocalized(problem.title_i18n, locale)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <label className="relative">
-            <span className="sr-only">{copy.bonus}</span>
-            <Input
-              className="pr-10"
-              min={0}
-              type="number"
-              value={dailyBonusPoints}
-              onChange={(event) => setDailyBonusPoints(Number(event.target.value))}
-            />
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">pts</span>
-          </label>
-          <Button onClick={() => void handleScheduleDailyChallenge()} disabled={schedulingDaily}>
-            {schedulingDaily ? copy.scheduling : copy.schedule}
-          </Button>
-        </div>
-        {dailyChallenges.length > 0 && (
-          <div className="border-t bg-muted/20 px-5 py-4">
-            <p className="mb-3 text-xs font-medium text-muted-foreground">{copy.scheduled}</p>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {dailyChallenges.slice(0, 6).map((challenge) => (
-                <div key={challenge.id} className="flex min-w-0 items-center justify-between gap-3 rounded-[var(--sx-radius-control)] border bg-background px-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{getLocalized(challenge.problems?.title_i18n, locale)}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{challenge.challenge_date} · +{challenge.bonus_points || 0} pts</p>
-                  </div>
-                  <Badge variant={challenge.is_active ? "secondary" : "outline"}>{challenge.is_active ? copy.active : copy.inactive}</Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
+      {canManageDaily && <DailyChallengeScheduler />}
 
-      <section className="space-y-4">
+      {canManageProblems && <><section className="space-y-4">
         <div className="flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold">{copy.library}</h2>
@@ -434,6 +313,7 @@ function AdminProblemsContent() {
           />
         </DialogContent>
       </Dialog>
+      </>}
     </main>
   );
 }
