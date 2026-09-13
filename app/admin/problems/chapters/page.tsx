@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getLocalized } from "@/lib/getLocalized";
+import { matchesProblemSearch } from "@/lib/problem-search";
 import { supabase } from "@/lib/supabase";
 import { fetchProblemChapters, validateProblemChapters, type ProblemChapter, type ChapterText } from "@/lib/problem-chapters";
 
@@ -86,8 +87,8 @@ function ChaptersEditor() {
               <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={topicIndex === 0} onClick={() => patch(chapter.id, { topics: move(chapter.topics, topicIndex, -1) })}>{ro ? "Mută în sus" : "Move up"}</Button><Button variant="outline" size="sm" disabled={topicIndex === chapter.topics.length - 1} onClick={() => patch(chapter.id, { topics: move(chapter.topics, topicIndex, 1) })}>{ro ? "Mută în jos" : "Move down"}</Button>{!topic.problemIds.length && <Button variant="ghost" size="sm" onClick={() => patch(chapter.id, { topics: chapter.topics.filter(t => t.id !== topic.id) })}>{ro ? "Elimină subcapitolul" : "Remove topic"}</Button>}</div>
               <Input aria-label={ro ? "Caută probleme pentru atribuire" : "Search problems to assign"} placeholder={ro ? "Caută după titlu sau număr…" : "Search by title or number…"} value={search} onChange={e => setSearch(e.target.value)} />
               <div className="max-h-72 overflow-y-auto rounded-md border border-border">
-                {problems.data.filter(p => `${p.code} ${getLocalized(p.title_i18n, locale)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(p => <label key={p.id} htmlFor={`${topic.id}-${p.id}`} className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 py-2 text-sm last:border-0 hover:bg-muted/50"><Checkbox id={`${topic.id}-${p.id}`} checked={topic.problemIds.includes(p.id)} onCheckedChange={checked => patch(chapter.id, { topics: chapter.topics.map(t => t.id === topic.id ? { ...t, problemIds: checked === true ? [...t.problemIds, p.id] : t.problemIds.filter(id => id !== p.id) } : t) })} /><span className="min-w-0 break-words">#{p.code} {getLocalized(p.title_i18n, locale)}</span></label>)}
-                {!problems.data.some(p => `${p.code} ${getLocalized(p.title_i18n, locale)}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className="p-3 text-sm text-muted-foreground">{ro ? "Nicio problemă găsită." : "No problems found."}</p>}
+                {problems.data.filter(p => matchesProblemSearch({ code: p.code, title: getLocalized(p.title_i18n, locale), description: "" }, search, locale)).map(p => <label key={p.id} htmlFor={`${topic.id}-${p.id}`} className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 py-2 text-sm last:border-0 hover:bg-muted/50"><Checkbox id={`${topic.id}-${p.id}`} checked={topic.problemIds.includes(p.id)} onCheckedChange={checked => patch(chapter.id, { topics: chapter.topics.map(t => t.id === topic.id ? { ...t, problemIds: checked === true ? [...t.problemIds, p.id] : t.problemIds.filter(id => id !== p.id) } : t) })} /><span className="min-w-0 break-words">#{p.code} {getLocalized(p.title_i18n, locale)}</span></label>)}
+                {!problems.data.some(p => matchesProblemSearch({ code: p.code, title: getLocalized(p.title_i18n, locale), description: "" }, search, locale)) && <p className="p-3 text-sm text-muted-foreground">{ro ? "Nicio problemă găsită." : "No problems found."}</p>}
               </div>
             </div>
             </AccordionContent>

@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { api, type DailyChallenge } from "@/lib/api";
 import { getLocalized } from "@/lib/getLocalized";
 import { markdownPreview } from "@/lib/markdownPreview";
+import { matchesProblemSearch } from "@/lib/problem-search";
 import { supabase } from "@/lib/supabase";
 import { ProblemChapters } from "@/components/problems/ProblemChapters";
 import { fetchProblemChapters, type ProblemTopic } from "@/lib/problem-chapters";
@@ -170,9 +171,6 @@ export default function ProblemsPage() {
   }, [problems, topic]);
 
   const filteredProblems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const codeQuery = query.replace(/^#/, "");
-
     return problems
       .filter((problem) => {
         if (topic && !topic.problemIds.includes(problem.id)) return false;
@@ -181,11 +179,14 @@ export default function ProblemsPage() {
           progressFilter !== "all" &&
           getProblemStatus(progress[problem.id]) !== progressFilter
         ) return false;
-        if (!query) return true;
-        if (/^\d+$/.test(codeQuery) && String(problem.code ?? "") === codeQuery) return true;
-        return (
-          getLocalized(problem.title_i18n, locale).toLowerCase().includes(query) ||
-          getLocalized(problem.description_i18n, locale).toLowerCase().includes(query)
+        return matchesProblemSearch(
+          {
+            code: problem.code,
+            title: getLocalized(problem.title_i18n, locale),
+            description: getLocalized(problem.description_i18n, locale),
+          },
+          search,
+          locale
         );
       })
       .sort((first, second) => {

@@ -52,6 +52,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalized } from "@/lib/getLocalized";
 import { markdownPreview } from "@/lib/markdownPreview";
+import { matchesProblemSearch } from "@/lib/problem-search";
 import { supabase } from "@/lib/supabase";
 
 type AdminProblem = {
@@ -129,6 +130,7 @@ function AdminProblemsContent() {
       };
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [openCreate, setOpenCreate] = useState(false);
   const [search, setSearch] = useState("");
   const [difficulty, setDifficulty] = useState("all");
@@ -149,29 +151,44 @@ function AdminProblemsContent() {
 
   const problems = useMemo(() => problemsQuery.data?.problems || [], [problemsQuery.data?.problems]);
   const filteredProblems = useMemo(() => {
-    const needle = search.trim().toLocaleLowerCase(locale);
     return problems.filter((problem) => {
       const title = getLocalized(problem.title_i18n, locale);
       const description = getLocalized(problem.description_i18n, locale);
-      const matchesSearch = !needle || `${problem.code ?? ""} ${title} ${description}`.toLocaleLowerCase(locale).includes(needle);
+      const matchesSearch = matchesProblemSearch({ code: problem.code, title, description }, search, locale);
       const matchesDifficulty = difficulty === "all" || problem.difficulty === difficulty;
       return matchesSearch && matchesDifficulty;
     });
   }, [difficulty, locale, problems, search]);
 
   async function handleDelete() {
-    if (!deleteId || !canManageProblems) return;
-    const { error } = await supabase.from("problems").delete().eq("id", deleteId);
-    if (error) {
-      toast.error(t("admin.problems.toast.deleteError"));
-      return;
+    if (!deleteId || !canManageProblems || deleting) return;
+    const targetId = deleteId;
+    setDeleting(true);
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw new Error(sessionError?.message || "Session expired");
+      }
+      const response = await fetch(`/api/admin/problems/${encodeURIComponent(targetId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || t("admin.problems.toast.deleteError"));
+
+      queryClient.setQueryData<typeof problemsQuery.data>(adminProblemsQueryKey, (current) =>
+        current ? { ...current, problems: current.problems.filter((problem) => problem.id !== targetId) } : current
+      );
+      void queryClient.invalidateQueries({ queryKey: ["problems"] });
+      setDeleteId(null);
+      toast.success(t("admin.problems.toast.deleted"));
+    } catch (error) {
+      toast.error(t("admin.problems.toast.deleteError"), {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setDeleting(false);
     }
-    queryClient.setQueryData<typeof problemsQuery.data>(adminProblemsQueryKey, (current) =>
-      current ? { ...current, problems: current.problems.filter((problem) => problem.id !== deleteId) } : current
-    );
-    void queryClient.invalidateQueries({ queryKey: ["problems"] });
-    setDeleteId(null);
-    toast.success(t("admin.problems.toast.deleted"));
   }
 
 
@@ -287,8 +304,10 @@ function AdminProblemsContent() {
             <AlertDialogDescription>{t("admin.problems.dialog.deleteDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("admin.problems.dialog.cancel")}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void handleDelete()}>{t("admin.problems.dialog.confirmDelete")}</AlertDialogAction>
+            <AlertDialogCancel disabled={deleting}>{t("admin.problems.dialog.cancel")}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" disabled={deleting} onClick={(event) => { event.preventDefault(); void handleDelete(); }}>
+              {deleting ? (ro ? "Se șterge…" : "Deleting…") : t("admin.problems.dialog.confirmDelete")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
