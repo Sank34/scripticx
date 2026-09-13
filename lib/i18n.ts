@@ -775,6 +775,8 @@ export const translations = {
 
       tabs: {
         description: "Problem",
+        hint: "Hint",
+        finalSolution: "Final solution",
         solution: "My solution",
         submissions: "Submissions",
       },
@@ -3066,6 +3068,8 @@ export const translations = {
 
       tabs: {
         description: "Cerință",
+        hint: "Indicație",
+        finalSolution: "Soluție finală",
         solution: "Soluția mea",
         submissions: "Submisii",
       },

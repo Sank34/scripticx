@@ -14,11 +14,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import RouteGuard from "@/components/RouteGuard";
+import { FocusModeButton } from "@/components/common/FocusModeButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RouteLoadingSkeleton } from "@/components/loading/RouteLoadingSkeleton";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useDesktopFocusMode } from "@/hooks/useDesktopFocusMode";
 import { competitionApiFetch } from "@/lib/competitionClient";
 import { isCompetitionRegistrationOpen } from "@/lib/competitions";
 import type { CompetitionSummary } from "@/lib/competitionTypes";
@@ -45,6 +47,7 @@ const phaseLabels = {
 function CompetitionsContent() {
   const { locale } = useLanguage();
   const language = locale === "ro" ? "ro" : "en";
+  const { active: focusMode, setActive: setFocusMode } = useDesktopFocusMode();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 30_000);
@@ -68,7 +71,7 @@ function CompetitionsContent() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8" data-tour="competitions-overview">
+    <div className={focusMode ? "fixed inset-0 z-[100] h-svh w-screen overflow-y-auto bg-background p-4 pb-10 sm:p-6 lg:p-8" : "mx-auto max-w-6xl space-y-8"} data-tour="competitions-overview">
       <header className="rounded-[var(--sx-radius-panel)] border border-foreground/10 bg-foreground px-6 py-7 text-background md:px-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
@@ -84,17 +87,20 @@ function CompetitionsContent() {
                 : "Solve timed problems, follow the ranking and keep every submitted solution."}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            {[
-              [live.length, language === "ro" ? "live" : "live"],
-              [upcoming.length, language === "ro" ? "viitoare" : "upcoming"],
-              [finished.length, language === "ro" ? "încheiate" : "finished"],
-            ].map(([value, label]) => (
-              <div key={String(label)} className="rounded-xl border border-background/15 px-4 py-3">
-                <p className="text-xl font-semibold">{value}</p>
-                <p className="text-xs text-background/60">{label}</p>
-              </div>
-            ))}
+          <div className="flex flex-wrap items-end justify-end gap-3">
+            <FocusModeButton active={focusMode} onChange={setFocusMode} locale={locale} />
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                [live.length, language === "ro" ? "live" : "live"],
+                [upcoming.length, language === "ro" ? "viitoare" : "upcoming"],
+                [finished.length, language === "ro" ? "încheiate" : "finished"],
+              ].map(([value, label]) => (
+                <div key={String(label)} className="rounded-xl border border-background/15 px-4 py-3">
+                  <p className="text-xl font-semibold">{value}</p>
+                  <p className="text-xs text-background/60">{label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </header>

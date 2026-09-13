@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { FocusModeButton } from "@/components/common/FocusModeButton";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useLanguage } from "@/components/LanguageProvider";
 import { RouteLoadingSkeleton } from "@/components/loading/RouteLoadingSkeleton";
@@ -28,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { useDesktopFocusMode } from "@/hooks/useDesktopFocusMode";
 import { api, type DailyChallenge } from "@/lib/api";
 import { getLocalized } from "@/lib/getLocalized";
 import { markdownPreview } from "@/lib/markdownPreview";
@@ -80,6 +82,7 @@ export default function ProblemsPage() {
   const [sort, setSort] = useState<SortMode>("code");
   const [view, setView] = useState<"chapters" | "all">("chapters");
   const [topic, setTopic] = useState<ProblemTopic | null>(null);
+  const { active: focusMode, setActive: setFocusMode } = useDesktopFocusMode();
   const libraryHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (view === "all") libraryHeading.current?.focus({ preventScroll: true });
@@ -235,20 +238,11 @@ export default function ProblemsPage() {
   }
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className={focusMode ? "fixed inset-0 z-[100] h-svh w-screen overflow-y-auto bg-background p-4 pb-10 sm:p-6 lg:p-8" : "space-y-8 pb-10"}>
       <PageHeader
         title={<span data-tour="problems-workspace">{t("problems.title")}</span>}
         subtitle={t("problems.subtitle")}
-        action={
-          user && continueProblem ? (
-            <Button asChild>
-              <Link href={`/problems/${continueProblem.id}`}>
-                {t("problems.actions.continue")}
-                <ArrowRight data-icon="inline-end" />
-              </Link>
-            </Button>
-          ) : null
-        }
+        action={<div className="flex flex-wrap items-center gap-2"><FocusModeButton active={focusMode} onChange={setFocusMode} locale={locale} />{user && continueProblem ? <Button asChild><Link href={`/problems/${continueProblem.id}`}>{t("problems.actions.continue")}<ArrowRight data-icon="inline-end" /></Link></Button> : null}</div>}
       />
 
       <section aria-label={t("problems.stats.label")} className="grid grid-cols-4 gap-1.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">

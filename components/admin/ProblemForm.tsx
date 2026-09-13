@@ -57,6 +57,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_PROBLEM_HINT_COST,
+  DEFAULT_PROBLEM_SOLUTION_COST,
+  type ProblemGuidanceAdmin,
+} from "@/lib/problem-guidance";
 import { supabase } from "@/lib/supabase";
 
 type EditorMode = "edit" | "split" | "preview";
@@ -72,6 +77,7 @@ type ProblemFormData = {
   description_i18n?: TranslationMap | null;
   difficulty?: string | null;
   id?: string;
+  guidance?: ProblemGuidanceAdmin | null;
   starter_code?: string | null;
   test_cases?: unknown;
   title_i18n?: TranslationMap | null;
@@ -165,6 +171,33 @@ function ProblemStatementPreview({
   );
 }
 
+function GuidanceMarkdownPreview({
+  emptyLabel,
+  heading,
+  markdown,
+}: {
+  emptyLabel: string;
+  heading: string;
+  markdown: string;
+}) {
+  return (
+    <article className="mx-auto w-full max-w-3xl px-6 py-10 sm:px-10 lg:py-14">
+      <div className="border-b pb-7">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{heading}</h1>
+      </div>
+      <div className="pt-7">
+        {markdown.trim() ? (
+          <Markdown className="text-[15px] leading-7 sm:text-base sm:leading-8">{markdown}</Markdown>
+        ) : (
+          <div className="grid min-h-56 place-items-center border border-dashed text-center text-sm text-muted-foreground">
+            {emptyLabel}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
 function ModeControl({
   mode,
   onChange,
@@ -227,11 +260,21 @@ export function ProblemForm({
         problemSettings: "Setările problemei",
         translation: "Traducere",
         translations: "Traduceri",
-        translationDescription: "Fiecare limbă păstrează propriul titlu și enunț.",
+        translationDescription: "Fiecare limbă păstrează propriul titlu, enunț și indicație.",
         removeTranslation: "Elimină traducerea",
         insertTemplate: "Inserează structura",
         emptyPreview: "Adaugă un titlu și un enunț pentru a construi preview-ul.",
         starterDescription: "Codul încărcat când utilizatorul deschide problema.",
+        guidance: "Indicații și soluție finală",
+        guidanceDescription: "Conținut opțional deblocat de cursanți cu puncte.",
+        hint: "Indicație",
+        hintDescription: "Scrie indicația în Markdown, cu aceeași previzualizare ca enunțul.",
+        solution: "Soluție finală",
+        solutionDescription: "Codul complet pe care îl pot vedea utilizatorii după deblocare.",
+        solutionNeedsHint: "Adaugă o indicație înainte de a configura soluția finală.",
+        hintCost: "Cost indicație",
+        solutionCost: "Cost soluție finală",
+        costDescription: "Puncte de recompensă retrase la deblocare.",
         testsDescription: "Cazurile sunt evaluate în ordinea afișată.",
         test: "Test",
         duplicateTest: "Duplică testul",
@@ -266,11 +309,21 @@ export function ProblemForm({
         problemSettings: "Problem settings",
         translation: "Translation",
         translations: "Translations",
-        translationDescription: "Each language keeps its own title and statement.",
+        translationDescription: "Each language keeps its own title, statement, and hint.",
         removeTranslation: "Remove translation",
         insertTemplate: "Insert structure",
         emptyPreview: "Add a title and statement to build the preview.",
         starterDescription: "The code loaded when a learner opens the problem.",
+        guidance: "Hints and final solution",
+        guidanceDescription: "Optional content learners unlock with reward points.",
+        hint: "Hint",
+        hintDescription: "Write the hint in Markdown with the same preview as the statement.",
+        solution: "Final solution",
+        solutionDescription: "The complete code learners see after unlocking.",
+        solutionNeedsHint: "Add a hint before configuring the final solution.",
+        hintCost: "Hint cost",
+        solutionCost: "Final solution cost",
+        costDescription: "Reward points deducted when the content is unlocked.",
         testsDescription: "Test cases are evaluated in the displayed order.",
         test: "Test",
         duplicateTest: "Duplicate test",
@@ -298,29 +351,41 @@ export function ProblemForm({
     () => normalizeTranslations(initialData?.description_i18n),
     [initialData?.description_i18n]
   );
+  const initialHints = useMemo(
+    () => normalizeTranslations(initialData?.guidance?.hint_i18n),
+    [initialData?.guidance?.hint_i18n]
+  );
   const initialLanguages = useMemo(
-    () => Array.from(new Set([...Object.keys(initialTitles), ...Object.keys(initialDescriptions)])),
-    [initialDescriptions, initialTitles]
+    () => Array.from(new Set([...Object.keys(initialTitles), ...Object.keys(initialDescriptions), ...Object.keys(initialHints)])),
+    [initialDescriptions, initialHints, initialTitles]
   );
 
   const [languages, setLanguages] = useState<string[]>(initialLanguages.length ? initialLanguages : ["en"]);
   const [activeLang, setActiveLang] = useState(initialLanguages[0] || "en");
   const [titleI18n, setTitleI18n] = useState<TranslationMap>(initialTitles);
   const [descriptionI18n, setDescriptionI18n] = useState<TranslationMap>(initialDescriptions);
+  const [hintI18n, setHintI18n] = useState<TranslationMap>(initialHints);
+  const [finalSolution, setFinalSolution] = useState(initialData?.guidance?.solution_code || "");
+  const [hintCost, setHintCost] = useState(String(initialData?.guidance?.hint_cost ?? DEFAULT_PROBLEM_HINT_COST));
+  const [solutionCost, setSolutionCost] = useState(String(initialData?.guidance?.solution_cost ?? DEFAULT_PROBLEM_SOLUTION_COST));
   const [starterCode, setStarterCode] = useState(initialData?.starter_code || "");
   const [difficulty, setDifficulty] = useState(initialData?.difficulty || "easy");
   const [testCases, setTestCases] = useState<ProblemTestCase[]>(() => normalizeTestCases(initialData?.test_cases));
   const [loading, setLoading] = useState(false);
   const [inlineMode, setInlineMode] = useState<EditorMode>("split");
+  const [hintMode, setHintMode] = useState<EditorMode>("split");
   const [studioMode, setStudioMode] = useState<EditorMode>("split");
   const [studioOpen, setStudioOpen] = useState(false);
   const [studioOptionsOpen, setStudioOptionsOpen] = useState(true);
 
   const title = titleI18n[activeLang] || "";
   const description = descriptionI18n[activeLang] || "";
+  const hint = hintI18n[activeLang] || "";
   const hasTitle = Object.values(titleI18n).some((value) => value.trim());
   const hasDescription = Object.values(descriptionI18n).some((value) => value.trim());
-  const canSave = hasTitle && hasDescription && testCases.length > 0 && !loading;
+  const hasHint = Object.values(hintI18n).some((value) => value.trim());
+  const hasFinalSolution = finalSolution.trim().length > 0;
+  const canSave = hasTitle && hasDescription && testCases.length > 0 && (!hasFinalSolution || hasHint) && !loading;
   const modes = { edit: copy.edit, split: copy.split, preview: copy.preview };
 
   function updateTitle(value: string) {
@@ -331,6 +396,10 @@ export function ProblemForm({
     setDescriptionI18n((current) => ({ ...current, [activeLang]: value }));
   }
 
+  function updateHint(value: string) {
+    setHintI18n((current) => ({ ...current, [activeLang]: value }));
+  }
+
   function addLanguage(language: string) {
     if (languages.includes(language)) {
       setActiveLang(language);
@@ -339,6 +408,7 @@ export function ProblemForm({
     setLanguages((current) => [...current, language]);
     setTitleI18n((current) => ({ ...current, [language]: "" }));
     setDescriptionI18n((current) => ({ ...current, [language]: "" }));
+    setHintI18n((current) => ({ ...current, [language]: "" }));
     setActiveLang(language);
   }
 
@@ -352,6 +422,11 @@ export function ProblemForm({
       return next;
     });
     setDescriptionI18n((current) => {
+      const next = { ...current };
+      delete next[language];
+      return next;
+    });
+    setHintI18n((current) => {
       const next = { ...current };
       delete next[language];
       return next;
@@ -384,6 +459,10 @@ export function ProblemForm({
       toast.error(t("admin.problems.form.validation.required"));
       return;
     }
+    if (hasFinalSolution && !hasHint) {
+      toast.error(copy.solutionNeedsHint);
+      return;
+    }
 
     setLoading(true);
     const payload = {
@@ -393,13 +472,28 @@ export function ProblemForm({
       difficulty,
       test_cases: testCases,
     };
+    const guidancePayload = {
+      hint_i18n: hintI18n,
+      solution_code: finalSolution.trim() || null,
+      hint_cost: Math.max(0, Math.min(1_000_000, Math.trunc(Number(hintCost) || 0))),
+      solution_cost: Math.max(0, Math.min(1_000_000, Math.trunc(Number(solutionCost) || 0))),
+    };
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Authentication required");
+      let problemId = initialData?.id;
       const result = initialData?.id
         ? await supabase.from("problems").update(payload).eq("id", initialData.id)
-        : await supabase.from("problems").insert([{ ...payload, author_id: user.id }]);
+        : await supabase.from("problems").insert([{ ...payload, author_id: user.id }]).select("id").single();
       if (result.error) throw result.error;
+      if (!problemId && result.data && typeof result.data === "object" && "id" in result.data) {
+        problemId = String(result.data.id);
+      }
+      if (!problemId) throw new Error("Problem id was not returned");
+      const guidanceResult = await supabase
+        .from("problem_guidance")
+        .upsert({ problem_id: problemId, ...guidancePayload }, { onConflict: "problem_id" });
+      if (guidanceResult.error) throw guidanceResult.error;
     } catch {
       toast.error(t("admin.problems.form.toast.saveError"));
       return;
@@ -453,6 +547,55 @@ export function ProblemForm({
           difficulty={difficulty}
           emptyLabel={copy.emptyPreview}
           title={title}
+        />
+      </div>
+    );
+
+    if (mode === "split") {
+      return (
+        <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-2">
+          <div className="min-h-0 border-b md:border-r md:border-b-0">{editor}</div>
+          <div className="min-h-0">{preview}</div>
+        </div>
+      );
+    }
+    return <div className="h-full min-h-0">{editor || preview}</div>;
+  }
+
+  function hintEditorSurface(mode: EditorMode) {
+    const editor = mode !== "preview" && (
+      <div className="h-full min-h-0 overflow-hidden bg-zinc-950">
+        <MiniScriptMonacoEditor
+          value={hint}
+          onChange={updateHint}
+          language="markdown"
+          path={`problem-hint-${activeLang}.md`}
+          theme="dark"
+          height="100%"
+          options={{
+            automaticLayout: true,
+            folding: true,
+            glyphMargin: false,
+            lineDecorationsWidth: 10,
+            lineNumbers: "on",
+            lineNumbersMinChars: 3,
+            minimap: { enabled: false },
+            padding: { top: 18, bottom: 22 },
+            quickSuggestions: false,
+            renderWhitespace: "selection",
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
+            wrappingIndent: "same",
+          }}
+        />
+      </div>
+    );
+    const preview = mode !== "edit" && (
+      <div className="note-scrollbar h-full min-h-0 overflow-y-auto bg-background">
+        <GuidanceMarkdownPreview
+          heading={copy.hint}
+          markdown={hint}
+          emptyLabel={copy.hintDescription}
         />
       </div>
     );
@@ -538,6 +681,41 @@ export function ProblemForm({
       <Separator />
 
       <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold">{copy.guidance}</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.costDescription}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            {copy.hintCost}
+            <Input
+              type="number"
+              min={0}
+              max={1_000_000}
+              step={1}
+              inputMode="numeric"
+              value={hintCost}
+              onChange={(event) => setHintCost(event.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            {copy.solutionCost}
+            <Input
+              type="number"
+              min={0}
+              max={1_000_000}
+              step={1}
+              inputMode="numeric"
+              value={solutionCost}
+              onChange={(event) => setSolutionCost(event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
         <h3 className="text-sm font-semibold">{copy.completeness}</h3>
         {[
           [copy.titleReady, hasTitle],
@@ -549,6 +727,9 @@ export function ProblemForm({
             <CheckCircle2 className={cn("size-4", complete ? "text-[var(--sx-success)]" : "text-muted-foreground/35")} />
           </div>
         ))}
+        {hasFinalSolution && !hasHint && (
+          <p className="text-xs leading-5 text-destructive">{copy.solutionNeedsHint}</p>
+        )}
         <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>{description.length} {copy.characters}</span>
           <span>{testCases.length} {copy.testCount}</span>
@@ -693,6 +874,64 @@ export function ProblemForm({
                   wordWrap: "on",
                 }}
               />
+            </section>
+
+            <section className="sx-surface overflow-hidden">
+              <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="size-4 text-muted-foreground" />
+                    <h3 className="font-semibold">{copy.guidance}</h3>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{copy.guidanceDescription}</p>
+                </div>
+                <ModeControl labels={modes} mode={hintMode} onChange={setHintMode} />
+              </div>
+              <div className="border-b px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold">{copy.hint} · {activeLang.toUpperCase()}</h4>
+                    <p className="mt-1 text-xs text-muted-foreground">{copy.hintDescription}</p>
+                  </div>
+                  <Badge variant="secondary">{hint.length} {copy.characters}</Badge>
+                </div>
+              </div>
+              <div className="h-[360px] min-h-0">{hintEditorSurface(hintMode)}</div>
+              <div className="border-b bg-muted/35 px-4 py-2 text-xs text-muted-foreground">
+                {copy.translation} · {activeLang.toUpperCase()}
+              </div>
+              <div className="space-y-3 border-b px-4 py-4">
+                <div>
+                  <h4 className="text-sm font-semibold">{copy.solution}</h4>
+                  <p className="mt-1 text-xs text-muted-foreground">{copy.solutionDescription}</p>
+                </div>
+                <div className="overflow-hidden border bg-zinc-950">
+                  <MiniScriptMonacoEditor
+                    height="320px"
+                    language="msp"
+                    path="final-solution.msp"
+                    value={finalSolution}
+                    onChange={setFinalSolution}
+                    theme="dark"
+                    options={{
+                      automaticLayout: true,
+                      bracketPairColorization: { enabled: true },
+                      folding: true,
+                      glyphMargin: false,
+                      guides: { bracketPairs: true, indentation: true },
+                      lineDecorationsWidth: 8,
+                      lineNumbers: "on",
+                      lineNumbersMinChars: 3,
+                      minimap: { enabled: false },
+                      padding: { top: 14, bottom: 18 },
+                      quickSuggestions: { other: true, comments: false, strings: false },
+                      snippetSuggestions: "top",
+                      suggestOnTriggerCharacters: true,
+                      wordWrap: "on",
+                    }}
+                  />
+                </div>
+              </div>
             </section>
 
             <section className="space-y-3">

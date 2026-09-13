@@ -14,6 +14,8 @@ import {
   Download,
   FileText,
   History,
+  Lightbulb,
+  LockKeyhole,
   Loader2,
   Send,
   XCircle,
@@ -28,6 +30,7 @@ import { Markdown } from "@/components/Markdown";
 import RouteGuard from "@/components/RouteGuard";
 import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
+import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import { SubmissionHistory } from "@/components/problems/SubmissionHistory";
 import {
   TestResultCard,
@@ -60,18 +63,26 @@ import { api, type DailyChallenge } from "@/lib/api";
 import { competitionApiFetch } from "@/lib/competitionClient";
 import type { StandardSubmission } from "@/lib/competitionTypes";
 import { getLocalized } from "@/lib/getLocalized";
+import {
+  fetchProblemGuidance,
+  getProblemGuidanceErrorCode,
+  normalizeProblemGuidance,
+  unlockProblemContent,
+  type ProblemGuidance,
+} from "@/lib/problem-guidance";
 import { supabase } from "@/lib/supabase";
 
 type EvaluationStatus = {
   status: "pending" | "evaluating" | "passed" | "failed";
 };
 
-type ProblemPanel = "description" | "solution" | "submissions";
+type ProblemPanel = "description" | "hint" | "solution" | "final-solution" | "submissions";
 
 type ProblemPageData = {
   problem: any;
   dailyChallenge: DailyChallenge | null;
   dailyCompleted: boolean;
+  guidance: ProblemGuidance;
 };
 
 function slugify(text: string): string {
@@ -144,6 +155,7 @@ function ProblemContent() {
   const [, setResult] = useState<string | null>(null);
   const [tabSize, setTabSize] = useState(2);
   const [testResults, setTestResults] = useState<ProblemTestResult[]>([]);
+  const [unlockingContent, setUnlockingContent] = useState<"hint" | "solution" | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
@@ -153,7 +165,9 @@ function ProblemContent() {
     return () => media.removeEventListener("change", sync);
   }, []);
 
-  const problemQueryKey = ["problems", "detail", id, user?.id] as const;
+  // Version the key so a persisted pre-guidance problem cache cannot hide the
+  // newly added hint and final-solution panels after an upgrade.
+  const problemQueryKey = ["problems", "detail", id, user?.id, "guidance-v1"] as const;
   const problemQuery = useQuery({
     queryKey: problemQueryKey,
     queryFn: async (): Promise<ProblemPageData> => {
@@ -162,6 +176,15 @@ function ProblemContent() {
         api.dailyChallenges.getForDate(),
       ]);
       if (problemResult.error) throw problemResult.error;
+
+      let guidance = normalizeProblemGuidance(null);
+      if (problemResult.data) {
+        try {
+          guidance = await fetchProblemGuidance(id);
+        } catch {
+          // Keep the problem usable if an older environment has not applied the migration yet.
+        }
+      }
 
       const dailyChallenge = todayChallenge?.problem_id === id ? todayChallenge : null;
       const completion = dailyChallenge && user
@@ -172,6 +195,7 @@ function ProblemContent() {
         problem: problemResult.data,
         dailyChallenge,
         dailyCompleted: Boolean(completion),
+        guidance,
       };
     },
     enabled: Boolean(id) && !authLoading,
@@ -181,6 +205,7 @@ function ProblemContent() {
   const problem = problemQuery.data?.problem ?? null;
   const dailyChallenge = problemQuery.data?.dailyChallenge ?? null;
   const dailyCompleted = problemQuery.data?.dailyCompleted ?? false;
+  const guidance = problemQuery.data?.guidance ?? normalizeProblemGuidance(null);
   const submissionsQueryKey = ["problems", "submissions", id, user?.id] as const;
   const submissionsQuery = useQuery<{ submissions: StandardSubmission[] }>({
     queryKey: submissionsQueryKey,
@@ -284,6 +309,37 @@ function ProblemContent() {
     }
   }
 
+  async function unlockContent(contentType: "hint" | "solution") {
+    if (!user || !problem || unlockingContent) return;
+    setUnlockingContent(contentType);
+    try {
+      await unlockProblemContent(id, contentType);
+      const refreshedGuidance = await fetchProblemGuidance(id);
+      queryClient.setQueryData<ProblemPageData>(problemQueryKey, (current) =>
+        current ? { ...current, guidance: refreshedGuidance } : current
+      );
+      queryClient.invalidateQueries({ queryKey: ["auth", "current"] });
+      window.dispatchEvent(new Event("profile-updated"));
+      toast.success(
+        locale === "ro"
+          ? contentType === "hint" ? "Indicația a fost deblocată." : "Soluția finală a fost deblocată."
+          : contentType === "hint" ? "Hint unlocked." : "Final solution unlocked."
+      );
+    } catch (error) {
+      const code = getProblemGuidanceErrorCode(error);
+      const message = code === "insufficient_reward_points"
+        ? locale === "ro" ? "Nu ai suficiente puncte disponibile." : "You do not have enough available points."
+        : code === "hint_required"
+          ? locale === "ro" ? "Deblochează întâi indicația." : "Unlock the hint first."
+          : code === "authentication_required"
+            ? locale === "ro" ? "Autentifică-te pentru a debloca acest conținut." : "Sign in to unlock this content."
+            : locale === "ro" ? "Conținutul nu a putut fi deblocat." : "This content could not be unlocked.";
+      toast.error(message);
+    } finally {
+      setUnlockingContent(null);
+    }
+  }
+
   const { bindings: shortcuts } = useKeyboardShortcuts();
   useShortcut("submit", () => { void runCode(); }, Boolean(problem && user && !isSubmitting), true);
 
@@ -336,6 +392,16 @@ function ProblemContent() {
       icon: Beaker,
       label: t("problemPage.tabs.solution"),
     },
+    ...(guidance.hasHint ? [{
+      id: "hint" as const,
+      icon: Lightbulb,
+      label: t("problemPage.tabs.hint"),
+    }] : []),
+    ...(guidance.hasSolution ? [{
+      id: "final-solution" as const,
+      icon: Code2,
+      label: t("problemPage.tabs.finalSolution"),
+    }] : []),
     {
       id: "submissions" as const,
       icon: History,
@@ -344,6 +410,11 @@ function ProblemContent() {
   ];
   const activePanelItem = panelItems.find((item) => item.id === activePanel) ?? panelItems[0];
   const ActivePanelIcon = activePanelItem.icon;
+  const panelGridClass = panelItems.length === 5
+    ? "grid-cols-5"
+    : panelItems.length === 4
+      ? "grid-cols-4"
+      : "grid-cols-3";
 
   const tabSizeControl = (
     <Select value={String(tabSize)} onValueChange={(value) => setTabSize(Number(value))}>
@@ -378,7 +449,7 @@ function ProblemContent() {
         )}
       </div>
 
-      <nav className="grid h-12 shrink-0 grid-cols-3 gap-1 border-b bg-muted/25 p-1 md:hidden" aria-label={t("problemPage.panelNavigation")}>
+      <nav className={`grid h-12 shrink-0 ${panelGridClass} gap-1 border-b bg-muted/25 p-1 md:hidden`} aria-label={t("problemPage.panelNavigation")}>
         {panelItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -394,7 +465,7 @@ function ProblemContent() {
               }`}
             >
               <Icon className="size-3.5" aria-hidden="true" />
-              {item.label}
+              <span className="truncate">{item.label}</span>
             </button>
           );
         })}
@@ -532,6 +603,88 @@ function ProblemContent() {
                   </Button>
                 }
               />
+            )}
+          </div>
+        )}
+
+        {activePanel === "hint" && (
+          <div className="space-y-5 p-4 md:p-5">
+            {guidance.hintUnlocked && guidance.hintI18n ? (
+              <div className="text-sm leading-7 text-foreground/90">
+                <Markdown>{getLocalized(guidance.hintI18n, locale)}</Markdown>
+              </div>
+            ) : (
+              <div className="space-y-4 border p-5">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-300">
+                    <Lightbulb className="size-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h2 className="font-semibold">{locale === "ro" ? "Indicație pentru problemă" : "Problem hint"}</h2>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {locale === "ro" ? "Deblochează un indiciu care te ajută să continui." : "Unlock a focused clue to help you continue."}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => void unlockContent("hint")}
+                  disabled={unlockingContent !== null || guidance.balance < guidance.hintCost}
+                >
+                  {unlockingContent === "hint" ? <Loader2 className="animate-spin" /> : <LockKeyhole />}
+                  {locale === "ro" ? `Deblochează pentru ${guidance.hintCost} pct` : `Unlock for ${guidance.hintCost} pts`}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  {locale === "ro" ? `${guidance.balance} puncte disponibile` : `${guidance.balance} points available`}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activePanel === "final-solution" && (
+          <div className="space-y-5 p-4 md:p-5">
+            {guidance.solutionUnlocked && guidance.solutionCode ? (
+              <div className="overflow-hidden border bg-zinc-950">
+                <HighlightedCodeBlock
+                  code={guidance.solutionCode}
+                  fileName="solution.msp"
+                  language="msp"
+                  languageLabel="MiniScript+"
+                  copiedLabel={locale === "ro" ? "Soluție copiată" : "Solution copied"}
+                  copyLabel={locale === "ro" ? "Copiază soluția" : "Copy solution"}
+                  copyErrorLabel={locale === "ro" ? "Soluția nu a putut fi copiată" : "Could not copy solution"}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4 border p-5">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-300">
+                    <Code2 className="size-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h2 className="font-semibold">{locale === "ro" ? "Soluție finală" : "Final solution"}</h2>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {guidance.hintUnlocked
+                        ? locale === "ro" ? "Vezi implementarea completă și compară-ți abordarea." : "See the complete implementation and compare your approach."
+                        : locale === "ro" ? "Deblochează mai întâi indicația, apoi soluția finală." : "Unlock the hint first, then the final solution."}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => void unlockContent("solution")}
+                  disabled={!guidance.hintUnlocked || unlockingContent !== null || guidance.balance < guidance.solutionCost}
+                >
+                  {unlockingContent === "solution" ? <Loader2 className="animate-spin" /> : <LockKeyhole />}
+                  {guidance.hintUnlocked
+                    ? locale === "ro" ? `Deblochează pentru ${guidance.solutionCost} pct` : `Unlock for ${guidance.solutionCost} pts`
+                    : locale === "ro" ? "Deblochează întâi indicația" : "Unlock the hint first"}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  {locale === "ro" ? `${guidance.balance} puncte disponibile` : `${guidance.balance} points available`}
+                </p>
+              </div>
             )}
           </div>
         )}

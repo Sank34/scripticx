@@ -28,6 +28,7 @@ import {
 import { GitHubCloneDialog } from "@/components/editor/GitHubCloneDialog";
 import { GitHubSourceControlPanel } from "@/components/editor/GitHubSourceControlPanel";
 import { ProjectExplorer } from "@/components/editor/ProjectExplorer";
+import { FocusModeButton } from "@/components/common/FocusModeButton";
 import { DebuggerStateCard } from "@/components/live/DebuggerStateCard";
 import { LiveConsolePanel } from "@/components/live/LiveConsolePanel";
 import { LiveSessionsPanel } from "@/components/live/LiveSessionsPanel";
@@ -77,6 +78,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { useDesktopFocusMode } from "@/hooks/useDesktopFocusMode";
 import {
   analyzeMiniScriptComplexity,
   type ComplexityAnalysis,
@@ -364,6 +366,7 @@ END
   const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [compactLayout, setCompactLayout] = useState(false);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true);
+  const { active: focusMode, setActive: setFocusMode } = useDesktopFocusMode();
   const [projectSearch, setProjectSearch] = useState("");
   const [projectLibrarySearch, setProjectLibrarySearch] = useState("");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -2233,7 +2236,7 @@ END
   );
 
   return (
-    <div data-tour="editor-workspace" className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+    <div data-tour="editor-workspace" className={`${focusMode ? "fixed inset-0 z-[100] h-svh w-screen" : "h-full"} flex min-h-0 flex-col overflow-hidden bg-background`}>
       <TooltipProvider>
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
           <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-2 md:h-12 md:gap-3 md:px-3">
@@ -2425,6 +2428,7 @@ END
                 <Share2 size={14} />
                 <span className="hidden md:inline">{locale === "ro" ? "Distribuie" : "Share"}</span>
               </Button>
+              <FocusModeButton active={focusMode} onChange={setFocusMode} locale={locale} />
             </div>
           </header>
 

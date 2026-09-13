@@ -193,7 +193,7 @@ export function PasswordlessSignInDialog({
                   onKeyDown={(event) => {
                     if (event.key === "Enter") void verifyCode();
                   }}
-                  className="h-12 text-center font-mono text-lg tracking-[0.35em]"
+                  className="h-12 text-center font-mono text-lg tracking-normal"
                   disabled={Boolean(action)}
                   autoFocus
                 />

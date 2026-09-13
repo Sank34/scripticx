@@ -37,6 +37,7 @@ import {
 
 import {
   Globe,
+  Coins,
   LoaderCircle,
   LogOut,
   Monitor,
@@ -287,6 +288,15 @@ export function Topbar() {
 
         {user ? (
           <>
+            <Link
+              href="/shop"
+              className="inline-flex items-center gap-1.5 rounded-[var(--sx-radius-control)] border border-border/70 px-2 py-1 text-xs font-medium tabular-nums transition-colors hover:bg-muted"
+              aria-label={locale === "ro" ? "Puncte disponibile" : "Available points"}
+              title={locale === "ro" ? "Puncte disponibile" : "Available points"}
+            >
+              <Coins className="size-3.5 text-amber-500" aria-hidden="true" />
+              <span>{Math.max(0, Number(profile?.reward_points) || 0).toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}</span>
+            </Link>
             <AttentionPopover />
 
             <NotificationsPopover user={user} />

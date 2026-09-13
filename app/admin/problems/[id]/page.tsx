@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLocalized } from "@/lib/getLocalized";
+import { type ProblemGuidanceAdmin } from "@/lib/problem-guidance";
 import { supabase } from "@/lib/supabase";
 
 function EditProblemContent() {
@@ -25,9 +26,20 @@ function EditProblemContent() {
   const problemQuery = useQuery({
     queryKey: ["admin", "problems", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("problems").select("*").eq("id", id).maybeSingle();
-      if (error) throw error;
-      return data;
+      const { data: problem, error: problemError } = await supabase.from("problems").select("*").eq("id", id).maybeSingle();
+      if (problemError) throw problemError;
+      let guidance: ProblemGuidanceAdmin | null = null;
+      try {
+        const { data, error } = await supabase
+          .from("problem_guidance")
+          .select("problem_id,hint_i18n,solution_code,hint_cost,solution_cost")
+          .eq("problem_id", id)
+          .maybeSingle();
+        if (!error) guidance = data as ProblemGuidanceAdmin | null;
+      } catch {
+        // Keep legacy projects editable until the guidance migration is applied.
+      }
+      return problem ? { ...problem, guidance: guidance as ProblemGuidanceAdmin | null } : null;
     },
     enabled: Boolean(id),
     staleTime: 2 * 60 * 1000,

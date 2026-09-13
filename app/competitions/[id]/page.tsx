@@ -26,7 +26,9 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useDesktopFocusMode } from "@/hooks/useDesktopFocusMode";
 import { useLanguage } from "@/components/LanguageProvider";
+import { FocusModeButton } from "@/components/common/FocusModeButton";
 import { Markdown } from "@/components/Markdown";
 import RouteGuard from "@/components/RouteGuard";
 import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
@@ -72,9 +74,9 @@ function CompetitionDetailSkeleton() {
     <div
       aria-busy="true"
       aria-label="Loading competition"
-      className="flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto p-3 md:p-4 xl:overflow-hidden"
+      className="flex h-full min-h-0 w-full flex-col overflow-y-auto bg-background xl:overflow-hidden"
     >
-      <header className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3">
+      <header className="shrink-0 border-b border-border bg-foreground px-4 py-3 text-background md:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Skeleton className="h-5 w-14 rounded-full bg-zinc-800" />
@@ -84,7 +86,7 @@ function CompetitionDetailSkeleton() {
               <Skeleton className="h-3 w-full max-w-80 bg-zinc-800" />
             </div>
           </div>
-          <div className="flex min-w-0 shrink-0 items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 lg:min-w-[310px]">
+          <div className="flex min-w-0 shrink-0 items-center gap-4 border-l border-background/15 bg-background/10 px-4 py-2 lg:min-w-[310px]">
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-center justify-between gap-4">
                 <Skeleton className="h-3 w-20 bg-zinc-700" />
@@ -97,24 +99,24 @@ function CompetitionDetailSkeleton() {
         </div>
       </header>
 
-      <div className="grid h-9 shrink-0 grid-cols-4 gap-1 rounded-lg bg-muted p-1">
+      <div className="grid h-10 shrink-0 grid-cols-4 border-b border-border bg-background p-0">
         {[0, 1, 2, 3].map((item) => (
           <Skeleton
             key={item}
-            className={item === 0 ? "h-full rounded-md bg-background shadow-sm" : "h-full rounded-md bg-muted-foreground/10"}
+            className={item === 0 ? "h-full bg-muted shadow-sm" : "h-full bg-muted-foreground/10"}
           />
         ))}
       </div>
 
-      <div className="grid min-h-[920px] flex-1 grid-rows-[160px_460px_280px] overflow-hidden rounded-xl border border-border bg-background xl:min-h-0 xl:grid-cols-[minmax(180px,18%)_minmax(420px,54%)_minmax(280px,28%)] xl:grid-rows-1">
+      <div className="grid min-h-[920px] flex-1 grid-rows-[160px_460px_280px] overflow-hidden border-y border-border bg-background xl:min-h-0 xl:grid-cols-[minmax(180px,18%)_minmax(420px,54%)_minmax(280px,28%)] xl:grid-rows-1">
         <section className="min-h-0 bg-muted/30">
           <div className="flex h-11 items-center justify-between border-b px-3">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-5 w-7 rounded-full" />
           </div>
           <div className="space-y-1.5 p-2">
-            <Skeleton className="h-16 w-full rounded-lg bg-foreground/10" />
-            <Skeleton className="h-14 w-full rounded-lg" />
+            <Skeleton className="h-16 w-full bg-foreground/10" />
+            <Skeleton className="h-14 w-full" />
           </div>
         </section>
 
@@ -165,6 +167,7 @@ function CompetitionDetailContent() {
   const { locale } = useLanguage();
   const language = locale === "ro" ? "ro" : "en";
   const ro = language === "ro";
+  const { active: focusMode, setActive: setFocusMode } = useDesktopFocusMode();
   const copy = ro
     ? {
         loadFailed: "Competiția nu a putut fi încărcată.",
@@ -462,6 +465,8 @@ function CompetitionDetailContent() {
     { id: "solution" as const, icon: Beaker, label: copy.panelSolution },
     { id: "submissions" as const, icon: History, label: copy.panelSubmissions },
   ];
+  const activePanelItem = panelItems.find((item) => item.id === activePanel) ?? panelItems[0];
+  const ActivePanelIcon = activePanelItem.icon;
 
   const canSubmitSelectedProblem = Boolean(
     selectedProblem &&
@@ -550,39 +555,42 @@ function CompetitionDetailContent() {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto p-3 md:p-4 xl:overflow-hidden">
-      <header className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-white">
+    <div className={`${focusMode ? "fixed inset-0 z-[100] h-svh w-screen" : "h-full"} flex min-h-0 w-full flex-col gap-0 overflow-y-auto bg-background p-0 xl:overflow-hidden`}>
+      <header className="shrink-0 border-b border-border bg-foreground px-4 py-3 text-background md:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 max-w-4xl">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="bg-white text-zinc-950 hover:bg-white">{competition.phase.toUpperCase()}</Badge>
-              {competition.visibility === "private" && <Badge variant="outline" className="border-zinc-700 text-zinc-300">Private</Badge>}
-              {competition.isParticipant && <Badge variant="outline" className="border-zinc-700 text-zinc-300">Participant</Badge>}
+              <Badge className="bg-background text-foreground hover:bg-background">{competition.phase.toUpperCase()}</Badge>
+              {competition.visibility === "private" && <Badge variant="outline" className="border-background/20 text-background/75">Private</Badge>}
+              {competition.isParticipant && <Badge variant="outline" className="border-background/20 text-background/75">Participant</Badge>}
               <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight">{competition.name}</h1>
             </div>
             {competition.description && (
-              <p className="mt-1 truncate text-xs text-zinc-400">{competition.description}</p>
+              <p className="mt-1 truncate text-xs text-background/65">{competition.description}</p>
             )}
           </div>
-          <div className="flex min-w-0 shrink-0 items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 lg:min-w-[310px]">
+          <div className="flex min-w-0 shrink-0 items-center gap-2 lg:min-w-[390px]">
+            <FocusModeButton active={focusMode} onChange={setFocusMode} locale={locale} />
+            <div className="flex min-w-0 flex-1 items-center gap-4 border-l border-background/15 bg-background/10 px-4 py-2">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-4 text-[11px] text-zinc-400"><span className="flex items-center gap-1.5"><AlarmClock className="size-3.5" />{copy.timeRemaining}</span><span>{competition.maximumPoints} {copy.pointsMax}</span></div>
-              <Progress value={elapsedPercent} className="mt-2 h-1 bg-zinc-700 [&_[data-slot=progress-indicator]]:bg-white" />
+              <div className="flex items-center justify-between gap-4 text-[11px] text-background/60"><span className="flex items-center gap-1.5"><AlarmClock className="size-3.5" />{copy.timeRemaining}</span><span>{competition.maximumPoints} {copy.pointsMax}</span></div>
+              <Progress value={elapsedPercent} className="mt-2 h-1 bg-background/20 [&_[data-slot=progress-indicator]]:bg-background" />
             </div>
             <p className="shrink-0 font-mono text-xl font-semibold tabular-nums tracking-tight">{competition.phase === "upcoming" ? formatCompetitionDuration(Math.max(0, Date.parse(competition.starts_at) - now.getTime())) : remaining}</p>
+            </div>
           </div>
         </div>
       </header>
 
       {competition.phase === "break" && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
           <PauseCircle className="mt-0.5 size-5 shrink-0" />
           <div><p className="text-sm font-semibold">{copy.breakTitle}</p><p className="mt-1 text-xs">{copy.breakDescription}</p></div>
         </div>
       )}
 
       {!competition.isParticipant && (
-        <Card>
+        <Card className="rounded-none border-x-0">
           <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-semibold">
@@ -604,21 +612,21 @@ function CompetitionDetailContent() {
         </Card>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 gap-3">
-        <TabsList className="grid h-9 w-full shrink-0 grid-cols-4">
-          <TabsTrigger value="arena"><Code2 className="size-4" />Arena</TabsTrigger>
-          <TabsTrigger value="overview"><Clock3 className="size-4" />Info</TabsTrigger>
-          <TabsTrigger value="ranking"><Trophy className="size-4" />{copy.ranking}</TabsTrigger>
-          <TabsTrigger value="submissions"><Send className="size-4" />{copy.submissions}</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="min-h-0 flex-1 gap-0">
+        <TabsList className="grid h-10 w-full shrink-0 grid-cols-4 rounded-none border-b bg-background p-0">
+          <TabsTrigger className="rounded-none" value="arena"><Code2 className="size-4" />Arena</TabsTrigger>
+          <TabsTrigger className="rounded-none" value="overview"><Clock3 className="size-4" />Info</TabsTrigger>
+          <TabsTrigger className="rounded-none" value="ranking"><Trophy className="size-4" />{copy.ranking}</TabsTrigger>
+          <TabsTrigger className="rounded-none" value="submissions"><Send className="size-4" />{copy.submissions}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="arena" className="mt-0 min-h-[960px] overflow-hidden p-1 xl:min-h-0">
+        <TabsContent value="arena" className="mt-0 min-h-[960px] overflow-hidden p-0 xl:min-h-0">
           {competition.problems.length === 0 ? (
-            <Card className="h-full"><CardContent className="flex h-full items-center justify-center p-10 text-center text-sm text-muted-foreground">{copy.hiddenProblems}</CardContent></Card>
+            <Card className="h-full rounded-none border-x-0"><CardContent className="flex h-full items-center justify-center p-10 text-center text-sm text-muted-foreground">{copy.hiddenProblems}</CardContent></Card>
           ) : (
             <ResizablePanelGroup
               orientation={isNarrowArena ? "vertical" : "horizontal"}
-              className="overflow-hidden rounded-xl border border-border bg-background"
+              className="overflow-hidden border-y border-border bg-background"
             >
               <ResizablePanel
                 id="competition-problems"
@@ -648,9 +656,9 @@ function CompetitionDetailContent() {
                                 [problem.id]: current[problem.id] ?? problem.problem.starter_code,
                               }));
                             }}
-                            className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                            className={`w-full rounded-none border px-3 py-2.5 text-left transition-colors ${
                               isSelected
-                                ? "border-zinc-950 bg-zinc-950 text-white"
+                                ? "border-foreground bg-foreground text-background"
                                 : "border-transparent bg-background hover:border-border hover:bg-muted"
                             }`}
                           >
@@ -658,11 +666,11 @@ function CompetitionDetailContent() {
                               <span className="text-xs font-semibold">{copy.problem} {index + 1}</span>
                               <span className="text-[11px] tabular-nums">{problem.max_points}p</span>
                             </div>
-                            <p className={`mt-1 truncate text-xs ${isSelected ? "text-zinc-300" : "text-muted-foreground"}`}>
+                            <p className={`mt-1 truncate text-xs ${isSelected ? "text-background/70" : "text-muted-foreground"}`}>
                               {getLocalized(problem.problem.title_i18n, locale)}
                             </p>
                             {attempts.length > 0 && (
-                              <p className={`mt-1.5 text-[10px] font-medium ${isSelected ? "text-zinc-300" : "text-emerald-700 dark:text-emerald-400"}`}>
+                              <p className={`mt-1.5 text-[10px] font-medium ${isSelected ? "text-background/70" : "text-[var(--sx-success)]"}`}>
                                 Best: {best}/{problem.max_points}
                               </p>
                             )}
@@ -700,10 +708,44 @@ function CompetitionDetailContent() {
                   >
                     <div className="min-h-0 flex-1">
                       <MiniScriptMonacoEditor
+                        key={selectedProblem?.id ?? "empty"}
+                        language="msp"
+                        path={`${selectedProblem?.problem_id ?? "solution"}.msp`}
+                        modelScope={`competition/${id}`}
+                        retainModels
+                        liveErrors
                         height="100%"
                         value={selectedProblem ? codeByProblem[selectedProblem.id] ?? selectedProblem.problem.starter_code : ""}
                         onChange={(value) => selectedProblem && setCodeByProblem((current) => ({ ...current, [selectedProblem.id]: value }))}
-                        options={{ automaticLayout: true, contextmenu: false, padding: { top: 16, bottom: 16 }, wordWrap: "on" }}
+                        options={{
+                          acceptSuggestionOnEnter: "on",
+                          automaticLayout: true,
+                          contextmenu: false,
+                          padding: { top: 16, bottom: 16 },
+                          smoothScrolling: true,
+                          wordWrap: "on",
+                          cursorSmoothCaretAnimation: "on",
+                          cursorBlinking: "smooth",
+                          fontLigatures: true,
+                          glyphMargin: true,
+                          inlineSuggest: { enabled: true },
+                          minimap: { enabled: !isNarrowArena, maxColumn: 90, scale: 0.8, showSlider: "mouseover" },
+                          lineNumbersMinChars: 4,
+                          bracketPairColorization: { enabled: true },
+                          guides: { bracketPairs: true, indentation: true },
+                          parameterHints: { enabled: true, cycle: true },
+                          quickSuggestions: { other: true, comments: false, strings: false },
+                          quickSuggestionsDelay: 60,
+                          scrollbar: { verticalScrollbarSize: 9, horizontalScrollbarSize: 9 },
+                          snippetSuggestions: "top",
+                          stickyScroll: { enabled: true },
+                          suggestOnTriggerCharacters: true,
+                          tabSize: 2,
+                          insertSpaces: true,
+                          wordBasedSuggestions: "currentDocument",
+                          wrappingIndent: "same",
+                          scrollBeyondLastLine: false,
+                        }}
                       />
                     </div>
                   </CodeEditorContextMenu>
@@ -741,19 +783,9 @@ function CompetitionDetailContent() {
                 defaultSize="28%"
                 minSize={isNarrowArena ? "260px" : "280px"}
               >
-                <div className="flex h-full min-h-0 flex-col bg-background">
-                  <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-muted/60 px-4 py-2">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-muted-foreground">{copy.prompt}</p>
-                      <h2 className="truncate text-sm font-semibold">
-                        {selectedProblem ? getLocalized(selectedProblem.problem.title_i18n, locale) : "—"}
-                      </h2>
-                    </div>
-                    {selectedProblem && <Badge variant="secondary" className="shrink-0">{selectedProblem.max_points} {copy.points}</Badge>}
-                  </div>
-
+                <div className="flex h-full min-h-0 min-w-0 bg-background">
                   <nav
-                    className="grid h-10 shrink-0 grid-cols-3 border-b bg-muted/25 p-1"
+                    className="hidden w-12 shrink-0 flex-col items-center gap-0.5 border-r bg-muted/20 py-1.5 md:flex"
                     aria-label={copy.panelNavigation}
                   >
                     {panelItems.map((item) => {
@@ -765,7 +797,65 @@ function CompetitionDetailContent() {
                           key={item.id}
                           onClick={() => setActivePanel(item.id)}
                           aria-pressed={isActive}
-                          className={`relative flex items-center justify-center gap-1.5 rounded-[var(--sx-radius-control)] text-xs font-medium transition-colors ${
+                          aria-label={item.label}
+                          title={item.label}
+                          className={`relative grid size-10 place-items-center rounded-md transition-colors ${
+                            isActive
+                              ? "bg-muted text-foreground"
+                              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                          }`}
+                        >
+                          {isActive && <span className="absolute inset-y-2 left-0 w-0.5 rounded-r bg-foreground" />}
+                          <Icon className="size-[18px]" aria-hidden="true" />
+                          {item.id === "solution" && selectedResults.length > 0 && (
+                            <span
+                              className={`absolute top-1.5 right-1.5 size-1.5 rounded-full ${
+                                selectedPerfect ? "bg-[var(--sx-success)]" : "bg-destructive"
+                              }`}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </nav>
+
+                  <div className="min-h-0 min-w-0 flex-1">
+                    <div className="flex h-full min-h-0 flex-col bg-background">
+                  <div className="hidden h-10 shrink-0 items-center justify-between border-b px-3 md:flex">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <ActivePanelIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                      <span className="truncate text-xs font-semibold">{activePanelItem.label}</span>
+                    </div>
+                    {activePanel === "solution" && selectedResults.length > 0 && (
+                      <span className={selectedPerfect ? "text-xs font-semibold text-[var(--sx-success)]" : "text-xs font-semibold text-destructive"}>
+                        {selectedScore}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border-b bg-muted/60 px-4 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">{copy.prompt}</p>
+                      <h2 className="truncate text-sm font-semibold">
+                        {selectedProblem ? getLocalized(selectedProblem.problem.title_i18n, locale) : "—"}
+                      </h2>
+                    </div>
+                    {selectedProblem && <Badge variant="secondary" className="shrink-0">{selectedProblem.max_points} {copy.points}</Badge>}
+                  </div>
+
+                  <nav
+                    className="grid h-10 shrink-0 grid-cols-3 border-b bg-muted/25 p-1 md:hidden"
+                    aria-label={copy.panelNavigation}
+                  >
+                    {panelItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activePanel === item.id;
+                      return (
+                        <button
+                          type="button"
+                          key={item.id}
+                          onClick={() => setActivePanel(item.id)}
+                          aria-pressed={isActive}
+                          className={`relative flex items-center justify-center gap-1.5 rounded-none text-xs font-medium transition-colors ${
                             isActive
                               ? "border border-border bg-background text-foreground"
                               : "text-muted-foreground hover:text-foreground"
@@ -797,7 +887,7 @@ function CompetitionDetailContent() {
                     ) : activePanel === "solution" ? (
                       <div className="space-y-5 p-5">
                         {selectedResults.length === 0 ? (
-                          <div className="rounded-[var(--sx-radius-card)] border border-dashed px-5 py-10 text-center">
+                          <div className="border border-dashed px-5 py-10 text-center">
                             <Beaker className="mx-auto size-6 text-muted-foreground/50" />
                             <p className="mt-3 text-sm font-medium">{copy.solutionEmptyTitle}</p>
                             <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -818,7 +908,7 @@ function CompetitionDetailContent() {
                                 {selectedPerfect ? copy.solutionPerfect : copy.solutionPartial}
                               </p>
                             </div>
-                            <div className="divide-y overflow-hidden rounded-[var(--sx-radius-card)] border">
+                            <div className="divide-y overflow-hidden border">
                               {selectedResults.map((result, index) => (
                                 <div
                                   key={index}
@@ -879,6 +969,8 @@ function CompetitionDetailContent() {
                       </div>
                     )}
                   </ScrollArea>
+                    </div>
+                  </div>
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -887,21 +979,21 @@ function CompetitionDetailContent() {
 
         <TabsContent value="overview" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">
           <div className="grid gap-4 md:grid-cols-3">
-            {[{ icon: Users, label: copy.participants, value: competition.participantCount }, { icon: Medal, label: copy.maximumScore, value: competition.maximumPoints }, { icon: Code2, label: copy.problems, value: competition.problemCount }].map((item) => <Card key={item.label}><CardContent className="p-5"><item.icon className="size-5 text-muted-foreground" /><p className="mt-4 text-2xl font-semibold">{item.value}</p><p className="mt-1 text-sm text-muted-foreground">{item.label}</p></CardContent></Card>)}
+            {[{ icon: Users, label: copy.participants, value: competition.participantCount }, { icon: Medal, label: copy.maximumScore, value: competition.maximumPoints }, { icon: Code2, label: copy.problems, value: competition.problemCount }].map((item) => <Card className="rounded-none border-x-0" key={item.label}><CardContent className="p-5"><item.icon className="size-5 text-muted-foreground" /><p className="mt-4 text-2xl font-semibold">{item.value}</p><p className="mt-1 text-sm text-muted-foreground">{item.label}</p></CardContent></Card>)}
           </div>
-          <Card className="mt-4">
+          <Card className="mt-4 rounded-none border-x-0">
             <CardContent className="space-y-4 p-5">
               <h2 className="font-semibold">{copy.schedule}</h2>
               <div className="grid gap-3 text-sm md:grid-cols-3">
-                <div className="rounded-xl bg-muted/60 p-4">
+                <div className="bg-muted/60 p-4">
                   <p className="text-xs text-muted-foreground">{copy.starts}</p>
                   <p className="mt-1 font-medium">{new Date(competition.starts_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p>
                 </div>
-                <div className="rounded-xl bg-muted/60 p-4">
+                <div className="bg-muted/60 p-4">
                   <p className="text-xs text-muted-foreground">{copy.ends}</p>
                   <p className="mt-1 font-medium">{new Date(competition.ends_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p>
                 </div>
-                <div className={`rounded-xl p-4 ${registrationOpen ? "bg-muted/60" : "bg-amber-50 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200"}`}>
+                <div className={`p-4 ${registrationOpen ? "bg-muted/60" : "bg-amber-50 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200"}`}>
                   <p className="text-xs opacity-70">{copy.registrationDeadline}</p>
                   <p className="mt-1 font-medium">{registrationClosesLabel}</p>
                   {!competition.registration_ends_at && (
@@ -913,7 +1005,7 @@ function CompetitionDetailContent() {
                 <div className="space-y-2">
                   <p className="text-sm font-semibold">{copy.breaks}</p>
                   {competition.breaks.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
+                    <div key={item.id} className="flex items-center justify-between border px-4 py-3 text-sm">
                       <span>{item.title}</span>
                       <span className="text-muted-foreground">
                         {new Date(item.starts_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}–{new Date(item.ends_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}
@@ -927,7 +1019,7 @@ function CompetitionDetailContent() {
         </TabsContent>
 
         <TabsContent value="ranking" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">
-          <Card className="my-1 gap-0 py-0">
+          <Card className="my-1 gap-0 rounded-none border-x-0 py-0">
             <div className="flex flex-col gap-3 border-b border-border bg-muted/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white">
@@ -995,7 +1087,7 @@ function CompetitionDetailContent() {
                     return (
                       <div
                         key={entry.user_id}
-                        className={`grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-3 transition-colors sm:grid-cols-[52px_minmax(0,1fr)_auto] sm:px-4 ${rowStyle}`}
+                        className={`grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 border px-3 py-3 transition-colors sm:grid-cols-[52px_minmax(0,1fr)_auto] sm:px-4 ${rowStyle}`}
                       >
                         <div className={`flex size-9 items-center justify-center rounded-full text-xs font-bold tabular-nums ring-4 ${rankStyle}`}>
                           {podium ? (
@@ -1039,7 +1131,7 @@ function CompetitionDetailContent() {
         </TabsContent>
 
         <TabsContent value="submissions" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">
-          <Card><CardContent className="p-5"><div className="mb-5"><h2 className="font-semibold">{copy.mySubmissions}</h2><p className="mt-1 text-sm text-muted-foreground">{copy.submissionDescription}</p></div>{submissionsQuery.isPending ? <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div> : <SubmissionHistory locale={locale} items={(submissionsQuery.data?.submissions || []).map((submission) => { const problem = problemMap.get(submission.competition_problem_id); return { code: submission.code, id: submission.id, label: problem ? getLocalized(problem.problem.title_i18n, locale) : copy.problem, maximumPoints: problem?.max_points, points: submission.points, score: submission.score, submittedAt: submission.submitted_at }; })} />}</CardContent></Card>
+          <Card className="rounded-none border-x-0"><CardContent className="p-5"><div className="mb-5"><h2 className="font-semibold">{copy.mySubmissions}</h2><p className="mt-1 text-sm text-muted-foreground">{copy.submissionDescription}</p></div>{submissionsQuery.isPending ? <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div> : <SubmissionHistory locale={locale} items={(submissionsQuery.data?.submissions || []).map((submission) => { const problem = problemMap.get(submission.competition_problem_id); return { code: submission.code, id: submission.id, label: problem ? getLocalized(problem.problem.title_i18n, locale) : copy.problem, maximumPoints: problem?.max_points, points: submission.points, score: submission.score, submittedAt: submission.submitted_at }; })} />}</CardContent></Card>
         </TabsContent>
       </Tabs>
     </div>
