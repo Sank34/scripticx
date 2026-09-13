@@ -19,6 +19,7 @@ export type CompetitionRow = {
   slug: string;
   name: string;
   description: string;
+  info_i18n: Record<string, string> | null;
   visibility: "public" | "private";
   status: "draft" | "published" | "cancelled";
   starts_at: string;
@@ -63,7 +64,7 @@ export async function listCompetitionSummaries(
 ): Promise<CompetitionSummary[]> {
   let query = admin
     .from("competitions")
-    .select("*")
+    .select("id, slug, name, description, visibility, status, starts_at, ends_at, registration_ends_at, reminder_interval_minutes, show_live_leaderboard, created_at, created_by")
     .order("starts_at", { ascending: false });
   if (!includeDrafts) query = query.eq("status", "published");
 

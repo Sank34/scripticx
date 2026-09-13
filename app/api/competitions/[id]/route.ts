@@ -23,6 +23,24 @@ import { createAdminSupabase } from "@/lib/supabaseServer";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+function localizedMarkdownField(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpError(400, "Competition info translations are invalid");
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > 8) {
+    throw new HttpError(400, "Too many competition info translations");
+  }
+  const result: Record<string, string> = {};
+  for (const [language, text] of entries) {
+    if (!/^[a-z]{2}(?:-[A-Z]{2})?$/.test(language) || typeof text !== "string" || text.length > 50_000) {
+      throw new HttpError(400, "Competition info translations are invalid");
+    }
+    result[language] = text;
+  }
+  return result;
+}
+
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
@@ -51,7 +69,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     await requireAdmin(request);
     const { id } = await context.params;
     const safeId = competitionId(id);
-    const body = jsonObject(await readJsonBody(request, 32_000));
+    const body = jsonObject(await readJsonBody(request, 100_000));
     const admin = createAdminSupabase();
     const { data: current, error: currentError } = await admin
       .from("competitions")
@@ -69,6 +87,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       body.description === undefined
         ? current.description
         : stringField(body.description, { max: 5_000 });
+    const infoI18n =
+      body.infoI18n === undefined
+        ? current.info_i18n || {}
+        : localizedMarkdownField(body.infoI18n);
     const slug =
       body.slug === undefined
         ? current.slug
@@ -147,6 +169,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       .from("competitions")
       .update({
         description,
+        info_i18n: infoI18n,
         ends_at: new Date(endsAt).toISOString(),
         name,
         registration_ends_at: registrationEndsAt,

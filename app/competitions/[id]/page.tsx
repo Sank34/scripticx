@@ -199,6 +199,8 @@ function CompetitionDetailContent() {
         points: "pct",
         participants: "Participanți",
         maximumScore: "Punctaj maxim",
+        infoTitle: "Informații și regulament",
+        infoEmpty: "Organizatorul nu a adăugat încă informații pentru această competiție.",
         schedule: "Program",
         starts: "Începe",
         ends: "Se încheie",
@@ -259,6 +261,8 @@ function CompetitionDetailContent() {
         points: "pts",
         participants: "Participants",
         maximumScore: "Maximum score",
+        infoTitle: "Competition information and rules",
+        infoEmpty: "The organiser has not added competition information yet.",
         schedule: "Schedule",
         starts: "Starts",
         ends: "Ends",
@@ -516,6 +520,7 @@ function CompetitionDetailContent() {
   const registrationClosesLabel = Number.isFinite(registrationClosesDate.getTime())
     ? registrationClosesDate.toLocaleString(ro ? "ro-RO" : "en-US")
     : copy.dateUnavailable;
+  const competitionInfo = getLocalized(competition.info_i18n, language) || competition.description;
 
   if (competition.access === "invite_required") {
     return (
@@ -978,44 +983,32 @@ function CompetitionDetailContent() {
         </TabsContent>
 
         <TabsContent value="overview" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            {[{ icon: Users, label: copy.participants, value: competition.participantCount }, { icon: Medal, label: copy.maximumScore, value: competition.maximumPoints }, { icon: Code2, label: copy.problems, value: competition.problemCount }].map((item) => <Card className="rounded-none border-x-0" key={item.label}><CardContent className="p-5"><item.icon className="size-5 text-muted-foreground" /><p className="mt-4 text-2xl font-semibold">{item.value}</p><p className="mt-1 text-sm text-muted-foreground">{item.label}</p></CardContent></Card>)}
+          <div className="grid grid-cols-3 gap-2">
+            {[{ icon: Users, label: copy.participants, value: competition.participantCount }, { icon: Medal, label: copy.maximumScore, value: competition.maximumPoints }, { icon: Code2, label: copy.problems, value: competition.problemCount }].map((item) => <Card className="min-w-0 rounded-none border-x-0" key={item.label}><CardContent className="flex min-w-0 items-center gap-2 p-2.5 sm:gap-3 sm:p-3"><div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted sm:size-8"><item.icon className="size-3.5 text-muted-foreground sm:size-4" /></div><div className="min-w-0"><p className="text-base font-semibold tabular-nums leading-none sm:text-lg">{item.value}</p><p className="mt-1 truncate text-[10px] leading-tight text-muted-foreground sm:text-[11px]">{item.label}</p></div></CardContent></Card>)}
           </div>
-          <Card className="mt-4 rounded-none border-x-0">
-            <CardContent className="space-y-4 p-5">
-              <h2 className="font-semibold">{copy.schedule}</h2>
-              <div className="grid gap-3 text-sm md:grid-cols-3">
-                <div className="bg-muted/60 p-4">
-                  <p className="text-xs text-muted-foreground">{copy.starts}</p>
-                  <p className="mt-1 font-medium">{new Date(competition.starts_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p>
+          <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+            <Card className="rounded-none border-x-0">
+              <CardContent className="p-5 sm:p-6">
+                <div className="mb-4 flex items-center gap-2 border-b pb-3">
+                  <FileText className="size-4 text-muted-foreground" />
+                  <h2 className="font-semibold">{copy.infoTitle}</h2>
                 </div>
-                <div className="bg-muted/60 p-4">
-                  <p className="text-xs text-muted-foreground">{copy.ends}</p>
-                  <p className="mt-1 font-medium">{new Date(competition.ends_at).toLocaleString(ro ? "ro-RO" : "en-US")}</p>
+                {competitionInfo.trim() ? <Markdown highlightCode codeLocale={language} className="text-[15px] leading-7">{competitionInfo}</Markdown> : <p className="text-sm text-muted-foreground">{copy.infoEmpty}</p>}
+              </CardContent>
+            </Card>
+            <Card className="rounded-none border-x-0">
+              <CardContent className="p-4">
+                <h2 className="mb-3 font-semibold">{copy.schedule}</h2>
+                <div className="divide-y rounded-lg border text-sm">
+                  <div className="flex items-start justify-between gap-3 px-3 py-2.5"><span className="text-xs text-muted-foreground">{copy.starts}</span><span className="text-right text-xs font-medium">{new Date(competition.starts_at).toLocaleString(ro ? "ro-RO" : "en-US")}</span></div>
+                  <div className="flex items-start justify-between gap-3 px-3 py-2.5"><span className="text-xs text-muted-foreground">{copy.ends}</span><span className="text-right text-xs font-medium">{new Date(competition.ends_at).toLocaleString(ro ? "ro-RO" : "en-US")}</span></div>
+                  <div className={`flex items-start justify-between gap-3 px-3 py-2.5 ${registrationOpen ? "" : "bg-amber-50 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200"}`}><span className="text-xs opacity-70">{copy.registrationDeadline}</span><span className="text-right text-xs font-medium">{registrationClosesLabel}</span></div>
                 </div>
-                <div className={`p-4 ${registrationOpen ? "bg-muted/60" : "bg-amber-50 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200"}`}>
-                  <p className="text-xs opacity-70">{copy.registrationDeadline}</p>
-                  <p className="mt-1 font-medium">{registrationClosesLabel}</p>
-                  {!competition.registration_ends_at && (
-                    <p className="mt-1 text-xs opacity-70">{copy.registrationOpenUntilEnd}</p>
-                  )}
-                </div>
-              </div>
-              {competition.breaks.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold">{copy.breaks}</p>
-                  {competition.breaks.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between border px-4 py-3 text-sm">
-                      <span>{item.title}</span>
-                      <span className="text-muted-foreground">
-                        {new Date(item.starts_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}–{new Date(item.ends_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {!competition.registration_ends_at && <p className="mt-2 text-[11px] text-muted-foreground">{copy.registrationOpenUntilEnd}</p>}
+                {competition.breaks.length > 0 && <div className="mt-4"><p className="mb-2 text-xs font-semibold">{copy.breaks}</p><div className="divide-y rounded-lg border text-xs">{competition.breaks.map((item) => <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2"><span className="truncate">{item.title}</span><span className="shrink-0 text-muted-foreground">{new Date(item.starts_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}–{new Date(item.ends_at).toLocaleTimeString(ro ? "ro-RO" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span></div>)}</div></div>}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="ranking" className="mt-0 min-h-0 overflow-y-auto p-1 pb-4">

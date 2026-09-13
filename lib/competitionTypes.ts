@@ -5,6 +5,7 @@ export type CompetitionSummary = {
   slug: string;
   name: string;
   description: string;
+  info_i18n?: Record<string, string> | null;
   visibility: "public" | "private";
   status: "draft" | "published" | "cancelled";
   starts_at: string;
