@@ -64,8 +64,11 @@ export default function UpdatesLayoutClient({ children }: { children: React.Reac
         }
       />
 
-      <section className="sx-surface overflow-hidden" aria-label={copy.title}>
-        <div className="border-b border-border p-4 md:hidden">
+      <section
+        className="sx-surface sticky top-0 z-10 flex max-h-[calc(100dvh-1rem)] min-h-0 flex-col overflow-hidden"
+        aria-label={copy.title}
+      >
+        <div className="shrink-0 border-b border-border p-4 md:hidden">
           <p className="mb-3 text-sm font-semibold text-foreground">{copy.archive}</p>
           {isLoading ? (
             <div className="flex gap-2" role="status" aria-label={copy.loading}>
@@ -91,9 +94,9 @@ export default function UpdatesLayoutClient({ children }: { children: React.Reac
           )}
         </div>
 
-        <div className="md:grid md:min-h-[620px] md:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="hidden border-r border-border bg-muted/10 md:block">
-            <div className="sticky top-0 max-h-[calc(100vh-4rem)] overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 md:grid md:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="hidden min-h-0 overflow-hidden border-r border-border bg-muted/10 md:block">
+            <div className="h-full min-h-0 overflow-y-auto p-4">
               <p className="px-2 pb-3 text-sm font-semibold text-foreground">{copy.archive}</p>
               {isLoading ? (
                 <div className="space-y-2 px-2" role="status" aria-label={copy.loading}>
@@ -120,7 +123,7 @@ export default function UpdatesLayoutClient({ children }: { children: React.Reac
             </div>
           </aside>
 
-          <div className="min-w-0 p-5 sm:p-8 lg:p-12">{children}</div>
+          <div className="min-h-0 min-w-0 overflow-y-auto p-5 sm:p-8 lg:p-12">{children}</div>
         </div>
       </section>
     </PageContainer>

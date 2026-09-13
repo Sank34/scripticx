@@ -1,20 +1,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AccessibilityProvider } from "@/components/AccessibilityProvider";
-import { Topbar } from "@/components/Topbar";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
-import { DeferredShellFeatures } from "@/components/DeferredShellFeatures";
-import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
-import { EmailVerificationBanner } from "@/components/account/EmailVerification";
 import { EmailVerificationAccessGate } from "@/components/account/EmailVerificationAccessGate";
 import { EntrySessionGate } from "@/components/auth/EntrySessionGate";
+import { AppShell } from "@/components/AppShell";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
@@ -145,30 +139,7 @@ export default function RootLayout({
               <LanguageProvider>
                 <EmailVerificationAccessGate />
                 <EntrySessionGate>
-                <GlobalContextMenu>
-                  <SidebarProvider>
-                    <div
-                      data-shell-root
-                      className="h-svh w-full overflow-hidden bg-sidebar p-2 md:h-dvh"
-                    >
-                      <div
-                        data-shell-frame
-                        className="flex h-full w-full gap-2 overflow-hidden rounded-[var(--sx-radius-shell)] bg-sidebar"
-                      >
-                        <AppSidebar />
-                        <div
-                          data-shell-surface
-                          className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--sx-radius-shell)] border border-border/70 bg-background shadow-sm"
-                        >
-                          <Topbar />
-                          <EmailVerificationBanner />
-                          <MainWrapper>{children}</MainWrapper>
-                        </div>
-                      </div>
-                    </div>
-                  </SidebarProvider>
-                  <DeferredShellFeatures />
-                </GlobalContextMenu>
+                  <AppShell>{children}</AppShell>
                 </EntrySessionGate>
               </LanguageProvider>
             </Providers>
