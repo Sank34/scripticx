@@ -1,29 +1,45 @@
 "use client";
 
-import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts";
+import { formatShortcut } from "@/lib/keyboard-shortcuts";
+
+import { useEffect, useRef, useState } from "react";
 import type { OnMount } from "@monaco-editor/react";
-import { parseLine, step, reset, setVariable, advanceLine } from "@/lib/engine";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Beaker,
+  CheckCircle2,
+  Code2,
+  Download,
+  FileText,
+  History,
+  Loader2,
+  Send,
+  XCircle,
+} from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
+
+import { EmptyState } from "@/components/common/EmptyState";
+import { useLanguage } from "@/components/LanguageProvider";
+import { Markdown } from "@/components/Markdown";
 import RouteGuard from "@/components/RouteGuard";
 import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
+import { SubmissionHistory } from "@/components/problems/SubmissionHistory";
 import {
   TestResultCard,
   type ProblemTestResult,
 } from "@/components/problems/TestResultCard";
-import { useAuth } from "@/hooks/useAuth";
-import { api, type DailyChallenge } from "@/lib/api";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { checkAchievements } from "@/lib/achievements";
-import { useLanguage } from "@/components/LanguageProvider";
-import { getLocalized } from "@/lib/getLocalized";
-import { UserAvatar } from "@/components/user/UserAvatar";
-import { Markdown } from "@/components/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import {
   Select,
   SelectContent,
@@ -31,20 +47,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, Loader2, Play, Send, XCircle } from "lucide-react";
-import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/useAuth";
+import { useProblemEditorDraft } from "@/hooks/useProblemEditorDraft";
+import { api, type DailyChallenge } from "@/lib/api";
+import { competitionApiFetch } from "@/lib/competitionClient";
+import type { StandardSubmission } from "@/lib/competitionTypes";
+import { getLocalized } from "@/lib/getLocalized";
+import { supabase } from "@/lib/supabase";
 
 type EvaluationStatus = {
   status: "pending" | "evaluating" | "passed" | "failed";
 };
 
-function waitForPaint() {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      window.setTimeout(resolve, 120);
-    });
-  });
-}
+type ProblemPanel = "description" | "solution" | "submissions";
+
+type ProblemPageData = {
+  problem: any;
+  dailyChallenge: DailyChallenge | null;
+  dailyCompleted: boolean;
+};
 
 function slugify(text: string): string {
   if (!text) return "problem";
@@ -58,299 +86,237 @@ function slugify(text: string): string {
     .replace(/-+/g, "-");
 }
 
+function ProblemWorkspaceSkeleton() {
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
+        <div className="flex items-center gap-2">
+          <Skeleton className="size-7 rounded-md" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-3.5 w-44" />
+            <Skeleton className="h-2.5 w-24" />
+          </div>
+        </div>
+        <Skeleton className="h-8 w-24" />
+      </div>
+      <div className="flex min-h-0 flex-1">
+        <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,66%)_1px_minmax(280px,34%)]">
+          <div className="flex min-h-0 flex-col">
+            <Skeleton className="h-9 w-full rounded-none" />
+            <Skeleton className="min-h-0 flex-1 rounded-none" />
+            <Skeleton className="h-7 w-full rounded-none" />
+          </div>
+          <div className="hidden bg-border md:block" />
+          <div className="hidden min-h-0 md:flex">
+            <div className="w-12 shrink-0 space-y-2 border-r p-2">
+              <Skeleton className="size-8 rounded-md" />
+              <Skeleton className="size-8 rounded-md" />
+              <Skeleton className="size-8 rounded-md" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-4 p-5">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProblemContent() {
-  const { user } = useAuth();
-  const { t, locale } = useLanguage();
-
+  const { user, loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
+  const { locale, t } = useLanguage();
   const params = useParams();
-  const id = params?.id;
+  const id = typeof params?.id === "string" ? params.id : "";
 
-  const [problem, setProblem] = useState<any>(null);
+  const [activePanel, setActivePanel] = useState<ProblemPanel>("description");
+  const statementRef = useRef<HTMLDivElement>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [code, setCode] = useState("");
-  const [, setResult] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<ProblemTestResult[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [evaluationStatuses, setEvaluationStatuses] = useState<EvaluationStatus[]>([]);
+  const [compactLayout, setCompactLayout] = useState(false);
   const [editorLine, setEditorLine] = useState(1);
+  const [evaluationStatuses, setEvaluationStatuses] = useState<EvaluationStatus[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [, setResult] = useState<string | null>(null);
   const [tabSize, setTabSize] = useState(2);
-  const [activeTab, setActiveTab] = useState<"description" | "solution">("description");
-  const [asideWidth, setAsideWidth] = useState(390);
-  const splitContainerRef = useRef<HTMLDivElement | null>(null);
-
-  const startAsideResize = useCallback((event: React.PointerEvent) => {
-    event.preventDefault();
-    const container = splitContainerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const minAside = 320;
-    const minEditor = 360;
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      const nextWidth = rect.right - moveEvent.clientX;
-      const maxAside = Math.max(minAside, rect.width - minEditor);
-      setAsideWidth(Math.min(Math.max(nextWidth, minAside), maxAside));
-    };
-
-    const handleUp = () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  }, []);
-  const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
-  const [dailyCompleted, setDailyCompleted] = useState(false);
+  const [testResults, setTestResults] = useState<ProblemTestResult[]>([]);
 
   useEffect(() => {
-    if (!id || typeof id !== "string") return;
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setCompactLayout(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
-    async function fetchProblem() {
-      const [{ data }, todayChallenge] = await Promise.all([
-        supabase
-          .from("problems")
-          .select("*, author:profiles!problems_author_id_fkey(id, username, avatar_url)")
-          .eq("id", id)
-          .single(),
+  const problemQueryKey = ["problems", "detail", id, user?.id] as const;
+  const problemQuery = useQuery({
+    queryKey: problemQueryKey,
+    queryFn: async (): Promise<ProblemPageData> => {
+      const [problemResult, todayChallenge] = await Promise.all([
+        supabase.from("problems").select("*").eq("id", id).maybeSingle(),
         api.dailyChallenges.getForDate(),
       ]);
+      if (problemResult.error) throw problemResult.error;
 
-      if (data) {
-        setProblem(data);
-        setCode(data.starter_code);
-      }
+      const dailyChallenge = todayChallenge?.problem_id === id ? todayChallenge : null;
+      const completion = dailyChallenge && user
+        ? await api.dailyChallenges.getCompletion(dailyChallenge.id, user.id)
+        : null;
 
-      const matchingDailyChallenge =
-        todayChallenge?.problem_id === id ? todayChallenge : null;
+      return {
+        problem: problemResult.data,
+        dailyChallenge,
+        dailyCompleted: Boolean(completion),
+      };
+    },
+    enabled: Boolean(id) && !authLoading,
+    staleTime: 2 * 60 * 1000,
+  });
 
-      if (matchingDailyChallenge) {
-        setDailyChallenge(matchingDailyChallenge);
+  const problem = problemQuery.data?.problem ?? null;
+  const dailyChallenge = problemQuery.data?.dailyChallenge ?? null;
+  const dailyCompleted = problemQuery.data?.dailyCompleted ?? false;
+  const submissionsQueryKey = ["problems", "submissions", id, user?.id] as const;
+  const submissionsQuery = useQuery<{ submissions: StandardSubmission[] }>({
+    queryKey: submissionsQueryKey,
+    queryFn: () => competitionApiFetch(`/api/submissions?problemId=${encodeURIComponent(id)}`),
+    enabled: Boolean(id && user?.id),
+    staleTime: 30_000,
+  });
 
-        if (user?.id) {
-          const completion = await api.dailyChallenges.getCompletion(
-            matchingDailyChallenge.id,
-            user.id
-          );
-          setDailyCompleted(Boolean(completion));
-        }
-      } else {
-        setDailyChallenge(null);
-        setDailyCompleted(false);
-      }
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const synchronize = () => setCompactLayout(media.matches);
+    synchronize();
+    media.addEventListener("change", synchronize);
+    return () => media.removeEventListener("change", synchronize);
+  }, []);
 
-      setLoading(false);
-    }
-
-    fetchProblem();
-  }, [id, user?.id]);
+  const draftSync = useProblemEditorDraft({
+    code,
+    fallbackCode: problem ? problem.starter_code || "" : null,
+    onHydrate: setCode,
+    problemId: id,
+    scopeKey: "library",
+    userId: user?.id ?? null,
+  });
 
   async function runCode() {
-    if (!problem || !user) return;
+    if (!problem || !user || isSubmitting) return;
 
+    const testCaseCount = Array.isArray(problem.test_cases) ? problem.test_cases.length : 0;
     setIsSubmitting(true);
-    setActiveTab("solution");
+    setActivePanel("solution");
     setTestResults([]);
     setEvaluationStatuses(
-      problem.test_cases.map(() => ({ status: "pending" }))
+      Array.from({ length: testCaseCount }, () => ({ status: "pending" as const }))
     );
-    const results: ProblemTestResult[] = [];
 
     try {
-      for (const [index, test] of problem.test_cases.entries()) {
-        setEvaluationStatuses((current) =>
-          current.map((item, itemIndex) =>
-            itemIndex === index ? { status: "evaluating" } : item
-          )
-        );
-        await waitForPaint();
-
-        let program;
-
-        try {
-          program = code.split("\n").map(parseLine);
-        } catch (e: any) {
-          setResult(`${t("problemPage.result.error")}: ${e.message}`);
-          setEvaluationStatuses((current) =>
-            current.map((item, itemIndex) =>
-              itemIndex === index ? { status: "failed" } : item
-            )
-          );
-          return;
-        }
-
-        reset();
-
-        let res;
-        const out: string[] = [];
-        let inputIndex = 0;
-
-        try {
-          while (true) {
-            res = step(program);
-            if (!res) break;
-
-            if ((res as any).inputRequest) {
-              const varName = (res as any).inputRequest;
-              const value = test.input[inputIndex++];
-              setVariable(varName, value);
-              advanceLine();
-              continue;
-            }
-
-            if (res.output !== null) {
-              out.push(String(res.output));
-            }
-          }
-        } catch (e: any) {
-          out.push(`${t("problemPage.result.error")}: ${e.message}`);
-        }
-
-        const normalize = (str: string) =>
-          str.trim().replace(/\r\n/g, "\n");
-
-        const got = normalize(out.join("\n"));
-        const expected = normalize(test.output);
-        const passed = got === expected;
-
-        results.push({
-          passed,
-          expected,
-          got,
-          input: test.input,
-        });
-
-        setEvaluationStatuses((current) =>
-          current.map((item, itemIndex) =>
-            itemIndex === index
-              ? { status: passed ? "passed" : "failed" }
-              : item
-          )
-        );
-        await waitForPaint();
+      setEvaluationStatuses(
+        Array.from({ length: testCaseCount }, () => ({ status: "evaluating" as const }))
+      );
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        throw sessionError || new Error("Authentication required");
       }
 
-      const score = Math.round(
-        (results.filter(r => r.passed).length / results.length) * 100
+      const response = await fetch("/api/submissions/evaluate", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ problemId: id, code }),
+      });
+      const payload = (await response.json()) as {
+        bonusAwarded?: boolean;
+        bonusPoints?: number;
+        error?: string;
+        results?: ProblemTestResult[];
+        score?: number;
+      };
+      if (!response.ok || typeof payload.score !== "number" || !payload.results) {
+        throw new Error(payload.error || "Could not evaluate submission");
+      }
+
+      setResult(`${t("problemPage.result.score")}: ${payload.score}%`);
+      setTestResults(payload.results);
+      setEvaluationStatuses(
+        payload.results.map((result) => ({ status: result.passed ? "passed" : "failed" }))
       );
 
-      setResult(`${t("problemPage.result.score")}: ${score}%`);
-      setTestResults(results);
-      setActiveTab("solution");
-
-      const { data: previous } = await supabase
-        .from("submissions")
-        .select("score")
-        .eq("user_id", user.id)
-        .eq("problem_id", id);
-
-      const bestPrevious =
-        previous?.length
-          ? Math.max(...previous.map((s) => s.score))
-          : 0;
-
-      await supabase.from("submissions").insert([
-        {
-          user_id: user.id,
-          problem_id: id,
-          code,
-          score,
-        },
-      ]);
-
-      let bonusAwarded = false;
-
-      if (score === 100 && dailyChallenge && !dailyCompleted) {
-        bonusAwarded = await api.dailyChallenges.complete({
-          challengeId: dailyChallenge.id,
-          userId: user.id,
-          problemId: String(id),
-          bonusPoints: dailyChallenge.bonus_points || 0,
-        });
-
-        if (bonusAwarded) {
-          setDailyCompleted(true);
-        }
-      }
-
-      const scoreIncrement = score > bestPrevious ? score - bestPrevious : 0;
-      const bonusIncrement = bonusAwarded ? dailyChallenge?.bonus_points || 0 : 0;
-      const totalIncrement = dailyChallenge ? bonusIncrement : scoreIncrement;
-
-      if (totalIncrement > 0) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("total_score")
-          .eq("id", user.id)
-          .single();
-
-        await supabase
-          .from("profiles")
-          .update({
-            total_score: (profile?.total_score || 0) + totalIncrement,
-          })
-          .eq("id", user.id);
-      }
-
-      await checkAchievements(user.id, score);
-
-      if (bonusAwarded && bonusIncrement > 0) {
-        toast.success(
-          locale === "ro"
-            ? `Daily challenge rezolvat! Ai primit ${bonusIncrement} puncte bonus.`
-            : `Daily challenge solved! You received ${bonusIncrement} bonus points.`
+      if (payload.bonusAwarded) {
+        queryClient.setQueryData<ProblemPageData>(problemQueryKey, (current) =>
+          current ? { ...current, dailyCompleted: true } : current
         );
       }
+
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+      void queryClient.invalidateQueries({ queryKey: ["rewards-shop"] });
+      void queryClient.invalidateQueries({ queryKey: submissionsQueryKey });
+      window.dispatchEvent(new Event("profile-updated"));
+      window.dispatchEvent(new Event("rewards-updated"));
+
+      if (payload.bonusAwarded && (payload.bonusPoints ?? 0) > 0) {
+        toast.success(
+          locale === "ro"
+            ? `Provocare rezolvată. Ai primit ${payload.bonusPoints} puncte bonus.`
+            : `Challenge solved. You received ${payload.bonusPoints} bonus points.`
+        );
+      }
+    } catch (error) {
+      setEvaluationStatuses(
+        Array.from({ length: testCaseCount }, () => ({ status: "failed" as const }))
+      );
+      const message = error instanceof Error ? error.message : "Submission failed";
+      setResult(`${t("problemPage.result.error")}: ${message}`);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Enter") return;
-      if (!event.ctrlKey && !event.metaKey) return;
-      if (isSubmitting) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      void runCode();
-    }
-
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  });
+  const { bindings: shortcuts } = useKeyboardShortcuts();
+  useShortcut("submit", () => { void runCode(); }, Boolean(problem && user && !isSubmitting), true);
 
   const handleEditorMount: OnMount = (editor) => {
-    const syncLine = () => {
-      setEditorLine(editor.getPosition()?.lineNumber ?? 1);
-    };
-
-    syncLine();
-    editor.onDidChangeCursorPosition(syncLine);
-    editor.onDidFocusEditorText(syncLine);
-    editor.onDidChangeModelContent(syncLine);
+    const synchronizeLine = () => setEditorLine(editor.getPosition()?.lineNumber ?? 1);
+    synchronizeLine();
+    editor.onDidChangeCursorPosition(synchronizeLine);
+    editor.onDidFocusEditorText(synchronizeLine);
+    editor.onDidChangeModelContent(synchronizeLine);
   };
 
-  if (!id || typeof id !== "string" || loading) {
+  if (!id || problemQuery.isPending) return <ProblemWorkspaceSkeleton />;
+
+  if (!problem || problemQuery.isError) {
     return (
-      <div className="flex h-full">
-        <Skeleton className="w-1/2 h-full" />
-        <Skeleton className="w-1/2 h-full" />
+      <div className="grid h-full place-items-center p-6">
+        <EmptyState
+          icon={<FileText className="size-6" />}
+          title={t("problemPage.notFound")}
+          action={
+            <Button asChild variant="outline">
+              <Link href="/problems">
+                <ArrowLeft data-icon="inline-start" />
+                {t("problemPage.actions.back")}
+              </Link>
+            </Button>
+          }
+        />
       </div>
     );
   }
 
-  if (!problem) {
-    return <div className="p-6">{t("problemPage.notFound")}</div>;
-  }
-
-  const passedCount = testResults.filter((r) => r.passed).length;
+  const passedCount = testResults.filter((result) => result.passed).length;
   const score = testResults.length
     ? Math.round((passedCount / testResults.length) * 100)
     : 0;
@@ -358,14 +324,32 @@ function ProblemContent() {
   const fileName = `${slugify(
     getLocalized(problem.title_i18n, "en") || localizedTitle
   )}.msp`;
+  const perfectScore = testResults.length > 0 && passedCount === testResults.length;
+  const panelItems = [
+    {
+      id: "description" as const,
+      icon: FileText,
+      label: t("problemPage.tabs.description"),
+    },
+    {
+      id: "solution" as const,
+      icon: Beaker,
+      label: t("problemPage.tabs.solution"),
+    },
+    {
+      id: "submissions" as const,
+      icon: History,
+      label: t("problemPage.tabs.submissions"),
+    },
+  ];
+  const activePanelItem = panelItems.find((item) => item.id === activePanel) ?? panelItems[0];
+  const ActivePanelIcon = activePanelItem.icon;
+
   const tabSizeControl = (
-    <Select
-      value={String(tabSize)}
-      onValueChange={(value) => setTabSize(Number(value))}
-    >
+    <Select value={String(tabSize)} onValueChange={(value) => setTabSize(Number(value))}>
       <SelectTrigger
         size="sm"
-        className="h-7 border-zinc-200 bg-white px-2 text-xs text-zinc-600"
+        className="h-6 border-0 bg-transparent px-1.5 text-[11px] text-muted-foreground shadow-none"
         aria-label={t("live.tabSize")}
       >
         <SelectValue />
@@ -380,292 +364,441 @@ function ProblemContent() {
     </Select>
   );
 
+  const problemPanel = (
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="hidden h-10 shrink-0 items-center justify-between border-b px-3 md:flex">
+        <div className="flex min-w-0 items-center gap-2">
+          <ActivePanelIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+          <span className="truncate text-xs font-semibold">{activePanelItem.label}</span>
+        </div>
+        {activePanel === "solution" && testResults.length > 0 && (
+          <span className={perfectScore ? "text-xs font-semibold text-[var(--sx-success)]" : "text-xs font-semibold text-destructive"}>
+            {score}%
+          </span>
+        )}
+      </div>
+
+      <nav className="grid h-12 shrink-0 grid-cols-3 gap-1 border-b bg-muted/25 p-1 md:hidden" aria-label={t("problemPage.panelNavigation")}>
+        {panelItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              type="button"
+              key={item.id}
+              onClick={() => setActivePanel(item.id)}
+              aria-pressed={activePanel === item.id}
+              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--sx-radius-control)] px-1 text-xs font-medium transition-colors ${
+                activePanel === item.id
+                  ? "border border-border bg-background text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="size-3.5" aria-hidden="true" />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {activePanel === "description" && (
+          <div className="space-y-5 p-4 md:p-5">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                {problem.code != null && (
+                  <span className="font-mono text-xs text-muted-foreground">#{problem.code}</span>
+                )}
+                <Badge variant="outline">{t(`problems.filters.${problem.difficulty}`)}</Badge>
+                {dailyChallenge && (
+                  <Badge variant="secondary">
+                    {t("problems.daily.title")} · +{dailyChallenge.bonus_points ?? 0} {t("problems.daily.points")}
+                  </Badge>
+                )}
+                {dailyCompleted && (
+                  <Badge variant="outline" className="text-[var(--sx-success)]">
+                    <CheckCircle2 aria-hidden="true" />
+                    {t("problems.status.solved")}
+                  </Badge>
+                )}
+              </div>
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight">{localizedTitle}</h2>
+              <Button variant="outline" size="sm" className="mt-3 gap-2" disabled={exportingPdf} onClick={async () => {
+                if (!statementRef.current) return;
+                setExportingPdf(true);
+                try {
+                  const { createProblemPdf } = await import("@/lib/problem-pdf");
+                  const { fetchProblemChapters } = await import("@/lib/problem-chapters");
+                  const { chapters } = await fetchProblemChapters();
+                  const category = chapters.flatMap(chapter => chapter.topics.filter(topic => topic.problemIds.includes(id)).map(topic => `${getLocalized(chapter.title, locale)} / ${getLocalized(topic.title, locale)}`)).join("; ");
+                  let addedBy: string | null = null;
+                  if (problem.author_id) {
+                    const { data, error } = await supabase.from("profiles").select("username").eq("id", problem.author_id).maybeSingle();
+                    if (error) throw error;
+                    addedBy = data?.username || null;
+                  }
+                  const pdf = await createProblemPdf(statementRef.current, { title: localizedTitle, code: problem.code, difficulty: t(`problems.filters.${problem.difficulty}`), locale, url: window.location.href, addedBy, chapter: category });
+                  pdf.save(`${slugify(localizedTitle) || "scripticx-problem"}.pdf`);
+                } catch {
+                  toast.error(locale === "ro" ? "PDF-ul nu a putut fi generat. Încearcă din nou." : "Could not generate the PDF. Please try again.");
+                } finally { setExportingPdf(false); }
+              }}>
+                {exportingPdf ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                {exportingPdf ? (locale === "ro" ? "Se generează…" : "Generating…") : (locale === "ro" ? "Descarcă PDF" : "Download PDF")}
+              </Button>
+            </div>
+            <div ref={statementRef} className="text-sm leading-7 text-foreground/90">
+              <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
+            </div>
+          </div>
+        )}
+
+        {activePanel === "solution" && (
+          <div className="space-y-5 p-4 md:p-5">
+            {isSubmitting ? (
+              <>
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    {t("problemPage.evaluation.title")}
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {t("problemPage.evaluation.subtitle")}
+                  </p>
+                </div>
+                <div className="divide-y overflow-hidden rounded-[var(--sx-radius-card)] border">
+                  {evaluationStatuses.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                      <span className="font-medium">
+                        {t("problemPage.evaluation.testCase")} {index + 1}/{evaluationStatuses.length}
+                      </span>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                        item.status === "passed"
+                          ? "text-[var(--sx-success)]"
+                          : item.status === "failed"
+                            ? "text-destructive"
+                            : item.status === "evaluating"
+                              ? "text-[var(--sx-warning)]"
+                              : "text-muted-foreground"
+                      }`}>
+                        {item.status === "evaluating" && <Loader2 className="size-3.5 animate-spin" />}
+                        {item.status === "passed" && <CheckCircle2 className="size-3.5" />}
+                        {item.status === "failed" && <XCircle className="size-3.5" />}
+                        {t(`problemPage.evaluation.${item.status}`)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : testResults.length > 0 ? (
+              <>
+                <div className="border-b pb-5">
+                  <p className={`text-3xl font-semibold tabular-nums ${perfectScore ? "text-[var(--sx-success)]" : "text-destructive"}`}>
+                    {score}%
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {perfectScore
+                      ? t("problemPage.solution.successMessage")
+                      : t("problemPage.solution.encouragement")}
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {testResults.map((testResult, index) => (
+                    <TestResultCard
+                      key={index}
+                      index={index}
+                      labels={{
+                        correct: t("problemPage.tests.correct"),
+                        programPrinted: t("problemPage.tests.programPrinted"),
+                        programRead: t("problemPage.tests.programRead"),
+                        shouldHavePrinted: t("problemPage.tests.shouldHavePrinted"),
+                        test: t("problemPage.tests.test"),
+                        wrong: t("problemPage.tests.wrong"),
+                      }}
+                      result={testResult}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <EmptyState
+                className="py-14"
+                icon={<Beaker className="size-6" />}
+                title={t("problemPage.solution.emptyTitle")}
+                description={t("problemPage.solution.emptyDescription")}
+                action={
+                  <Button onClick={() => void runCode()}>
+                    <Send data-icon="inline-start" />
+                    {t("problemPage.actions.submit")}
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        )}
+
+        {activePanel === "submissions" && (
+          <div className="space-y-4 p-4 md:p-5">
+            <div>
+              <h2 className="font-semibold">{t("problemPage.submissions.title")}</h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {t("problemPage.submissions.description")}
+              </p>
+            </div>
+            {submissionsQuery.isPending ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : submissionsQuery.isError ? (
+              <div className="rounded-[var(--sx-radius-card)] border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+                {t("problemPage.submissions.error")}
+              </div>
+            ) : (
+              <SubmissionHistory
+                locale={locale}
+                emptyDescription={t("problemPage.submissions.empty")}
+                items={(submissionsQuery.data?.submissions ?? []).map((submission) => ({
+                  code: submission.code,
+                  id: submission.id,
+                  score: submission.score,
+                  submittedAt: submission.created_at,
+                }))}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+
+  const inspectorPanel = (
+    <div className="flex h-full min-h-0 min-w-0 bg-background">
+      <nav
+        className="hidden w-12 shrink-0 flex-col items-center gap-0.5 border-r bg-muted/20 py-1.5 md:flex"
+        aria-label={t("problemPage.panelNavigation")}
+      >
+        {panelItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Tooltip key={item.id}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setActivePanel(item.id)}
+                  aria-pressed={activePanel === item.id}
+                  aria-label={item.label}
+                  className={`relative grid size-10 place-items-center rounded-md transition-colors ${
+                    activePanel === item.id
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  }`}
+                >
+                  {activePanel === item.id && (
+                    <span className="absolute inset-y-2 left-0 w-0.5 rounded-r bg-foreground" />
+                  )}
+                  <Icon className="size-[18px]" />
+                  {item.id === "solution" && testResults.length > 0 && (
+                    <span
+                      className={`absolute top-1.5 right-1.5 size-1.5 rounded-full ${
+                        perfectScore ? "bg-[var(--sx-success)]" : "bg-destructive"
+                      }`}
+                    />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{item.label}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </nav>
+      <div className="min-h-0 min-w-0 flex-1">{problemPanel}</div>
+    </div>
+  );
+
+  const editorPanel = (
+    <section className="flex h-full min-h-0 min-w-0 flex-col bg-background" aria-label={t("problemPage.editor.label")}>
+      <div className="flex h-11 shrink-0 items-center border-b bg-muted/25 md:h-9">
+        <div className="flex h-full min-w-0 items-center border-r border-t-2 border-t-foreground bg-background px-3 text-xs">
+          <Code2 className="mr-2 size-3.5 text-muted-foreground" aria-hidden="true" />
+          <span className="truncate font-medium">{fileName}</span>
+        </div>
+      </div>
+      <CodeEditorContextMenu
+        code={code}
+        fileName={fileName}
+        onChange={setCode}
+        onSubmit={runCode}
+        submitDisabled={isSubmitting}
+        submitShortcut={formatShortcut(shortcuts.submit)}
+      >
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <MiniScriptMonacoEditor
+            onMount={handleEditorMount}
+            height="100%"
+            language="msp"
+            path={fileName}
+            value={code}
+            onChange={setCode}
+            options={{
+              acceptSuggestionOnEnter: "on",
+              automaticLayout: true,
+              bracketPairColorization: { enabled: true },
+              contextmenu: false,
+              cursorBlinking: "smooth",
+              cursorSmoothCaretAnimation: "on",
+              fontLigatures: true,
+              guides: { bracketPairs: true, indentation: true },
+              inlineSuggest: { enabled: true },
+              minimap: { enabled: !compactLayout, maxColumn: 90, scale: 0.8, showSlider: "mouseover" },
+              padding: { top: 14, bottom: 20 },
+              parameterHints: { enabled: true, cycle: true },
+              quickSuggestions: { other: true, comments: false, strings: false },
+              quickSuggestionsDelay: 60,
+              scrollbar: { verticalScrollbarSize: 9, horizontalScrollbarSize: 9 },
+              snippetSuggestions: "top",
+              stickyScroll: { enabled: true },
+              suggestOnTriggerCharacters: true,
+              tabSize,
+              insertSpaces: true,
+              wordBasedSuggestions: "currentDocument",
+              wordWrap: "on",
+              wrappingIndent: "same",
+            }}
+          />
+        </div>
+      </CodeEditorContextMenu>
+      <footer className="flex h-11 shrink-0 items-center justify-between border-t bg-muted/35 px-3 pb-[env(safe-area-inset-bottom)] text-[11px] text-muted-foreground md:h-7 md:pb-0">
+        <div className="flex items-center gap-2">
+          <span>Ln {editorLine}</span>
+          <span>·</span>
+          {draftSync.conflict ? (
+            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+              <span>{locale === "ro" ? "Conflict de ciornă" : "Draft conflict"}</span>
+              <button
+                className="underline underline-offset-2"
+                onClick={() => void draftSync.resolveConflict("cloud")}
+                type="button">
+                {locale === "ro" ? "Cloud" : "Use cloud"}
+              </button>
+              <button
+                className="underline underline-offset-2"
+                onClick={() => void draftSync.resolveConflict("local").catch(() => {
+                  toast.error(locale === "ro" ? "Ciorna s-a schimbat din nou." : "The draft changed again.");
+                })}
+                type="button">
+                {locale === "ro" ? "Păstrează aici" : "Keep this"}
+              </button>
+            </span>
+          ) : (
+            <span className={draftSync.state === "synced" ? "text-emerald-600" : undefined}>
+              {draftSync.state === "saving"
+                ? locale === "ro" ? "Se salvează…" : "Saving…"
+                : draftSync.state === "error"
+                  ? locale === "ro" ? "Nesincronizat" : "Not synced"
+                  : locale === "ro" ? "Sincronizat" : "Synced"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {tabSizeControl}
+          <span>·</span>
+          <span>MiniScript+</span>
+        </div>
+      </footer>
+    </section>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-sm font-semibold md:text-base">
-              {problem.code != null && (
-                <span className="mr-1 text-zinc-500">#{problem.code}</span>
-              )}
-              {localizedTitle}
-            </h1>
-            {dailyChallenge && (
-              <Badge className="hidden bg-orange-600 hover:bg-orange-600 md:inline-flex">
-                Daily code challenge
-              </Badge>
-            )}
-            {dailyCompleted && (
-              <Badge className="hidden bg-emerald-600 hover:bg-emerald-600 md:inline-flex">
-                {t("problems.status.solved")}
-              </Badge>
-            )}
+    <TooltipProvider>
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-background px-2 md:h-12 md:gap-3 md:px-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon-sm"
+                  variant="outline"
+                  className="size-11 shrink-0 rounded-[var(--sx-radius-control)] bg-background shadow-xs md:size-8"
+                  asChild
+                >
+                  <Link href="/problems" aria-label={t("problemPage.actions.back")}>
+                    <ArrowLeft />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("problemPage.actions.back")}</TooltipContent>
+            </Tooltip>
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-1.5 text-sm">
+                <span className="hidden font-medium text-muted-foreground sm:inline">ScripticX</span>
+                <span className="hidden text-muted-foreground sm:inline">/</span>
+                <h1 className="truncate font-semibold">
+                  {problem.code != null && <span className="mr-1 text-muted-foreground">#{problem.code}</span>}
+                  {localizedTitle}
+                </h1>
+              </div>
+              <p className="hidden truncate text-[11px] text-muted-foreground md:block">{fileName}</p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Badge variant="outline" className="hidden sm:inline-flex">
+              {t(`problems.filters.${problem.difficulty}`)}
+            </Badge>
             {testResults.length > 0 && (
-              <Badge
-                variant={passedCount === testResults.length ? "default" : "secondary"}
-                className="hidden md:inline-flex"
-              >
+              <Badge variant={perfectScore ? "secondary" : "outline"} className="hidden md:inline-flex">
                 {score}%
               </Badge>
             )}
-          </div>
-          <div className="hidden text-xs text-zinc-500 md:block">
-            {fileName}
-          </div>
-        </div>
-
-        <Button
-          size="sm"
-          onClick={runCode}
-          disabled={isSubmitting}
-          className="gap-2"
-        >
-          {testResults.length > 0 ? <CheckCircle2 size={15} /> : <Send size={15} />}
-          {t("problemPage.actions.submit")}
-        </Button>
-      </header>
-
-      <div
-        ref={splitContainerRef}
-        className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(320px,46vh)_minmax(0,1fr)] md:grid-rows-1 md:[grid-template-columns:minmax(0,1fr)_6px_var(--problem-aside-width)]"
-        style={{ "--problem-aside-width": `${asideWidth}px` } as React.CSSProperties}
-      >
-        <main className="flex min-h-0 min-w-0 flex-col bg-white">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-zinc-200 bg-white md:border-b-0">
-            <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
-                <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
-                <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                <span className="ml-2 truncate text-xs font-medium text-zinc-700">
-                  {fileName}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-zinc-500">
-                <Play size={13} />
-                <span>MiniScript+</span>
-              </div>
-            </div>
-
-            <CodeEditorContextMenu
-              code={code}
-              fileName={fileName}
-              onChange={setCode}
-              onSubmit={runCode}
+            <Button
+              size="sm"
+              onClick={() => void runCode()}
+              disabled={isSubmitting}
+              title={formatShortcut(shortcuts.submit) || undefined}
+              className="h-11 gap-1.5 px-3 md:h-8"
+              aria-label={isSubmitting ? t("problemPage.actions.submitting") : t("problemPage.actions.submit")}
             >
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <MiniScriptMonacoEditor
-                  onMount={handleEditorMount}
-                  height="100%"
-                  value={code}
-                  onChange={setCode}
-                  options={{
-                    contextmenu: false,
-                    padding: { top: 16, bottom: 16 },
-                    smoothScrolling: true,
-                    wordWrap: "on",
-                    automaticLayout: true,
-                    cursorSmoothCaretAnimation: "on",
-                    cursorBlinking: "smooth",
-                    scrollbar: {
-                      verticalScrollbarSize: 8,
-                      horizontalScrollbarSize: 8,
-                    },
-                    tabSize,
-                    insertSpaces: true,
-                    wrappingIndent: "same",
-                  }}
-                />
-              </div>
-            </CodeEditorContextMenu>
+              {isSubmitting ? <Loader2 className="animate-spin" /> : <Send />}
+              <span className="hidden sm:inline">
+                {isSubmitting ? t("problemPage.actions.submitting") : t("problemPage.actions.submit")}
+              </span>
+            </Button>
           </div>
+        </header>
 
-          <div className="flex h-8 shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-500">
-            <span>Ln {editorLine}</span>
-            <div className="flex items-center gap-2">
-              <span>{t("live.tabSize")}</span>
-              {tabSizeControl}
-              <span>· MSP</span>
-            </div>
-          </div>
-        </main>
-
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={t("live.resizePanels")}
-          onPointerDown={startAsideResize}
-          className="hidden bg-zinc-200 transition-colors hover:bg-zinc-300 active:bg-zinc-400 md:block md:cursor-col-resize"
-        />
-
-        <aside className="min-h-0 overflow-hidden border-t border-zinc-200 bg-white md:border-t-0">
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => setActiveTab(v as "description" | "solution")}
-            className="flex h-full min-h-0 flex-col gap-0"
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <ResizablePanelGroup
+            key={compactLayout ? "problem-compact" : "problem-desktop"}
+            orientation={compactLayout ? "vertical" : "horizontal"}
+            className="min-w-0 flex-1"
           >
-            <TabsList className="grid h-11 w-full grid-cols-2 rounded-none border-b bg-zinc-50 px-3">
-              <TabsTrigger value="description" className="text-sm">
-                {t("problemPage.tabs.description") || "Cerință"}
-              </TabsTrigger>
-              <TabsTrigger value="solution" className="text-sm" disabled={!isSubmitting && testResults.length === 0}>
-                {t("problemPage.tabs.solution") || "Soluția mea"}
-                {testResults.length > 0 && (
-                  <span className={`ml-2 text-xs font-semibold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
-                    {score}%
-                  </span>
-                )}
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="description" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-              <div className="space-y-4 px-5 py-5">
-                <div className="space-y-1.5">
-                  {problem.author?.username && (
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      {t("problemPage.publishedBy")}
-                      <Link
-                        href={`/u/${problem.author.username}`}
-                        className="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline"
-                      >
-                        <UserAvatar
-                          avatarUrl={problem.author.avatar_url}
-                          username={problem.author.username}
-                          className="h-5 w-5"
-                        />
-                        {problem.author.username}
-                      </Link>
-                    </p>
-                  )}
-                  <h2 className="text-xl font-bold tracking-tight">
-                    {localizedTitle}
-                  </h2>
-                </div>
-                {dailyChallenge && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="bg-orange-600 hover:bg-orange-600">
-                      Daily code challenge
-                    </Badge>
-                    <Badge variant="secondary">
-                      +{dailyChallenge.bonus_points || 0} pts
-                    </Badge>
-                    {dailyCompleted && (
-                      <Badge className="bg-emerald-600 hover:bg-emerald-600">
-                        {t("problems.status.solved")}
-                      </Badge>
-                    )}
-                  </div>
-                )}
-                <div className="text-sm leading-relaxed text-zinc-700">
-                  <Markdown>{getLocalized(problem.description_i18n, locale)}</Markdown>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="solution" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-              <div className="space-y-5 px-5 py-5">
-                {isSubmitting && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("problemPage.evaluation.title") || "Se evaluează soluția..."}
-                      </div>
-                      <p className="text-xs text-zinc-500">
-                        {t("problemPage.evaluation.subtitle") || "Rulăm soluția pe fiecare test case."}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      {evaluationStatuses.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
-                        >
-                          <span className="font-medium">
-                            {t("problemPage.evaluation.testCase") || "Test case"} {index + 1}/{evaluationStatuses.length}
-                          </span>
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                              item.status === "passed"
-                                ? "text-emerald-600"
-                                : item.status === "failed"
-                                  ? "text-red-600"
-                                  : item.status === "evaluating"
-                                    ? "text-amber-600"
-                                    : "text-zinc-400"
-                            }`}
-                          >
-                            {item.status === "evaluating" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                            {item.status === "passed" && <CheckCircle2 className="h-3.5 w-3.5" />}
-                            {item.status === "failed" && <XCircle className="h-3.5 w-3.5" />}
-                            {t(`problemPage.evaluation.${item.status}`)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <Skeleton className="h-4 w-2/3" />
-                      <Skeleton className="h-24 w-full" />
-                      <Skeleton className="h-24 w-full" />
-                    </div>
-                  </div>
-                )}
-
-                {!isSubmitting && testResults.length > 0 && (
-                  <>
-                    <div>
-                      {dailyChallenge && (
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
-                          <Badge className="bg-orange-600 hover:bg-orange-600">
-                            Daily code challenge
-                          </Badge>
-                          <Badge variant="secondary">
-                            {dailyCompleted
-                              ? locale === "ro"
-                                ? "Bonus revendicat"
-                                : "Bonus claimed"
-                              : `+${dailyChallenge.bonus_points || 0} pts`}
-                          </Badge>
-                        </div>
-                      )}
-                      <h2 className={`text-3xl font-bold ${passedCount === testResults.length ? "text-emerald-600" : "text-red-600"}`}>
-                        {score} {t("problemPage.solution.points") || "puncte"}
-                      </h2>
-                      <p className="mt-2 text-sm text-zinc-600">
-                        {passedCount === testResults.length
-                          ? (t("problemPage.solution.successMessage") || "Felicitări! Codul tău a trecut toate testele.")
-                          : (t("problemPage.solution.encouragement") || "Codul tău a obținut un punctaj parțial. Analizează exemplele, încearcă să îți corectezi soluția și trimite o nouă soluție.")}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      {testResults.map((testResult, index) => (
-                        <TestResultCard
-                          key={index}
-                          index={index}
-                          labels={{
-                            correct: t("problemPage.tests.correct") || "Răspuns corect",
-                            programPrinted: t("problemPage.tests.programPrinted") || "Programul a afișat",
-                            programRead: t("problemPage.tests.programRead") || "Programul a citit",
-                            shouldHavePrinted: t("problemPage.tests.shouldHavePrinted") || "Programul ar fi trebuit să afișeze",
-                            test: t("problemPage.tests.test") || "Test",
-                            wrong: t("problemPage.tests.wrong") || "Răspuns greșit",
-                          }}
-                          result={testResult}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </aside>
+            <ResizablePanel
+              id="problem-editor"
+              defaultSize={compactLayout ? "62%" : "66%"}
+              minSize={compactLayout ? "300px" : "360px"}
+            >
+              {editorPanel}
+            </ResizablePanel>
+            <ResizableHandle
+              aria-label={t("problemPage.resizePanel")}
+              className={`z-20 bg-border transition-colors after:bg-transparent hover:bg-muted-foreground/50 focus-visible:bg-foreground/60 ${
+                compactLayout
+                  ? "h-px cursor-row-resize after:h-3"
+                  : "w-px cursor-col-resize after:w-3"
+              }`}
+            />
+            <ResizablePanel
+              id="problem-inspector"
+              defaultSize={compactLayout ? "38%" : "34%"}
+              minSize={compactLayout ? "210px" : "280px"}
+              maxSize={compactLayout ? "52%" : "52%"}
+            >
+              {inspectorPanel}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 

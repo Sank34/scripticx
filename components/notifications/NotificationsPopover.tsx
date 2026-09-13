@@ -4,13 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { Bell, BellRing, CheckCheck, Inbox } from "lucide-react";
+import { Bell, BellRing, CheckCheck, Gift, Inbox } from "lucide-react";
 
 import { api, type AppNotification } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { UserAvatar } from "@/components/user/UserAvatar";
+import { EmailVerificationNotification } from "@/components/account/EmailVerification";
+import { getDailyChallengeProblemTitle } from "@/lib/daily-challenge-notification";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -28,6 +31,20 @@ type NotificationsData = {
   items: AppNotification[];
   unreadCount: number;
 };
+
+let hasNotificationSoundGesture = false;
+
+function getSafeNotificationHref(href: string | null | undefined) {
+  if (!href?.startsWith("/") || href.startsWith("//")) return null;
+
+  try {
+    const parsed = new URL(href, window.location.origin);
+    if (parsed.origin !== window.location.origin) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
+}
 
 function getNotificationGroupKey(notification: AppNotification) {
   if (notification.type !== "daily_challenge") {
@@ -88,11 +105,6 @@ function getStringMetadata(
   return typeof value === "string" ? value : null;
 }
 
-function stripNotificationPrefix(value: string | null | undefined) {
-  if (!value) return null;
-  return value.replace(/^(Solve|Rezolvă|Rezolva):\s*/i, "");
-}
-
 function getLocalizedNotification(
   notification: AppNotification,
   locale: string
@@ -104,7 +116,11 @@ function getLocalizedNotification(
     (ro ? "Cineva" : "Someone");
 
   if (notification.type === "daily_challenge") {
-    const problemTitle = stripNotificationPrefix(notification.body);
+    const problemTitle = getDailyChallengeProblemTitle({
+      body: notification.body,
+      locale: ro ? "ro" : "en",
+      metadata: notification.metadata,
+    });
 
     return {
       title: ro
@@ -114,6 +130,82 @@ function getLocalizedNotification(
         ? ro
           ? `Rezolvă: ${problemTitle}`
           : `Solve: ${problemTitle}`
+        : ro
+          ? "Rezolvă provocarea de azi."
+          : "Solve today's coding challenge.",
+    };
+  }
+
+  if (notification.type === "birthday_surprise") {
+    return {
+      title: ro
+        ? "Surpriza ta aniversară a sosit"
+        : "Your birthday surprise is here",
+      body: ro
+        ? "Ți-am lăsat două cadouri speciale în Inventory. La mulți ani!"
+        : "We left two special gifts in your Inventory. Happy birthday!",
+    };
+  }
+
+  if (notification.type === "contact_received") {
+    return {
+      title: ro ? "Mesaj primit" : "Message received",
+      body: ro
+        ? "Solicitarea ta a fost înregistrată. Vei primi răspunsul pe email."
+        : "Your request was registered. The reply will be sent by email.",
+    };
+  }
+
+  if (notification.type === "contact_reply") {
+    const topic = getStringMetadata(notification.metadata, "topic");
+    return {
+      title: ro ? "Ai primit un răspuns" : "You received a reply",
+      body: topic
+        ? ro
+          ? `Echipa ScripticX a răspuns solicitării tale despre ${topic}.`
+          : `The ScripticX team replied to your request about ${topic}.`
+        : ro
+          ? "Răspunsul echipei ScripticX a fost trimis pe email."
+          : "The ScripticX team sent its reply by email.",
+    };
+  }
+
+  if (notification.type === "contact_message") {
+    const contactName =
+      getStringMetadata(notification.metadata, "contactName") ||
+      (ro ? "Un utilizator" : "A user");
+    const topic = getStringMetadata(notification.metadata, "topic");
+    return {
+      title: ro ? "Mesaj de contact nou" : "New contact message",
+      body: topic
+        ? ro
+          ? `${contactName} a trimis un mesaj despre ${topic}.`
+          : `${contactName} sent a message about ${topic}.`
+        : notification.body,
+    };
+  }
+
+  if (notification.type === "competition_time") {
+    const competitionName =
+      getStringMetadata(notification.metadata, "competitionName") ||
+      (ro ? "Competiție" : "Competition");
+    const remainingValue = notification.metadata?.remainingMinutes;
+    const remainingMinutes =
+      typeof remainingValue === "number" ? remainingValue : null;
+    const remainingLabel = remainingMinutes == null
+      ? null
+      : remainingMinutes >= 60
+        ? `${Math.floor(remainingMinutes / 60)}h${remainingMinutes % 60 ? ` ${remainingMinutes % 60}m` : ""}`
+        : `${remainingMinutes}m`;
+
+    return {
+      title: ro
+        ? `${competitionName}: timp rămas`
+        : `${competitionName}: time remaining`,
+      body: remainingLabel
+        ? ro
+          ? `Mai sunt ${remainingLabel} din competiție.`
+          : `${remainingLabel} remain in the competition.`
         : notification.body,
     };
   }
@@ -232,6 +324,7 @@ function notifyBrowser(notification: Pick<AppNotification, "body" | "id" | "titl
 
 function playNotificationSound() {
   if (typeof window === "undefined") return;
+  if (!hasNotificationSoundGesture) return;
 
   const AudioContextClass =
     window.AudioContext ||
@@ -272,6 +365,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
+  const isMobile = useIsMobile();
 
   const [open, setOpen] = useState(false);
   const [browserPermission, setBrowserPermission] = useState(getBrowserPermission);
@@ -280,6 +374,20 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   const initializedNotifications = useRef(false);
 
   const queryKey = useMemo(() => ["notifications", user?.id], [user?.id]);
+
+  useEffect(() => {
+    function markGesture() {
+      hasNotificationSoundGesture = true;
+    }
+
+    window.addEventListener("pointerdown", markGesture, { once: true });
+    window.addEventListener("keydown", markGesture, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", markGesture);
+      window.removeEventListener("keydown", markGesture);
+    };
+  }, []);
 
   const { data, isLoading } = useQuery<NotificationsData>({
     queryKey,
@@ -309,6 +417,10 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
     () => notifications.filter((notification) => !notification.read_at).length,
     [notifications]
   );
+  const needsEmailVerification = Boolean(
+    user?.email && !user.email_confirmed_at
+  );
+  const visibleUnreadCount = unreadCount + (needsEmailVerification ? 1 : 0);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -448,9 +560,10 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   async function openNotification(notification: AppNotification) {
     await markAsRead(notification);
 
-    if (notification.href) {
+    const safeHref = getSafeNotificationHref(notification.href);
+    if (safeHref) {
       setOpen(false);
-      router.push(notification.href);
+      router.push(safeHref);
     }
   }
 
@@ -467,30 +580,34 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-zinc-600 transition hover:border-zinc-200 hover:bg-zinc-100 hover:text-zinc-950"
+          className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-muted-foreground transition hover:border-border hover:bg-accent hover:text-accent-foreground"
           aria-label={t("notifications.open")}
         >
-          {unreadCount ? <BellRing size={18} /> : <Bell size={18} />}
+          {visibleUnreadCount ? <BellRing size={18} /> : <Bell size={18} />}
 
-          {unreadCount ? (
+          {visibleUnreadCount ? (
             <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-              {unreadCount > 99 ? "99+" : unreadCount}
+              {visibleUnreadCount > 99 ? "99+" : visibleUnreadCount}
             </span>
           ) : null}
         </button>
       </PopoverTrigger>
 
       <PopoverContent
-        align="end"
+        align={isMobile ? "center" : "end"}
         sideOffset={12}
-        className="w-[min(24rem,calc(100vw-2rem))] gap-0 overflow-hidden rounded-2xl p-0"
+        collisionPadding={isMobile ? 20 : 8}
+        className="w-[calc(100vw-3rem)] max-w-[23rem] gap-0 overflow-hidden rounded-2xl p-0 sm:w-96 sm:max-w-none"
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div>
             <h2 className="text-base font-semibold">{t("notifications.title")}</h2>
             <p className="text-xs text-muted-foreground">
-              {unreadCount
-                ? t("notifications.unread").replace("{count}", String(unreadCount))
+              {visibleUnreadCount
+                ? t("notifications.unread").replace(
+                    "{count}",
+                    String(visibleUnreadCount)
+                  )
                 : t("notifications.allCaughtUp")}
             </p>
           </div>
@@ -508,7 +625,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
         </div>
 
         {browserPermission === "default" ? (
-          <div className="border-b bg-zinc-50 px-4 py-2">
+          <div className="border-b bg-muted/60 px-4 py-2">
             <Button
               variant="outline"
               size="sm"
@@ -521,14 +638,16 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
         ) : null}
 
         <ScrollArea className="h-[min(28rem,calc(100vh-12rem))]">
+          <EmailVerificationNotification />
+
           {isLoading ? (
             <div className="space-y-3 p-4">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div key={index} className="flex gap-3">
-                  <div className="h-9 w-9 rounded-full bg-zinc-100" />
+                  <div className="h-9 w-9 rounded-full bg-muted" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 w-3/4 rounded bg-zinc-100" />
-                    <div className="h-3 w-1/2 rounded bg-zinc-100" />
+                    <div className="h-3 w-3/4 rounded bg-muted" />
+                    <div className="h-3 w-1/2 rounded bg-muted" />
                   </div>
                 </div>
               ))}
@@ -544,15 +663,24 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                     key={notification.id}
                     onClick={() => void openNotification(notification)}
                     className={cn(
-                      "flex w-full gap-3 px-4 py-3 text-left transition hover:bg-zinc-50",
-                      unread && "bg-red-50/40"
+                      "flex w-full gap-3 px-4 py-3 text-left transition hover:bg-accent/70",
+                      unread && "bg-red-50/40 dark:bg-red-950/20"
                     )}
                   >
-                    <UserAvatar
-                      avatarUrl={notification.actor?.avatar_url}
-                      username={notification.actor?.username || "S"}
-                      className="h-9 w-9"
-                    />
+                    {notification.type === "platform_announcement" ? (
+                      <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-background"><img src="/logoSCX.svg" alt="ScripticX" className="size-7 object-contain dark:invert" /></span>
+                    ) : notification.type === "birthday_surprise" ? (
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full border bg-muted">
+                        <Gift className="size-4" />
+                      </span>
+                    ) : (
+                      <UserAvatar
+                        avatarUrl={notification.actor?.avatar_url}
+                        username={notification.actor?.username || "S"}
+                        equippedRewards={notification.actor?.equipped_rewards}
+                        className="h-9 w-9"
+                      />
+                    )}
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start gap-2">
@@ -579,17 +707,17 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
                 );
               })}
             </div>
-          ) : (
+          ) : !needsEmailVerification ? (
             <div className="flex h-64 flex-col items-center justify-center px-6 text-center">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100">
-                <Inbox size={18} className="text-zinc-500" />
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                <Inbox size={18} className="text-muted-foreground" />
               </div>
               <p className="text-sm font-medium">{t("notifications.empty")}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {t("notifications.emptyHint")}
               </p>
             </div>
-          )}
+          ) : null}
         </ScrollArea>
       </PopoverContent>
     </Popover>

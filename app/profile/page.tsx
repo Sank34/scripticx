@@ -6,7 +6,7 @@ import RouteGuard from "@/components/RouteGuard";
 import { SectionCard } from "@/components/common/SectionCard";
 import { StatCard } from "@/components/common/StatCard";
 import { useAuth } from "@/hooks/useAuth";
-import { Flame, Globe, Share2, Trophy, Check, Rocket, Brain } from "lucide-react";
+import { Award, Flame, Globe, Share2, Trophy } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 import { toast } from "sonner";
 
@@ -25,6 +25,23 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalized } from "@/lib/getLocalized";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
+import { ProfileBackground } from "@/components/user/ProfileBackground";
+import { EmailVerificationProfileStatus } from "@/components/account/EmailVerification";
+import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
+import { AchievementBadgeCard } from "@/components/achievements/AchievementBadgeCard";
+import {
+  getLegacyBadgeRarity,
+  resolveEquippedReward,
+  type EquippedRewards,
+  type RewardRarity,
+} from "@/lib/rewards";
+import {
+  buildSubmissionActivityHeatmap,
+  buildSubmissionActivityHeatmapFromDailyRows,
+  type SubmissionActivityAggregateRow,
+  type SubmissionActivityHeatmap,
+} from "@/lib/submissionActivity";
+import { normalizeProfilePronouns } from "@/lib/profile-pronouns";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -41,9 +58,13 @@ type DifficultyStats = {
 };
 
 type ProfileData = {
+  activity: SubmissionActivityHeatmap;
   avatar: string | null;
+  banner: string | null;
   username: string | null;
   bio: string;
+  pronouns: string;
+  points: number;
   github: string;
   twitter: string;
   website: string;
@@ -55,6 +76,7 @@ type ProfileData = {
   followers: number;
   following: number;
   achievements: any[];
+  equippedRewards: EquippedRewards;
 };
 
 function BrandIcon({ icon }: { icon: any }) {
@@ -86,20 +108,21 @@ function ProfileContent() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
-  const iconMap: any = {
-    trophy: Trophy,
-    flame: Flame,
-    check: Check,
-    rocket: Rocket,
-    brain: Brain,
-  };
 
   async function fetchData(): Promise<ProfileData> {
+    const emptyActivity = buildSubmissionActivityHeatmap([], {
+      timeZone: "UTC",
+    });
+
     if (!user) {
       return {
+        activity: emptyActivity,
         avatar: null,
+        banner: null,
         username: null,
         bio: "",
+        pronouns: "",
+        points: 0,
         github: "",
         twitter: "",
         website: "",
@@ -119,12 +142,13 @@ function ProfileContent() {
         followers: 0,
         following: 0,
         achievements: [],
+        equippedRewards: {},
       };
     }
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, username, avatar_url, bio, github, twitter, website")
+      .select("*")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -132,6 +156,10 @@ function ProfileContent() {
       profile?.avatar_url &&
       profile.avatar_url !== "null" &&
       profile.avatar_url.startsWith("http");
+    const validBanner =
+      profile?.banner_url &&
+      profile.banner_url !== "null" &&
+      profile.banner_url.startsWith("http");
 
     const profileId = profile?.id;
 
@@ -153,23 +181,50 @@ function ProfileContent() {
       following = followingCount || 0;
     }
 
-    const { data } = await supabase
-      .from("submissions")
-      .select(`
-        *,
-        problems (
-          title_i18n,
-          difficulty
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    const [submissionResult, activityResult] = await Promise.all([
+      supabase
+        .from("submissions")
+        .select(`
+          id,
+          user_id,
+          problem_id,
+          score,
+          created_at,
+          verified_at,
+          problems (
+            title_i18n,
+            difficulty
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase.rpc("get_profile_submission_activity", {
+        p_user_id: user.id,
+        p_start_date: emptyActivity.startDate,
+        p_end_date: emptyActivity.endDate,
+      }),
+    ]);
+    const data = submissionResult.data;
+    const fallbackActivity = buildSubmissionActivityHeatmap(
+      (data || []).filter((submission) => Boolean(submission.verified_at)),
+      { endDate: emptyActivity.endDate, timeZone: "UTC" }
+    );
+    const activity = activityResult.error
+      ? fallbackActivity
+      : buildSubmissionActivityHeatmapFromDailyRows(
+          (activityResult.data || []) as SubmissionActivityAggregateRow[],
+          { endDate: emptyActivity.endDate, timeZone: "UTC" }
+        );
 
     if (!data) {
       return {
+        activity,
         avatar: validAvatar ? profile.avatar_url : null,
+        banner: validBanner ? profile.banner_url : null,
         username: profile?.username || null,
         bio: profile?.bio || "",
+        pronouns: normalizeProfilePronouns(profile?.pronouns) || "",
+        points: Number(profile?.total_score) || 0,
         github: profile?.github || "",
         twitter: profile?.twitter || "",
         website: profile?.website || "",
@@ -189,6 +244,7 @@ function ProfileContent() {
         followers,
         following,
         achievements: [],
+        equippedRewards: (profile?.equipped_rewards || {}) as EquippedRewards,
       };
     }
 
@@ -206,7 +262,10 @@ function ProfileContent() {
       if (!best[sub.problem_id] || sub.score > best[sub.problem_id].score) {
         best[sub.problem_id] = sub;
 
-        const diff = sub.problems?.difficulty;
+        const joinedProblem = Array.isArray(sub.problems)
+          ? sub.problems[0]
+          : sub.problems;
+        const diff = joinedProblem?.difficulty;
         if (diff === "easy") easy++;
         if (diff === "medium") medium++;
         if (diff === "hard") hard++;
@@ -239,7 +298,10 @@ function ProfileContent() {
 
     const count: Record<string, number> = {};
     data.forEach((d) => {
-      const title = getLocalized(d.problems?.title_i18n, locale);
+      const joinedProblem = Array.isArray(d.problems)
+        ? d.problems[0]
+        : d.problems;
+      const title = getLocalized(joinedProblem?.title_i18n, locale);
       count[title] = (count[title] || 0) + 1;
     });
 
@@ -252,16 +314,19 @@ function ProfileContent() {
       .from("user_achievements")
       .select(`
         achievement:achievements (
-          title,
-          icon
+          *
         )
       `)
       .eq("user_id", user.id);
 
     return {
+      activity,
       avatar: validAvatar ? profile.avatar_url : null,
+      banner: validBanner ? profile.banner_url : null,
       username: profile?.username || null,
       bio: profile?.bio || "",
+      pronouns: normalizeProfilePronouns(profile?.pronouns) || "",
+      points: Number(profile?.total_score) || 0,
       github: profile?.github || "",
       twitter: profile?.twitter || "",
       website: profile?.website || "",
@@ -273,6 +338,7 @@ function ProfileContent() {
       followers,
       following,
       achievements: ach || [],
+      equippedRewards: (profile?.equipped_rewards || {}) as EquippedRewards,
     };
   }
 
@@ -286,8 +352,14 @@ function ProfileContent() {
   });
 
   const avatar = profileData?.avatar || null;
+  const activity =
+    profileData?.activity ||
+    buildSubmissionActivityHeatmap([], { timeZone: "UTC" });
+  const banner = profileData?.banner || null;
   const username = profileData?.username || null;
   const bio = profileData?.bio || "";
+  const pronouns = profileData?.pronouns || "";
+  const points = profileData?.points || 0;
   const github = profileData?.github || "";
   const twitter = profileData?.twitter || "";
   const website = profileData?.website || "";
@@ -307,6 +379,11 @@ function ProfileContent() {
   const followers = profileData?.followers || 0;
   const following = profileData?.following || 0;
   const achievements = profileData?.achievements || [];
+  const equippedRewards = profileData?.equippedRewards || {};
+  const backgroundReward =
+    equippedRewards["profile-background"] || equippedRewards["profile-banner"];
+  const titleReward = resolveEquippedReward(equippedRewards["profile-title"]);
+  const equippedTitle = titleReward?.name?.[locale];
 
   useEffect(() => {
     const handler = async () => {
@@ -315,12 +392,16 @@ function ProfileContent() {
       });
     };
     window.addEventListener("profile-updated", handler);
-    return () => window.removeEventListener("profile-updated", handler);
+    window.addEventListener("rewards-updated", handler);
+    return () => {
+      window.removeEventListener("profile-updated", handler);
+      window.removeEventListener("rewards-updated", handler);
+    };
   }, [queryClient, user?.id]);
 
   if (loading || !user) {
     return (
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Skeleton className="w-16 h-16 rounded-full" />
@@ -335,6 +416,8 @@ function ProfileContent() {
           </div>
           <Skeleton className="h-9 w-9 rounded-md" />
         </div>
+
+        <Skeleton className="h-72 w-full rounded-2xl" />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-6">
@@ -395,6 +478,7 @@ function ProfileContent() {
             </Card>
           </div>
         </div>
+
       </div>
     );
   }
@@ -416,22 +500,55 @@ function ProfileContent() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="relative isolate min-h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
+      {backgroundReward && <ProfileBackground reward={backgroundReward} />}
+      <div className="relative z-[1] mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <ProfileImagePreview
-            alt={`${displayName} profile picture`}
-            avatarUrl={avatar}
-            className="h-16 w-16"
-            fallback={initial}
-          />
+      <div className="overflow-hidden rounded-[var(--sx-radius-panel)] border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
+        <div
+          className="relative h-44 bg-muted bg-cover bg-center sm:h-52"
+          style={
+            banner
+              ? {
+                  backgroundImage: `url("${banner}")`,
+                }
+              : undefined
+          }
+        >
+          {banner && (
+            <div className="absolute inset-0 bg-transparent transition-colors duration-300 dark:bg-background/55" />
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-px bg-border" />
+        </div>
 
-          <div>
-            <h1 className="text-2xl font-bold">
-              {displayName}
-            </h1>
-            <p className="text-muted-foreground">{email}</p>
+        <div className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <ProfileImagePreview
+              alt={`${displayName} profile picture`}
+              avatarUrl={avatar}
+              equippedRewards={equippedRewards}
+              className="h-20 w-20 border border-border shadow-sm"
+              fallback={initial}
+            />
+
+            <div className="pb-1">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <h1 className="text-2xl font-bold">
+                  {displayName}
+                </h1>
+                {pronouns && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {pronouns}
+                  </span>
+                )}
+              </div>
+              {equippedTitle && (
+                <Badge variant="outline" className="mt-1.5 bg-background">
+                  {equippedTitle}
+                </Badge>
+              )}
+              <p className="text-muted-foreground">{email}</p>
+              <EmailVerificationProfileStatus />
 
             <div className="flex gap-4 mt-1 text-sm">
               <span><b>{followers}</b> {t("profile.followers")}</span>
@@ -469,14 +586,23 @@ function ProfileContent() {
           </div>
         </div>
 
-        <Button variant="outline" size="icon" onClick={handleShare}>
-          <Share2 size={16} />
-        </Button>
+          <Button variant="outline" size="icon" onClick={handleShare}>
+            <Share2 size={16} />
+          </Button>
+        </div>
       </div>
+
+      <ContributionHeatmap data={activity} locale={locale} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         <div className="space-y-6">
+
+          <StatCard
+            icon={<Trophy className="size-5 text-amber-500" />}
+            title={t("profile.points")}
+            value={points.toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}
+          />
 
           <Card>
             <CardHeader>
@@ -537,19 +663,45 @@ function ProfileContent() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between">
               <CardTitle>{t("profile.achievements.title")}</CardTitle>
+              <Badge variant="secondary">{achievements.length}</Badge>
             </CardHeader>
-            <CardContent className="flex gap-2 flex-wrap">
-              {achievements.map((a, i) => {
-                const Icon = iconMap[a.achievement.icon];
-                return (
-                  <div key={i} className="flex items-center gap-2 px-3 py-1 rounded bg-muted text-sm">
-                    {Icon && <Icon size={14} />}
-                    {a.achievement.title}
-                  </div>
-                );
-              })}
+            <CardContent>
+              {achievements.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {achievements.map((item, index) => {
+                    const achievement = item.achievement;
+                    if (!achievement) return null;
+
+                    return (
+                      <AchievementBadgeCard
+                        key={`${achievement.title}-${index}`}
+                        compact
+                        title={achievement.title}
+                        iconName={achievement.icon}
+                        iconUrl={achievement.icon_url}
+                        rarity={(achievement.rarity || getLegacyBadgeRarity(achievement.icon)) as RewardRarity}
+                        description={achievement.description || (
+                          locale === "ro" ? "Badge obținut pe ScripticX." : "Badge earned on ScripticX."
+                        )}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/40 px-4 py-10 text-center">
+                  <Award className="size-8 text-muted-foreground/50" />
+                  <p className="mt-2 text-sm font-medium">
+                    {locale === "ro" ? "Primele badge-uri sunt pe drum." : "Your first badges are on the way."}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {locale === "ro"
+                      ? "Rezolvă probleme și participă la evenimente pentru a le debloca."
+                      : "Solve problems and join events to unlock them."}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -590,6 +742,7 @@ function ProfileContent() {
 
       </div>
 
+    </div>
     </div>
   );
 }

@@ -21,7 +21,7 @@ export default async function CommunityPage() {
   const supabase = createServerSupabase();
   const { data } = await supabase
     .from("profiles")
-    .select("username, avatar_url, bio, total_score")
+    .select("username, avatar_url, bio, total_score, equipped_rewards")
     .not("username", "is", null)
     .order("total_score", { ascending: false })
     .limit(500);

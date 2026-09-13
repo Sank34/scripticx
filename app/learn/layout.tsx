@@ -1,22 +1,28 @@
 import type { Metadata } from "next";
 
-import LearnLayoutClient from "@/components/learn/LearnLayoutClient";
+import RouteGuard from "@/components/RouteGuard";
 import { createPageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = createPageMetadata({
-  title: "MiniScript+ Documentation",
-  description:
-    "Learn MiniScript+ syntax, variables, conditions, loops, and input-output operations through practical explanations and examples.",
-  path: "/learn",
-  keywords: [
-    "MiniScript+ documentation",
-    "beginner programming tutorial",
-    "MiniScript+ syntax",
-  ],
-});
+export const metadata: Metadata = {
+  ...createPageMetadata({
+    title: "Learning Roadmap",
+    description:
+      "Follow the ScripticX learning roadmap with guided lessons, interactive MiniScript+ examples, quick quizzes, and recommended problems.",
+    path: "/learn",
+    keywords: [
+      "MiniScript+ roadmap",
+      "beginner programming tutorial",
+      "learn programming",
+    ],
+  }),
+  robots: {
+    follow: false,
+    index: false,
+  },
+};
 
 export default function LearnLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <LearnLayoutClient>{children}</LearnLayoutClient>;
+  return <RouteGuard requireAuth>{children}</RouteGuard>;
 }

@@ -15,18 +15,20 @@ import {
 import { Crown, Medal, Trophy } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
+import type { EquippedRewards } from "@/lib/rewards";
 
 type LeaderboardUser = {
   id: string;
   username: string;
   avatar_url: string | null;
+  equipped_rewards?: EquippedRewards | null;
   total_score: number;
 };
 
 async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, username, avatar_url, total_score")
+    .select("id, username, avatar_url, total_score, equipped_rewards")
     .order("total_score", { ascending: false })
     .limit(50);
 
@@ -48,7 +50,7 @@ export default function LeaderboardPage() {
   const rest = users.slice(3);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8">
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <PageHeader
@@ -77,9 +79,9 @@ export default function LeaderboardPage() {
 
             {top3[1] && (
               <PodiumCard
-                className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-muted dark:to-muted/60 cursor-pointer hover:scale-[1.02] transition"
+                className="cursor-pointer bg-zinc-100 transition hover:scale-[1.02] dark:bg-muted/70"
                 icon={Medal}
-                iconClassName="w-6 h-6 text-gray-500"
+                iconClassName="w-6 h-6 text-muted-foreground"
                 pointsLabel={t("leaderboard.points")}
                 rank={2}
                 user={top3[1]}
@@ -88,7 +90,7 @@ export default function LeaderboardPage() {
 
             {top3[0] && (
               <PodiumCard
-                className="bg-gradient-to-br from-yellow-200 to-yellow-400 dark:from-yellow-500/30 dark:to-yellow-600/20 scale-105 cursor-pointer hover:scale-110 transition"
+                className="scale-105 cursor-pointer bg-amber-100 transition hover:scale-110 dark:bg-amber-500/20"
                 icon={Crown}
                 iconClassName="w-7 h-7 text-yellow-700 dark:text-yellow-300"
                 pointsLabel={t("leaderboard.points")}
@@ -99,9 +101,9 @@ export default function LeaderboardPage() {
 
             {top3[2] && (
               <PodiumCard
-                className="bg-gradient-to-br from-orange-200 to-orange-400 dark:from-orange-500/30 dark:to-orange-600/20 cursor-pointer hover:scale-[1.02] transition"
+                className="cursor-pointer bg-orange-100 transition hover:scale-[1.02] dark:bg-orange-500/20"
                 icon={Trophy}
-                iconClassName="w-6 h-6 text-orange-600"
+                iconClassName="w-6 h-6 text-orange-600 dark:text-orange-400"
                 pointsLabel={t("leaderboard.points")}
                 rank={3}
                 user={top3[2]}

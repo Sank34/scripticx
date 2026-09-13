@@ -1,0 +1,12 @@
+export type MissionId = 'lanterns' | 'gate' | 'beacon';
+export type ZoneId = 'meadow' | 'grove';
+type Copy = { ro: string; en: string };
+export type GameMission = { id: MissionId; zone: ZoneId; title: Copy; description: Copy; hint: Copy; starter: string; expected: (number|string)[]; required: string[]; inputs: Record<string, number> };
+export const missions: GameMission[] = [
+  { id:'lanterns',zone:'meadow',title:{ro:'Aprinde insula',en:'Light the island'},description:{ro:'Aprinde felinarele 1, 2, 3 cu o singură buclă. PRINT trimite numărul felinarului. După verificare, podul se deschide.',en:'Light lanterns 1, 2, 3 with one loop. PRINT sends a lantern number. Verification unlocks the bridge.'},hint:{ro:'Verifică limita buclei: trebuie să ajungă și la 3.',en:'Check the loop limit: it must reach 3 too.'},starter:'lamp = 1\nWHILE lamp <= 2\n  PRINT lamp\n  lamp = lamp + 1\nEND',expected:[1,2,3],required:['WHILE'],inputs:{}},
+  { id:'gate',zone:'grove',title:{ro:'Poarta de energie',en:'The energy gate'},description:{ro:'Senzorul oferă variabila energy. Afișează "OPEN" când energy este cel puțin 3; altfel "WAIT". Serverul testează mai multe valori.',en:'The sensor supplies energy. Print "OPEN" when energy is at least 3; otherwise "WAIT". The server tests several readings.'},hint:{ro:'Folosește energy >= 3. Păstrează ambele ramuri ale condiției.',en:'Use energy >= 3. Keep both branches of the condition.'},starter:'IF energy > 3 THEN\n  PRINT "OPEN"\nELSE\n  PRINT "WAIT"\nEND',expected:['OPEN'],required:['IF','ELSE'],inputs:{energy:3}},
+  { id:'beacon',zone:'grove',title:{ro:'Semnalul farului',en:'The beacon signal'},description:{ro:'Trimite platforma-releu la stațiile pare: PRINT deplasează platforma la numărul transmis. Combină WHILE și IF, de la 1 până la limit inclusiv. Nu modifica senzorul limit.',en:'Send the relay platform to the even stations: PRINT moves it to the transmitted number. Combine WHILE and IF, from 1 through limit. Do not change the limit sensor.'},hint:{ro:'Un număr este par dacă n MOD 2 == 0.',en:'A number is even when n MOD 2 == 0.'},starter:'n = 1\nWHILE n <= limit\n  IF n MOD 2 == 1 THEN\n    PRINT n\n  END\n  n = n + 1\nEND',expected:[2,4,6],required:['WHILE','IF'],inputs:{limit:6}},
+];
+export function getMission(id:string){return missions.find(m=>m.id===id);}
+export type GameProgress={completed:MissionId[];rewards:Record<string,{points:number;productId:string|null}>};
+export const emptyProgress:GameProgress={completed:[],rewards:{}};

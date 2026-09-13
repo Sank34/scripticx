@@ -5,9 +5,32 @@ import { useEffect } from "react";
 
 export function MainWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isStudentWorkspaceWhiteboard = pathname?.startsWith(
+    "/workspace/student/whiteboard"
+  );
+  const isStudentWorkspaceGraph = pathname?.startsWith(
+    "/workspace/student/graph"
+  );
+  const isStudentWorkspaceNotes = pathname?.startsWith(
+    "/workspace/student/notes"
+  );
+  const isStudentWorkspaceImmersive =
+    isStudentWorkspaceWhiteboard ||
+    isStudentWorkspaceNotes ||
+    isStudentWorkspaceGraph;
+  const isProfileSurface =
+    pathname === "/profile" || /^\/u\/[^/]+$/.test(pathname || "");
   const isFullWidth =
     pathname === "/editor" ||
+    pathname?.startsWith("/editor/live/") ||
+    pathname?.startsWith("/docs") ||
+    pathname?.startsWith("/examples") ||
+    pathname === "/admin/lessons" ||
+    isStudentWorkspaceImmersive ||
+    /^\/competitions\/[^/]+$/.test(pathname || "") ||
     (pathname?.startsWith("/problems/") && pathname !== "/problems") ||
+    (pathname?.startsWith("/groups/") && pathname !== "/groups") ||
+    pathname?.startsWith("/invite/") ||
     pathname?.startsWith("/live/");
 
   useEffect(() => {
@@ -24,15 +47,32 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
 
   if (isFullWidth) {
     return (
-      <main className="min-h-0 flex-1 overflow-hidden bg-white">
+      <main
+        data-shell-immersive={
+          isStudentWorkspaceImmersive ? "true" : undefined
+        }
+        className={`relative h-0 min-h-0 flex-1 overflow-hidden bg-background ${
+          isStudentWorkspaceImmersive
+            ? "pb-[calc(env(safe-area-inset-bottom)+3.25rem)] md:pb-0"
+            : ""
+        }`}
+      >
+        {children}
+      </main>
+    );
+  }
+
+  if (isProfileSurface) {
+    return (
+      <main className="relative min-h-0 flex-1 overflow-y-auto bg-background [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {children}
       </main>
     );
   }
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto bg-white pb-16 md:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+    <main className="relative min-h-0 flex-1 overflow-y-auto bg-background pb-16 md:pb-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="sx-page">
         {children}
       </div>
     </main>

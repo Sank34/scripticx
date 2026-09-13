@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="680" viewBox="0 0 480 680">
+  <g id="Mousey-Bare">
+    <g id="Tail"><path d="M284 572 C304 575 327 571 337 558 Q324 563 315 554" fill="none" stroke="#A4AEA6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g id="Arm-left">
+      <path d="M218 434 C200 448 186 475 183 500 C181 516 184 530 192 532 C201 534 204 525 202 516 C201 504 205 489 216 474Z" fill="#B9C2BB"/>
+      <path d="M188 516 Q188 525 193 526" fill="none" stroke="#A4AEA6" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="Arm-right">
+      <path d="M262 434 C280 448 294 475 297 500 C299 516 296 530 288 532 C279 534 276 525 278 516 C279 504 275 489 264 474Z" fill="#B9C2BB"/>
+      <path d="M292 516 Q292 525 287 526" fill="none" stroke="#A4AEA6" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <g id="Body">
+      <path d="M222 403 C225 423 218 435 210 454 C196 485 190 521 194 555 L200 607 C202 628 215 639 225 632 C236 626 234 599 240 587 C246 599 244 626 255 632 C265 639 278 628 280 607 L286 555 C290 521 284 485 270 454 C262 435 255 423 258 403Z" fill="#C9CFCA"/>
+    </g>
+    <g id="Head">
+      <g id="Ear-left">
+        <circle cx="117" cy="254" r="66" fill="#C9CFCA"/>
+        <circle cx="117" cy="254" r="42" fill="#A4AEA6"/>
+        <ellipse cx="110" cy="246" rx="28" ry="29" fill="#B4BEB5"/>
+      </g>
+      <g id="Ear-right">
+        <circle cx="363" cy="254" r="66" fill="#C9CFCA"/>
+        <circle cx="363" cy="254" r="42" fill="#A4AEA6"/>
+        <ellipse cx="370" cy="246" rx="28" ry="29" fill="#B4BEB5"/>
+      </g>
+      <g id="Whiskers-left" fill="none" stroke="#59675E" stroke-width="6" stroke-linecap="round">
+        <path d="M129 344 L90 340"/><path d="M135 360 L102 371"/>
+      </g>
+      <g id="Whiskers-right" fill="none" stroke="#59675E" stroke-width="6" stroke-linecap="round">
+        <path d="M351 344 L390 340"/><path d="M345 360 L378 371"/>
+      </g>
+      <path id="Face" d="M240 225 C315 225 355 267 355 323 C355 384 309 418 240 424 C171 418 125 384 125 323 C125 267 165 225 240 225Z" fill="#C9CFCA"/>
+      <path id="Muzzle" d="M183 370 C195 352 221 347 240 350 C259 347 285 352 297 370 C298 397 265 411 240 413 C215 411 182 397 183 370Z" fill="#DEE3DD"/>
+      <g id="Eye-left">
+        <ellipse cx="190" cy="320" rx="43" ry="53" fill="#D2F9C8"/>
+        <g id="Pupil-left">
+          <rect x="177" y="281" width="40" height="64" rx="20" fill="#17291D"/>
+          <ellipse cx="188" cy="291" rx="10" ry="12" fill="#FFFFFF"/>
+        </g>
+      </g>
+      <g id="Eye-right">
+        <ellipse cx="290" cy="320" rx="43" ry="53" fill="#D2F9C8"/>
+        <g id="Pupil-right">
+          <rect x="277" y="281" width="40" height="64" rx="20" fill="#17291D"/>
+          <ellipse cx="288" cy="291" rx="10" ry="12" fill="#FFFFFF"/>
+        </g>
+      </g>
+      <path id="Nose" d="M234 361 Q240 357 246 361 Q248 364 244 368 Q240 373 236 368 Q232 364 234 361Z" fill="#59675E"/>
+      <g id="Smile">
+        <path d="M222 384 Q240 400 258 384" fill="none" stroke="#384A3D" stroke-width="5" stroke-linecap="round"/>
+      </g>
+    </g>
+  </g>
+</svg>

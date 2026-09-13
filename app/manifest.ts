@@ -14,12 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["education", "developer tools", "productivity"],
     icons: [
       {
-        src: "/icons/notification-icon-72.png",
-        sizes: "72x72",
+        src: "/icons/app-icon-v2-192.png",
+        sizes: "192x192",
         type: "image/png",
       },
       {
-        src: "/icons/notification-icon-512.png",
+        src: "/icons/app-icon-v2-512.png",
         sizes: "512x512",
         type: "image/png",
       },

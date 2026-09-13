@@ -30,7 +30,7 @@ export function MentionText({
     }
 
     const mentionClassName =
-      "font-semibold text-zinc-950 underline-offset-2 transition-colors hover:text-zinc-600 hover:underline";
+      "font-semibold text-foreground underline-offset-2 transition-colors hover:text-muted-foreground hover:underline";
 
     parts.push(
       onMentionOpen ? (

@@ -1,0 +1,25 @@
+{
+  "name": "robot",
+  "clips": [
+    "Idle",
+    "Walk"
+  ],
+  "morphs": [
+    "blink",
+    "sad",
+    "lookLeft",
+    "lookRight"
+  ],
+  "defaultExpression": "happy",
+  "forward": "+Z (glTF)",
+  "up": "+Y",
+  "units": "meters",
+  "meshCount": 55,
+  "bones": 15,
+  "collision": "Use a separate capsule; do not use render meshes as physics colliders.",
+  "limitations": [
+    "No IK",
+    "No facial lip sync",
+    "Prototype walk cycle; tune foot contact to movement speed"
+  ]
+}

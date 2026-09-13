@@ -11,7 +11,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
-import { AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, LoaderCircle } from "lucide-react";
 
 type ModalType = "error" | "success" | "info";
 
@@ -21,6 +21,10 @@ interface Props {
   title: string;
   description: string;
   type?: ModalType;
+  actionLabel?: string;
+  actionLoading?: boolean;
+  closeLabel?: string;
+  onAction?: () => void | Promise<void>;
 }
 
 export function AppModal({
@@ -29,6 +33,10 @@ export function AppModal({
   title,
   description,
   type = "info",
+  actionLabel = "OK",
+  actionLoading = false,
+  closeLabel = "Close",
+  onAction,
 }: Props) {
   const Icon =
     type === "error"
@@ -72,10 +80,19 @@ export function AppModal({
 
         {/* BUTTONS */}
         <AlertDialogFooter className="flex justify-end gap-2">
-          <AlertDialogCancel>Close</AlertDialogCancel>
+          <AlertDialogCancel>{closeLabel}</AlertDialogCancel>
 
-          <AlertDialogAction className={actionColor}>
-            OK
+          <AlertDialogAction
+            className={actionColor}
+            disabled={actionLoading}
+            onClick={(event) => {
+              if (!onAction) return;
+              event.preventDefault();
+              void onAction();
+            }}
+          >
+            {actionLoading ? <LoaderCircle className="size-4 animate-spin" /> : null}
+            {actionLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
 

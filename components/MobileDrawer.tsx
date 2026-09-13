@@ -4,38 +4,54 @@ import {
   Drawer,
   DrawerClose,
   DrawerContent,
+  DrawerDescription,
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
 
 import {
   BookOpen,
-  Code,
   HelpCircle,
   LayoutDashboard,
-  List,
   Mail,
+  Menu,
+  Medal,
   MessageSquare,
-  School,
   Search,
   Shield,
+  ShoppingBag,
   Sparkles,
-  SquareTerminal,
   Trophy,
+  UsersRound,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { WorkspaceSwitcher } from "@/components/workspaces/WorkspaceSwitcher";
+import {
+  getTeacherWorkspaceNavigation,
+  getStudentStudyNavigation,
+  getStudentWorkspaceNavigation,
+  isStudentWorkspaceContext,
+  isTeacherWorkspaceContext,
+  sharedStudyNavigationIcons,
+} from "@/components/workspaces/WorkspaceNavigation";
+import {
+  formatWorkspaceNoteTime,
+  useRecentWorkspaceNotes,
+} from "@/components/workspaces/useRecentWorkspaceNotes";
 import { useAuth } from "@/hooks/useAuth";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 type MobileNavItem = {
   href: string;
   icon: LucideIcon;
   label: string;
+  meta?: string;
   active?: (pathname: string) => boolean;
   children?: Array<{
     href: string;
@@ -45,47 +61,113 @@ type MobileNavItem = {
 
 export function MobileDrawer() {
   const pathname = usePathname();
-  const { t } = useLanguage();
+  const useHeaderTrigger = pathname === "/editor" || pathname.startsWith("/groups/");
+  const { locale, t } = useLanguage();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const {
     hasUnread: hasUnreadUpdates,
-    latestSlug: latestUpdateSlug,
   } = useUnreadUpdates();
-  const { user, isAdmin } = useAuth();
+  const { user, canAccessAdmin: isAdmin } = useAuth();
+  const studentWorkspaceActive = isStudentWorkspaceContext(
+    pathname,
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
+  const teacherWorkspaceActive = isTeacherWorkspaceContext(
+    pathname,
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
+  const recentNotes = useRecentWorkspaceNotes(
+    studentWorkspaceActive ? user?.id : null
+  );
 
-  if (pathname.startsWith("/live/")) {
+  if (
+    pathname.startsWith("/live/") ||
+    pathname.startsWith("/editor/live/")
+  ) {
     return null;
   }
 
   const isLoggedIn = Boolean(user);
+  const studentWorkspaceNavigation = getStudentWorkspaceNavigation(locale);
+  const studentStudyNavigation = getStudentStudyNavigation(locale);
+  const teacherWorkspaceNavigation = getTeacherWorkspaceNavigation(locale);
 
-  const navItems: Array<{ label: string; items: MobileNavItem[] }> = [
-    {
+  const navItems: Array<{ label: string; items: MobileNavItem[] }> =
+    isLoggedIn && teacherWorkspaceActive
+      ? [
+          {
+            label: locale === "ro" ? "Workspace profesor" : "Teacher workspace",
+            items: teacherWorkspaceNavigation,
+          },
+        ]
+      : isLoggedIn && studentWorkspaceActive
+      ? [
+          {
+            label: locale === "ro" ? "Workspace elev" : "Student workspace",
+            items: studentWorkspaceNavigation,
+          },
+          ...(recentNotes.length
+            ? [
+                {
+                  label: locale === "ro" ? "Notițe recente" : "Recent notes",
+                  items: recentNotes.map((note) => ({
+                    href: `/workspace/student/notes/${note.id}`,
+                    icon: FileText,
+                    label:
+                      note.title.trim() ||
+                      (locale === "ro" ? "Fără titlu" : "Untitled"),
+                    meta: formatWorkspaceNoteTime(note.updatedAt, locale),
+                    active: (currentPath: string) =>
+                      currentPath === `/workspace/student/notes/${note.id}`,
+                  })),
+                },
+              ]
+            : []),
+          {
+            label: locale === "ro" ? "Învățare" : "Study",
+            items: studentStudyNavigation,
+          },
+        ]
+      : [{
       label: t("sidebar.platform"),
       items: [
         ...(isLoggedIn
           ? [
-              { href: "/editor", icon: Code, label: t("nav.editor") },
+              { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
               {
-                href: "/livecode",
-                icon: SquareTerminal,
-                label: t("nav.livecode"),
-                active: (currentPath: string) =>
-                  currentPath.startsWith("/livecode") ||
-                  currentPath.startsWith("/live"),
+                href: "/editor",
+                icon: sharedStudyNavigationIcons.editor,
+                label: t("nav.editor"),
               },
             ]
           : []),
-        { href: "/problems", icon: List, label: t("nav.problems") },
-        { href: "/leaderboard", icon: Trophy, label: t("nav.leaderboard") },
+        {
+          href: "/problems",
+          icon: sharedStudyNavigationIcons.problems,
+          label: t("nav.problems"),
+        },
         ...(isLoggedIn
           ? [
-              { href: "/feed", icon: MessageSquare, label: t("nav.feed") },
-              { href: "/dashboard", icon: LayoutDashboard, label: t("nav.dashboard") },
               { href: "/search", icon: Search, label: t("nav.search") },
               ...(isAdmin
                 ? [{ href: "/admin", icon: Shield, label: t("nav.admin") }]
                 : []),
-              { href: "/classes", icon: School, label: t("nav.classes") },
+            ]
+          : []),
+      ],
+    },
+    {
+      label: t("sidebar.community"),
+      items: [
+        ...(isLoggedIn
+          ? [{ href: "/competitions", icon: Medal, label: t("nav.competitions") }]
+          : []),
+        { href: "/leaderboard", icon: Trophy, label: t("nav.leaderboard") },
+        ...(isLoggedIn
+          ? [
+              { href: "/shop", icon: ShoppingBag, label: t("nav.shop") },
+              { href: "/feed", icon: MessageSquare, label: t("nav.feed") },
+              { href: "/groups", icon: UsersRound, label: t("nav.groups") },
             ]
           : []),
       ],
@@ -93,15 +175,28 @@ export function MobileDrawer() {
     {
       label: t("sidebar.learn"),
       items: [
+        ...(isLoggedIn
+          ? [
+              {
+                href: "/learn",
+                icon: sharedStudyNavigationIcons.learn,
+                label: t("nav.learn"),
+                active: (currentPath: string) =>
+                  currentPath === "/learn" ||
+                  currentPath.startsWith("/learn/"),
+              },
+            ]
+          : []),
         {
-          href: "/learn",
+          href: "/docs/basics",
           icon: BookOpen,
           label: t("nav.docs"),
+          active: (currentPath: string) => currentPath.startsWith("/docs"),
           children: [
-            { href: "/learn/basics", label: t("learn.basics") },
-            { href: "/learn/variables", label: t("learn.variables") },
-            { href: "/learn/loops", label: t("learn.loops") },
-            { href: "/learn/input-output", label: t("learn.inputOutput") },
+            { href: "/docs/basics", label: t("learn.basics") },
+            { href: "/docs/variables", label: t("learn.variables") },
+            { href: "/docs/loops", label: t("learn.loops") },
+            { href: "/docs/input-output", label: t("learn.inputOutput") },
           ],
         },
         {
@@ -116,12 +211,11 @@ export function MobileDrawer() {
           ],
         },
       ],
-    },
-  ];
+    }];
 
   const footerItems = [
     {
-      href: latestUpdateSlug ? `/updates/${latestUpdateSlug}` : "/updates",
+      href: "/updates",
       icon: Sparkles,
       label: t("nav.whatsNew"),
       unread: hasUnreadUpdates,
@@ -131,39 +225,34 @@ export function MobileDrawer() {
   ];
 
   return (
-    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 -translate-x-1/2 md:hidden">
-      <Drawer>
+    <div className={useHeaderTrigger ? "fixed left-4 top-3 z-40 md:hidden" : "fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-1/2 z-50 -translate-x-1/2 md:hidden"}>
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
         <DrawerTrigger asChild>
           <button
             aria-label={t("mobileDrawer.open")}
-            className="flex h-7 w-28 items-center justify-center rounded-full border border-zinc-200/80 bg-white/80 shadow-[0_10px_30px_rgba(24,24,27,0.14)] backdrop-blur-xl transition-all duration-200 active:scale-95"
+            data-tour="mobile-menu"
+            className={useHeaderTrigger ? "flex size-11 items-center justify-center rounded-md text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : "flex h-8 w-24 items-center justify-center rounded-full border border-border bg-background/95 shadow-md backdrop-blur-xl transition-transform duration-150 active:scale-95"}
           >
-            <span className="h-1.5 w-12 rounded-full bg-zinc-400" />
+            {useHeaderTrigger ? <Menu size={20} /> : <span className="h-1.5 w-12 rounded-full bg-muted-foreground/60" />}
           </button>
         </DrawerTrigger>
 
-        <DrawerContent className="h-[82vh] rounded-t-[32px] border-zinc-200 bg-white/95 backdrop-blur-xl">
+        <DrawerContent className="h-[82vh] rounded-t-[var(--sx-radius-shell)] border-border bg-sidebar/98 backdrop-blur-xl">
           <DrawerTitle className="sr-only">
             {t("mobileDrawer.title")}
           </DrawerTitle>
+          <DrawerDescription className="sr-only">
+            {locale === "ro"
+              ? "Navighează între paginile și workspace-urile ScripticX."
+              : "Navigate between ScripticX pages and workspaces."}
+          </DrawerDescription>
 
-          <div className="flex h-full flex-col overflow-hidden px-8 pb-10 pt-8">
-            <div className="mb-10 flex flex-col items-center justify-center text-center">
-              <Image
-                src="/logoSCX.svg"
-                alt="ScripticX"
-                width={56}
-                height={56}
-                className="mb-3 h-14 w-14 object-contain"
+          <div className="flex h-full flex-col overflow-hidden px-4 pb-6 pt-4">
+            <div className="mb-4 border-b border-sidebar-border pb-3">
+              <WorkspaceSwitcher
+                variant="mobile"
+                onNavigate={() => setDrawerOpen(false)}
               />
-
-              <h2 className="text-3xl font-semibold tracking-tight text-black">
-                ScripticX
-              </h2>
-
-              <p className="mt-1 text-sm text-zinc-500">
-                {t("mobileDrawer.subtitle")}
-              </p>
             </div>
 
             <div
@@ -179,17 +268,18 @@ export function MobileDrawer() {
                 }
               `}</style>
 
-              <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-10 pb-12">
-                {navItems.map((section) => (
+              <div className="mx-auto flex w-full max-w-sm flex-col gap-5 pb-8">
+                {navItems.map((section, sectionIndex) => (
                   <div
                     key={section.label}
-                    className="flex w-full flex-col items-center"
+                    className="flex w-full flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
+                    style={{ animationDelay: `${sectionIndex * 45}ms` }}
                   >
-                    <h3 className="mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-zinc-400">
+                    <h3 className="mb-1.5 px-3 text-xs font-medium tracking-normal text-muted-foreground">
                       {section.label}
                     </h3>
 
-                    <div className="flex w-full flex-col items-center gap-2">
+                    <div className="flex w-full flex-col gap-1">
                       {section.items.map((item) => {
                         const active = item.active
                           ? item.active(pathname)
@@ -201,19 +291,29 @@ export function MobileDrawer() {
                             <DrawerClose asChild>
                               <Link
                                 href={item.href}
-                                className={`flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-medium transition-all duration-200 active:scale-[0.98] ${
+                                aria-current={active ? "page" : undefined}
+                                className={`flex w-full items-center justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring ${
                                   active
-                                    ? "bg-zinc-100 text-black shadow-sm"
-                                    : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
+                                    ? "bg-accent text-accent-foreground"
+                                    : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                                 }`}
                               >
-                                <Icon size={22} />
-                                <span>{item.label}</span>
+                                <Icon size={19} strokeWidth={1.8} />
+                                <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                                  <span className="min-w-0 flex-1 truncate text-left">
+                                    {item.label}
+                                  </span>
+                                  {item.meta && (
+                                    <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground/65">
+                                      {item.meta}
+                                    </span>
+                                  )}
+                                </span>
                               </Link>
                             </DrawerClose>
 
                             {item.children && active && (
-                              <div className="mt-2 flex flex-col items-center gap-1">
+                              <div className="mt-1 flex flex-col gap-1 pl-11">
                                 {item.children.map((child) => {
                                   const childActive = pathname === child.href;
 
@@ -221,10 +321,10 @@ export function MobileDrawer() {
                                     <DrawerClose asChild key={child.href}>
                                       <Link
                                         href={child.href}
-                                        className={`w-full rounded-xl px-4 py-2 text-center text-sm font-medium transition ${
+                                        className={`w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                                           childActive
-                                            ? "bg-zinc-100 text-black"
-                                            : "text-zinc-500 hover:bg-zinc-50 hover:text-black"
+                                            ? "bg-accent text-accent-foreground"
+                                            : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                                         }`}
                                       >
                                         {child.label}
@@ -241,9 +341,9 @@ export function MobileDrawer() {
                   </div>
                 ))}
 
-                <div className="h-px w-24 bg-zinc-200" />
+                {!studentWorkspaceActive && <div className="h-px w-full bg-border" />}
 
-                <div className="flex w-full flex-col items-center gap-2">
+                {!studentWorkspaceActive && <div className="flex w-full flex-col gap-1">
                   {footerItems.map((item) => {
                     const active = pathname.startsWith(item.href);
                     const Icon = item.icon;
@@ -252,18 +352,19 @@ export function MobileDrawer() {
                       <DrawerClose asChild key={item.href}>
                         <Link
                           href={item.href}
-                          className={`flex w-full items-center justify-center gap-3 rounded-2xl px-5 py-4 text-lg font-medium transition-all duration-200 active:scale-[0.98] ${
+                          prefetch={item.href === "/updates" ? false : undefined}
+                          className={`flex w-full items-center justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 ${
                             active
-                              ? "bg-zinc-100 text-black shadow-sm"
-                              : "text-zinc-600 hover:bg-zinc-50 hover:text-black"
+                              ? "bg-accent text-accent-foreground"
+                              : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                           }`}
                         >
                           <span className="relative inline-flex">
-                            <Icon size={22} />
+                            <Icon size={19} strokeWidth={1.8} />
                             {item.unread && (
                               <span className="absolute -right-1 -top-1 flex h-2 w-2">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
                               </span>
                             )}
                           </span>
@@ -272,7 +373,7 @@ export function MobileDrawer() {
                       </DrawerClose>
                     );
                   })}
-                </div>
+                </div>}
               </div>
             </div>
           </div>

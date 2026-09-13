@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 
 type ModalType = "error" | "success" | "info";

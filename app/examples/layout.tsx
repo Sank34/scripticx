@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
-import ExamplesLayoutClient from "@/components/examples/ExamplesLayoutClient";
+import { DocsShell } from "@/components/docs/DocsShell";
 import { createPageMetadata } from "@/lib/metadata";
+import { getExamplesNavigation } from "@/lib/server/docs";
 
 export const metadata: Metadata = createPageMetadata({
   title: "MiniScript+ Examples",
@@ -18,5 +19,15 @@ export const metadata: Metadata = createPageMetadata({
 export default function ExamplesLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <ExamplesLayoutClient>{children}</ExamplesLayoutClient>;
+  return (
+    <DocsShell
+      collection="examples"
+      navigation={{
+        en: getExamplesNavigation("en"),
+        ro: getExamplesNavigation("ro"),
+      }}
+    >
+      {children}
+    </DocsShell>
+  );
 }

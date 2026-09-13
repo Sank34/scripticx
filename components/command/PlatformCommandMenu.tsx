@@ -1,4 +1,5 @@
 "use client";
+import { useAuth } from "@/hooks/useAuth";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -7,20 +8,37 @@ import {
   BookOpen,
   Code,
   Command as CommandIcon,
+  Eye,
+  FilePlus2,
+  FolderGit2,
+  FolderOpen,
+  GitBranch,
   LayoutDashboard,
   List,
+  LockKeyhole,
+  Mail,
   MessageSquare,
+  Medal,
+  Route,
+  RadioTower,
   Search,
   Settings,
+  SlidersHorizontal,
   Shield,
+  ShoppingBag,
   Sparkles,
   SquareTerminal,
   Trophy,
   User,
+  UserRoundCog,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { openCommandMenuEvent, useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts";
+import { formatShortcut, matchesShortcut, type ShortcutId } from "@/lib/keyboard-shortcuts";
+
 
 import { useLanguage } from "@/components/LanguageProvider";
 import {
@@ -35,7 +53,12 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { startShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { api, type LiveCodeData } from "@/lib/api";
+import {
+  canAccessClassesForAccount,
+  getWorkspacePersonaFromMetadata,
+} from "@/lib/workspaces";
 
 type PlatformCommandMenuProps = {
   isAdmin: boolean;
@@ -48,16 +71,18 @@ type CommandEntry = {
   icon: LucideIcon;
   keywords?: string[];
   label: string;
-  shortcut?: string;
-  shortcutKey?: string;
+  shortcutId?: ShortcutId;
 };
 
 export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps) {
+  const { canAccessAdmin } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [isSafari, setIsSafari] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(720);
+  const { bindings } = useKeyboardShortcuts();
+  useShortcut("search", () => setOpen(value => !value));
 
   const { data: liveCodeData } = useQuery<LiveCodeData>({
     queryKey: ["command-menu", "livecode", user?.id],
@@ -67,18 +92,9 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
   });
 
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        if (!window.matchMedia("(min-width: 640px)").matches) return;
-
-        event.preventDefault();
-        setOpen((value) => !value);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    const show = () => setOpen(true);
+    window.addEventListener(openCommandMenuEvent, show);
+    return () => window.removeEventListener(openCommandMenuEvent, show);
   }, []);
 
   useEffect(() => {
@@ -104,25 +120,22 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         href: "/problems",
         icon: List,
         label: t("nav.problems"),
-        shortcut: "⌘ P",
-        shortcutKey: "p",
+        shortcutId: "problems",
         keywords: ["tasks", "exercises", "problems"],
       },
       {
         href: "/leaderboard",
         icon: Trophy,
         label: t("nav.leaderboard"),
-        shortcut: "⌘ L",
-        shortcutKey: "l",
+        shortcutId: "leaderboard",
         keywords: ["ranking", "score"],
       },
       {
-        href: "/learn",
+        href: "/docs/basics",
         icon: BookOpen,
         label: t("nav.docs"),
-        shortcut: "⌘ D",
-        shortcutKey: "d",
-        keywords: ["documentation", "learn"],
+        shortcutId: "docs",
+        keywords: ["documentation", "learn", "syntax"],
       },
       {
         href: "/examples",
@@ -142,27 +155,42 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
 
     commands.unshift(
       {
+        href: "/learn",
+        icon: Route,
+        label: t("nav.learn"),
+        keywords: ["roadmap", "learning path", "lessons"],
+      },
+      {
         href: "/dashboard",
         icon: LayoutDashboard,
         label: t("nav.dashboard"),
-        shortcut: "⌘ H",
-        shortcutKey: "h",
+        shortcutId: "dashboard",
         keywords: ["home", "overview"],
+      },
+      {
+        href: "/competitions",
+        icon: Medal,
+        label: t("nav.competitions"),
+        keywords: ["contest", "competition", "arena", "ranking"],
+      },
+      {
+        href: "/shop",
+        icon: ShoppingBag,
+        label: t("nav.shop"),
+        keywords: ["rewards", "points", "avatar", "badges"],
       },
       {
         href: "/editor",
         icon: Code,
         label: t("nav.editor"),
-        shortcut: "⌘ E",
-        shortcutKey: "e",
+        shortcutId: "editor",
         keywords: ["miniscript", "snippet", "code"],
       },
       {
-        href: "/livecode",
+        href: "/editor?view=live",
         icon: SquareTerminal,
         label: t("nav.livecode"),
-        shortcut: "⌘ V",
-        shortcutKey: "v",
+        shortcutId: "live",
         keywords: ["session", "collaboration"],
       },
       {
@@ -172,52 +200,61 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         keywords: ["posts", "social"],
       },
       {
+        href: "/groups",
+        icon: UsersRound,
+        label: t("nav.groups"),
+        keywords: ["groups", "study", "community", "discord"],
+      },
+      {
         href: "/search",
         icon: Search,
         label: t("nav.search"),
         keywords: ["users", "find"],
       },
       {
-        href: "/classes",
-        icon: Users,
-        label: t("nav.classes"),
-        keywords: ["school", "assignments"],
-      },
-      {
         href: "/profile",
         icon: User,
         label: t("user.profile"),
-        shortcut: "⌘ U",
-        shortcutKey: "u",
+        shortcutId: "profile",
       },
       {
         href: "/settings",
         icon: Settings,
         label: t("user.settings"),
-        shortcut: "⌘ S",
-        shortcutKey: "s",
+        shortcutId: "settings",
       }
     );
 
-    if (isAdmin) {
+    const persona = getWorkspacePersonaFromMetadata(
+      user.user_metadata as Record<string, unknown>
+    ) || "learner";
+    if (canAccessClassesForAccount(persona, isAdmin)) {
+      commands.push({
+        href: "/classes",
+        icon: Users,
+        label: t("nav.classes"),
+        keywords: ["school", "assignments"],
+      });
+    }
+
+    if (canAccessAdmin) {
       commands.push({
         href: "/admin",
         icon: Shield,
         label: t("nav.admin"),
-        shortcut: "⌘ A",
-        shortcutKey: "a",
+        shortcutId: "admin",
         keywords: ["manage", "panel"],
       });
     }
 
     return commands;
-  }, [isAdmin, t, user]);
+  }, [isAdmin, canAccessAdmin, t, user]);
 
   const liveSessionCommands = useMemo<CommandEntry[]>(() => {
     const rooms = liveCodeData?.rooms || [];
 
     return rooms.slice(0, 8).map((room) => ({
-      href: `/live/${room.id}`,
+      href: `/editor?live=${encodeURIComponent(room.id)}&view=live`,
       icon: SquareTerminal,
       label: room.name || t("command.untitledSession"),
       breadcrumb: [t("nav.livecode")],
@@ -229,7 +266,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     if (!liveCodeData?.participantsByRoom) return [];
 
     return liveSessionCommands.flatMap((session) => {
-      const roomId = session.href.split("/").pop();
+      const roomId = new URL(session.href, "https://scripticx.local").searchParams.get("live");
       if (!roomId) return [];
 
       const roomParticipants = liveCodeData.participantsByRoom[roomId] || [];
@@ -244,8 +281,105 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     });
   }, [liveCodeData, liveSessionCommands, t]);
 
+  const quickActionCommands = useMemo<CommandEntry[]>(() => {
+    if (!user) return [];
+    return [
+      {
+        href: "/editor?action=new-project",
+        icon: FilePlus2,
+        label: t("command.actions.newProject"),
+        keywords: ["create", "project", "miniscript", "python", "cpp"],
+      },
+      {
+        href: "/editor?action=clone-github",
+        icon: FolderGit2,
+        label: t("command.actions.cloneGitHub"),
+        keywords: ["github", "repository", "repo", "import", "clone"],
+      },
+      {
+        href: "/editor?view=projects",
+        icon: FolderOpen,
+        label: t("command.actions.openAccountProjects"),
+        keywords: ["saved", "projects", "account", "library"],
+      },
+      {
+        href: "/editor?action=start-live-share&view=live",
+        icon: RadioTower,
+        label: t("command.actions.startLiveShare"),
+        keywords: ["live", "share", "collaboration", "session"],
+      },
+    ];
+  }, [t, user]);
+
+  const editorActionCommands = useMemo<CommandEntry[]>(() => {
+    if (!user) return [];
+    return [
+      {
+        href: "/editor?action=new-file",
+        icon: FilePlus2,
+        label: t("command.actions.newFile"),
+        keywords: ["file", "source", "create"],
+      },
+      {
+        href: "/editor?view=source-control",
+        icon: GitBranch,
+        label: t("command.actions.sourceControl"),
+        keywords: ["github", "git", "commit", "push", "pull", "branch"],
+      },
+      {
+        href: "/editor?view=settings",
+        icon: SlidersHorizontal,
+        label: t("command.actions.editorSettings"),
+        keywords: ["autocomplete", "font", "minimap", "editor", "settings"],
+      },
+      {
+        href: "/editor?action=open-terminal",
+        icon: SquareTerminal,
+        label: t("command.actions.openTerminal"),
+        keywords: ["terminal", "run", "python", "cpp", "javascript", "console"],
+      },
+    ];
+  }, [t, user]);
+
+  const settingsCommands = useMemo<CommandEntry[]>(() => {
+    if (!user) return [];
+    return [
+      {
+        href: "/settings#profile-settings",
+        icon: UserRoundCog,
+        label: t("command.actions.editProfile"),
+        keywords: ["username", "bio", "avatar", "banner", "social"],
+      },
+      {
+        href: "/settings#profile-pronouns",
+        icon: User,
+        label: t("command.actions.editPronouns"),
+        keywords: ["pronouns", "identity", "profile"],
+      },
+      {
+        href: "/settings#public-profile-settings",
+        icon: Eye,
+        label: t("command.actions.profileVisibility"),
+        keywords: ["public", "widgets", "visibility", "privacy"],
+      },
+      {
+        href: "/settings#email-preferences",
+        icon: Mail,
+        label: t("command.actions.emailPreferences"),
+        keywords: ["email", "newsletter", "notifications", "marketing"],
+      },
+      {
+        href: "/settings#account-security",
+        icon: LockKeyhole,
+        label: t("command.actions.accountSecurity"),
+        keywords: ["password", "security", "account"],
+      },
+    ];
+  }, [t, user]);
+
   const runCommand = useCallback((href: string) => {
     setOpen(false);
+    startShellRouteProgress();
     router.push(href);
   }, [router]);
 
@@ -253,21 +387,19 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     if (!open) return;
 
     function handleMenuShortcut(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.altKey || event.shiftKey) return;
-
-      const key = event.key.toLowerCase();
-      const command = pageCommands.find((entry) => entry.shortcutKey === key);
+      if (event.defaultPrevented || (event.target instanceof Element && event.target.closest("[data-shortcut-recorder]"))) return;
+      const command = pageCommands.find((entry) => entry.shortcutId && matchesShortcut(event, bindings[entry.shortcutId]));
       if (!command) return;
 
       event.preventDefault();
+      event.stopPropagation();
       runCommand(command.href);
     }
 
-    window.addEventListener("keydown", handleMenuShortcut);
+    window.addEventListener("keydown", handleMenuShortcut, true);
 
-    return () => window.removeEventListener("keydown", handleMenuShortcut);
-  }, [open, pageCommands, runCommand]);
+    return () => window.removeEventListener("keydown", handleMenuShortcut, true);
+  }, [bindings, open, pageCommands, runCommand]);
 
   const safariDialogMaxHeight = Math.max(
     280,
@@ -282,14 +414,15 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     <>
       <button
         type="button"
+        data-tour="command-menu"
         onClick={() => setOpen(true)}
-        className="hidden h-9 w-full max-w-md items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 text-sm text-zinc-500 shadow-inner transition hover:border-zinc-300 hover:bg-white sm:flex"
+        className="hidden h-9 w-full max-w-md items-center justify-between gap-3 rounded-xl border bg-muted/60 px-3 text-sm text-muted-foreground shadow-inner transition hover:border-foreground/20 hover:bg-accent sm:flex"
       >
         <span className="flex min-w-0 items-center gap-2">
           <Search className="h-4 w-4 shrink-0" />
           <span className="truncate">{t("command.placeholder")}</span>
         </span>
-        <ShortcutKeys shortcut="⌘ K" />
+        {bindings.search && <ShortcutKeys shortcut={formatShortcut(bindings.search)} />}
       </button>
 
       <CommandDialog
@@ -297,7 +430,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
         onOpenChange={setOpen}
         title={t("command.title")}
         description={t("command.description")}
-        className={`max-w-xl border-zinc-200 bg-white/95 shadow-2xl backdrop-blur-xl ${
+        className={`max-w-xl border-border bg-popover/95 text-popover-foreground shadow-2xl backdrop-blur-xl ${
           isSafari ? "" : "max-h-[calc(100vh-4rem)]"
         }`}
         contentStyle={
@@ -326,6 +459,51 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
                 />
               ))}
             </CommandGroup>
+
+            {user && quickActionCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.quickActions")}>
+                  {quickActionCommands.map((command) => (
+                    <CommandMenuItem
+                      key={command.href}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
+            {user && editorActionCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.editor")}>
+                  {editorActionCommands.map((command) => (
+                    <CommandMenuItem
+                      key={command.href}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
+            {user && settingsCommands.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={t("command.groups.settings")}>
+                  {settingsCommands.map((command) => (
+                    <CommandMenuItem
+                      key={command.href}
+                      command={command}
+                      onSelect={runCommand}
+                    />
+                  ))}
+                </CommandGroup>
+              </>
+            )}
 
             {user && liveSessionCommands.length > 0 && (
               <>
@@ -371,6 +549,8 @@ function CommandMenuItem({
   onSelect: (href: string) => void;
 }) {
   const Icon = command.icon;
+  const { bindings } = useKeyboardShortcuts();
+  const shortcut = command.shortcutId ? formatShortcut(bindings[command.shortcutId]) : "";
   const value = [
     command.label,
     command.href,
@@ -389,9 +569,9 @@ function CommandMenuItem({
           </div>
         )}
       </div>
-      {command.shortcut && (
+      {shortcut && (
         <CommandShortcut>
-          <ShortcutKeys shortcut={command.shortcut} />
+          <ShortcutKeys shortcut={shortcut} />
         </CommandShortcut>
       )}
     </CommandItem>
@@ -401,7 +581,7 @@ function CommandMenuItem({
 function ShortcutKeys({ shortcut }: { shortcut: string }) {
   return (
     <KbdGroup>
-      {shortcut.split(" ").map((key) => (
+      {shortcut.split(" + ").map((key) => (
         <Kbd key={key}>
           {key === "⌘" ? <CommandIcon className="h-3 w-3" /> : key}
         </Kbd>

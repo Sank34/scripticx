@@ -60,6 +60,7 @@ export function LiveRoomCard({
                 avatarUrl={participant.avatar_url}
                 className="w-6 h-6 border"
                 username={participant.username}
+                equippedRewards={participant.equipped_rewards}
               />
             ))}
 
@@ -75,7 +76,7 @@ export function LiveRoomCard({
           <span
             className={`rounded px-2 py-[2px] text-[10px] ${
               isOwner
-                ? "bg-primary text-white"
+                ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground"
             }`}
           >

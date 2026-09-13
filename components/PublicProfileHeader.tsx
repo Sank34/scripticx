@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import FollowButton from "@/components/FollowButton";
 import FollowStats from "@/components/FollowStats";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function PublicProfileHeader({
   profileId,
@@ -12,19 +11,8 @@ export default function PublicProfileHeader({
   profileId: string;
   profileUsername: string;
 }) {
-  const [userId, setUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function getUser() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      setUserId(session?.user?.id || null);
-    }
-
-    getUser();
-  }, []);
+  const { user } = useAuth();
+  const userId = user?.id || null;
 
   return (
     <div className="flex items-center gap-4">

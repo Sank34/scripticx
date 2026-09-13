@@ -356,7 +356,7 @@ function visitStatement(
 
   if (
     activeFunction &&
-    statement.type === "assignment" &&
+    (statement.type === "assignment" || statement.type === "return" || statement.type === "call" || statement.type === "print") &&
     isFunctionCallTo(statement.expression.raw, activeFunction)
   ) {
     return {

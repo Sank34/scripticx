@@ -52,13 +52,14 @@ export default async function FollowingPage({
       profiles!follows_following_id_fkey (
         id,
         username,
-        avatar_url
+        avatar_url,
+        equipped_rewards
       )
     `)
     .eq("follower_id", profile.id);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
 
       <h1 className="text-2xl font-bold">
         {t("social.following.title")}
@@ -88,6 +89,7 @@ export default async function FollowingPage({
                 key={u.id}
                 href={`/u/${u.username}`}
                 avatarUrl={u.avatar_url}
+                equippedRewards={u.equipped_rewards}
                 showArrow={false}
                 username={u.username}
                 variant="row"

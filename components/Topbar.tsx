@@ -1,23 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
+import { toast } from "sonner";
 
-import { api, type ProfileSummary } from "@/lib/api";
-import { PlatformCommandMenu } from "@/components/command/PlatformCommandMenu";
 import { useLanguage } from "@/components/LanguageProvider";
+import { ShellRouteProgress } from "@/components/navigation/ShellRouteProgress";
 import { TopbarBreadcrumbs } from "@/components/navigation/TopbarBreadcrumbs";
-import { NotificationsPopover } from "@/components/notifications/NotificationsPopover";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
+import { useSavedAccounts } from "@/hooks/useSavedAccounts";
+import {
+  saveAccountSession,
+  type SavedScripticXAccount,
+} from "@/lib/account-switcher";
+import {
+  activateSavedAccount,
+  logoutCurrentAccount,
+} from "@/lib/account-session-manager";
+import { supabase } from "@/lib/supabase";
+import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 
 import { Button } from "@/components/ui/button";
-
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
 
 import {
   DropdownMenu,
@@ -30,77 +37,238 @@ import {
 
 import {
   Globe,
+  LoaderCircle,
   LogOut,
+  Monitor,
+  Moon,
   Settings,
+  Sun,
   User,
+  UserPlus,
 } from "lucide-react";
+
+const AddAccountDialog = dynamic(
+  () =>
+    import("@/components/account/AddAccountDialog").then(
+      (module) => module.AddAccountDialog
+    ),
+  { ssr: false }
+);
+const PlatformCommandMenu = dynamic(
+  () =>
+    import("@/components/command/PlatformCommandMenu").then(
+      (module) => module.PlatformCommandMenu
+    ),
+  { ssr: false }
+);
+const NotificationsPopover = dynamic(
+  () =>
+    import("@/components/notifications/NotificationsPopover").then(
+      (module) => module.NotificationsPopover
+    ),
+  { ssr: false }
+);
+const AttentionPopover = dynamic(
+  () =>
+    import("@/components/admin/AttentionPopover").then(
+      (module) => module.AttentionPopover
+    ),
+  { ssr: false }
+);
 
 export function Topbar() {
   const router = useRouter();
   const { t, locale, setLocale } = useLanguage();
-
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [profile, setProfile] = useState<ProfileSummary | null>(null);
+  const { theme, setTheme } = useTheme();
+  const { profile, user } = useAuth();
+  const { accounts } = useSavedAccounts();
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
+    null
+  );
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [themeMounted, setThemeMounted] = useState(false);
+  const themeTransitionId = useRef(0);
+  const themeTransitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestedTheme = useRef<string | undefined>(theme);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadProfile(currentUser: SupabaseUser) {
-      const profileData = await api.profiles.getSummary(currentUser.id);
-
-      if (!active) return;
-
-      setProfile(profileData);
-    }
-
-    async function load() {
-      const { data } = await api.auth.getSession();
-
-      const currentUser = data.session?.user ?? null;
-
-      if (!active) return;
-
-      setUser(currentUser);
-
-      if (!currentUser) return;
-
-      await loadProfile(currentUser);
-    }
-
-    void load();
-
-    const subscription = api.auth.onAuthStateChange((session) => {
-      const currentUser = session?.user ?? null;
-
-      setUser(currentUser);
-
-      if (!currentUser) {
-        setProfile(null);
-        return;
-      }
-
-      window.setTimeout(() => {
-        void loadProfile(currentUser);
-      }, 0);
-    });
+    setThemeMounted(true);
 
     return () => {
-      active = false;
-      subscription.unsubscribe();
+      if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
+      document.documentElement.classList.remove("theme-transition", "theme-color-transition");
     };
   }, []);
 
-  async function logout() {
-    await api.auth.signOut();
-    router.replace("/login");
+  useEffect(() => {
+    requestedTheme.current = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!data.session || data.session.user.id !== user.id) return;
+      saveAccountSession(data.session, {
+        avatarUrl: profile?.avatar_url || null,
+        username: profile?.username || null,
+      });
+    });
+  }, [profile?.avatar_url, profile?.username, user]);
+
+  function changeTheme(nextTheme: "light" | "dark" | "system") {
+    if (requestedTheme.current === nextTheme) return;
+    requestedTheme.current = nextTheme;
+
+    const root = document.documentElement;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const viewTransitionDocument = document as Document & {
+      startViewTransition?: (update: () => void) => {
+        finished: Promise<void>;
+      };
+    };
+    const resolvedNextTheme =
+      nextTheme === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : nextTheme;
+    const applyTheme = () => {
+      root.classList.toggle("dark", resolvedNextTheme === "dark");
+      root.style.colorScheme = resolvedNextTheme;
+      setTheme(nextTheme);
+    };
+
+    const transitionId = ++themeTransitionId.current;
+    if (themeTransitionTimer.current) clearTimeout(themeTransitionTimer.current);
+    root.classList.remove("theme-color-transition");
+
+    if (reduceMotion) {
+      root.classList.remove("theme-transition");
+      applyTheme();
+      return;
+    }
+
+    const applyWithColorTransition = () => {
+      root.classList.remove("theme-transition");
+      root.classList.add("theme-color-transition");
+      // Commit the transition rules before changing the theme colors.
+      void getComputedStyle(root).backgroundColor;
+      applyTheme();
+      themeTransitionTimer.current = setTimeout(() => {
+        root.classList.remove("theme-color-transition");
+      }, 400);
+    };
+
+    if (!viewTransitionDocument.startViewTransition) {
+      applyWithColorTransition();
+      return;
+    }
+
+    const finishTransition = () => {
+      if (themeTransitionId.current === transitionId) {
+        root.classList.remove("theme-transition");
+      }
+    };
+
+    root.classList.add("theme-transition");
+    try {
+      const transition = viewTransitionDocument.startViewTransition(() => {
+        if (themeTransitionId.current !== transitionId) return;
+        applyTheme();
+      });
+
+      void transition.finished.then(finishTransition, finishTransition);
+    } catch {
+      if (themeTransitionId.current === transitionId) {
+        applyWithColorTransition();
+      }
+      finishTransition();
+    }
   }
 
-  const initial = (
-    profile?.username || user?.email || "U"
-  )[0]?.toUpperCase();
+  async function logout() {
+    if (!user || switchingAccountId || loggingOut) return;
+    setLoggingOut(true);
+
+    try {
+      const result = await logoutCurrentAccount(user.id);
+      if (result) {
+        toast.success(
+          locale === "ro"
+            ? `Te-ai deconectat și ai trecut pe contul ${result.account.nickname}.`
+            : `Signed out and switched to ${result.account.nickname}.`
+        );
+        router.replace(
+          getWorkspaceLandingRoute(result.session.user.user_metadata)
+        );
+      } else {
+        router.replace("/login");
+      }
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        locale === "ro"
+          ? "Nu te-am putut deconecta fără să pierdem celelalte sesiuni."
+          : "Could not sign out without losing the other sessions.",
+        {
+          description: error instanceof Error ? error.message : String(error),
+        }
+      );
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
+  async function switchAccount(account: SavedScripticXAccount) {
+    if (
+      !user ||
+      account.userId === user.id ||
+      switchingAccountId ||
+      loggingOut
+    ) return;
+    setSwitchingAccountId(account.userId);
+
+    try {
+      const { data: current } = await supabase.auth.getSession();
+      if (current.session) {
+        saveAccountSession(current.session, {
+          avatarUrl: profile?.avatar_url || null,
+          username: profile?.username || null,
+        });
+      }
+
+      const session = await activateSavedAccount(account);
+
+      toast.success(
+        locale === "ro"
+          ? `Ai trecut pe contul ${account.nickname}.`
+          : `Switched to ${account.nickname}.`
+      );
+      router.replace(getWorkspaceLandingRoute(session.user.user_metadata));
+      router.refresh();
+    } catch (error) {
+      toast.error(
+        locale === "ro" ? "Contul nu a putut fi activat." : "Could not switch accounts.",
+        {
+          description: error instanceof Error ? error.message : String(error),
+        }
+      );
+    } finally {
+      setSwitchingAccountId(null);
+    }
+  }
+
+  const currentSavedAccount = accounts.find(
+    (account) => account.userId === user?.id
+  );
+  const otherAccounts = accounts.filter((account) => account.userId !== user?.id);
 
   return (
-    <header className="grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-zinc-200/70 bg-white px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
+    <header className="relative grid h-14 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-border/70 bg-background px-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,26rem)_minmax(0,1fr)]">
 
       <div className="flex min-w-0 items-center overflow-hidden pr-3">
         <TopbarBreadcrumbs />
@@ -119,21 +287,21 @@ export function Topbar() {
 
         {user ? (
           <>
+            <AttentionPopover />
+
             <NotificationsPopover user={user} />
 
             <DropdownMenu>
 
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-zinc-100">
-                <Avatar className="h-8 w-8">
-                  {profile?.avatar_url && (
-                    <AvatarImage src={profile.avatar_url} />
-                  )}
-
-                  <AvatarFallback>
-                    {initial}
-                  </AvatarFallback>
-                </Avatar>
+              <button className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-accent">
+                <UserAvatar
+                  avatarUrl={profile?.avatar_url}
+                  username={profile?.username}
+                  email={user.email}
+                  equippedRewards={profile?.equipped_rewards}
+                  className="h-8 w-8"
+                />
               </button>
             </DropdownMenuTrigger>
 
@@ -144,19 +312,17 @@ export function Topbar() {
             >
               <DropdownMenuLabel className="flex items-center gap-3 py-3">
 
-                <Avatar className="h-10 w-10">
-                  {profile?.avatar_url && (
-                    <AvatarImage src={profile.avatar_url} />
-                  )}
-
-                  <AvatarFallback>
-                    {initial}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  avatarUrl={profile?.avatar_url}
+                  username={profile?.username}
+                  email={user.email}
+                  equippedRewards={profile?.equipped_rewards}
+                  className="h-10 w-10"
+                />
 
                 <div className="flex flex-col leading-tight">
                   <span className="font-medium">
-                    {profile?.username || "User"}
+                    {currentSavedAccount?.nickname || profile?.username || "User"}
                   </span>
 
                   <span className="max-w-[160px] truncate text-xs text-muted-foreground">
@@ -168,13 +334,58 @@ export function Topbar() {
 
               <DropdownMenuSeparator />
 
+              {otherAccounts.length ? (
+                <>
+                  <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    {locale === "ro" ? "Alte conturi" : "Other accounts"}
+                  </DropdownMenuLabel>
+                  {otherAccounts.map((account) => (
+                    <DropdownMenuItem
+                      key={account.userId}
+                      onSelect={() => void switchAccount(account)}
+                      disabled={switchingAccountId !== null || loggingOut}
+                      className="gap-3 py-2"
+                    >
+                      <UserAvatar
+                        avatarUrl={account.avatarUrl}
+                        username={account.username}
+                        email={account.email}
+                        className="size-8"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {account.nickname}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {account.email}
+                        </span>
+                      </span>
+                      {switchingAccountId === account.userId ? (
+                        <LoaderCircle className="size-4 animate-spin" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
+
+              <DropdownMenuItem
+                onSelect={() => setAddAccountOpen(true)}
+                className="gap-2"
+              >
+                <UserPlus size={16} />
+                {locale === "ro" ? "Adaugă alt cont" : "Add another account"}
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
               <DropdownMenuItem asChild>
                 <Link
                   href="/profile"
                   className="flex items-center gap-2"
                 >
                   <User size={16} />
-                  Profile
+                  {t("user.profile")}
                 </Link>
               </DropdownMenuItem>
 
@@ -184,8 +395,52 @@ export function Topbar() {
                   className="flex items-center gap-2"
                 >
                   <Settings size={16} />
-                  Settings
+                  {t("user.settings")}
                 </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onSelect={(event) => event.preventDefault()}
+                className="flex flex-col items-stretch gap-2 p-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Sun size={16} />
+                  {t("user.appearance")}
+                </div>
+
+                <div
+                  role="group"
+                  aria-label={t("user.appearance")}
+                  className="grid grid-cols-3 items-center rounded-lg bg-muted p-0.5"
+                >
+                  {([
+                    { value: "light", label: t("user.light"), icon: Sun },
+                    { value: "dark", label: t("user.dark"), icon: Moon },
+                    { value: "system", label: t("user.auto"), icon: Monitor },
+                  ] as const).map((option) => {
+                    const Icon = option.icon;
+                    const active = themeMounted && theme === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        title={option.label}
+                        aria-label={option.label}
+                        aria-pressed={active}
+                        onClick={() => changeTheme(option.value)}
+                        className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2 text-[11px] font-medium transition-colors ${
+                          active
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="size-3.5" />
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />
@@ -224,16 +479,32 @@ export function Topbar() {
               <DropdownMenuSeparator />
 
               <DropdownMenuItem
-                onClick={logout}
+                onClick={() => void logout()}
+                disabled={loggingOut || switchingAccountId !== null}
                 className="flex items-center gap-2 text-red-500"
               >
-                <LogOut size={16} />
-                Logout
+                {loggingOut ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <LogOut size={16} />
+                )}
+                {otherAccounts.length
+                  ? locale === "ro"
+                    ? "Deconectează și schimbă contul"
+                    : "Log out and switch account"
+                  : t("user.logout")}
               </DropdownMenuItem>
 
             </DropdownMenuContent>
 
             </DropdownMenu>
+
+            {addAccountOpen ? (
+              <AddAccountDialog
+                open={addAccountOpen}
+                onOpenChange={setAddAccountOpen}
+              />
+            ) : null}
           </>
         ) : (
           <Link href="/login">
@@ -247,6 +518,8 @@ export function Topbar() {
         )}
 
       </div>
+
+      <ShellRouteProgress />
 
     </header>
   );

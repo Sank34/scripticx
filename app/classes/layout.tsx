@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { ClassesAccessGuard } from "@/app/classes/ClassesAccessGuard";
 import { createPageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = createPageMetadata({
@@ -13,5 +14,5 @@ export const metadata: Metadata = createPageMetadata({
 export default function ClassesLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return children;
+  return <ClassesAccessGuard>{children}</ClassesAccessGuard>;
 }

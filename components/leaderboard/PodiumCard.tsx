@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/user/UserAvatar";
+import type { EquippedRewards } from "@/lib/rewards";
 
 type PodiumCardProps = {
   className: string;
@@ -12,6 +13,7 @@ type PodiumCardProps = {
   rank: 1 | 2 | 3;
   user: {
     avatar_url: string | null;
+    equipped_rewards?: EquippedRewards | null;
     username: string;
     total_score: number;
   };
@@ -36,6 +38,7 @@ export function PodiumCard({
             avatarUrl={user.avatar_url}
             className={isWinner ? "w-16 h-16" : "w-14 h-14"}
             username={user.username}
+            equippedRewards={user.equipped_rewards}
           />
           <p className={isWinner ? "font-bold text-lg" : "font-semibold"}>
             {user.username}

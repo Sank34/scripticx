@@ -1,3 +1,4 @@
+import RouteGuard from "@/components/RouteGuard";
 import type { Metadata } from "next";
 
 import { createPageMetadata } from "@/lib/metadata";
@@ -12,5 +13,5 @@ export const metadata: Metadata = createPageMetadata({
 export default function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return children;
+  return <RouteGuard requireAuth requireAdmin>{children}</RouteGuard>;
 }

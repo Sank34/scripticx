@@ -9,6 +9,7 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
+  ContextMenuShortcut,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -22,8 +23,11 @@ type CodeEditorContextMenuProps = {
   fileName?: string;
   onChange?: (code: string) => void;
   onRun?: () => void;
+  runShortcut?: string;
   onSubmit?: () => void;
   readOnly?: boolean;
+  submitDisabled?: boolean;
+  submitShortcut?: string;
 };
 
 export function CodeEditorContextMenu({
@@ -33,8 +37,11 @@ export function CodeEditorContextMenu({
   fileName = "main.msp",
   onChange,
   onRun,
+  runShortcut,
   onSubmit,
   readOnly = false,
+  submitDisabled = false,
+  submitShortcut,
 }: CodeEditorContextMenuProps) {
   async function copyCode() {
     await navigator.clipboard.writeText(code);
@@ -105,13 +112,17 @@ export function CodeEditorContextMenu({
           <ContextMenuItem onSelect={onRun}>
             <Play size={14} />
             Run
+            {runShortcut && <ContextMenuShortcut>{runShortcut}</ContextMenuShortcut>}
           </ContextMenuItem>
         )}
 
         {onSubmit && (
-          <ContextMenuItem onSelect={onSubmit}>
+          <ContextMenuItem disabled={submitDisabled} onSelect={onSubmit}>
             <Send size={14} />
             Submit
+            {submitShortcut && (
+              <ContextMenuShortcut>{submitShortcut}</ContextMenuShortcut>
+            )}
           </ContextMenuItem>
         )}
 

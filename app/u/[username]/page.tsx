@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabaseServer";
 import PublicProfileHeader from "@/components/PublicProfileHeader";
 import { StatCard } from "@/components/common/StatCard";
+import { AchievementBadgeCard } from "@/components/achievements/AchievementBadgeCard";
 
 import {
   Card,
@@ -14,12 +15,20 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 
-import { Flame, Globe, Trophy, Check, Rocket, Brain } from "lucide-react";
+import { Award, Flame, Globe, Trophy } from "lucide-react";
 import { siGithub, siX } from "simple-icons";
 
 import { getLocalized } from "@/lib/getLocalized";
 import { translations } from "@/lib/i18n";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
+import { ProfileBackground } from "@/components/user/ProfileBackground";
+import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
+import {
+  getLegacyBadgeRarity,
+  resolveEquippedReward,
+  type EquippedRewards,
+  type RewardRarity,
+} from "@/lib/rewards";
 import {
   absoluteUrl,
   createNotFoundMetadata,
@@ -27,6 +36,13 @@ import {
   metadataExcerpt,
   siteConfig,
 } from "@/lib/metadata";
+import {
+  buildSubmissionActivityHeatmap,
+  buildSubmissionActivityHeatmapFromDailyRows,
+  type SubmissionActivityAggregateRow,
+} from "@/lib/submissionActivity";
+import { normalizeProfilePronouns } from "@/lib/profile-pronouns";
+import { normalizePublicProfileVisibility } from "@/lib/profile-visibility";
 
 function BrandIcon({ icon }: { icon: any }) {
   return (
@@ -54,7 +70,7 @@ export async function generateMetadata({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, bio, avatar_url, github, twitter, website")
+    .select("*")
     .eq("username", username)
     .maybeSingle();
 
@@ -69,7 +85,7 @@ export async function generateMetadata({
       `Explore ${profile.username}'s ScripticX profile, including progress, solved problems, achievements, and community activity.`
     ),
     path: `/u/${encodeURIComponent(profile.username)}`,
-    image: profile.avatar_url || null,
+    image: profile.banner_url || profile.avatar_url || null,
     type: "profile",
     keywords: [
       profile.username,
@@ -106,42 +122,62 @@ export default async function PublicProfile({
 
   if (!profile) notFound();
 
-  const { data: submissions } = await supabase
-    .from("submissions")
-    .select(`
-      *,
-      problems (
-        title_i18n,
-        difficulty
-      )
-    `)
-    .eq("user_id", profile.id)
-    .order("created_at", { ascending: false });
-
-  const { data: achievements } = await supabase
-    .from("user_achievements")
-    .select(`
-      achievement:achievements (
-        title,
-        icon
-      )
-    `)
-    .eq("user_id", profile.id);
-
-  const { data: posts } = await supabase
-    .from("posts")
-    .select("id, content, image_url, created_at")
-    .eq("user_id", profile.id)
-    .order("created_at", { ascending: false })
-    .limit(3);
-
-  const iconMap: any = {
-    trophy: Trophy,
-    flame: Flame,
-    check: Check,
-    rocket: Rocket,
-    brain: Brain,
-  };
+  const emptyActivity = buildSubmissionActivityHeatmap([], {
+    timeZone: "UTC",
+  });
+  const [submissionResult, activityResult, achievementResult, postResult] =
+    await Promise.all([
+      supabase
+        .from("submissions")
+        .select(`
+          id,
+          user_id,
+          problem_id,
+          score,
+          created_at,
+          verified_at,
+          problems (
+            title_i18n,
+            difficulty
+          )
+        `)
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false }),
+      supabase.rpc("get_profile_submission_activity", {
+        p_user_id: profile.id,
+        p_start_date: emptyActivity.startDate,
+        p_end_date: emptyActivity.endDate,
+      }),
+      supabase
+        .from("user_achievements")
+        .select(`
+          achievement:achievements (
+            *
+          )
+        `)
+        .eq("user_id", profile.id),
+      supabase
+        .from("posts")
+        .select("id, content, image_url, created_at")
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
+  const submissions = submissionResult.data;
+  const achievements = achievementResult.data;
+  const posts = postResult.data;
+  const fallbackActivity = buildSubmissionActivityHeatmap(
+    (submissions || []).filter((submission) =>
+      Boolean(submission.verified_at)
+    ),
+    { endDate: emptyActivity.endDate, timeZone: "UTC" }
+  );
+  const activity = activityResult.error
+    ? fallbackActivity
+    : buildSubmissionActivityHeatmapFromDailyRows(
+        (activityResult.data || []) as SubmissionActivityAggregateRow[],
+        { endDate: emptyActivity.endDate, timeZone: "UTC" }
+      );
 
   const best: Record<string, any> = {};
   const days = new Set<string>();
@@ -179,10 +215,22 @@ export default async function PublicProfile({
   }
 
   const initial = (profile.username || "U")[0]?.toUpperCase();
+  const equippedRewards = (profile.equipped_rewards || {}) as EquippedRewards;
+  const backgroundReward =
+    equippedRewards["profile-background"] || equippedRewards["profile-banner"];
+  const titleReward = resolveEquippedReward(equippedRewards["profile-title"]);
+  const equippedTitle = titleReward?.name?.[locale];
+  const pronouns = normalizeProfilePronouns(profile.pronouns);
+  const visibility = normalizePublicProfileVisibility(
+    profile.public_profile_visibility
+  );
+  const points = Number(profile.total_score) || 0;
   const profileUrl = absoluteUrl(
     `/u/${encodeURIComponent(profile.username)}`
   );
-  const sameAs = [profile.github, profile.twitter, profile.website]
+  const sameAs = (visibility.socialLinks
+    ? [profile.github, profile.twitter, profile.website]
+    : [])
     .filter((value): value is string => Boolean(value))
     .map(normalizeUrl);
   const profileJsonLd = {
@@ -220,7 +268,9 @@ export default async function PublicProfile({
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="relative isolate min-h-full w-full overflow-hidden bg-background pb-16 md:pb-0">
+      {backgroundReward && <ProfileBackground reward={backgroundReward} />}
+      <div className="relative z-[1] mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -228,32 +278,66 @@ export default async function PublicProfile({
         }}
       />
 
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-4">
-          <ProfileImagePreview
-            alt={`${profile.username} profile picture`}
-            avatarUrl={profile.avatar_url}
-            className="h-16 w-16"
-            fallback={initial}
-          />
+      <div className="overflow-hidden rounded-[var(--sx-radius-panel)] border bg-card/95 shadow-sm supports-[backdrop-filter]:backdrop-blur-sm">
+        <div
+          className="relative h-44 bg-muted bg-cover bg-center sm:h-52"
+          style={
+            profile.banner_url
+              ? {
+                  backgroundImage: `url("${profile.banner_url}")`,
+                }
+              : undefined
+          }
+        >
+          {profile.banner_url && (
+            <div className="absolute inset-0 bg-transparent transition-colors duration-300 dark:bg-background/55" />
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-px bg-border" />
+        </div>
 
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">
-              {profile.username}
-            </h1>
+        <div className="px-6 py-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <ProfileImagePreview
+                alt={`${profile.username} profile picture`}
+                avatarUrl={profile.avatar_url}
+                equippedRewards={equippedRewards}
+                className="h-20 w-20 border border-border shadow-sm sm:h-24 sm:w-24"
+                fallback={initial}
+              />
 
-            <PublicProfileHeader
-              profileId={profile.id}
-              profileUsername={profile.username}
-            />
+              <div className="min-w-0 pb-1">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <h1 className="truncate text-3xl font-bold">
+                    {profile.username}
+                  </h1>
+                  {pronouns && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {pronouns}
+                    </span>
+                  )}
+                </div>
+                {equippedTitle && (
+                  <Badge variant="outline" className="mt-1.5 bg-background">
+                    {equippedTitle}
+                  </Badge>
+                )}
+                <PublicProfileHeader
+                  profileId={profile.id}
+                  profileUsername={profile.username}
+                />
+              </div>
+            </div>
+          </div>
 
-            {profile.bio && (
-              <p className="text-sm text-muted-foreground">
-                {profile.bio}
-              </p>
-            )}
+          {profile.bio && (
+            <p className="mt-4 max-w-2xl text-sm text-muted-foreground">
+              {profile.bio}
+            </p>
+          )}
 
-            <div className="flex gap-4 text-sm flex-wrap">
+          {visibility.socialLinks && (
+            <div className="mt-4 flex flex-wrap gap-4 text-sm">
               {profile.github && (
                 <a href={normalizeUrl(profile.github)} target="_blank" rel="noopener noreferrer">
                   <span className="flex items-center gap-1">
@@ -281,47 +365,91 @@ export default async function PublicProfile({
                 </a>
               )}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      {visibility.activity && (
+        <ContributionHeatmap data={activity} locale={locale} />
+      )}
 
-        <StatCard
-          title={t("publicProfile.stats.solved")}
-          value={solved}
-        />
+      {(visibility.points || visibility.stats) && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-        <StatCard
-          title={t("publicProfile.stats.average")}
-          value={`${average}%`}
-        />
+        {visibility.points && (
+          <StatCard
+            icon={<Trophy className="size-5 text-amber-500" />}
+            title={t("publicProfile.points")}
+            value={points.toLocaleString(locale === "ro" ? "ro-RO" : "en-US")}
+          />
+        )}
 
-        <StatCard
-          icon={<Flame className="w-5 h-5 text-orange-500" />}
-          title={t("publicProfile.stats.streak")}
-          value={streak}
-        />
+          {visibility.stats && (
+            <StatCard
+              title={t("publicProfile.stats.solved")}
+              value={solved}
+            />
+          )}
 
-      </div>
+          {visibility.stats && (
+            <StatCard
+              title={t("publicProfile.stats.average")}
+              value={`${average}%`}
+            />
+          )}
 
+          {visibility.stats && (
+            <StatCard
+              icon={<Flame className="w-5 h-5 text-orange-500" />}
+              title={t("publicProfile.stats.streak")}
+              value={streak}
+            />
+          )}
+
+        </div>
+      )}
+
+      {visibility.achievements && (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between">
           <CardTitle>{t("publicProfile.achievements")}</CardTitle>
+          <Badge variant="secondary">{achievements?.length || 0}</Badge>
         </CardHeader>
-        <CardContent className="flex gap-2 flex-wrap">
-          {achievements?.map((a: any, i: number) => {
-            const Icon = iconMap[a.achievement.icon];
-            return (
-              <div key={i} className="flex items-center gap-2 px-3 py-1 rounded bg-muted text-sm">
-                {Icon && <Icon size={14} />}
-                {a.achievement.title}
-              </div>
-            );
-          })}
+        <CardContent>
+          {achievements?.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {achievements.map((item: any, index: number) => {
+                const achievement = item.achievement;
+                if (!achievement) return null;
+
+                return (
+                  <AchievementBadgeCard
+                    key={`${achievement.title}-${index}`}
+                    compact
+                    title={achievement.title}
+                    iconName={achievement.icon}
+                    iconUrl={achievement.icon_url}
+                    rarity={(achievement.rarity || getLegacyBadgeRarity(achievement.icon)) as RewardRarity}
+                    description={achievement.description || (
+                      locale === "ro" ? "Badge obținut pe ScripticX." : "Badge earned on ScripticX."
+                    )}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-muted/40 px-4 py-10 text-center">
+              <Award className="size-8 text-muted-foreground/50" />
+              <p className="mt-2 text-sm font-medium">
+                {locale === "ro" ? "Nu există badge-uri încă." : "No badges yet."}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
+      )}
 
+      {visibility.posts && (
       <Card>
         <CardHeader>
           <CardTitle>{t("publicProfile.posts.title")}</CardTitle>
@@ -357,7 +485,9 @@ export default async function PublicProfile({
           ))}
         </CardContent>
       </Card>
+      )}
 
+      {visibility.submissions && (
       <Card>
         <CardHeader>
           <CardTitle>{t("publicProfile.submissions.title")}</CardTitle>
@@ -380,7 +510,9 @@ export default async function PublicProfile({
           ))}
         </CardContent>
       </Card>
+      )}
 
+    </div>
     </div>
   );
 }

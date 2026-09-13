@@ -1,29 +1,47 @@
 "use client";
+import { useAuth } from "@/hooks/useAuth";
+import { DailyChallengeScheduler } from "@/components/admin/DailyChallengeScheduler";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import RouteGuard from "@/components/RouteGuard";
-import { useRouter } from "next/navigation";
-import { getLocalized } from "@/lib/getLocalized";
-import { markdownPreview } from "@/lib/markdownPreview";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ExternalLink,
+  FileCode2,
+  FlaskConical,
+  Languages,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
+
+import { ProblemForm } from "@/components/admin/ProblemForm";
+import { EmptyState } from "@/components/common/EmptyState";
 import { useLanguage } from "@/components/LanguageProvider";
-import { api, type DailyChallenge } from "@/lib/api";
-
+import { PageHeader } from "@/components/common/PageHeader";
+import RouteGuard from "@/components/RouteGuard";
 import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-
-import { Button } from "@/components/ui/button";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -31,365 +49,272 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getLocalized } from "@/lib/getLocalized";
+import { markdownPreview } from "@/lib/markdownPreview";
+import { supabase } from "@/lib/supabase";
 
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-import { ProblemForm } from "@/components/admin/ProblemForm";
-
-import { CalendarDays } from "lucide-react";
-import { toast } from "sonner";
-
-function formatDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function parseDateKey(dateKey: string) {
-  return new Date(`${dateKey}T00:00:00`);
-}
+type AdminProblem = {
+  code: number | string | null;
+  created_at?: string | null;
+  description_i18n: Record<string, string> | null;
+  difficulty: string | null;
+  id: string;
+  starter_code?: string | null;
+  test_cases?: unknown;
+  title_i18n: Record<string, string> | null;
+};
 
 function AdminProblemsContent() {
-  const router = useRouter();
+  const { can, user } = useAuth();
+  const canManageProblems = can("admin.problems");
+  const canManageDaily = can("admin.daily");
   const { locale, t } = useLanguage();
-  const todayKey = api.dailyChallenges.getTodayKey();
-
-  const [problems, setProblems] = useState<any[]>([]);
-  const [dailyChallenges, setDailyChallenges] = useState<DailyChallenge[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [schedulingDaily, setSchedulingDaily] = useState(false);
-  const [dailyDate, setDailyDate] = useState(() => todayKey);
-  const [dailyProblemId, setDailyProblemId] = useState("");
-  const [dailyBonusPoints, setDailyBonusPoints] = useState(25);
+  const queryClient = useQueryClient();
+  const ro = locale === "ro";
+  const copy = ro
+    ? {
+        subtitle: "Creează enunțuri clare, configurează evaluarea și programează provocările zilnice.",
+        library: "Biblioteca de probleme",
+        libraryDescription: "Caută, verifică și deschide configuratorul unei probleme.",
+        search: "Caută după titlu, cod sau descriere...",
+        allDifficulties: "Toate dificultățile",
+        daily: "Provocarea zilnică",
+        dailyDescription: "Alege problema care va apărea în dashboard-ul utilizatorilor.",
+        chooseProblem: "Alege problema",
+        bonus: "Puncte bonus",
+        schedule: "Programează",
+        scheduling: "Se programează...",
+        scheduled: "Programări viitoare",
+        active: "Activă",
+        inactive: "Inactivă",
+        empty: "Nu există probleme care corespund filtrelor.",
+        tests: "teste",
+        translations: "traduceri",
+        openPublic: "Deschide pagina publică",
+        scheduleSuccess: "Provocarea zilnică a fost programată.",
+        scheduleError: "Provocarea zilnică nu a putut fi programată.",
+        selectFirst: "Selectează mai întâi o problemă.",
+        futureOnly: "Provocările pot fi programate începând de astăzi.",
+        loadingError: "Problemele nu au putut fi încărcate.",
+        retry: "Încearcă din nou",
+        clearFilters: "Resetează filtrele",
+      }
+    : {
+        subtitle: "Create clear statements, configure evaluation, and schedule daily challenges.",
+        library: "Problem library",
+        libraryDescription: "Search, review, and open the configurator for any problem.",
+        search: "Search by title, code, or description...",
+        allDifficulties: "All difficulties",
+        daily: "Daily challenge",
+        dailyDescription: "Choose the problem shown in user dashboards for a specific day.",
+        chooseProblem: "Choose problem",
+        bonus: "Bonus points",
+        schedule: "Schedule",
+        scheduling: "Scheduling...",
+        scheduled: "Upcoming schedule",
+        active: "Active",
+        inactive: "Inactive",
+        empty: "No problems match the current filters.",
+        tests: "tests",
+        translations: "translations",
+        openPublic: "Open public page",
+        scheduleSuccess: "Daily challenge scheduled.",
+        scheduleError: "The daily challenge could not be scheduled.",
+        selectFirst: "Select a problem first.",
+        futureOnly: "Daily challenges can be scheduled from today onward.",
+        loadingError: "Problems could not be loaded.",
+        retry: "Try again",
+        clearFilters: "Clear filters",
+      };
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [openCreate, setOpenCreate] = useState(false);
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [search, setSearch] = useState("");
+  const [difficulty, setDifficulty] = useState("all");
+  const adminProblemsQueryKey = ["admin", "problems", user?.id, canManageProblems] as const;
 
-  function handleCreateOpenChange(nextOpen: boolean) {
-    if (nextOpen) {
-      setOpenCreate(true);
-      return;
-    }
-    setConfirmDiscard(true);
-  }
-  const scheduledDateKeys = new Set(
-    dailyChallenges
-      .filter((challenge) => challenge.is_active)
-      .map((challenge) => challenge.challenge_date)
-  );
+  const problemsQuery = useQuery({
+    queryKey: adminProblemsQueryKey,
+    enabled: canManageProblems,
+    queryFn: async () => {
+      const { data: problemRows, error } = await supabase.from("problems").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return {
+        problems: (problemRows || []) as AdminProblem[],
+      };
+    },
+    staleTime: 2 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    async function fetchProblems() {
-      const [{ data }, scheduled] = await Promise.all([
-        supabase
-          .from("problems")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        api.dailyChallenges.list(90),
-      ]);
-
-      setProblems(data || []);
-      setDailyChallenges(scheduled);
-      setLoading(false);
-    }
-
-    fetchProblems();
-  }, []);
+  const problems = useMemo(() => problemsQuery.data?.problems || [], [problemsQuery.data?.problems]);
+  const filteredProblems = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase(locale);
+    return problems.filter((problem) => {
+      const title = getLocalized(problem.title_i18n, locale);
+      const description = getLocalized(problem.description_i18n, locale);
+      const matchesSearch = !needle || `${problem.code ?? ""} ${title} ${description}`.toLocaleLowerCase(locale).includes(needle);
+      const matchesDifficulty = difficulty === "all" || problem.difficulty === difficulty;
+      return matchesSearch && matchesDifficulty;
+    });
+  }, [difficulty, locale, problems, search]);
 
   async function handleDelete() {
-    if (!deleteId) return;
-
-    const { error } = await supabase
-      .from("problems")
-      .delete()
-      .eq("id", deleteId);
-
+    if (!deleteId || !canManageProblems) return;
+    const { error } = await supabase.from("problems").delete().eq("id", deleteId);
     if (error) {
       toast.error(t("admin.problems.toast.deleteError"));
       return;
     }
-
-    setProblems((prev) => prev.filter((p) => p.id !== deleteId));
+    queryClient.setQueryData<typeof problemsQuery.data>(adminProblemsQueryKey, (current) =>
+      current ? { ...current, problems: current.problems.filter((problem) => problem.id !== deleteId) } : current
+    );
+    void queryClient.invalidateQueries({ queryKey: ["problems"] });
     setDeleteId(null);
-
     toast.success(t("admin.problems.toast.deleted"));
   }
 
-  async function handleScheduleDailyChallenge() {
-    if (!dailyProblemId) {
-      toast.error("Select a problem first");
-      return;
-    }
-
-    if (dailyDate < todayKey) {
-      setDailyDate(todayKey);
-      toast.error("Daily challenges can only be scheduled from today onward");
-      return;
-    }
-
-    setSchedulingDaily(true);
-
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) throw new Error("Missing user");
-
-      await api.dailyChallenges.schedule({
-        date: dailyDate,
-        problemId: dailyProblemId,
-        bonusPoints: dailyBonusPoints,
-        createdBy: user.id,
-      });
-
-      setDailyChallenges(await api.dailyChallenges.list(90));
-      toast.success("Daily challenge scheduled");
-    } catch {
-      toast.error("Could not schedule daily challenge");
-    } finally {
-      setSchedulingDaily(false);
-    }
-  }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">{t("admin.problems.manageTitle")}</h1>
-
-        <Button onClick={() => setOpenCreate(true)}>
-          {t("admin.problems.create")}
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-orange-500" />
-            <h2 className="text-lg font-semibold">Daily code challenge</h2>
+    <main className="sx-page space-y-8 pb-16">
+      <PageHeader
+        title={t("admin.problems.manageTitle")}
+        subtitle={canManageProblems ? (canManageDaily ? copy.subtitle : copy.libraryDescription) : copy.dailyDescription}
+        meta={canManageProblems ? <Badge variant="secondary">{problems.length}</Badge> : undefined}
+        action={canManageProblems && (
+          <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/problems/chapters">{locale === "ro" ? "Capitole" : "Chapters"}</Link>
+          </Button>
+          <Button onClick={() => setOpenCreate(true)}>
+            <Plus />
+            {t("admin.problems.create")}
+          </Button>
           </div>
+        )}
+      />
 
-          <div className="grid gap-3 md:grid-cols-[190px_minmax(0,1fr)_140px_auto]">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="justify-start gap-2 font-normal"
-                >
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  {parseDateKey(dailyDate).toLocaleDateString(
-                    locale === "ro" ? "ro-RO" : "en-US"
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={parseDateKey(dailyDate)}
-                  modifiers={{
-                    scheduled: (date) => scheduledDateKeys.has(formatDateKey(date)),
-                  }}
-                  modifiersClassNames={{
-                    scheduled:
-                      "bg-emerald-500/15 text-emerald-900 font-semibold hover:bg-emerald-500/25",
-                  }}
-                  disabled={(date) => formatDateKey(date) < todayKey}
-                  onSelect={(date) => {
-                    if (!date) return;
+      {canManageDaily && <DailyChallengeScheduler />}
 
-                    const dateKey = formatDateKey(date);
-                    if (dateKey < todayKey) return;
-
-                    setDailyDate(dateKey);
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-            <Select value={dailyProblemId} onValueChange={setDailyProblemId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose problem" />
-              </SelectTrigger>
+      {canManageProblems && <><section className="space-y-4">
+        <div className="flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">{copy.library}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{copy.libraryDescription}</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(240px,360px)_180px]">
+            <label className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.search} />
+            </label>
+            <Select value={difficulty} onValueChange={setDifficulty}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {problems.map((problem) => (
-                  <SelectItem key={problem.id} value={problem.id}>
-                    {problem.code != null ? `#${problem.code} ` : ""}
-                    {getLocalized(problem.title_i18n, locale)}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">{copy.allDifficulties}</SelectItem>
+                <SelectItem value="easy">Easy</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="hard">Hard</SelectItem>
               </SelectContent>
             </Select>
-            <div className="relative">
-              <Input
-                className="pr-10"
-                min={0}
-                type="number"
-                value={dailyBonusPoints}
-                onChange={(event) =>
-                  setDailyBonusPoints(Number(event.target.value))
-                }
-              />
-              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-medium text-muted-foreground">
-                pct
-              </span>
-            </div>
-            <Button
-              onClick={handleScheduleDailyChallenge}
-              disabled={schedulingDaily}
-            >
-              {schedulingDaily ? "Scheduling..." : "Schedule"}
-            </Button>
           </div>
+        </div>
 
-          <div className="max-h-[198px] space-y-2 overflow-y-auto pr-1">
-            {dailyChallenges.map((challenge) => (
-              <div
-                key={challenge.id}
-                className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium">
-                    {challenge.challenge_date} ·{" "}
-                    {getLocalized(challenge.problems?.title_i18n, locale)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {challenge.bonus_points || 0} bonus points
-                  </p>
-                </div>
-                <Badge variant={challenge.is_active ? "default" : "secondary"}>
-                  {challenge.is_active ? "Active" : "Inactive"}
-                </Badge>
-              </div>
-            ))}
+        {problemsQuery.isPending ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 w-full rounded-[var(--sx-radius-card)]" />)}
           </div>
-        </CardContent>
-      </Card>
+        ) : problemsQuery.isError ? (
+          <EmptyState
+            icon={<FileCode2 className="size-6" />}
+            title={copy.loadingError}
+            action={<Button variant="outline" onClick={() => void problemsQuery.refetch()}>{copy.retry}</Button>}
+          />
+        ) : filteredProblems.length === 0 ? (
+          <EmptyState
+            icon={<Search className="size-6" />}
+            title={copy.empty}
+            action={(search || difficulty !== "all") ? <Button variant="outline" onClick={() => { setSearch(""); setDifficulty("all"); }}>{copy.clearFilters}</Button> : undefined}
+          />
+        ) : (
+          <div className="sx-surface divide-y overflow-hidden">
+            {filteredProblems.map((problem) => {
+              const translations = Object.keys(problem.title_i18n || {}).length;
+              const tests = Array.isArray(problem.test_cases) ? problem.test_cases.length : 0;
+              return (
+                <article key={problem.id} className="group grid gap-4 px-4 py-4 transition-colors hover:bg-muted/25 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+                  <div className="grid size-10 place-items-center rounded-[var(--sx-radius-control)] border bg-muted/35 font-mono text-xs text-muted-foreground">
+                    {problem.code != null ? `#${problem.code}` : "—"}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate font-semibold">{getLocalized(problem.title_i18n, locale)}</h3>
+                      <Badge variant="outline" className="capitalize">{problem.difficulty || "easy"}</Badge>
+                    </div>
+                    <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{markdownPreview(getLocalized(problem.description_i18n, locale))}</p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5"><Languages className="size-3.5" />{translations} {copy.translations}</span>
+                      <span className="inline-flex items-center gap-1.5"><FlaskConical className="size-3.5" />{tests} {copy.tests}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 md:justify-end">
+                    <Button asChild variant="ghost" size="icon-sm" aria-label={copy.openPublic}>
+                      <Link href={`/problems/${problem.id}`} target="_blank"><ExternalLink /></Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/admin/problems/${problem.id}`}><Pencil />{t("admin.problems.edit")}</Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(problem.id)}
+                      aria-label={t("admin.problems.delete")}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
-      <div className="space-y-4">
-
-        {loading &&
-          Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full" />
-          ))}
-
-        {!loading &&
-          problems.map((p) => (
-            <Card key={p.id}>
-              <CardContent className="p-4 flex justify-between items-center">
-
-                <div>
-                  <h2 className="font-semibold text-lg">
-                    {getLocalized(p.title_i18n, locale)}
-                  </h2>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {markdownPreview(getLocalized(p.description_i18n, locale))}
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push(`/admin/problems/${p.id}`)}
-                  >
-                    {t("admin.problems.edit")}
-                  </Button>
-
-                  <Button
-                    variant="destructive"
-                    onClick={() => setDeleteId(p.id)}
-                  >
-                    {t("admin.problems.delete")}
-                  </Button>
-
-                </div>
-
-              </CardContent>
-            </Card>
-          ))}
-
-      </div>
-
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      <AlertDialog open={Boolean(deleteId)} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("admin.problems.dialog.deleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("admin.problems.dialog.deleteDescription")}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t("admin.problems.dialog.deleteDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
-
           <AlertDialogFooter>
             <AlertDialogCancel>{t("admin.problems.dialog.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>
-              {t("admin.problems.dialog.confirmDelete")}
-            </AlertDialogAction>
+            <AlertDialogAction variant="destructive" onClick={() => void handleDelete()}>{t("admin.problems.dialog.confirmDelete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={openCreate} onOpenChange={handleCreateOpenChange}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <DialogHeader>
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent
+          className="h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[1440px] grid-rows-[minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-[1440px]"
+        >
+          <DialogHeader className="sr-only">
             <DialogTitle>{t("admin.problems.dialog.createTitle")}</DialogTitle>
+            <DialogDescription>{copy.subtitle}</DialogDescription>
           </DialogHeader>
-
           <ProblemForm
+            fillHeight
+            className="p-4 sm:p-5 lg:p-6"
+            onCancel={() => setOpenCreate(false)}
             onSuccess={() => {
               setOpenCreate(false);
-              window.location.reload();
+              void queryClient.invalidateQueries({ queryKey: adminProblemsQueryKey });
+              void queryClient.invalidateQueries({ queryKey: ["problems"] });
             }}
           />
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("admin.problems.dialog.discardTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("admin.problems.dialog.discardDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("admin.problems.dialog.discardStay")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setConfirmDiscard(false);
-                setOpenCreate(false);
-              }}
-            >
-              {t("admin.problems.dialog.discardLeave")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-    </div>
+      </>}
+    </main>
   );
 }
 

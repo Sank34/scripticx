@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAuth } from "@/hooks/useAuth";
+import { getWorkspaceKindFromMetadata } from "@/lib/workspaces";
 import {
   Breadcrumb,
   BreadcrumbEllipsis,
@@ -20,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getLessonById, text, type LessonLocale } from "@/lib/learn-lessons";
 import { cn } from "@/lib/utils";
 
 type Crumb = {
@@ -40,7 +43,12 @@ function isProbablyId(segment: string) {
 export function TopbarBreadcrumbs() {
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || "/";
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const { user } = useAuth();
+  const activeWorkspaceKind = getWorkspaceKindFromMetadata(
+    user?.user_metadata as Record<string, unknown> | undefined
+  );
+  const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
   const segments = pathname.split("/").filter(Boolean);
 
   useEffect(() => {
@@ -50,25 +58,41 @@ export function TopbarBreadcrumbs() {
   const labelBySegment: Record<string, string> = {
     admin: t("nav.admin"),
     classes: t("nav.classes"),
+    competitions: t("nav.competitions"),
     contact: t("nav.contact"),
     dashboard: t("nav.dashboard"),
+    "design-system": locale === "ro" ? "Sistem de design" : "Design system",
     editor: t("nav.editor"),
+    email: t("admin.emailCenter.cardTitle"),
     examples: t("nav.examples"),
     feed: t("nav.feed"),
     followers: "Followers",
     following: "Following",
+    groups: t("nav.groups"),
     help: t("nav.help"),
     leaderboard: t("nav.leaderboard"),
-    learn: t("nav.docs"),
+    docs: t("nav.docs"),
+    learn: t("nav.learn"),
     live: t("nav.livecode"),
     livecode: t("nav.livecode"),
     login: "Login",
+    lockdown: "Maintenance",
     post: t("nav.feed"),
     problems: t("nav.problems"),
     profile: t("user.profile"),
     search: t("nav.search"),
     settings: t("user.settings"),
-    assignments: "Assignments",
+    workshops: locale === "ro" ? "Portal traineri" : "Trainer portal",
+    workspace: locale === "ro" ? "Workspace-uri" : "Workspaces",
+    student: locale === "ro" ? "Elev" : "Student",
+    teacher: locale === "ro" ? "Profesor" : "Teacher",
+    notes: locale === "ro" ? "Notițe" : "Notes",
+    whiteboard: "Whiteboard",
+    graph: locale === "ro" ? "Grafuri" : "Graphs",
+    assignments: locale === "ro" ? "Teme" : "Assignments",
+    analytics: locale === "ro" ? "Analiză" : "Analytics",
+    calendar: "Calendar",
+    students: locale === "ro" ? "Elevi" : "Students",
     solve: "Solve",
     u: t("user.profile"),
     updates: t("nav.whatsNew"),
@@ -76,31 +100,50 @@ export function TopbarBreadcrumbs() {
 
   const crumbs: Crumb[] = [
     {
-      href: userHomeHref(segments),
+      href: userHomeHref(segments, activeWorkspaceKind),
       label: "ScripticX",
     },
   ];
 
-  segments.forEach((segment, index) => {
-    const isLast = index === segments.length - 1;
-    const previous = segments[index - 1];
-    const label =
-      labelBySegment[segment] ??
-      (isProbablyId(segment)
-        ? previous === "post"
-          ? "Post"
-          : previous === "live"
-            ? "Session"
-            : previous === "problems"
-              ? "Problem"
-              : "Details"
-        : formatSegment(decodeURIComponent(segment)));
+  if (segments[0] === "learn" && segments[1] === "lesson") {
+    const lessonId = segments[2] ? decodeURIComponent(segments[2]) : "";
+    const lesson = getLessonById(lessonId);
 
     crumbs.push({
-      href: isLast ? undefined : resolveCrumbHref(segments, index),
-      label,
+      href: "/learn",
+      label: t("nav.learn"),
     });
-  });
+    crumbs.push({
+      label: lesson ? text(lesson.title, lessonLocale) : "Lesson",
+    });
+  } else {
+    segments.forEach((segment, index) => {
+      if (index === 0 && segment === "workspace") return;
+
+      const isLast = index === segments.length - 1;
+      const previous = segments[index - 1];
+      const label =
+        labelBySegment[segment] ??
+        (isProbablyId(segment)
+          ? previous === "post"
+            ? "Post"
+            : previous === "live"
+              ? "Session"
+              : previous === "problems"
+                ? "Problem"
+                : previous === "whiteboard"
+                  ? locale === "ro"
+                    ? "Tablă"
+                    : "Board"
+                : "Details"
+          : formatSegment(decodeURIComponent(segment)));
+
+      crumbs.push({
+        href: isLast ? undefined : resolveCrumbHref(segments, index),
+        label,
+      });
+    });
+  }
 
   const shouldCollapse = crumbs.length > 2;
   const visibleCrumbs = shouldCollapse
@@ -130,7 +173,7 @@ export function TopbarBreadcrumbs() {
 
   return (
     <Breadcrumb className="hidden w-full min-w-0 overflow-hidden md:block">
-      <BreadcrumbList className="w-full min-w-0 flex-nowrap gap-1.5 overflow-hidden text-xs text-zinc-500">
+      <BreadcrumbList className="w-full min-w-0 flex-nowrap gap-1.5 overflow-hidden text-xs text-muted-foreground">
         {breadcrumbEntries.map((entry, index) => {
           const isLast = index === breadcrumbEntries.length - 1;
 
@@ -143,7 +186,7 @@ export function TopbarBreadcrumbs() {
               }
             >
               {index > 0 && (
-                <BreadcrumbSeparator className="text-zinc-300">
+                <BreadcrumbSeparator className="text-border">
                   <span>/</span>
                 </BreadcrumbSeparator>
               )}
@@ -167,8 +210,19 @@ export function TopbarBreadcrumbs() {
   );
 }
 
-function userHomeHref(segments: string[]) {
+function userHomeHref(
+  segments: string[],
+  activeWorkspaceKind: "personal" | "student" | "teacher" | null
+) {
   if (segments.length === 0) return undefined;
+  if (segments[0] === "workspace" && segments[1] === "student") {
+    return "/workspace/student";
+  }
+  if (segments[0] === "workspace" && segments[1] === "teacher") {
+    return "/workspace/teacher";
+  }
+  if (activeWorkspaceKind === "student") return "/workspace/student";
+  if (activeWorkspaceKind === "teacher") return "/workspace/teacher";
   return "/dashboard";
 }
 
@@ -177,7 +231,8 @@ function resolveCrumbHref(segments: string[], index: number) {
   const previous = segments[index - 1];
 
   if (segment === "post") return "/feed";
-  if (segment === "live") return "/livecode";
+  if (segment === "live") return "/editor?view=live";
+  if (segment === "learn") return "/learn";
   if (segment === "u") return "/search";
 
   if (segment === "assignments" && segments[0] === "classes") {
@@ -210,8 +265,8 @@ function CrumbNode({
 }) {
   const className = cn(
     "block max-w-[6rem] truncate rounded-md px-1.5 py-1 transition-colors lg:max-w-[8rem] xl:max-w-[10rem]",
-    strong && "font-semibold text-zinc-800",
-    isLast && "bg-zinc-100 text-zinc-950"
+    strong && "font-semibold text-foreground/90",
+    isLast && "bg-accent text-accent-foreground"
   );
 
   if (!isLast && crumb.href) {
@@ -228,7 +283,7 @@ function CrumbNode({
 function HiddenCrumbsMenu({ crumbs }: { crumbs: Crumb[] }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="rounded-md px-1 py-0.5 hover:bg-zinc-100">
+      <DropdownMenuTrigger className="rounded-md px-1 py-0.5 hover:bg-accent">
         <BreadcrumbEllipsis className="h-5 w-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">

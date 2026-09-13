@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { canAccessAdminPage } from "@/lib/permissions";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  isEmailVerified,
+  storePendingEmailVerification,
+} from "@/lib/email-verification";
 
 export default function RouteGuard({
   children,
@@ -14,27 +19,45 @@ export default function RouteGuard({
   requireAuth?: boolean;
   requireAdmin?: boolean;
 }) {
-  const { user, loading, isAdmin, isBanned } = useAuth();
+  const { user, loading: authLoading, isAdmin, isBanned, can, canAccessAdmin, permissionsLoading } = useAuth();
+  const adminAllowed = canAccessAdminPage(usePathname(), can, isAdmin, canAccessAdmin);
+  const loading = authLoading || Boolean(requireAdmin && permissionsLoading);
   const router = useRouter();
+  const verified = isEmailVerified(user);
 
   useEffect(() => {
     if (loading) return;
 
     if (isBanned) {
-      router.push("/banned");
+      router.replace("/banned");
+      return;
+    }
+
+    if (requireAuth && user && !verified) {
+      if (user.email) storePendingEmailVerification(user.email, user.id);
+      router.replace("/login?verification=pending");
       return;
     }
 
     if (requireAuth && !user) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
-    if (requireAdmin && !isAdmin) {
-      router.push("/");
+    if (requireAdmin && !adminAllowed) {
+      router.replace("/");
       return;
     }
-  }, [user, loading, isAdmin, isBanned, requireAuth, requireAdmin, router]);
+  }, [
+    user,
+    loading,
+    adminAllowed,
+    isBanned,
+    requireAuth,
+    requireAdmin,
+    router,
+    verified,
+  ]);
 
   if (loading) {
     return (
@@ -44,6 +67,15 @@ export default function RouteGuard({
         <Skeleton className="h-32 w-full" />
       </div>
     );
+  }
+
+  if (
+    isBanned ||
+    (requireAuth && !user) ||
+    (requireAuth && !verified) ||
+    (requireAdmin && !adminAllowed)
+  ) {
+    return null;
   }
 
   return children;

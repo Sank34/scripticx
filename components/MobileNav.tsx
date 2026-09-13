@@ -35,7 +35,7 @@ export default function MobileNav() {
               href={item.href}
               className={`flex flex-col items-center justify-center py-2 ${
                 active
-                  ? "text-black"
+                  ? "text-foreground"
                   : "text-muted-foreground"
               }`}
             >

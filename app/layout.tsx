@@ -3,13 +3,18 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { AccessibilityProvider } from "@/components/AccessibilityProvider";
 import { Topbar } from "@/components/Topbar";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
-import { MobileDrawer } from "@/components/MobileDrawer";
 import { MainWrapper } from "@/components/MainWrapper";
 import Providers from "@/components/Providers";
-import { NetworkStatus } from "@/components/NetworkStatus";
+import { DeferredShellFeatures } from "@/components/DeferredShellFeatures";
+import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
+import { EmailVerificationBanner } from "@/components/account/EmailVerification";
+import { EmailVerificationAccessGate } from "@/components/account/EmailVerificationAccessGate";
+import { EntrySessionGate } from "@/components/auth/EntrySessionGate";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
 
 const geistSans = Geist({
@@ -44,20 +49,20 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
+    apple: [{ url: "/apple-icon.png?v=2", sizes: "180x180", type: "image/png" }],
     icon: [
-      { url: "/favicon.ico" },
+      { url: "/favicon.ico?v=2", sizes: "16x16 32x32 48x48", type: "image/x-icon" },
       {
-        url: "/icons/notification-icon-72.png",
-        sizes: "72x72",
+        url: "/icons/app-icon-v2-32.png",
+        sizes: "32x32",
         type: "image/png",
       },
       {
-        url: "/icons/notification-icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
+        url: "/icons/favicon-v2.svg",
+        sizes: "any",
+        type: "image/svg+xml",
       },
     ],
-    apple: "/icons/notification-icon-512.png",
   },
   manifest: "/manifest.webmanifest",
   openGraph: {
@@ -67,13 +72,13 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     locale: "en_US",
     type: "website",
-    images: [absoluteUrl(siteConfig.socialImage)],
+    images: [absoluteUrl(`/api/social-image?title=${encodeURIComponent("ScripticX | Learn Programming Interactively")}&description=${encodeURIComponent(siteConfig.description)}&section=ScripticX&path=/`)],
   },
   twitter: {
     card: "summary_large_image",
     title: "ScripticX | Learn Programming Interactively",
     description: siteConfig.description,
-    images: [absoluteUrl(siteConfig.socialImage)],
+    images: [absoluteUrl(`/api/social-image?title=${encodeURIComponent("ScripticX | Learn Programming Interactively")}&description=${encodeURIComponent(siteConfig.description)}&section=ScripticX&path=/`)],
   },
   robots: {
     index: true,
@@ -96,10 +101,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body
-        className={`${geistSans.className} h-screen overflow-hidden bg-zinc-100 antialiased`}
+        className={`${geistSans.className} h-svh overflow-hidden bg-background text-foreground antialiased md:h-dvh`}
       >
         <script
           type="application/ld+json"
@@ -133,46 +139,57 @@ export default function RootLayout({
             }).replace(/</g, "\\u003c"),
           }}
         />
-        <Providers>
-          <LanguageProvider>
-            <SidebarProvider>
-              <div className="h-screen w-full overflow-hidden p-2">
-                <div className="flex h-full w-full gap-2 overflow-hidden rounded-[28px] bg-zinc-100">
+        <ThemeProvider>
+          <AccessibilityProvider>
+            <Providers>
+              <LanguageProvider>
+                <EmailVerificationAccessGate />
+                <EntrySessionGate>
+                <GlobalContextMenu>
+                  <SidebarProvider>
+                    <div
+                      data-shell-root
+                      className="h-svh w-full overflow-hidden bg-sidebar p-2 md:h-dvh"
+                    >
+                      <div
+                        data-shell-frame
+                        className="flex h-full w-full gap-2 overflow-hidden rounded-[var(--sx-radius-shell)] bg-sidebar"
+                      >
+                        <AppSidebar />
+                        <div
+                          data-shell-surface
+                          className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[var(--sx-radius-shell)] border border-border/70 bg-background shadow-sm"
+                        >
+                          <Topbar />
+                          <EmailVerificationBanner />
+                          <MainWrapper>{children}</MainWrapper>
+                        </div>
+                      </div>
+                    </div>
+                  </SidebarProvider>
+                  <DeferredShellFeatures />
+                </GlobalContextMenu>
+                </EntrySessionGate>
+              </LanguageProvider>
+            </Providers>
+          </AccessibilityProvider>
 
-                  <AppSidebar />
-
-                  <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-zinc-200/70 bg-white shadow-sm">
-
-                    <Topbar />
-
-                    <MainWrapper>{children}</MainWrapper>
-
-                  </div>
-
-                </div>
-              </div>
-            </SidebarProvider>
-            <MobileDrawer />
-            <NetworkStatus />
-          </LanguageProvider>
-        </Providers>
-
-        <Toaster
-          position="top-center"
-          richColors={false}
-          closeButton
-          toastOptions={{
-            classNames: {
-              toast:
-                "border-zinc-200 bg-white text-zinc-900 shadow-lg",
-              description: "text-zinc-500",
-              actionButton: "bg-zinc-950 text-white",
-              cancelButton: "bg-zinc-100 text-zinc-700",
-              closeButton:
-                "border-zinc-200 bg-white text-zinc-500 hover:text-zinc-950",
-            },
-          }}
-        />
+          <Toaster
+            position="top-center"
+            richColors={false}
+            closeButton
+            toastOptions={{
+              classNames: {
+                toast: "border-border bg-popover text-popover-foreground shadow-lg",
+                description: "text-muted-foreground",
+                actionButton: "bg-primary text-primary-foreground",
+                cancelButton: "bg-muted text-muted-foreground",
+                closeButton:
+                  "border-border bg-popover text-muted-foreground hover:text-foreground",
+              },
+            }}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

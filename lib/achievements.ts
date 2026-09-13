@@ -1,56 +1,106 @@
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
+import { supabase } from "@/lib/supabase";
+
+type SubmissionScore = {
+  problem_id: string;
+  score: number;
+};
+
+type AchievementRow = {
+  id: string;
+  key: string;
+  title: string;
+};
+
+type UnlockedAchievement = {
+  id: string;
+  title: string;
+};
+
+const SOLVE_MILESTONES = [
+  { count: 1, key: "first_solve" },
+  { count: 5, key: "five_solves" },
+  { count: 10, key: "ten_solves" },
+] as const;
+
 export async function checkAchievements(userId: string, score: number) {
-  console.log("CHECKING", userId, score);
-  const { data: submissions } = await supabase
+  const { data: serverUnlocked, error: unlockError } = await supabase.rpc(
+    "unlock_automatic_achievements"
+  );
+
+  if (!unlockError) {
+    for (const achievement of (serverUnlocked || []) as UnlockedAchievement[]) {
+      toast.success(`Unlocked: ${achievement.title}`);
+    }
+    return;
+  }
+
+  const rpcUnavailable =
+    unlockError.code === "PGRST202" || unlockError.code === "42883";
+  if (!rpcUnavailable) return;
+
+  // Compatibility path for deployments where the rewards migration has not
+  // reached the database yet. The migration moves this check server-side.
+  const { data: submissions, error: submissionsError } = await supabase
     .from("submissions")
     .select("score, problem_id")
     .eq("user_id", userId);
 
-  const best: Record<string, number> = {};
+  if (submissionsError) return;
 
-  submissions?.forEach((s: any) => {
-    if (!best[s.problem_id] || s.score > best[s.problem_id]) {
-      best[s.problem_id] = s.score;
+  const bestScores = new Map<string, number>();
+  for (const submission of (submissions || []) as SubmissionScore[]) {
+    const currentBest = bestScores.get(submission.problem_id) ?? -1;
+    if (submission.score > currentBest) {
+      bestScores.set(submission.problem_id, submission.score);
     }
-  });
+  }
 
-  const solved = Object.values(best).filter((s) => s === 100).length;
+  const solvedCount = [...bestScores.values()].filter((value) => value === 100).length;
+  const eligibleKeys = new Set<string>();
 
-  const keys: string[] = [];
+  for (const milestone of SOLVE_MILESTONES) {
+    if (solvedCount >= milestone.count) eligibleKeys.add(milestone.key);
+  }
+  if (score === 100) eligibleKeys.add("perfect");
 
-  if (solved >= 1) keys.push("first_solve");
-  if (solved >= 5) keys.push("five_solves");
-  if (solved >= 10) keys.push("ten_solves");
-  if (score === 100) keys.push("perfect");
+  if (eligibleKeys.size === 0) return;
 
-  for (const key of keys) {
-    console.log("trying key:", key);
-    const { data: achievement } = await supabase
-      .from("achievements")
-      .select("*")
-      .eq("key", key)
-      .maybeSingle();
-    console.log("achievement found:", achievement);
+  const { data: achievements, error: achievementsError } = await supabase
+    .from("achievements")
+    .select("id, key, title")
+    .in("key", [...eligibleKeys])
+    .eq("active", true);
 
-    if (!achievement) continue;
+  if (achievementsError || !achievements?.length) return;
 
-    const { data: exists } = await supabase
-      .from("user_achievements")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("achievement_id", achievement.id)
-      .maybeSingle();
+  const definitions = achievements as AchievementRow[];
+  const { data: existing, error: existingError } = await supabase
+    .from("user_achievements")
+    .select("achievement_id")
+    .eq("user_id", userId)
+    .in("achievement_id", definitions.map((achievement) => achievement.id));
 
-    if (exists) continue;
+  if (existingError) return;
 
-    console.log("inserting achievement:", achievement.id);
-    await supabase.from("user_achievements").insert({
+  const existingIds = new Set(
+    (existing || []).map((row: { achievement_id: string }) => row.achievement_id)
+  );
+  const unlocked = definitions.filter((achievement) => !existingIds.has(achievement.id));
+
+  if (unlocked.length === 0) return;
+
+  const { error: insertError } = await supabase.from("user_achievements").insert(
+    unlocked.map((achievement) => ({
       user_id: userId,
       achievement_id: achievement.id,
-    });
+    }))
+  );
 
+  if (insertError) return;
+
+  for (const achievement of unlocked) {
     toast.success(`Unlocked: ${achievement.title}`);
   }
 }

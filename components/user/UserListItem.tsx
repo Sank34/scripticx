@@ -3,10 +3,13 @@ import { ArrowUpRight } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/user/UserAvatar";
+import type { EquippedRewards } from "@/lib/rewards";
 
 type UserListItemProps = {
   avatarUrl?: string | null;
+  className?: string;
   description?: string | null;
+  equippedRewards?: EquippedRewards | null;
   href: string;
   meta?: string;
   rank?: number;
@@ -17,7 +20,9 @@ type UserListItemProps = {
 
 export function UserListItem({
   avatarUrl,
+  className,
   description,
+  equippedRewards,
   href,
   meta,
   rank,
@@ -34,7 +39,7 @@ export function UserListItem({
           </span>
         )}
 
-        <UserAvatar avatarUrl={avatarUrl} username={username} />
+        <UserAvatar avatarUrl={avatarUrl} username={username} equippedRewards={equippedRewards} />
 
         <div className="min-w-0">
           <p className="truncate font-medium">{username || "user"}</p>
@@ -59,7 +64,7 @@ export function UserListItem({
 
   if (variant === "row") {
     return (
-      <Link href={href} className="block rounded-md p-2 transition hover:bg-muted/60">
+      <Link href={href} className={`block rounded-md p-2 transition hover:bg-muted/60 ${className || ""}`}>
         {content}
       </Link>
     );

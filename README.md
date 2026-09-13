@@ -1,46 +1,122 @@
 <div align="center">
-<img src="https://media.discordapp.net/attachments/1495347070654218342/1532703552160399360/logo-github.png?ex=6a71c56b&is=6a7073eb&hm=205ec8d045d7f3321b8b87810d10fa7e56165b634561680f87c59adee5a6fa61&=&format=webp&quality=lossless" alt="logo" width="200"><br>
-<br>
-Learn programming the smart way. <br><br>
-
-[![GitHub stars](https://img.shields.io/github/stars/Sank34/scripticx?style=social)](https://github.com/Sank34/scripticx/stargazers)
-[![License](https://img.shields.io/github/license/Sank34/scripticx)](https://github.com/Sank34/scripticx/blob/main/LICENSE)
-[![Version](https://img.shields.io/github/package-json/v/Sank34/scripticx)](https://github.com/Sank34/scripticx/blob/main/package.json)
-[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-red)](https://buymeacoffee.com/scripticx)
-
-<br><br>ScripticX is a modern programming learning platform built around MiniScript+, a language built specifically for beginners, avoiding technical barriers. It features an in-browser code editor, auto-graded problems, classes & lessons, live coding sessions, and a full community feed for students to share their progress. The platform is fully bilingual (RO/EN) and runs entirely client-side (private code execution).
+  <img src="./public/scripticx-readme.png" alt="ScripticX" width="460" />
+  <p>Learn programming visually, one small idea at a time.</p>
+  <p>
+    <a href="https://platform.scripticx.org">Open the platform</a> ·
+    <a href="https://scripticx.org">Visit the landing page</a>
+  </p>
 </div>
 
+# ScripticX platform
 
-### Main Features
+ScripticX is a bilingual (Romanian / English) learning platform for students, teachers and independent learners. It combines the MiniScript+ language with guided lessons, automatically graded problems, a collaborative community and a browser-based editor.
 
-<img src="https://api.iconify.design/lucide:code.svg?color=%2386efac" width="20" height="20" /> **In-browser Editor** <br>
+The current release adds the platform experiences that were not part of the original pre-alpha: dedicated workspaces, Groups, Competitions, the Rewards Shop, a structured learning roadmap, accessibility mode and a new editor with GitHub integration.
 
-<img src="https://api.iconify.design/lucide:check-circle.svg?color=%2386efac" width="20" height="20" /> **Auto-graded Problems** <br>
+## What is included
 
-<img src="https://api.iconify.design/lucide:school.svg?color=%2386efac" width="20" height="20" /> **Classes & Lessons**<br>
+| Area | What users can do |
+| --- | --- |
+| **MiniScript+ editor** | Write, run and debug code in the browser with step-through execution, live diagnostics, syntax highlighting and custom editor settings. |
+| **Learning roadmap** | Follow localized paths, chapters and lessons with quizzes, progress gates and recommended practice. |
+| **Problems** | Search and solve automatically graded problems, browse chapters and download a branded PDF statement. |
+| **Groups** | Chat in channels, share images and GIFs, use named custom emoji and preview media in a focused modal. |
+| **Competitions** | Join public or invite-only contests, with participant invitations managed by username search or CSV upload. |
+| **Rewards Shop** | Spend points on cosmetic items and manage owned items in Inventory. |
+| **Workspaces** | Personal, Student and Teacher workspaces expose the tools and navigation relevant to each role. |
+| **Community** | Share posts and snippets, mention users, follow progress and compare results on leaderboards. |
+| **Accessibility** | Turn on a higher-contrast visual mode designed for projectors and colour-vision differences. |
+| **Administration** | Manage content, chapters, announcements, roles and granular permissions from one secure admin surface. |
 
-<img src="https://api.iconify.design/lucide:radio.svg?color=%2386efac" width="20" height="20" /> **Livecode**<br>
-
-<img src="https://api.iconify.design/lucide:message-circle.svg?color=%2386efac" width="20" height="20" /> **Community Feed**<br>
-
-<img src="https://api.iconify.design/lucide:trending-up.svg?color=%2386efac" width="20" height="20" /> **Progress Tracking**<br>
-
-<img src="https://api.iconify.design/lucide:user.svg?color=%2386efac" width="20" height="20" /> **Profiles** <br>
+## Screenshots
 
 <div align="center">
-
-### Sneak Peek
-<img src="https://media.discordapp.net/attachments/1479338345367601254/1533885103086895206/image.png?ex=6a721d52&is=6a70cbd2&hm=a3a768d36119a7d5322cb828cd5334d099f81185789dbcd19f66f3a8f4891415&=&format=webp&quality=lossless&width=1536&height=818" alt="logo"><br>
-<br>
-<img src="https://media.discordapp.net/attachments/1479338345367601254/1533895257773703341/image.png?ex=6a7226c7&is=6a70d547&hm=fe8c08f911f48a69e4143fd184ab07e14f85e8c21ed384b8f6f51d933062af27&=&format=webp&quality=lossless&width=1536&height=818" alt="logo"><br>
-<br>
-
-### Tech Stack
-![Next.js](https://img.shields.io/badge/Next.js-black?logo=next.js&logoColor=white)
-![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-06B6D4?logo=tailwindcss&logoColor=white)
-
+  <img src="./public/releases/official-launch/editor.jpg" alt="ScripticX editor" width="820" />
+  <br><br>
+  <img src="./public/releases/official-launch/problems.jpg" alt="ScripticX problems and roadmap chapters" width="820" />
+  <br><br>
+  <img src="./public/releases/official-launch/rewards.jpg" alt="ScripticX Rewards Shop" width="820" />
+  <br><br>
+  <img src="./public/releases/official-launch/problems-mobile.jpg" alt="ScripticX on mobile" width="360" />
 </div>
+
+## MiniScript+
+
+MiniScript+ is a small educational language with readable, beginner-friendly syntax and localized runtime messages. It runs directly in the browser and includes variables, conditions, loops, functions, return values and input/output.
+
+```msp
+FUNCTION build(x, y)
+  RETURN x + y
+END
+
+FOR i FROM 1 TO 5 INCR 1
+  PRINT build(i, 2)
+END
+```
+
+`INCR` is optional. `RETURN` ends the current function immediately and sends its value back to the caller.
+
+## Run locally
+
+Requirements: Node.js 20 or newer and npm 10 or newer.
+
+```bash
+git clone https://github.com/Sank34/scripticx.git
+cd scripticx
+npm install
+```
+
+Create `.env.local` with the Supabase project URL and anonymous key:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+Start the development server at `http://localhost:3000`:
+
+```bash
+npm run dev
+```
+
+For a production build:
+
+```bash
+npm run build
+npm run start
+```
+
+## Project layout
+
+```text
+scripticx/
+├── app/                    # Next.js routes and API handlers
+│   ├── admin/              # Admin workspace and content management
+│   ├── editor/             # MiniScript+ and multi-language editor
+│   ├── learn/              # Roadmap, paths and lessons
+│   ├── problems/           # Problem library and submissions
+│   ├── competitions/       # Contest browsing and participation
+│   ├── groups/             # Community groups and channels
+│   └── workspace/          # Student and teacher tools
+├── components/             # Shared UI, shell and feature components
+├── hooks/                  # Client data and interaction hooks
+├── lib/                    # Interpreter, permissions, i18n and services
+├── public/                 # Logos, screenshots and static assets
+└── supabase/migrations/    # Database schema and security migrations
+```
+
+## Architecture and security
+
+The app uses Next.js App Router with React Server and Client Components, React Query for server-state caching, Tailwind CSS and accessible Radix-based UI primitives. Supabase provides PostgreSQL, authentication, realtime updates and storage.
+
+Authorization is enforced in API handlers and database policies. Platform access modes, workspace restrictions, competitions and custom roles are checked server-side; UI visibility is only a convenience layer. Custom roles can grant specific tools without exposing unrelated admin capabilities.
+
+MiniScript+ executes in the browser. Other supported languages are evaluated by an isolated execution service with explicit limits. See [`docs/code-execution.md`](docs/code-execution.md) for the execution model.
+
+## Internationalization
+
+The `LanguageProvider` switches the interface between Romanian and English and persists the preference for the signed-in account. Lesson, roadmap and problem content use localized fields, so each language can be edited and saved independently in the admin configurator.
+
+## Licence
+
+ScripticX is developed by ScripticX SRL. See the repository licence and the notices included with third-party assets before redistributing the project.

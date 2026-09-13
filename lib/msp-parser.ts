@@ -3,6 +3,8 @@ export type MspExpression = {
 };
 
 export type MspStatement =
+  | { type: "return"; line: number; expression: MspExpression }
+  | { type: "call"; line: number; expression: MspExpression }
   | {
       type: "assignment";
       line: number;
@@ -274,6 +276,13 @@ function parseBlock(
         line: line.line,
         variable,
       });
+      index++;
+      continue;
+    }
+
+    if (/^RETURN\b/.test(line.raw) || /^[A-Za-z_]\w*\s*\(/.test(line.raw)) {
+      body.push({ type: /^RETURN\b/.test(line.raw) ? "return" : "call", line: line.line,
+        expression: makeExpression(line.raw.replace(/^RETURN\b/, "").trim()) });
       index++;
       continue;
     }

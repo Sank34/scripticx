@@ -1,0 +1,85 @@
+diff --git a/app/layout.tsx b/app/layout.tsx
+index b97eea3..5b4f873 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -8,7 +8,6 @@ import { Topbar } from "@/components/Topbar";
+ import "./globals.css";
+ import { Toaster } from "@/components/ui/sonner";
+ import { MainWrapper } from "@/components/MainWrapper";
+-import { PlayShellBoundary, OutsideGame } from "@/components/PlayShellBoundary";
+ import Providers from "@/components/Providers";
+ import { DeferredShellFeatures } from "@/components/DeferredShellFeatures";
+ import { GlobalContextMenu } from "@/components/navigation/GlobalContextMenu";
+@@ -143,7 +142,6 @@ export default function RootLayout({
+               <EmailVerificationAccessGate />
+               <GlobalContextMenu>
+                 <SidebarProvider>
+-                  <PlayShellBoundary game={children}>
+                   <div
+                     data-shell-root
+                     className="h-screen w-full overflow-hidden bg-sidebar p-2"
+@@ -169,9 +167,8 @@ export default function RootLayout({
+                       </div>
+                     </div>
+                   </div>
+-                  </PlayShellBoundary>
+                 </SidebarProvider>
+-                <OutsideGame><DeferredShellFeatures /></OutsideGame>
++                <DeferredShellFeatures />
+               </GlobalContextMenu>
+             </LanguageProvider>
+           </Providers>
+diff --git a/components/AppSidebar.tsx b/components/AppSidebar.tsx
+index 2bc0153..c62741e 100644
+--- a/components/AppSidebar.tsx
++++ b/components/AppSidebar.tsx
+@@ -34,7 +34,6 @@ import {
+   HelpCircle,
+   Sparkles,
+   ShoppingBag,
+-  Gamepad2,
+   Mail,
+   FileText,
+   type LucideIcon,
+@@ -477,7 +476,6 @@ export function AppSidebar() {
+             {user && (
+               <>
+               <NavItem href="/shop" icon={ShoppingBag} label={t("nav.shop")} active={pathname.startsWith("/shop")} />
+-              <NavItem href="/play" icon={Gamepad2} label="Playground" active={pathname.startsWith("/play")} />
+               </>
+             )}
+             {user && (
+diff --git a/components/navigation/GlobalContextMenu.tsx b/components/navigation/GlobalContextMenu.tsx
+index d31d868..e32f458 100644
+--- a/components/navigation/GlobalContextMenu.tsx
++++ b/components/navigation/GlobalContextMenu.tsx
+@@ -11,8 +11,7 @@ import {
+   RefreshCw,
+   Search,
+ } from "lucide-react";
+-import { usePathname, useRouter } from "next/navigation";
+-import { isGameRoute } from "@/lib/game-routes";
++import { useRouter } from "next/navigation";
+ import { toast } from "sonner";
+ 
+ import { useLanguage } from "@/components/LanguageProvider";
+@@ -32,7 +31,6 @@ import { startShellRouteProgress } from "@/components/navigation/ShellRouteProgr
+ 
+ export function GlobalContextMenu({ children }: { children: React.ReactNode }) {
+   const router = useRouter();
+-  const pathname = usePathname();
+   const { locale } = useLanguage();
+   const ro = locale === "ro";
+   const copy = ro
+@@ -85,11 +83,6 @@ export function GlobalContextMenu({ children }: { children: React.ReactNode }) {
+     toast.success(copy.copied);
+   }
+ 
+-  // Do not mount the platform trigger or its portal in the fullscreen game.
+-  if (isGameRoute(pathname)) {
+-    return <div className="contents" onContextMenu={event => event.preventDefault()}>{children}</div>;
+-  }
+-
+   return (
+     <ContextMenu>
+       <ContextMenuTrigger asChild className="!select-auto">

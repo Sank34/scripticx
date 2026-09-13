@@ -48,9 +48,12 @@ export function createPageMetadata({
   keywords = [],
 }: PageMetadataOptions): Metadata {
   const canonical = absoluteUrl(path);
+  const generatedImage = absoluteUrl(
+    `/api/social-image?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}&section=${encodeURIComponent(siteConfig.name)}&path=${encodeURIComponent(path)}`
+  );
   const images = image
     ? [image.startsWith("http") ? image : absoluteUrl(image)]
-    : [absoluteUrl(siteConfig.socialImage)];
+    : [generatedImage];
 
   return {
     title,

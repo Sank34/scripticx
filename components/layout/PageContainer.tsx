@@ -12,9 +12,9 @@ export function PageContainer({
   className?: string;
 }) {
   const variants = {
-    default: "max-w-5xl mx-auto p-6",
-    wide: "max-w-7xl mx-auto p-6",
-    full: "w-full max-w-none p-6",
+    default: "mx-auto w-full max-w-5xl",
+    wide: "mx-auto w-full max-w-7xl",
+    full: "w-full max-w-none",
   };
 
   return (

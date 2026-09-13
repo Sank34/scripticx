@@ -1,291 +1,418 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import RouteGuard from "@/components/RouteGuard";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-
-import { useLanguage } from "@/components/LanguageProvider";
-import { useAuth } from "@/hooks/useAuth";
-
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@/components/ui/avatar";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-
-import {
-  Shield,
-  ShieldOff,
-  Trash2,
-  Search,
   Ban,
+  ExternalLink,
+  LoaderCircle,
+  Pencil,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserRoundCheck,
+  UsersRound,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { AdminStatTile } from "@/components/admin/AdminStatTile";
+import {
+  AdminUserEditorDrawer,
+  type AdminManagedUser,
+} from "@/components/admin/AdminUserEditorDrawer";
+import { EmptyState } from "@/components/common/EmptyState";
+import { PageHeader } from "@/components/common/PageHeader";
+import { useLanguage } from "@/components/LanguageProvider";
+import RouteGuard from "@/components/RouteGuard";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogFooter,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { UserAvatar } from "@/components/user/UserAvatar";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
-type AdminUser = {
-  id: string;
-  username: string | null;
-  avatar_url: string | null;
-  role: string;
-  banned: boolean;
-};
+type RoleFilter = "all" | "admin" | "user";
+type StatusFilter = "all" | "active" | "banned";
+
+function UsersPageSkeleton() {
+  return (
+    <main className="sx-page space-y-7 pb-16">
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-5 w-[min(100%,560px)]" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-[var(--sx-radius-card)]" />)}
+      </div>
+      <Skeleton className="h-[560px] rounded-[var(--sx-radius-card)]" />
+    </main>
+  );
+}
 
 function AdminUsersContent() {
-  const { t } = useLanguage();
-  const { user } = useAuth();
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { locale } = useLanguage();
+  const { user, isAdmin: fullAdmin } = useAuth();
+  const queryClient = useQueryClient();
+  const ro = locale === "ro";
+  const copy = ro
+    ? {
+        active: "Activ",
+        activeUsers: "Utilizatori activi",
+        admins: "Administratori",
+        allRoles: "Toate rolurile",
+        allStatuses: "Toate statusurile",
+        banned: "Suspendat",
+        bannedUsers: "Conturi suspendate",
+        deleteConfirm: "Această acțiune șterge definitiv contul, profilul și fișierele avatarului.",
+        deleteTitle: "Ștergi utilizatorul?",
+        empty: "Nu există utilizatori pentru filtrele selectate.",
+        manage: "Administrează",
+        refresh: "Reîncarcă",
+        results: "rezultate",
+        role: "Rol",
+        search: "Caută după username sau ID…",
+        score: "Punctaj",
+        status: "Status",
+        subtitle: "Controlează profilurile, accesul, punctele și starea conturilor dintr-un singur loc.",
+        title: "User management",
+        total: "Total utilizatori",
+        users: "Utilizatori",
+        view: "Vezi profilul",
+        you: "Tu",
+      }
+    : {
+        active: "Active",
+        activeUsers: "Active users",
+        admins: "Administrators",
+        allRoles: "All roles",
+        allStatuses: "All statuses",
+        banned: "Suspended",
+        bannedUsers: "Suspended accounts",
+        deleteConfirm: "This permanently deletes the account, profile, and stored avatar files.",
+        deleteTitle: "Delete user?",
+        empty: "No users match the selected filters.",
+        manage: "Manage",
+        refresh: "Refresh",
+        results: "results",
+        role: "Role",
+        search: "Search by username or user ID…",
+        score: "Score",
+        status: "Status",
+        subtitle: "Control profiles, access, points, and account status from one place.",
+        title: "User management",
+        total: "Total users",
+        users: "Users",
+        view: "View profile",
+        you: "You",
+      };
 
   const [search, setSearch] = useState("");
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminManagedUser | null>(null);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    if (!user) return;
+  const usersQueryKey = ["admin", "users", user?.id] as const;
+  const usersQuery = useQuery({
+    queryKey: usersQueryKey,
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, banner_url, bio, pronouns, equipped_rewards, role, banned, total_score, reward_points, platform_user_roles(role_id,platform_roles(name))")
+        .order("username", { ascending: true }).returns<AdminManagedUser[]>();
+      if (error) throw error;
+      return (data || []) as AdminManagedUser[];
+    },
+    enabled: Boolean(user),
+    staleTime: 2 * 60 * 1000,
+  });
 
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url, role, banned")
-      .neq("id", user.id)
-      .order("username", { ascending: true });
+  const users = useMemo(() => usersQuery.data || [], [usersQuery.data]);
+  const selectedUser = users.find((listedUser) => listedUser.id === selectedUserId) || null;
+  const stats = useMemo(() => ({
+    active: users.filter((listedUser) => !listedUser.banned).length,
+    admins: users.filter((listedUser) => listedUser.role === "admin").length,
+    banned: users.filter((listedUser) => listedUser.banned).length,
+    total: users.length,
+  }), [users]);
 
-    setUsers((data || []) as AdminUser[]);
-    setLoading(false);
-  }, [user]);
-
-  async function toggleAdmin(userId: string, currentRole: string) {
-    if (userId === user?.id) return;
-
-    const newRole = currentRole === "admin" ? "user" : "admin";
-
-    await supabase
-      .from("profiles")
-      .update({ role: newRole })
-      .eq("id", userId);
-
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userId ? { ...u, role: newRole } : u
-      )
-    );
-  }
-
-  async function toggleBan(userId: string, banned: boolean) {
-    if (userId === user?.id) return;
-
-    await supabase
-      .from("profiles")
-      .update({ banned: !banned })
-      .eq("id", userId);
-
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userId ? { ...u, banned: !banned } : u
-      )
-    );
-  }
-
-  async function deleteUser(userId: string) {
-    if (userId === user?.id) return;
-
-    await supabase.from("profiles").delete().eq("id", userId);
-
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
-    setDeleteId(null);
-  }
-
-  useEffect(() => {
-    void fetchUsers();
-  }, [fetchUsers]);
-
-  const filtered = useMemo(() => {
+  const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return users;
+    return users.filter((listedUser) => {
+      const matchesQuery = !query
+        || listedUser.username?.toLowerCase().includes(query)
+        || listedUser.id.toLowerCase().includes(query);
+      const matchesRole = roleFilter === "all" || listedUser.role === roleFilter;
+      const matchesStatus = statusFilter === "all"
+        || (statusFilter === "banned" ? listedUser.banned : !listedUser.banned);
+      return matchesQuery && matchesRole && matchesStatus;
+    });
+  }, [roleFilter, search, statusFilter, users]);
 
-    return users.filter((listedUser) =>
-      listedUser.username?.toLowerCase().includes(query)
-    );
-  }, [search, users]);
-
-  if (loading) {
-    return (
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-10 w-full" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-5 w-32" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between border-b pb-2">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="w-9 h-9 rounded-full" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-16" />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    );
+  async function getAccessToken() {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session?.access_token) throw error || new Error("Session expired");
+    return data.session.access_token;
   }
+
+  async function saveUser(userId: string, formData: FormData) {
+    setSavingUserId(userId);
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const result = (await response.json()) as { error?: string; user?: AdminManagedUser };
+      if (!response.ok || !result.user) throw new Error(result.error || "Could not update user");
+
+      queryClient.setQueryData<AdminManagedUser[]>(usersQueryKey, (current = []) =>
+        current.map((listedUser) => listedUser.id === userId ? { ...listedUser, ...result.user } : listedUser)
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin", "overview"] });
+      setSelectedUserId(null);
+      toast.success(ro ? "Utilizatorul a fost actualizat." : "User updated.");
+    } catch (error) {
+      toast.error(ro ? "Utilizatorul nu a putut fi actualizat." : "Could not update user.", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  async function deleteUser(target: AdminManagedUser) {
+    if (target.id === user?.id || deletingId) return;
+    setDeletingId(target.id);
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`/api/admin/users/${encodeURIComponent(target.id)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = (await response.json()) as {
+        blockers?: Array<{
+          column_name: string;
+          constraint_name: string;
+          schema_name: string;
+          table_name: string;
+        }>;
+        code?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        const blocker = result.blockers?.[0];
+        const blockerMessage = blocker
+          ? ro
+            ? `Contul este încă referit de ${blocker.schema_name}.${blocker.table_name}.${blocker.column_name} (${blocker.constraint_name}).`
+            : `The account is still referenced by ${blocker.schema_name}.${blocker.table_name}.${blocker.column_name} (${blocker.constraint_name}).`
+          : null;
+        throw new Error(blockerMessage || result.error || "Could not delete user");
+      }
+
+      queryClient.setQueryData<AdminManagedUser[]>(usersQueryKey, (current = []) =>
+        current.filter((listedUser) => listedUser.id !== target.id)
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin", "overview"] });
+      setDeleteTarget(null);
+      setSelectedUserId(null);
+      toast.success(ro ? "Utilizatorul a fost șters." : "User deleted.");
+    } catch (error) {
+      toast.error(ro ? "Utilizatorul nu a putut fi șters." : "Could not delete user.", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  if (usersQuery.isPending) return <UsersPageSkeleton />;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <main className="sx-page space-y-7 pb-16">
+      <PageHeader
+        title={copy.title}
+        subtitle={copy.subtitle}
+        action={(
+          <Button variant="outline" onClick={() => void usersQuery.refetch()} disabled={usersQuery.isFetching}>
+            <RefreshCw className={usersQuery.isFetching ? "animate-spin" : undefined} />
+            {copy.refresh}
+          </Button>
+        )}
+      />
 
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          {t("admin.users.page.manageTitle")}
-        </h1>
-      </div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={ro ? "Statistici utilizatori" : "User statistics"}>
+        <AdminStatTile pending={false} label={copy.total} value={stats.total} footer={copy.users} icon={<UsersRound className="size-4 text-muted-foreground" />} />
+        <AdminStatTile pending={false} label={copy.activeUsers} value={stats.active} footer={copy.active} icon={<UserRoundCheck className="size-4 text-[var(--sx-success)]" />} />
+        <AdminStatTile pending={false} label={copy.admins} value={stats.admins} footer="ScripticX" icon={<ShieldCheck className="size-4 text-muted-foreground" />} />
+        <AdminStatTile pending={false} label={copy.bannedUsers} value={stats.banned} footer={copy.banned} icon={<Ban className="size-4 text-destructive" />} />
+      </section>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder={t("admin.users.page.searchPlaceholder")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {users.length} {t("admin.users.page.usersCount")}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-
-          {filtered.map((u) => (
-            <div
-              key={u.id}
-              className="flex items-center justify-between border-b pb-2"
-            >
-              <Link
-                href={`/u/${u.username}`}
-                className="flex items-center gap-3 hover:opacity-80"
-              >
-                <Avatar className="w-9 h-9">
-                  {u.avatar_url && (
-                    <AvatarImage src={u.avatar_url} />
-                  )}
-                  <AvatarFallback>
-                    {u.username?.[0]?.toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="flex flex-col">
-                  <p className="font-medium">
-                    {u.username}
-                  </p>
-
-                  <div className="flex gap-2 text-xs">
-                    <Badge variant="secondary">
-                      {u.role}
-                    </Badge>
-
-                    {u.banned && (
-                      <Badge variant="destructive">
-                        {t("admin.users.page.badges.banned")}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </Link>
-
-              <div className="flex items-center gap-2">
-
-                <Button
-                  size="sm"
-                  variant={u.role === "admin" ? "secondary" : "default"}
-                  onClick={() => toggleAdmin(u.id, u.role)}
-                  className="flex items-center gap-1"
-                >
-                  {u.role === "admin" ? (
-                    <ShieldOff size={14} />
-                  ) : (
-                    <Shield size={14} />
-                  )}
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => toggleBan(u.id, u.banned)}
-                  className="flex items-center gap-1"
-                >
-                  <Ban size={14} />
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => setDeleteId(u.id)}
-                  className="flex items-center gap-1"
-                >
-                  <Trash2 size={14} />
-                </Button>
-
-              </div>
+      {usersQuery.isError ? (
+        <section className="sx-surface">
+          <EmptyState
+            icon={<UsersRound className="size-6" />}
+            title={ro ? "Utilizatorii nu au putut fi încărcați." : "Users could not be loaded."}
+            description={usersQuery.error instanceof Error ? usersQuery.error.message : undefined}
+            action={<Button variant="outline" onClick={() => void usersQuery.refetch()}>{copy.refresh}</Button>}
+          />
+        </section>
+      ) : (
+        <section className="sx-surface overflow-hidden">
+          <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative min-w-0 flex-1 lg:max-w-xl">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.search} className="pl-9" />
             </div>
-          ))}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as RoleFilter)}>
+                <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{copy.allRoles}</SelectItem>
+                  <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
+                <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{copy.allStatuses}</SelectItem>
+                  <SelectItem value="active">{copy.active}</SelectItem>
+                  <SelectItem value="banned">{copy.banned}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-        </CardContent>
-      </Card>
+          <div className="flex items-center justify-between border-b bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
+            <span>{filteredUsers.length} {copy.results}</span>
+            <span className="hidden lg:inline">{copy.manage}</span>
+          </div>
 
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+          {filteredUsers.length === 0 ? (
+            <EmptyState icon={<Search className="size-6" />} title={copy.empty} />
+          ) : (
+            <div className="divide-y">
+              {filteredUsers.map((listedUser) => {
+                const isSelf = listedUser.id === user?.id;
+                return (
+                  <article
+                    key={listedUser.id}
+                    className="grid gap-4 px-5 py-4 transition-colors hover:bg-muted/25 lg:grid-cols-[minmax(0,1.6fr)_110px_120px_120px_auto] lg:items-center"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar
+                        avatarUrl={listedUser.avatar_url}
+                        username={listedUser.username}
+                        equippedRewards={listedUser.equipped_rewards}
+                        className="size-10"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-medium">{listedUser.username || "User"}</p>
+                          {isSelf && <Badge variant="secondary">{copy.you}</Badge>}
+                        </div>
+                        <p className="truncate font-mono text-[11px] text-muted-foreground">{listedUser.id}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground lg:hidden">{copy.score}</p>
+                      <p className="font-mono text-sm tabular-nums">{Number(listedUser.total_score) || 0}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground lg:hidden">{copy.role}</p>
+                      <Badge variant={listedUser.role === "admin" ? "default" : "secondary"} className="capitalize">
+                        {listedUser.role || "user"}
+                      </Badge>
+                      {listedUser.platform_user_roles?.map(assignment => <Badge key={assignment.role_id} variant="outline" className="ml-1 mt-1">{assignment.platform_roles?.name}</Badge>)}
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground lg:hidden">{copy.status}</p>
+                      <Badge variant={listedUser.banned ? "destructive" : "outline"}>
+                        {listedUser.banned ? copy.banned : copy.active}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-2 lg:justify-end">
+                      {listedUser.username && (
+                        <Button asChild size="icon-sm" variant="ghost" aria-label={copy.view}>
+                          <Link href={`/u/${listedUser.username}`} target="_blank"><ExternalLink /></Link>
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" disabled={!fullAdmin && (listedUser.role === "admin" || Boolean(listedUser.platform_user_roles?.length) || listedUser.id === user?.id)} onClick={() => setSelectedUserId(listedUser.id)}>
+                        <Pencil />{copy.manage}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      <AdminUserEditorDrawer
+        actorId={user?.id}
+        locale={locale}
+        open={Boolean(selectedUser)}
+        user={selectedUser}
+        saving={savingUserId === selectedUser?.id}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && !savingUserId) setSelectedUserId(null);
+        }}
+        onSave={saveUser}
+        onDelete={(target) => setDeleteTarget(target)}
+      />
+
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(nextOpen) => !nextOpen && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("admin.users.page.dialog.deleteTitle")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{copy.deleteTitle}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.username ? `@${deleteTarget.username}. ` : ""}{copy.deleteConfirm}
+            </AlertDialogDescription>
           </AlertDialogHeader>
-
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("admin.users.page.dialog.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{ro ? "Anulează" : "Cancel"}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteUser(deleteId!)}
-              className="bg-red-500 hover:bg-red-600"
+              variant="destructive"
+              onClick={() => deleteTarget && void deleteUser(deleteTarget)}
+              disabled={Boolean(deletingId)}
             >
-              {t("admin.users.page.dialog.confirm")}
+              {deletingId ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+              {ro ? "Șterge definitiv" : "Delete permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-    </div>
+    </main>
   );
 }
 
