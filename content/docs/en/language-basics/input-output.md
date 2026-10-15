@@ -34,6 +34,21 @@ PRINT age
 
 The variable becomes available to every instruction that follows.
 
+## Read text
+
+`INPUT` keeps spaces between words. You can enter `i love bananas` as a single value. Empty input stays an empty string, and whitespace-only input stays text.
+
+In the editor console, numbers and the values `true` and `false` receive their matching types automatically. To keep a code such as `00123` as text, enter `"00123"` with double quotes. You can also enter `""` for an empty string.
+
+```msp
+INPUT text
+PRINT LEN(text)
+```
+
+For `i love bananas`, the program prints `14`. In a problem test case, set the input type to string; do not add quote characters to the value itself.
+
+See [Strings](/docs/strings) for traversal, searching, and conversions.
+
 ## Complete example
 
 This program reads two values and prints their sum:
@@ -68,7 +83,7 @@ Combine `INPUT` with a loop when several values must be processed.
 ```msp
 total = 0
 
-FOR index = 1 TO 3
+FOR index FROM 1 TO 3
   INPUT value
   total = total + value
 END

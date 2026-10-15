@@ -30,3 +30,25 @@ it("keeps runaway code bounded in the grader", () => {
   expect(result.score).toBe(0);
   expect(result.results[0].got).toContain("Maximum function call depth exceeded");
 });
+
+it("grades string processing with spaces, empty text, numeric text and Unicode", () => {
+  const code = `INPUT x
+key = "le papoi"
+y = ""
+FOR i FROM 0 TO LEN(x) - 1
+  n = ORD(CHAR(x, i)) * ORD(CHAR(key, i MOD LEN(key))) + 1
+  IF i > 0 THEN
+    y = y + " "
+  END
+  y = y + STR(n)
+END
+PRINT y`;
+  expect(evaluateMiniScript(code, [
+    { input: ["i love bananas"], output: "11341 3233 3457 12433 11447 11313 3553 10291 10477 11111 3105 12321 9410 12881" },
+    { input: [""], output: "" },
+    { input: [" "], output: "3457" },
+    { input: ["😀"], output: "13879297" },
+    { input: ["001"], output: "5185 4849 1569" },
+    { input: ["a".repeat(50)], output: Array.from({ length: 50 }, (_, i) => String(97 * "le papoi".charCodeAt(i % 8) + 1)).join(" ") },
+  ]).score).toBe(100);
+});

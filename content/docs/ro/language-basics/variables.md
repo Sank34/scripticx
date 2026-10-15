@@ -79,3 +79,5 @@ PRINT puncte    # afișează 25
 ```
 
 În continuare, folosește variabile în [bucle](/docs/loops).
+
+Pentru lungime, caractere și porțiuni de text, vezi [Șiruri de caractere](/docs/strings).

@@ -40,15 +40,15 @@ Bucla are trei părți:
 Folosește `FOR` când începutul, sfârșitul și pasul sunt cunoscute.
 
 ```msp
-FOR numar = 1 TO 5
+FOR numar FROM 1 TO 5
   PRINT numar
 END
 ```
 
-Adaugă `STEP` pentru a modifica pasul:
+Adaugă `INCR` pentru a modifica pasul:
 
 ```msp
-FOR numar = 10 TO 0 STEP -2
+FOR numar FROM 10 TO 0 INCR -2
   PRINT numar
 END
 ```
@@ -82,8 +82,8 @@ Exemplul nu modifică `contor`. Adaugă `contor = contor + 1` în buclă înaint
 O buclă poate conține altă buclă. Indentarea păstrează structura lizibilă.
 
 ```msp
-FOR linie = 1 TO 3
-  FOR coloana = 1 TO 3
+FOR linie FROM 1 TO 3
+  FOR coloana FROM 1 TO 3
     PRINT linie * coloana
   END
 END

@@ -36,6 +36,8 @@ import { markdownPreview } from "@/lib/markdownPreview";
 import { matchesProblemSearch } from "@/lib/problem-search";
 import { supabase } from "@/lib/supabase";
 import { ProblemChapters } from "@/components/problems/ProblemChapters";
+import { ProblemAuthor } from "@/components/problems/ProblemAuthor";
+import { useProblemAuthors } from "@/hooks/useProblemAuthors";
 import { fetchProblemChapters, type ProblemTopic } from "@/lib/problem-chapters";
 
 type Difficulty = "easy" | "medium" | "hard";
@@ -44,6 +46,7 @@ type ProgressFilter = "all" | "notStarted" | "inProgress" | "solved";
 type SortMode = "code" | "difficulty" | "progress";
 
 type ProblemRow = {
+  author_id: string | null;
   code: number | null;
   description_i18n: Record<string, string> | null;
   difficulty: Difficulty;
@@ -93,7 +96,7 @@ export default function ProblemsPage() {
     const [problemResult, dailyChallenge, submissionResult] = await Promise.all([
       supabase
         .from("problems")
-        .select("id, code, title_i18n, description_i18n, difficulty")
+        .select("id, code, title_i18n, description_i18n, difficulty, author_id")
         .order("code", { ascending: true }),
       api.dailyChallenges.getForDate(),
       user
@@ -131,13 +134,14 @@ export default function ProblemsPage() {
   };
 
   const problemsQuery = useQuery<ProblemsData>({
-    queryKey: ["problems", user?.id ?? "guest"],
+    queryKey: ["problems", user?.id ?? "guest", "authors-v1"],
     queryFn: fetchProblemsData,
     staleTime: 10 * 60 * 1000,
     placeholderData: (previousData) => previousData,
   });
 
   const problems = useMemo(() => problemsQuery.data?.problems ?? [], [problemsQuery.data]);
+  const authors = useProblemAuthors(problems.map((problem) => problem.author_id));
   const progress = useMemo(() => problemsQuery.data?.progress ?? {}, [problemsQuery.data]);
   const dailyChallenge = problemsQuery.data?.dailyChallenge ?? null;
   const dailySolved = problemsQuery.data?.dailySolved ?? false;
@@ -292,6 +296,12 @@ export default function ProblemsPage() {
                 <p className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                   {markdownPreview(getLocalized(dailyChallenge.problems.description_i18n, locale))}
                 </p>
+                <ProblemAuthor
+                  authorId={problems.find((problem) => problem.id === dailyChallenge.problem_id)?.author_id}
+                  author={authors.data?.[problems.find((problem) => problem.id === dailyChallenge.problem_id)?.author_id ?? ""]}
+                  isLoading={authors.isFetching && !authors.data}
+                  className="mt-2"
+                />
               </div>
             </div>
             <Button variant="outline" asChild className="self-start sm:self-center">
@@ -416,6 +426,7 @@ export default function ProblemsPage() {
                         {title}
                       </h3>
                       <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{description}</p>
+                      <ProblemAuthor authorId={problem.author_id} author={authors.data?.[problem.author_id ?? ""]} isLoading={authors.isFetching && !authors.data} linkProfile={false} className="mt-2" />
                     </div>
                   </div>
 

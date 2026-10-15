@@ -18,6 +18,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { ProblemForm } from "@/components/admin/ProblemForm";
+import { ProblemAuthor } from "@/components/problems/ProblemAuthor";
+import { useProblemAuthors } from "@/hooks/useProblemAuthors";
 import { EmptyState } from "@/components/common/EmptyState";
 import { useLanguage } from "@/components/LanguageProvider";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -56,6 +58,7 @@ import { matchesProblemSearch } from "@/lib/problem-search";
 import { supabase } from "@/lib/supabase";
 
 type AdminProblem = {
+  author_id: string | null;
   code: number | string | null;
   created_at?: string | null;
   description_i18n: Record<string, string> | null;
@@ -148,6 +151,7 @@ function AdminProblemsContent() {
     },
     staleTime: 2 * 60 * 1000,
   });
+  const authors = useProblemAuthors((problemsQuery.data?.problems ?? []).map((problem) => problem.author_id));
 
   const problems = useMemo(() => problemsQuery.data?.problems || [], [problemsQuery.data?.problems]);
   const filteredProblems = useMemo(() => {
@@ -268,6 +272,7 @@ function AdminProblemsContent() {
                       <Badge variant="outline" className="capitalize">{problem.difficulty || "easy"}</Badge>
                     </div>
                     <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{markdownPreview(getLocalized(problem.description_i18n, locale))}</p>
+                    <ProblemAuthor authorId={problem.author_id} author={authors.data?.[problem.author_id ?? ""]} isLoading={authors.isFetching && !authors.data} className="mt-2" />
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5"><Languages className="size-3.5" />{translations} {copy.translations}</span>
                       <span className="inline-flex items-center gap-1.5"><FlaskConical className="size-3.5" />{tests} {copy.tests}</span>

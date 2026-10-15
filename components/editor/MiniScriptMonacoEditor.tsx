@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { STRING_FUNCTIONS } from "@/lib/miniscript/strings";
 import { miniScriptDiagnostics, SYNTAX_GRAMMARS } from "@/lib/editor-diagnostics";
 import Editor, {
   loader,
@@ -98,6 +99,7 @@ function configureMiniScriptMonaco(monaco: Monaco) {
   });
 
   const keywordDocs: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(STRING_FUNCTIONS).map(([name, fn]) => [name, fn.description])),
     IF: "Starts a conditional block. Use `IF condition THEN`, optionally `ELSE`, and close it with `END`.",
     THEN: "Separates an `IF` condition from its block.",
     ELSE: "Runs an alternative block when the matching `IF` condition is false.",
@@ -172,6 +174,12 @@ function configureMiniScriptMonaco(monaco: Monaco) {
             range,
           })),
           ...[
+            ...Object.entries(STRING_FUNCTIONS).map(([name, fn]) => ({
+              label: name,
+              insertText: `${name}(${fn.parameters.map((param, index) => `\${${index + 1}:${param}}`).join(", ")})`,
+              detail: `${name}(${fn.parameters.join(", ")})`,
+              documentation: fn.description,
+            })),
             { label: "INT", insertText: "INT(${1:value})", detail: "INT(value)" },
             { label: "TRUNC", insertText: "TRUNC(${1:value})", detail: "TRUNC(value)" },
             { label: "FLOOR", insertText: "FLOOR(${1:value})", detail: "FLOOR(value)" },
@@ -209,6 +217,9 @@ function configureMiniScriptMonaco(monaco: Monaco) {
 
       const name = call[1].toUpperCase();
       const signatures: Record<string, { label: string; parameters: string[]; documentation: string }> = {
+        ...Object.fromEntries(Object.entries(STRING_FUNCTIONS).map(([name, fn]) => [name, {
+          label: `${name}(${fn.parameters.join(", ")})`, parameters: fn.parameters, documentation: fn.description,
+        }])),
         INT: { label: "INT(value)", parameters: ["value"], documentation: "Truncate toward zero." },
         TRUNC: { label: "TRUNC(value)", parameters: ["value"], documentation: "Truncate toward zero." },
         FLOOR: { label: "FLOOR(value)", parameters: ["value"], documentation: "Round down." },

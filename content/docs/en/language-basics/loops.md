@@ -40,15 +40,15 @@ The loop has three parts:
 Use `FOR` when the start, end, and step are known in advance.
 
 ```msp
-FOR number = 1 TO 5
+FOR number FROM 1 TO 5
   PRINT number
 END
 ```
 
-Add `STEP` to change the increment:
+Add `INCR` to change the increment:
 
 ```msp
-FOR number = 10 TO 0 STEP -2
+FOR number FROM 10 TO 0 INCR -2
   PRINT number
 END
 ```
@@ -82,8 +82,8 @@ The example never changes `counter`. Add `counter = counter + 1` inside the loop
 A loop may contain another loop. Use indentation to keep the structure readable.
 
 ```msp
-FOR row = 1 TO 3
-  FOR column = 1 TO 3
+FOR row FROM 1 TO 3
+  FOR column FROM 1 TO 3
     PRINT row * column
   END
 END

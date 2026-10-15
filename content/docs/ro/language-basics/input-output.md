@@ -34,6 +34,21 @@ PRINT varsta
 
 Variabila devine disponibilă tuturor instrucțiunilor următoare.
 
+## Citirea textului
+
+`INPUT` păstrează spațiile dintre cuvinte. Poți introduce `i love bananas` ca o singură valoare. O intrare goală rămâne șirul gol, iar spațiile introduse singure rămân text.
+
+În consola editorului, numerele și valorile `true` sau `false` primesc automat tipul corespunzător. Ca să păstrezi un cod precum `00123` ca text, introdu `"00123"`, cu ghilimele duble. Pentru un șir gol poți introduce și `""`.
+
+```msp
+INPUT text
+PRINT LEN(text)
+```
+
+Pentru `i love bananas`, programul afișează `14`. În cazurile de test ale unei probleme, setează intrarea ca șir; nu adăuga ghilimele în conținutul valorii.
+
+Vezi [Șiruri de caractere](/docs/strings) pentru parcurgere, căutare și conversii.
+
 ## Exemplu complet
 
 Programul citește două valori și afișează suma lor:
@@ -68,7 +83,7 @@ Combină `INPUT` cu o buclă când trebuie procesate mai multe valori.
 ```msp
 total = 0
 
-FOR index = 1 TO 3
+FOR index FROM 1 TO 3
   INPUT valoare
   total = total + valoare
 END

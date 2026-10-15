@@ -1,0 +1,16 @@
+# Educational character-code transform; the key repeats, including its space.
+FUNCTION encrypt(x)
+  key = "le papoi"
+  y = ""
+  FOR i FROM 0 TO LEN(x) - 1
+    n = ORD(CHAR(x, i)) * ORD(CHAR(key, i MOD LEN(key))) + 1
+    IF i > 0 THEN
+      y = y + " "
+    END
+    y = y + STR(n)
+  END
+  RETURN y
+END
+
+INPUT x
+PRINT encrypt(x)

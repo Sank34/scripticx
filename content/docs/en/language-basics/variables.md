@@ -79,3 +79,5 @@ PRINT points    # prints 25
 ```
 
 Next, use variables to control [loops](/docs/loops).
+
+For length, characters, and parts of text, see [Strings](/docs/strings).

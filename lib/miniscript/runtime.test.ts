@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MiniScriptRuntime, parseLine, validateProgramSyntax } from "../engine";
 import { miniScriptDiagnostics } from "../editor-diagnostics";
@@ -133,4 +134,75 @@ describe("syntax and isolated runtimes", () => {
     first.step(p1); second.step(p2);
     expect(first.step(p1)?.output).toBe(1); expect(second.step(p2)?.output).toBe(2);
   });
+});
+
+
+describe("string processing", () => {
+  it("handles Unicode consistently across length, access, slices and search", () => {
+    expect(execute('s = "aă😀b"\nPRINT LEN(s)\nPRINT CHAR(s, 2)\nPRINT SUBSTR(s, 1, 2)\nPRINT FIND(s, "b")\nPRINT FIND(s, "z")\nPRINT FIND(s, "")\nPRINT SUBSTR(s, 4, 10)').output)
+      .toEqual([4, "😀", "ă😀", 3, -1, 0, ""]);
+  });
+  it("converts characters, case and scalar values", () => {
+    expect(execute('PRINT ORD("a")\nPRINT CHR(128512)\nPRINT ORD(CHR(1114111))\nPRINT LOWER("ȘȚABC")\nPRINT UPPER("șțabc")\nPRINT STR(12) + STR(TRUE)\nPRINT len("")\nPRINT SUBSTR("abc", 1, 100)').output)
+      .toEqual([97, "😀", 1114111, "șțabc", "ȘȚABC", "12true", 0, "bc"]);
+  });
+  it.each([
+    'CHAR("", 0)', 'CHAR("abc", 3)', 'CHAR("abc", -1)', 'CHAR("abc", 0.5)',
+    'SUBSTR("abc", 4, 1)', 'SUBSTR("abc", 0, -1)', 'SUBSTR("abc", 0.5, 1)',
+    'ORD("")', 'ORD("ab")', 'CHR(55296)', 'CHR(57343)', 'CHR(1114112)', 'CHR(-1)', 'CHR(1.5)',
+    'LEN(1)', 'CHAR("a", "0")', 'FIND("a", 1)', 'UPPER(FALSE)', 'LOWER(1)', 'ORD(1)',
+    'LEN()', 'CHAR("a")', 'SUBSTR("abc", 0)', 'STR(1, 2)',
+  ])("reports string errors on the correct source line: %s", expression => {
+    try { execute(`x = 1\nPRINT ${expression}`); throw new Error("Expected failure"); }
+    catch (error) { expect(error).toMatchObject({ line: 2 }); }
+  });
+  it("accepts string builtins in live diagnostics and rejects invalid arity and reserved names", () => {
+    expect(miniScriptDiagnostics('PRINT CHAR("abc", LEN("a"))')).toEqual([]);
+    expect(miniScriptDiagnostics('PRINT LEN()')).toHaveLength(1);
+    expect(miniScriptDiagnostics('FUNCTION len(x)\nRETURN x\nEND')).toHaveLength(1);
+  });
+  it("preserves complete input lines and builds one encrypted output line", () => {
+    const code = `INPUT x
+key = "le papoi"
+y = ""
+FOR i FROM 0 TO LEN(x) - 1
+  code = ORD(CHAR(x, i)) * ORD(CHAR(key, i MOD LEN(key))) + 1
+  IF i > 0 THEN
+    y = y + " "
+  END
+  y = y + STR(code)
+END
+PRINT y`;
+    expect(execute(code, ["i love bananas"]).output).toEqual([
+      "11341 3233 3457 12433 11447 11313 3553 10291 10477 11111 3105 12321 9410 12881",
+    ]);
+    expect(execute(code, [""]).output).toEqual([""]);
+    expect(execute(code, [" "]).output).toEqual(["3457"]);
+    expect(execute(code, ["😀"]).output).toEqual(["13879297"]);
+  });
+});
+
+
+it("runs the shipped encryption program in MiniScript+ for the sample and 50-character inputs", () => {
+  const source = readFileSync(new URL("../../MSP_code_ex/string_encryption.msp", import.meta.url), "utf8");
+  expect(miniScriptDiagnostics(source)).toEqual([]);
+  expect(execute(source, ["i love bananas"]).output).toEqual([
+    "11341 3233 3457 12433 11447 11313 3553 10291 10477 11111 3105 12321 9410 12881",
+  ]);
+  const input = "aă😀 ".repeat(12) + "xy";
+  const key = Array.from("le papoi");
+  const expected = Array.from(input, (char, i) => String(char.codePointAt(0)! * key[i % key.length].codePointAt(0)! + 1)).join(" ");
+  expect(execute(source, [input]).output).toEqual([expected]);
+  expect(execute(source, [""]).output).toEqual([""]);
+});
+
+it("decrypts character values using MiniScript arithmetic and CHR", () => {
+  const source = `key = "le papoi"
+result = ""
+FOR i FROM 0 TO LEN(key) - 1
+  n = ORD("😀") * ORD(CHAR(key, i)) + 1
+  result = result + CHR((n - 1) / ORD(CHAR(key, i)))
+END
+PRINT result`;
+  expect(execute(source).output).toEqual(["😀".repeat(8)]);
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { parseMiniScriptInput } from "@/lib/miniscript/input";
 import { useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts";
 import { formatShortcut } from "@/lib/keyboard-shortcuts";
 
@@ -240,11 +241,7 @@ function getErrorDetails(error: unknown) {
   };
 }
 
-function parseInputValue(value: string): Value {
-  if (value === "true" || value === "false") return value === "true";
-  if (!Number.isNaN(Number(value))) return Number(value);
-  return value;
-}
+const parseInputValue = parseMiniScriptInput;
 
 function normalizeErrorLine(line: number | undefined) {
   if (typeof line !== "number") return null;

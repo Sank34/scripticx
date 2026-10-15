@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { ProblemForm } from "@/components/admin/ProblemForm";
+import { ProblemAuthor } from "@/components/problems/ProblemAuthor";
+import { useProblemAuthors } from "@/hooks/useProblemAuthors";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -44,6 +46,7 @@ function EditProblemContent() {
     enabled: Boolean(id),
     staleTime: 2 * 60 * 1000,
   });
+  const authors = useProblemAuthors([problemQuery.data?.author_id]);
 
   if (problemQuery.isPending) {
     return (
@@ -106,6 +109,8 @@ function EditProblemContent() {
           </Button>
         )}
       />
+
+      <ProblemAuthor authorId={problem.author_id} author={authors.data?.[problem.author_id ?? ""]} isLoading={authors.isFetching && !authors.data} />
 
       <ProblemForm
         initialData={problem}

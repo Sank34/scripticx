@@ -1,3 +1,5 @@
+import { evaluateStringBuiltin, STRING_FUNCTIONS } from "./strings";
+
 export type ASTNode =
   | { type: "number"; value: number }
   | { type: "string"; value: string }
@@ -307,6 +309,7 @@ export function evaluateBuiltin(name: string, args: Value[]): Value {
       return Math.abs(asNumber(args[0], fn));
 
     default:
+      if (Object.hasOwn(STRING_FUNCTIONS, fn)) return evaluateStringBuiltin(fn, args);
       throw new Error(`Unknown function "${name}"`);
   }
 }

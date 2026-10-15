@@ -32,6 +32,8 @@ import { CodeEditorContextMenu } from "@/components/editor/CodeEditorContextMenu
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import { SubmissionHistory } from "@/components/problems/SubmissionHistory";
+import { ProblemAuthor } from "@/components/problems/ProblemAuthor";
+import { useProblemAuthors } from "@/hooks/useProblemAuthors";
 import {
   TestResultCard,
   type ProblemTestResult,
@@ -203,6 +205,7 @@ function ProblemContent() {
   });
 
   const problem = problemQuery.data?.problem ?? null;
+  const authors = useProblemAuthors([problem?.author_id]);
   const dailyChallenge = problemQuery.data?.dailyChallenge ?? null;
   const dailyCompleted = problemQuery.data?.dailyCompleted ?? false;
   const guidance = problemQuery.data?.guidance ?? normalizeProblemGuidance(null);
@@ -493,6 +496,7 @@ function ProblemContent() {
                 )}
               </div>
               <h2 className="mt-4 text-2xl font-semibold tracking-tight">{localizedTitle}</h2>
+              <ProblemAuthor authorId={problem.author_id} author={authors.data?.[problem.author_id ?? ""]} isLoading={authors.isFetching && !authors.data} className="mt-3" />
               <Button variant="outline" size="sm" className="mt-3 gap-2" disabled={exportingPdf} onClick={async () => {
                 if (!statementRef.current) return;
                 setExportingPdf(true);

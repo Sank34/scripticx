@@ -1,3 +1,4 @@
+import { STRING_FUNCTIONS } from "./strings";
 import { parseExpressionSource, type ASTNode } from "./expressions";
 
 export type Instruction =
@@ -19,7 +20,7 @@ export type CompiledProgram = {
   expressions: Map<string, ASTNode>;
 };
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/;
-export const BUILTINS = new Set(["INT", "TRUNC", "FLOOR", "ROUND", "ABS"]);
+export const BUILTINS = new Set(["INT", "TRUNC", "FLOOR", "ROUND", "ABS", ...Object.keys(STRING_FUNCTIONS)]);
 const reserved = new Set([...BUILTINS, "FOR", "FROM", "TO", "INCR", "FUNCTION", "RETURN", "PRINT", "INPUT", "IF", "THEN", "ELSE", "END", "WHILE", "TRUE", "FALSE", "AND", "OR", "NOT", "DIV", "MOD"]);
 export function lineError(message: string, line: number): Error & { line: number } {
   return Object.assign(new Error(message), { line });
@@ -128,6 +129,8 @@ function validateCalls(node: ASTNode, functions: Map<string, FunctionDefinition>
     const definition = functions.get(node.name);
     if (!definition && !BUILTINS.has(node.name.toUpperCase())) throw new Error(`Unknown function "${node.name}"`);
     if (definition && definition.params.length !== node.args.length) throw new Error(`${node.name} expects ${definition.params.length} arguments`);
+    const stringFunction = Object.hasOwn(STRING_FUNCTIONS, node.name.toUpperCase()) ? STRING_FUNCTIONS[node.name.toUpperCase()] : undefined;
+    if (stringFunction && node.args.length !== stringFunction.parameters.length) throw new Error(`${node.name} expects ${stringFunction.parameters.length} arguments`);
     node.args.forEach(arg => validateCalls(arg, functions));
   } else if (node.type === "binary") { validateCalls(node.left, functions); validateCalls(node.right, functions); }
   else if (node.type === "unary") validateCalls(node.value, functions);
