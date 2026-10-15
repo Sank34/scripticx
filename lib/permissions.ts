@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   { key: "admin.platform", en: "Change maintenance / competition mode", ro: "Modificare maintenance / competition mode", path: "/admin/platform" },
   { key: "admin.daily", en: "Daily challenges", ro: "Provocări zilnice", path: "/admin/problems" },
   { key: "admin.certificates", en: "Certificates", ro: "Certificate", path: null },
+  { key: "admin.clients", en: "Development clients portal", ro: "Portalul clienților Development", path: null },
   { key: "maintenance.bypass", en: "Use platform during maintenance", ro: "Acces la platformă în maintenance", path: null },
   { key: "competition.bypass", en: "Full platform during competition mode", ro: "Acces complet în competition mode", path: null },
 ] as const;

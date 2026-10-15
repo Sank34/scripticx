@@ -8,7 +8,8 @@ export type MailCategory =
   | "competitions"
   | "social"
   | "security"
-  | "contact";
+  | "contact"
+  | "client_updates";
 export type MailKind = "campaign" | "one_off" | "transactional" | "admin_alert";
 export type MailStatus = "queued" | "processing" | "sent" | "failed" | "cancelled";
 

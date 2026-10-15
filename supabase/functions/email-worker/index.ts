@@ -43,7 +43,8 @@ type EmailOutboxRow = {
     | "competitions"
     | "social"
     | "security"
-    | "contact";
+    | "contact"
+    | "client_updates";
   subject: string;
   preheader: string | null;
   content: string;
