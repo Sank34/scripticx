@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { STRING_FUNCTIONS } from "@/lib/miniscript/strings";
 import { miniScriptDiagnostics, SYNTAX_GRAMMARS } from "@/lib/editor-diagnostics";
+import { getEditorTextChange } from "@/lib/editor-text-change";
 import Editor, {
   loader,
   type Monaco,
@@ -504,10 +505,16 @@ export function MiniScriptMonacoEditor({
   useEffect(() => {
     const model = mountedEditor?.getModel();
     if (!model || model.isDisposed() || model.getValue() === value) return;
-    // A cached model can change while the controlled value stays the same.
+    const change = getEditorTextChange(model.getValue(), value);
+    if (!change) return;
+    const start = model.getPositionAt(change.start);
+    const end = model.getPositionAt(change.end);
     synchronizingRef.current = true;
     try {
-      model.setValue(value);
+      model.applyEdits([{ range: {
+        startLineNumber: start.lineNumber, startColumn: start.column,
+        endLineNumber: end.lineNumber, endColumn: end.column,
+      }, text: change.text }]);
     } finally {
       synchronizingRef.current = false;
     }
@@ -561,7 +568,7 @@ export function MiniScriptMonacoEditor({
       path={modelPath}
       keepCurrentModel
       theme={monacoTheme}
-      value={value}
+      defaultValue={value}
       onChange={(nextValue) => {
         if (!synchronizingRef.current) onChange(nextValue || "");
       }}

@@ -77,6 +77,7 @@
     "web-tree-sitter": "0.24.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/cytoscape": "^3.21.9",

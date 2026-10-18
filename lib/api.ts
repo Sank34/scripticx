@@ -58,6 +58,7 @@ export type FeedData = {
 export type LiveRoom = {
   id: string;
   owner_id: string;
+  project_id?: string | null;
   name?: string | null;
   code?: string | null;
   status?: string | null;
@@ -1258,15 +1259,11 @@ class LiveApi {
   constructor(private readonly client: SupabaseClient) {}
 
   async getRoom(roomId: string): Promise<LiveRoom | null> {
-    const { data, error } = await this.client
-      .from("live_rooms")
-      .select("*")
-      .eq("id", roomId)
-      .maybeSingle<LiveRoom>();
+    const { data, error } = await this.client.rpc("get_live_workspace", { p_room_id: roomId });
 
     if (error) throw error;
 
-    return data || null;
+    return (data as LiveRoom | null) || null;
   }
 
   async getMessages(roomId: string): Promise<LiveMessage[]> {
@@ -1465,50 +1462,35 @@ class LiveApi {
   }
 
   async removeRoomParticipant(roomId: string, userId: string) {
-    const [{ error: participantError }, { error: liveError }] = await Promise.all([
-      this.client
-        .from("room_participants")
-        .update({ status: "removed" })
-        .eq("room_id", roomId)
-        .eq("user_id", userId),
-      this.client
-        .from("live_participants")
-        .delete()
-        .eq("room_id", roomId)
-        .eq("user_id", userId),
-    ]);
-
+    const { data: auth, error: authError } = await this.client.auth.getUser();
+    if (authError || !auth.user) throw new Error("Authentication required");
+    const room = await this.getRoom(roomId);
+    if (!room || room.owner_id !== auth.user.id) throw new Error("Only the session owner can remove participants");
+    if (userId === room.owner_id) throw new Error("The session owner cannot be removed");
+    if (room.status === "closed") throw new Error("This live session has ended");
+    const { data: removed, error: participantError } = await this.client
+      .from("room_participants")
+      .upsert({ room_id: roomId, user_id: userId, status: "removed" }, { onConflict: "room_id,user_id" })
+      .select("user_id")
+      .maybeSingle();
     if (participantError) throw participantError;
+    if (!removed) throw new Error("The participant could not be removed");
+    const { error: liveError } = await this.client.from("live_participants")
+      .delete().eq("room_id", roomId).eq("user_id", userId);
     if (liveError) throw liveError;
   }
 
   async saveCode(roomId: string, code: string) {
-    const { error } = await this.client.rpc("update_live_room_code", {
+    const { error } = await this.client.rpc("save_live_workspace", {
       p_room_id: roomId,
       p_code: code,
     });
 
-    if (!error) return;
-
-    const isMissingRpc =
-      error.code === "PGRST202" ||
-      error.message?.includes("Could not find the function");
-
-    if (!isMissingRpc) throw error;
-
-    const { error: updateError } = await this.client
-      .from("live_rooms")
-      .update({ code })
-      .eq("id", roomId);
-
-    if (updateError) throw updateError;
+    if (error) throw error;
   }
 
   async closeRoom(roomId: string) {
-    const { error } = await this.client
-      .from("live_rooms")
-      .update({ status: "closed", ended_at: new Date().toISOString() })
-      .eq("id", roomId);
+    const { error } = await this.client.rpc("close_live_workspace", { p_room_id: roomId });
 
     if (error) throw error;
   }
@@ -1669,13 +1651,14 @@ class LiveApi {
     return grouped;
   }
 
-  async createRoom(ownerId: string, name: string) {
+  async createRoom(ownerId: string, name: string, code?: string) {
     const { data, error } = await this.client
       .from("live_rooms")
       .insert({
         owner_id: ownerId,
         name,
         status: "active",
+        ...(code === undefined ? {} : { code }),
       })
       .select()
       .single<LiveRoom>();
@@ -1690,7 +1673,8 @@ class LiveApi {
       .from("room_participants")
       .update({ status: "accepted" })
       .eq("room_id", roomId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("status", "invited");
 
     if (error) throw error;
   }
@@ -1700,7 +1684,8 @@ class LiveApi {
       .from("room_participants")
       .delete()
       .eq("room_id", roomId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("status", "invited");
 
     if (error) throw error;
   }

@@ -14,7 +14,7 @@ import {
   useState,
 } from "react";
 import { useEditorSessionDraft } from "@/hooks/useEditorSessionDraft";
-import { EDITOR_ACTIVITY_VIEWS, type EditorActivityView } from "@/lib/editor-session-draft";
+import { EDITOR_ACTIVITY_VIEWS, readEditorSessionDraft, type EditorActivityView, type EditorSessionDraft } from "@/lib/editor-session-draft";
 import { editorGitHubBranches, editorGitHubProjectLink } from "@/lib/editor-github-cache";
 import { persistEditorProject } from "@/lib/editor-project-persistence";
 import type { OnMount } from "@monaco-editor/react";
@@ -39,6 +39,8 @@ import { DebuggerStateCard } from "@/components/live/DebuggerStateCard";
 import { LiveConsolePanel } from "@/components/live/LiveConsolePanel";
 import { LiveSessionsPanel } from "@/components/live/LiveSessionsPanel";
 import { useLiveWorkspaceCollaboration } from "@/components/live/useLiveWorkspaceCollaboration";
+import { useLiveMonacoCursors } from "@/components/live/useLiveMonacoCursors";
+import "@/components/live/live-cursors.css";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Button } from "@/components/ui/button";
 import {
@@ -293,7 +295,7 @@ function encodeGitHubPath(path: string) {
 }
 
 function EditorContent() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -406,12 +408,18 @@ END
   >(null);
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
+  const [collaborationEditor, setCollaborationEditor] = useState<MonacoEditorInstance | null>(null);
   const terminalRef = useRef<EditorTerminalHandle | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
   const preserveProjectOnLiveLoadRef = useRef(false);
   const lastLiveErrorRef = useRef<string | null>(null);
   const lastEditorActionRef = useRef<string | null>(null);
   const lastEditorImportRef = useRef<string | null>(null);
+  const personalWorkspaceBeforeLiveRef = useRef<EditorSessionDraft | null>(null);
+  const lastLiveRoomRef = useRef<string | null>(null);
+  const enteredOnLiveLinkRef = useRef(searchParams.has("live"));
+  const leavingLiveRef = useRef(false);
+  const [liveTransitionPending, setLiveTransitionPending] = useState(false);
 
   const sessionDraft = useMemo(() => ({
     files, directories, activeFileId, openFileIds, title, description,
@@ -660,6 +668,32 @@ END
   );
   const projectName = title.trim() || (locale === "ro" ? "Proiect fără titlu" : "Untitled project");
   const activeLiveRoomId = searchParams.get("live");
+  useEffect(() => {
+    if (activeLiveRoomId && !lastLiveRoomRef.current) {
+      personalWorkspaceBeforeLiveRef.current = enteredOnLiveLinkRef.current && user
+        ? readEditorSessionDraft(user.id) ?? sessionDraft : sessionDraft;
+      enteredOnLiveLinkRef.current = false;
+    }
+    lastLiveRoomRef.current = activeLiveRoomId;
+  }, [activeLiveRoomId, sessionDraft, user]);
+  const restorePersonalWorkspace = useCallback(() => {
+    const personal = personalWorkspaceBeforeLiveRef.current;
+    if (!personal) return;
+    setFiles(personal.files);
+    setDirectories(personal.directories);
+    setActiveFileId(personal.activeFileId);
+    setOpenFileIds(personal.openFileIds);
+    setTitle(personal.title);
+    setDescription(personal.description);
+    setSavedId(personal.savedId);
+    setProjectIsPublic(personal.projectIsPublic);
+    setDirty(personal.dirty);
+    setOutput(personal.output);
+    setProgram([]);
+    setVariables({});
+    setInputVar(null);
+    setErrorLine(null);
+  }, []);
   const liveWorkspaceDocument = useMemo<LiveWorkspaceDocument>(
     () =>
       createLiveWorkspaceDocument({
@@ -668,11 +702,25 @@ END
         files,
         directories,
         activeFileId: activeFile?.id ?? null,
+        project: savedId && user ? {
+          projectId: savedId, ownerId: user.id,
+          ...(githubProjectQuery.data?.link ? { github: {
+            owner: githubProjectQuery.data.link.owner, repo: githubProjectQuery.data.link.repo, branch: githubProjectQuery.data.link.branch,
+          } } : {}),
+        } : null,
       }),
-    [activeFile?.id, description, directories, files, projectName]
+    [activeFile?.id, description, directories, files, githubProjectQuery.data?.link, projectName, savedId, user]
   );
   const applyRemoteLiveWorkspace = useCallback(
-    (workspace: LiveWorkspaceDocument, source: "initial" | "remote") => {
+    (workspace: LiveWorkspaceDocument, source: "initial" | "remote", ownedProject?: { isPublic: boolean }) => {
+      if (source === "initial" && preserveProjectOnLiveLoadRef.current) {
+        preserveProjectOnLiveLoadRef.current = false;
+        if (workspace.project && workspace.project.ownerId === user?.id) {
+          setSavedId(workspace.project.projectId);
+          setProjectIsPublic(ownedProject?.isPublic ?? false);
+        }
+        return;
+      }
       setTitle(workspace.title);
       setDescription(workspace.description);
       setFiles(workspace.files);
@@ -702,24 +750,35 @@ END
       setVariables({});
       setExecutedLine(0);
       setNextExecutionLine(null);
-      setOutput([]);
+      if (source === "initial") setOutput([]);
       setStopped(false);
+      setIsRunning(false);
       setErrorLine(null);
       setInputVar(null);
       setInputValue("");
-      setDirty(false);
+      setDirty(true);
       if (source === "initial") {
-        if (!preserveProjectOnLiveLoadRef.current) setSavedId(null);
+        setSavedId(workspace.project && workspace.project.ownerId === user?.id ? workspace.project.projectId : null);
+        setProjectIsPublic(ownedProject?.isPublic ?? true);
         preserveProjectOnLiveLoadRef.current = false;
       }
     },
-    []
+    [user?.id]
   );
   const liveCollaboration = useLiveWorkspaceCollaboration({
     roomId: activeLiveRoomId,
     userId: user?.id,
+    username: profile?.username,
     document: liveWorkspaceDocument,
     onRemoteWorkspace: applyRemoteLiveWorkspace,
+    onAccessEnded: restorePersonalWorkspace,
+  });
+  useLiveMonacoCursors({
+    editor: collaborationEditor,
+    fileId: activeFile?.id ?? null,
+    peers: liveCollaboration.peers,
+    enabled: liveCollaboration.status === "connected",
+    onSelection: liveCollaboration.publishSelection,
   });
   useEffect(() => {
     if (!liveCollaboration.error) {
@@ -835,6 +894,7 @@ END
   function applyStepResult(result: StepResult, collectedOutput: string[] = []) {
     if (!result) {
       setStopped(true);
+      setIsRunning(false);
       return false;
     }
 
@@ -894,6 +954,7 @@ END
 
         if (!result) {
           setStopped(true);
+          setIsRunning(false);
           break;
         }
 
@@ -905,6 +966,7 @@ END
       newOutput.push(`ERROR: ${details.message}`);
       setErrorLine(normalizeErrorLine(details.line) ?? Math.max(1, executedLine));
       setStopped(true);
+      setIsRunning(false);
     }
 
     if (newOutput.length) {
@@ -958,6 +1020,7 @@ END
   }
 
   function resetRuntimeState(clearOutput = false) {
+    setIsRunning(false);
     setProgram([]);
     setVariables({});
     setExecutedLine(0);
@@ -1011,6 +1074,10 @@ END
     projectIdOverride?: string
   ) {
     if (!user || saving) return;
+    if (activeLiveRoomId && !liveCollaboration.isOwner) {
+      toast.info(locale === "ro" ? "Proiectul Live Share este salvat în contul proprietarului." : "The Live Share project is saved in its owner's account.");
+      return;
+    }
 
     const filesToSave = snapshot?.files ?? files;
     const directoriesToSave = snapshot?.directories ?? directories;
@@ -1063,6 +1130,10 @@ END
   }
 
   async function handleShare(file?: ProjectFile) {
+    if (activeLiveRoomId) {
+      await copyLiveShareLink();
+      return;
+    }
     const idToUse =
       !savedId || dirty || !projectIsPublic
         ? await saveSnippet(true, undefined, true)
@@ -1587,6 +1658,7 @@ END
       .single();
 
     if (!data) return;
+    if (activeLiveRoomId) detachLiveRoom();
     setWorkspaceGeneration(current => current + 1);
 
     const nextProject = normalizeProjectEntries(data.files, data.code || "");
@@ -1606,6 +1678,7 @@ END
   }
 
   function createNewProject(templateKey: ProjectTemplateKey) {
+    if (activeLiveRoomId) detachLiveRoom();
     setWorkspaceGeneration(current => current + 1);
     setShowGitHubForProject(null);
     const template = createProjectTemplate(templateKey);
@@ -1628,6 +1701,7 @@ END
 
   const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor;
+    setCollaborationEditor(editor);
 
     const syncLine = () => {
       setEditorLine(editor.getPosition()?.lineNumber ?? 1);
@@ -1877,10 +1951,50 @@ END
     window.history.pushState(null, "", url);
   }
 
-  function leaveLiveRoom() {
+  async function leaveLiveRoom() {
+    if (leavingLiveRef.current) return;
+    leavingLiveRef.current = true;
+    setLiveTransitionPending(true);
+    try {
+      await liveCollaboration.flushWorkspace();
+      if (liveCollaboration.isOwner) {
+        const origin = liveCollaboration.projectOrigin;
+        if (origin && user && origin.ownerId === user.id) {
+          const { data: project, error } = await supabase.from("snippets").select("*")
+            .eq("id", origin.projectId).eq("user_id", user.id).single();
+          if (error || !project) throw error ?? new Error("Linked project unavailable");
+          const restored = normalizeProjectEntries(project.files, project.code || "");
+          setFiles(restored.files);
+          setDirectories(restored.directories);
+          setActiveFileId(current => restored.files.some(file => file.id === current) ? current : restored.files[0]?.id ?? null);
+          setOpenFileIds(current => { const retained = current.filter(id => restored.files.some(file => file.id === id)); return retained.length ? retained : restored.files[0] ? [restored.files[0].id] : []; });
+          setTitle(project.title || "");
+          setDescription(project.description || "");
+          setProjectIsPublic(project.is_public !== false);
+          setSavedId(origin.projectId);
+        }
+        setDirty(false);
+      } else restorePersonalWorkspace();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("live");
+      url.searchParams.set("view", "explorer");
+      window.history.replaceState(null, "", url);
+      setActivityView("explorer");
+      setSidePanelOpen(true);
+      void queryClient.invalidateQueries({ queryKey: ["editor-snippets"] });
+    } catch {
+      toast.error(locale === "ro" ? "Modificările nu au putut fi salvate. Încearcă din nou înainte să ieși." : "Changes could not be saved. Please retry before leaving.");
+    } finally {
+      leavingLiveRef.current = false;
+      setLiveTransitionPending(false);
+    }
+  }
+
+  function detachLiveRoom() {
+    preserveProjectOnLiveLoadRef.current = false;
     const url = new URL(window.location.href);
     url.searchParams.delete("live");
-    url.searchParams.set("view", "live");
+    url.searchParams.delete("view");
     window.history.pushState(null, "", url);
   }
 
@@ -1891,6 +2005,7 @@ END
   }
 
   function requestLiveInvite() {
+    if (liveCollaboration.status !== "connected") return;
     setActivityView("live");
     setSidePanelOpen(true);
     setLiveInviteRequest((request) => request + 1);
@@ -1914,10 +2029,13 @@ END
   }
 
   async function endLiveShare() {
+    if (leavingLiveRef.current) return;
+    leavingLiveRef.current = true;
+    setLiveTransitionPending(true);
     try {
       const closed = await liveCollaboration.closeSession();
       if (!closed) return;
-      leaveLiveRoom();
+      setDirty(false);
       toast.success(
         locale === "ro" ? "Sesiunea Live Share s-a încheiat." : "Live Share ended."
       );
@@ -1927,6 +2045,9 @@ END
           ? "Sesiunea nu a putut fi încheiată."
           : "The session could not be ended."
       );
+    } finally {
+      leavingLiveRef.current = false;
+      setLiveTransitionPending(false);
     }
   }
 
@@ -2135,6 +2256,7 @@ END
           onCopyActiveRoom={() => void copyLiveShareLink()}
           onEndActiveRoom={() => void endLiveShare()}
           onLeaveActiveRoom={leaveLiveRoom}
+          onRemoveParticipant={liveCollaboration.removeParticipant}
         />
       );
     }
@@ -2147,6 +2269,15 @@ END
           onChange={setEditorPreferences}
         />
       );
+    }
+
+    if (activeLiveRoomId && !liveCollaboration.isOwner) {
+      const github = liveCollaboration.projectOrigin?.github;
+      return <div className="space-y-3 p-3 text-xs">
+        <p className="font-semibold">GitHub</p>
+        {github && <p className="break-words">{github.owner}/{github.repo} · {github.branch}</p>}
+        <p className="text-muted-foreground">{locale === "ro" ? "Repository-ul sesiunii este gestionat de proprietar. Modificările colaborative pot fi salvate și publicate de acesta." : "The session repository is managed by its owner, who can save and push the collaborative changes."}</p>
+      </div>;
     }
 
     return (
@@ -2353,6 +2484,7 @@ END
                         size="icon-xs"
                         variant="ghost"
                         onClick={() => void copyLiveShareLink()}
+                        disabled={liveCollaboration.status !== "connected"}
                         aria-label={locale === "ro" ? "Copiază invitația" : "Copy invitation"}
                       >
                         <Link2 size={13} />
@@ -2360,7 +2492,7 @@ END
                     </TooltipTrigger>
                     <TooltipContent>{locale === "ro" ? "Copiază linkul" : "Copy link"}</TooltipContent>
                   </Tooltip>
-                  {liveCollaboration.isOwner ? (
+                  {liveCollaboration.isOwner && liveCollaboration.status === "connected" ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -2384,6 +2516,7 @@ END
                           size="icon-xs"
                           variant="ghost"
                           onClick={() => void endLiveShare()}
+                          disabled={liveTransitionPending}
                           aria-label={locale === "ro" ? "Încheie Live Share" : "End Live Share"}
                         >
                           <Square className="fill-current" size={11} />
@@ -2398,6 +2531,7 @@ END
                           size="icon-xs"
                           variant="ghost"
                           onClick={leaveLiveRoom}
+                          disabled={liveTransitionPending}
                           aria-label={locale === "ro" ? "Părăsește Live Share" : "Leave Live Share"}
                         >
                           <X size={13} />
@@ -2452,7 +2586,7 @@ END
                     size="icon-sm"
                     variant="outline"
                     onClick={() => void saveSnippet(false)}
-                    disabled={saving}
+                    disabled={saving || Boolean(activeLiveRoomId && !liveCollaboration.isOwner)}
                     aria-label={saveProjectLabel}
                     aria-busy={saving}
                   >
@@ -2595,8 +2729,9 @@ END
                               height="100%"
                               language={activeFile?.language ?? "text"}
                               path={activeFile?.path ?? fileName}
-                              modelScope={`workspace/${user?.id ?? "local"}/${savedId ?? "unsaved"}`}
+                              modelScope={activeLiveRoomId ? `live/${activeLiveRoomId}` : `workspace/${user?.id ?? "local"}/${savedId ?? "unsaved"}`}
                               retainModels
+                              readOnly={Boolean(activeLiveRoomId && (liveCollaboration.status !== "connected" || liveTransitionPending))}
                               value={code}
                               liveErrors={editorPreferences.liveErrors}
                               onChange={handleCodeChange}

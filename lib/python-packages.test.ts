@@ -5,9 +5,11 @@ describe("Python package commands", () => {
   it("merges pip and python -m pip installations without losing existing dependencies", () => {
     expect(pythonPackageCommand("pip install requests numpy==2.3.0", "pandas\nrequests==2.0\n")?.requirements).toBe("pandas\nrequests\nnumpy==2.3.0\n");
     expect(pythonPackageCommand("python3 -m pip install rich", "")?.requirements).toBe("rich\n");
+    expect(pythonPackageCommand("pip install numpy==2.3.0 requests", "")?.addedPackages).toEqual(["numpy", "requests"]);
   });
   it("supports requirements files without treating normal Python runs as pip", () => {
     expect(pythonPackageCommand("pip install -r requirements.txt", "requests\n")?.requirements).toBe("requests\n");
+    expect(pythonPackageCommand("pip install -r requirements.txt", "requests\n")?.addedPackages).toEqual([]);
     expect(pythonPackageCommand("python main.py", "")).toBeNull();
   });
   it("rejects unsupported commands, remote packages and flags", () => {

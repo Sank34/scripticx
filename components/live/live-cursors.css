@@ -1,0 +1,22 @@
+.sx-live-color-0 { --sx-live-cursor: #2563eb; }
+.sx-live-color-1 { --sx-live-cursor: #b91c1c; }
+.sx-live-color-2 { --sx-live-cursor: #15803d; }
+.sx-live-color-3 { --sx-live-cursor: #7e22ce; }
+.sx-live-color-4 { --sx-live-cursor: #92400e; }
+.sx-live-color-5 { --sx-live-cursor: #0f766e; }
+.sx-live-selection { background-color: color-mix(in srgb, var(--sx-live-cursor) 22%, transparent); }
+.sx-live-caret { border-left: 2px solid var(--sx-live-cursor); margin-left: -1px; }
+.monaco-editor.vs-dark .sx-live-caret { border-color: color-mix(in srgb, var(--sx-live-cursor) 65%, white); }
+.monaco-editor.vs-dark .sx-live-selection { background-color: color-mix(in srgb, var(--sx-live-cursor) 36%, transparent); }
+.sx-live-label {
+  background: var(--sx-live-cursor);
+  color: #fff;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font: 11px/16px sans-serif;
+  pointer-events: none;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -22,6 +22,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { LiveInvitationDialog } from "@/components/live/LiveInvitationDialog";
+import { getLiveInvitationRoomId } from "@/lib/live-invitations";
+import { getLiveWorkspaceUrl } from "@/lib/editor-live-workspace";
 
 type NotificationsPopoverProps = {
   user: SupabaseUser | null;
@@ -368,6 +371,7 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   const isMobile = useIsMobile();
 
   const [open, setOpen] = useState(false);
+  const [liveInvitationRoomId, setLiveInvitationRoomId] = useState<string | null>(null);
   const [browserPermission, setBrowserPermission] = useState(getBrowserPermission);
   const knownNotificationIds = useRef<Set<string>>(new Set());
   const browserNotifiedIds = useRef<Set<string>>(new Set());
@@ -558,6 +562,19 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   }
 
   async function openNotification(notification: AppNotification) {
+    if (notification.type === "live_invite") {
+      const roomId = getLiveInvitationRoomId(notification);
+      if (!roomId) {
+        toast.error(locale === "ro" ? "Invitația nu mai este disponibilă." : "This invitation is no longer available.");
+        return;
+      }
+      setOpen(false);
+      setLiveInvitationRoomId(roomId);
+      void markAsRead(notification).catch(() => {
+        toast.error(locale === "ro" ? "Notificarea nu a putut fi marcată ca citită." : "The notification could not be marked as read.");
+      });
+      return;
+    }
     await markAsRead(notification);
 
     const safeHref = getSafeNotificationHref(notification.href);
@@ -577,6 +594,18 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
   if (!user) return null;
 
   return (
+    <>
+    {liveInvitationRoomId && <LiveInvitationDialog
+      key={`${user.id}:${liveInvitationRoomId}`}
+      roomId={liveInvitationRoomId}
+      userId={user.id}
+      onClose={() => setLiveInvitationRoomId(null)}
+      onAccepted={() => {
+        const href = getLiveWorkspaceUrl(liveInvitationRoomId);
+        setLiveInvitationRoomId(null);
+        router.push(href);
+      }}
+    />}
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
@@ -721,5 +750,6 @@ export function NotificationsPopover({ user }: NotificationsPopoverProps) {
         </ScrollArea>
       </PopoverContent>
     </Popover>
+    </>
   );
 }

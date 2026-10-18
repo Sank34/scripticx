@@ -139,7 +139,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
             after = event.seq;
           }
           if (status.phase === "exited" || status.phase === "error") {
-            append(status.code === 0 ? "system" : "error", status.message || `${ro ? "Proces încheiat" : "Process exited"}${status.code === null ? "" : ` (${status.code})`}`);
+            if (mode !== "install" || status.code !== 0) append(status.code === 0 ? "system" : "error", status.message || `${ro ? "Proces încheiat" : "Process exited"}${status.code === null ? "" : ` (${status.code})`}`);
             break;
           }
           await new Promise<void>(resolve => {
@@ -295,7 +295,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
           const requirementFile = requirementsFile ? { ...requirementsFile, content: install.requirements } : createProjectFile("requirements.txt", install.requirements);
           const nextFiles = requirementsFile ? files.map(file => file.id === requirementFile.id ? requirementFile : file) : [...files, requirementFile];
           onUpdateFiles(nextFiles);
-          append("system", ro ? "Dependențele sunt păstrate în requirements.txt și pregătite la fiecare rulare Python." : "Dependencies are saved in requirements.txt and prepared for each Python run.");
+          if (install.addedPackages.length) append("system", `Added ${install.addedPackages.join(", ")} to the requirements.txt file`);
           await interactivePython(pythonFile, [], source, "install", nextFiles);
           return;
         }
@@ -441,7 +441,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
             }}
             disabled={sendingInput || running && sessionPhase !== "running"}
             aria-label={running && sessionPhase === "running" ? ro ? "Input program" : "Program input" : ro ? "Comandă terminal" : "Terminal command"}
-            placeholder={running ? sessionPhase === "running" ? ro ? "Input → Enter · Ctrl+D: EOF" : "Input → Enter · Ctrl+D: EOF" : sessionPhase === "installing" ? ro ? "Se instalează pachetele…" : "Installing packages…" : ro ? "Se pregătește execuția…" : "Preparing execution…" : "run"}
+            placeholder={running ? sessionPhase === "running" ? ro ? "Input → Enter · Ctrl+D: EOF" : "Input → Enter · Ctrl+D: EOF" : sessionPhase === "installing" ? "Preparing packages" : ro ? "Se pregătește execuția…" : "Preparing execution…" : "run"}
             className="h-7 border-0 bg-transparent px-0 font-mono text-xs text-zinc-100 shadow-none focus-visible:ring-0 dark:bg-transparent"
             autoComplete="off"
             spellCheck={false}

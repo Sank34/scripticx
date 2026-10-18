@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { respondToLiveInvitation } from "@/lib/live-invitations";
 import {
   Check,
   Clock3,
@@ -11,6 +12,7 @@ import {
   Radio,
   Square,
   UserPlus,
+  UserMinus,
   Users,
   X,
 } from "lucide-react";
@@ -63,6 +65,7 @@ type LiveSessionsPanelProps = {
   onCopyActiveRoom?: () => void;
   onEndActiveRoom?: () => void;
   onLeaveActiveRoom?: () => void;
+  onRemoveParticipant?: (userId: string) => Promise<void>;
 };
 
 function getInviteRoom(invite: LiveCodeData["invites"][number]) {
@@ -85,17 +88,23 @@ export function LiveSessionsPanel({
   onCopyActiveRoom,
   onEndActiveRoom,
   onLeaveActiveRoom,
+  onRemoveParticipant,
 }: LiveSessionsPanelProps) {
   const queryClient = useQueryClient();
   const { locale, t } = useLanguage();
   const ro = locale === "ro";
   const [createOpen, setCreateOpen] = useState(false);
+  const handledStartRequest = useRef(0);
   const [sessionName, setSessionName] = useState("");
   const [creating, setCreating] = useState(false);
   const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteQuery, setInviteQuery] = useState("");
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const removalBusy = useRef(false);
+  const membersCloseRef = useRef<HTMLButtonElement>(null);
 
   const { data, isPending } = useQuery<LiveCodeData>({
     queryKey: ["livecode"],
@@ -108,6 +117,7 @@ export function LiveSessionsPanel({
   const pastRooms = rooms.filter((room) => room.status === "closed");
   const invites = data?.invites || [];
   const participantsByRoom = data?.participantsByRoom || {};
+  const activeMembers = activeRoomId ? participantsByRoom[activeRoomId] || [] : [];
   const userId = data?.userId || null;
   const activeParticipantIds = useMemo(
     () =>
@@ -133,22 +143,45 @@ export function LiveSessionsPanel({
   );
 
   useEffect(() => {
-    if (!startRequest) return;
+    if (!startRequest || handledStartRequest.current === startRequest) return;
+    handledStartRequest.current = startRequest;
     setSessionName(workspace.title);
     setCreateOpen(true);
   }, [startRequest, workspace.title]);
 
   useEffect(() => {
-    if (!inviteRequest || !activeRoomId || !activeRoomIsOwner) return;
+    if (!inviteRequest || !activeRoomId || !activeRoomIsOwner || activeRoomStatus !== "connected") return;
     setInviteOpen(true);
     onInviteRequestHandled?.();
-  }, [activeRoomId, activeRoomIsOwner, inviteRequest, onInviteRequestHandled]);
+  }, [activeRoomId, activeRoomIsOwner, activeRoomStatus, inviteRequest, onInviteRequestHandled]);
 
   useEffect(() => {
-    if (activeRoomId && activeRoomIsOwner) return;
+    if (activeRoomId && activeRoomIsOwner && activeRoomStatus === "connected") return;
     setInviteOpen(false);
+    setMembersOpen(false);
     setInviteQuery("");
-  }, [activeRoomId, activeRoomIsOwner]);
+  }, [activeRoomId, activeRoomIsOwner, activeRoomStatus]);
+
+  async function removeMember(memberId: string) {
+    if (!activeRoomIsOwner || !onRemoveParticipant || memberId === userId || removalBusy.current) return;
+    removalBusy.current = true;
+    setRemovingId(memberId);
+    try {
+      await onRemoveParticipant(memberId);
+      const roomId = activeRoomId;
+      queryClient.setQueryData<LiveCodeData>(["livecode"], current => current && roomId ? {
+        ...current,
+        participantsByRoom: { ...current.participantsByRoom, [roomId]: (current.participantsByRoom[roomId] || []).filter(member => member.id !== memberId) },
+      } : current);
+      void queryClient.invalidateQueries({ queryKey: ["livecode"] });
+      toast.success(ro ? "Membrul a fost eliminat din sesiune." : "Member removed from the session.");
+    } catch {
+      toast.error(ro ? "Membrul nu a putut fi eliminat. Încearcă din nou." : "Could not remove the member. Please try again.");
+    } finally {
+      removalBusy.current = false;
+      setRemovingId(null);
+    }
+  }
 
   useEffect(() => {
     if (!userId) return;
@@ -191,7 +224,7 @@ export function LiveSessionsPanel({
   }
 
   async function createRoom() {
-    if (!userId || creating) return;
+    if (!userId || creating || activeRoomId) return;
 
     setCreating(true);
     try {
@@ -199,10 +232,9 @@ export function LiveSessionsPanel({
         userId,
         sessionName.trim() ||
           workspace.title.trim() ||
-          t("livecode.dialog.untitled")
+          t("livecode.dialog.untitled"),
+        serializeLiveWorkspace(workspace)
       );
-
-      await api.live.saveCode(room.id, serializeLiveWorkspace(workspace));
 
       await queryClient.invalidateQueries({ queryKey: ["livecode"] });
       setCreateOpen(false);
@@ -225,7 +257,7 @@ export function LiveSessionsPanel({
 
     setPendingInviteId(roomId);
     try {
-      await api.live.acceptInvite(roomId, userId);
+      await respondToLiveInvitation(api.live, roomId, userId, "accept");
       await queryClient.invalidateQueries({ queryKey: ["livecode"] });
       openRoom(roomId);
     } catch {
@@ -242,7 +274,7 @@ export function LiveSessionsPanel({
 
     setPendingInviteId(roomId);
     try {
-      await api.live.declineInvite(roomId, userId);
+      await respondToLiveInvitation(api.live, roomId, userId, "decline");
       await queryClient.invalidateQueries({ queryKey: ["livecode"] });
     } catch {
       toast.error(
@@ -254,7 +286,7 @@ export function LiveSessionsPanel({
   }
 
   async function inviteParticipant(candidate: MentionCandidate) {
-    if (!activeRoomId || !userId || !activeRoomIsOwner || invitingId) return;
+    if (!activeRoomId || !userId || !activeRoomIsOwner || activeRoomStatus !== "connected" || invitingId) return;
 
     setInvitingId(candidate.id);
     try {
@@ -303,8 +335,9 @@ export function LiveSessionsPanel({
       <button
         key={room.id}
         type="button"
+        disabled={closed && !isOwner}
         onClick={() => openRoom(room.id)}
-        className={`group w-full rounded-md px-2 py-2.5 text-left transition-colors hover:bg-muted ${
+        className={`group w-full rounded-md px-2 py-2.5 text-left transition-colors hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent ${
           room.id === activeRoomId ? "bg-muted" : ""
         }`}
       >
@@ -315,21 +348,27 @@ export function LiveSessionsPanel({
               <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full border border-background bg-emerald-500" />
             ) : null}
           </span>
-          <span className="min-w-0 flex-1">
+          <span className="@container/room-details min-w-0 flex-1">
             <span className="block truncate text-xs font-medium text-foreground">
               {room.name || t("livecode.sessions.fallbackName")}
             </span>
-            <span className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
               <span>{isOwner ? t("livecode.roles.owner") : t("livecode.roles.member")}</span>
               <span aria-hidden="true">·</span>
-              <span>{participants.length} {ro ? "participanți" : "participants"}</span>
-              {room.id === activeRoomId ? (
-                <>
+              <span className="whitespace-nowrap">
+                <span aria-hidden="true">
+                  {participants.length}
+                  <span className="hidden @min-[11rem]/room-details:inline"> {ro ? "participanți" : "participants"}</span>
+                </span>
+                <span className="sr-only">{participants.length} {ro ? "participanți" : "participants"}</span>
+              </span>
+              {room.id === activeRoomId && !closed ? (
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                   <span aria-hidden="true">·</span>
                   <span className="text-emerald-600 dark:text-emerald-400">
                     {ro ? "deschisă" : "open"}
                   </span>
-                </>
+                </span>
               ) : null}
             </span>
           </span>
@@ -371,6 +410,7 @@ export function LiveSessionsPanel({
             setCreateOpen(true);
           }}
           aria-label={t("livecode.createSession")}
+          disabled={Boolean(activeRoomId)}
         >
           <Plus className="size-3.5" />
         </Button>
@@ -413,6 +453,16 @@ export function LiveSessionsPanel({
             </div>
             <TooltipProvider delayDuration={250}>
               <div className="mt-2.5 flex items-center justify-end gap-1 border-t pt-2.5">
+                {activeRoomIsOwner && activeRoomStatus === "connected" && onRemoveParticipant ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button type="button" size="icon-sm" variant="ghost" onClick={() => setMembersOpen(true)} aria-label={ro ? "Gestionează membrii" : "Manage members"}>
+                        <Users className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{ro ? "Gestionează membrii" : "Manage members"}</TooltipContent>
+                  </Tooltip>
+                ) : null}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -420,7 +470,7 @@ export function LiveSessionsPanel({
                       size="icon-sm"
                       variant="ghost"
                       onClick={onCopyActiveRoom}
-                      disabled={!onCopyActiveRoom}
+                      disabled={!onCopyActiveRoom || activeRoomStatus !== "connected"}
                       aria-label={ro ? "Copiază linkul" : "Copy link"}
                     >
                       <Link2 className="size-3.5" />
@@ -431,7 +481,7 @@ export function LiveSessionsPanel({
                   </TooltipContent>
                 </Tooltip>
 
-                {activeRoomIsOwner ? (
+                {activeRoomIsOwner && activeRoomStatus === "connected" ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -490,7 +540,7 @@ export function LiveSessionsPanel({
             </TooltipProvider>
             {userId ? (
               <LiveRoomChat
-                disabled={activeRoomStatus === "closed"}
+                disabled={activeRoomStatus !== "connected"}
                 locale={locale}
                 roomId={activeRoomId}
                 userId={userId}
@@ -507,7 +557,7 @@ export function LiveSessionsPanel({
             setSessionName(workspace.title);
             setCreateOpen(true);
           }}
-          disabled={!userId}
+          disabled={!userId || Boolean(activeRoomId)}
         >
           <Radio className="size-3.5" />
           {ro ? "Pornește Live Share" : "Start Live Share"}
@@ -608,6 +658,36 @@ export function LiveSessionsPanel({
         )}
       </div>
 
+      <Dialog open={membersOpen && activeRoomIsOwner} onOpenChange={open => { if (!removalBusy.current) setMembersOpen(open); }}>
+        <DialogContent showCloseButton={!removingId} onOpenAutoFocus={event => { event.preventDefault(); membersCloseRef.current?.focus(); }}>
+          <DialogHeader>
+            <DialogTitle>{ro ? "Membrii sesiunii" : "Session members"}</DialogTitle>
+            <DialogDescription>{ro ? "Poți elimina membri sau retrage invitații. Pentru a reveni, vor avea nevoie de o invitație nouă." : "Remove members or withdraw invitations. They will need a new invitation to return."}</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            {activeMembers.length ? activeMembers.map(member => (
+              <div key={member.id} className="flex min-w-0 items-center gap-2 rounded-md p-2">
+                <UserAvatar avatarUrl={member.avatar_url} username={member.username} equippedRewards={member.equipped_rewards} className="size-7 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-sm">{member.username || (ro ? "Utilizator" : "User")}</span>
+                {member.id === userId ? <span className="text-xs text-muted-foreground">{ro ? "Proprietar" : "Owner"}</span> : (
+                  <TooltipProvider delayDuration={250}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button type="button" size="icon-sm" variant="ghost" className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={Boolean(removingId) || activeRoomStatus !== "connected"} onClick={() => void removeMember(member.id)} aria-label={ro ? `Elimină ${member.username || "membrul"}` : `Remove ${member.username || "member"}`}>
+                          {removingId === member.id ? <LoaderCircle className="size-4 animate-spin" /> : <UserMinus className="size-4" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{ro ? "Elimină din sesiune" : "Remove from session"}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            )) : <p className="py-3 text-sm text-muted-foreground">{ro ? "Niciun membru disponibil." : "No members available."}</p>}
+          </div>
+          <DialogFooter><Button ref={membersCloseRef} variant="outline" disabled={Boolean(removingId)} onClick={() => setMembersOpen(false)}>{ro ? "Închide" : "Close"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -631,7 +711,7 @@ export function LiveSessionsPanel({
             <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
               {ro ? "Anulează" : "Cancel"}
             </Button>
-            <Button onClick={() => void createRoom()} disabled={!userId || creating}>
+            <Button onClick={() => void createRoom()} disabled={!userId || creating || Boolean(activeRoomId)}>
               {creating ? <LoaderCircle className="size-4 animate-spin" /> : <Radio className="size-4" />}
               {creating ? t("livecode.dialog.creating") : ro ? "Pornește" : "Start"}
             </Button>
