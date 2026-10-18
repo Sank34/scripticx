@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
   useMemo,
   useState,
   type ComponentProps,
   type ReactNode,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownToLine,
   Check,
@@ -66,31 +66,13 @@ import {
 import type { ProjectFile } from "@/lib/editor-project";
 import { githubClientRequest } from "@/lib/github-client";
 import { cn } from "@/lib/utils";
-
-type BranchSummary = {
-  name: string;
-  protected: boolean;
-  sha: string;
-};
-
-type RepositoryPayload = {
-  configured: boolean;
-  installations: Array<{
-    accountLogin: string;
-    accountType: string;
-    id: number;
-    repositorySelection: string;
-    suspended: boolean;
-  }>;
-  link: GitHubProjectLink | null;
-  repositories: GitHubRepository[];
-};
+import { cacheEditorGitHubProjectLink, editorGitHubBranches, editorGitHubProjectLink, editorGitHubRepositories } from "@/lib/editor-github-cache";
 
 type GitHubSourceControlPanelProps = {
   dirty: boolean;
   files: ProjectFile[];
   locale: "en" | "ro";
-  onApplyRemote: (files: GitHubRemoteFile[]) => Promise<void> | void;
+  onApplyRemote: (files: GitHubRemoteFile[], projectId: string) => Promise<void> | void;
   onCommitted: () => void;
   onEnsureProjectSaved: () => Promise<string | null | undefined>;
   onOpenPublicImport: () => void;
@@ -119,13 +101,24 @@ export function GitHubSourceControlPanel({
   userId,
 }: GitHubSourceControlPanelProps) {
   const ro = locale === "ro";
-  const [resolvedProjectId, setResolvedProjectId] = useState(projectId);
-  const [payload, setPayload] = useState<RepositoryPayload | null>(null);
-  const [branches, setBranches] = useState<BranchSummary[]>([]);
+  const resolvedProjectId = projectId;
+  const queryClient = useQueryClient();
+  const projectLinkQuery = useQuery(editorGitHubProjectLink(userId, resolvedProjectId));
+  const savedLink = projectLinkQuery.data?.link ?? null;
+  const repositoriesQuery = useQuery({
+    ...editorGitHubRepositories(userId),
+    enabled: Boolean(userId && !savedLink && (!resolvedProjectId || projectLinkQuery.isSuccess)),
+  });
+  const payload = {
+    installations: repositoriesQuery.data?.installations ?? [],
+    repositories: repositoriesQuery.data?.repositories ?? [],
+    link: savedLink,
+  };
+  const branchesQuery = useQuery(editorGitHubBranches(userId, resolvedProjectId, Boolean(savedLink)));
+  const branches = branchesQuery.data ?? [];
   const [selectedRepository, setSelectedRepository] = useState("");
   const [commitMessage, setCommitMessage] = useState("");
   const [fileHashes, setFileHashes] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<
     "install" | "connect" | "sync" | "commit" | "branch" | "pull-request" | "disconnect" | null
   >(null);
@@ -137,57 +130,36 @@ export function GitHubSourceControlPanel({
   const [pullRequestTitle, setPullRequestTitle] = useState("");
   const [pullRequestDescription, setPullRequestDescription] = useState("");
 
-  useEffect(() => setResolvedProjectId(projectId), [projectId]);
-
-  const loadRepositories = useCallback(async () => {
-    if (!userId) {
-      setPayload(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const query = resolvedProjectId
-        ? `?projectId=${encodeURIComponent(resolvedProjectId)}`
-        : "";
-      const nextPayload = await githubClientRequest<RepositoryPayload>(
-        `/api/github/repositories${query}`
-      );
-      setPayload(nextPayload);
-    } catch (error) {
-      setPayload(null);
+  useEffect(() => {
+    if (repositoriesQuery.isError || projectLinkQuery.isError) {
       toast.error(ro ? "GitHub nu a putut fi încărcat." : "GitHub could not be loaded.", {
-        description: error instanceof Error ? error.message : undefined,
+        description: (projectLinkQuery.error ?? repositoriesQuery.error)?.message,
       });
-    } finally {
-      setLoading(false);
     }
-  }, [resolvedProjectId, ro, userId]);
+  }, [repositoriesQuery.isError, repositoriesQuery.error, projectLinkQuery.isError, projectLinkQuery.error, ro]);
 
-  const loadBranches = useCallback(async () => {
-    if (!resolvedProjectId || !payload?.link) {
-      setBranches([]);
-      return;
-    }
-    try {
-      const result = await githubClientRequest<{ branches: BranchSummary[] }>(
-        `/api/github/branches?projectId=${encodeURIComponent(resolvedProjectId)}`
-      );
-      setBranches(result.branches);
-    } catch (error) {
+  useEffect(() => {
+    if (branchesQuery.isError) {
       toast.error(ro ? "Branch-urile nu au putut fi încărcate." : "Branches could not be loaded.", {
-        description: error instanceof Error ? error.message : undefined,
+        description: branchesQuery.error.message,
       });
     }
-  }, [payload?.link, resolvedProjectId, ro]);
+  }, [branchesQuery.isError, branchesQuery.error, ro]);
 
-  useEffect(() => {
-    void loadRepositories();
-  }, [loadRepositories]);
+  async function loadRepositories() {
+    await Promise.all([
+      resolvedProjectId ? projectLinkQuery.refetch() : Promise.resolve(),
+      savedLink ? branchesQuery.refetch() : repositoriesQuery.refetch(),
+    ]);
+  }
 
-  useEffect(() => {
-    void loadBranches();
-  }, [loadBranches]);
+  async function updateLink(id: string, link: GitHubProjectLink | null) {
+    await cacheEditorGitHubProjectLink(queryClient, userId, id, link);
+  }
+
+  async function loadBranches(id = resolvedProjectId) {
+    await queryClient.invalidateQueries({ queryKey: editorGitHubBranches(userId, id, true).queryKey });
+  }
 
   const managedFiles = useMemo(
     () => files.filter((file) => isSupportedGitHubTextPath(file.path)),
@@ -219,7 +191,6 @@ export function GitHubSourceControlPanel({
     if (resolvedProjectId && !forceSave) return resolvedProjectId;
     const id = await onEnsureProjectSaved();
     if (!id) throw new Error(ro ? "Salvează proiectul înainte de conectare." : "Save the project before connecting.");
-    setResolvedProjectId(id);
     return id;
   }
 
@@ -249,11 +220,11 @@ export function GitHubSourceControlPanel({
           body: JSON.stringify({ projectId: id, ...(branch ? { branch } : {}) }),
         }
       );
-      await onApplyRemote(result.files);
-      setPayload((current) => (current ? { ...current, link: result.link } : current));
+      await onApplyRemote(result.files, id);
+      await updateLink(id, result.link);
       setCommitMessage("");
       toast.success(ro ? "Proiect sincronizat cu GitHub." : "Project synchronized with GitHub.");
-      await loadBranches();
+      await loadBranches(id);
     } catch (error) {
       toast.error(ro ? "Sincronizarea a eșuat." : "Synchronization failed.", {
         description: error instanceof Error ? error.message : undefined,
@@ -291,7 +262,7 @@ export function GitHubSourceControlPanel({
           }),
         }
       );
-      setPayload((current) => (current ? { ...current, link: result.link } : current));
+      await updateLink(id, result.link);
       await performSync(result.link.branch, id);
     } catch (error) {
       toast.error(ro ? "Repository-ul nu a putut fi conectat." : "Repository could not be connected.", {
@@ -317,7 +288,7 @@ export function GitHubSourceControlPanel({
           files: managedFiles.map((file) => ({ path: file.path, content: file.content })),
         }),
       });
-      setPayload((current) => (current ? { ...current, link: result.link } : current));
+      await updateLink(id, result.link);
       setCommitMessage("");
       onCommitted();
       toast.success(ro ? "Commit publicat pe GitHub." : "Commit pushed to GitHub.", {
@@ -353,10 +324,10 @@ export function GitHubSourceControlPanel({
           body: JSON.stringify({ projectId: id, branch }),
         }
       );
-      setPayload((current) => (current ? { ...current, link: result.link } : current));
+      await updateLink(id, result.link);
       setNewBranchOpen(false);
       setNewBranchName("");
-      await loadBranches();
+      await loadBranches(id);
       toast.success(ro ? `Branch-ul ${branch} a fost creat.` : `Branch ${branch} was created.`);
     } catch (error) {
       toast.error(ro ? "Branch-ul nu a putut fi creat." : "Branch could not be created.", {
@@ -414,8 +385,8 @@ export function GitHubSourceControlPanel({
         `/api/github/project-link?projectId=${encodeURIComponent(resolvedProjectId)}`,
         { method: "DELETE" }
       );
-      setPayload((current) => (current ? { ...current, link: null } : current));
-      setBranches([]);
+      await updateLink(resolvedProjectId, null);
+      queryClient.removeQueries({ queryKey: editorGitHubBranches(userId, resolvedProjectId, false).queryKey });
       setDisconnectOpen(false);
       toast.success(ro ? "Repository deconectat." : "Repository disconnected.");
     } catch (error) {
@@ -438,7 +409,7 @@ export function GitHubSourceControlPanel({
     );
   }
 
-  if (loading) {
+  if ((resolvedProjectId && projectLinkQuery.isPending) || (!savedLink && repositoriesQuery.isPending && !projectLinkQuery.isError)) {
     return (
       <div className="@container/source-control flex h-full min-h-0 flex-col">
         <PanelHeader title={ro ? "Controlul sursei" : "Source control"} />
@@ -460,6 +431,7 @@ export function GitHubSourceControlPanel({
             size="icon-xs"
             variant="ghost"
             onClick={() => void loadRepositories()}
+            disabled={repositoriesQuery.isFetching || projectLinkQuery.isFetching || branchesQuery.isFetching || Boolean(busy)}
             aria-label={ro ? "Reîncarcă" : "Refresh"}
           >
             <RefreshCw size={13} />
@@ -468,7 +440,12 @@ export function GitHubSourceControlPanel({
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!payload?.installations.length ? (
+        {projectLinkQuery.isError && !projectLinkQuery.data || repositoriesQuery.isError && !repositoriesQuery.data && !savedLink ? (
+          <div className="space-y-3 p-3 text-xs" role="alert">
+            <p>{ro ? "GitHub nu a putut fi încărcat." : "GitHub could not be loaded."}</p>
+            <Button variant="outline" size="sm" onClick={() => void loadRepositories()}>{ro ? "Încearcă din nou" : "Try again"}</Button>
+          </div>
+        ) : !savedLink && !payload.installations.length ? (
           <div className="space-y-4 p-3">
             <div className="border-b pb-4">
               <div className="flex items-center gap-2.5">

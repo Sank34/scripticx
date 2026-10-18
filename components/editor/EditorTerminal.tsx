@@ -19,7 +19,9 @@ import {
   type CodeExecutionResult,
 } from "@/lib/code-runner";
 import { requestCodeExecution } from "@/lib/code-runner-client";
-import type { ProjectFile } from "@/lib/editor-project";
+import { pollExecutionSession, sendExecutionInput, startExecutionSession, stopExecutionSession, type ExecutionSessionStatus } from "@/lib/code-session-client";
+import { pythonPackageCommand } from "@/lib/python-packages";
+import { createProjectFile, type ProjectFile } from "@/lib/editor-project";
 import { cn } from "@/lib/utils";
 
 type TerminalEntry = {
@@ -40,6 +42,7 @@ type EditorTerminalProps = {
   locale: "en" | "ro";
   onRunningChange?: (running: boolean) => void;
   projectName: string;
+  onUpdateFiles?: (files: ProjectFile[]) => void;
 };
 
 const HELP_EN = `Available commands:
@@ -51,6 +54,8 @@ const HELP_EN = `Available commands:
   ts-node [file] [args]    Run TypeScript
   java, go, rustc, dotnet, bash
   stdin [text]             Set program input
+  pip install <packages>   Save and install Python dependencies
+  pip install -r requirements.txt
   ls, pwd, clear, help`;
 
 const HELP_RO = `Comenzi disponibile:
@@ -62,11 +67,13 @@ const HELP_RO = `Comenzi disponibile:
   ts-node [fișier] [args]  Rulează TypeScript
   java, go, rustc, dotnet, bash
   stdin [text]             Configurează intrarea programului
+  pip install <pachete>    Salvează și instalează dependențe Python
+  pip install -r requirements.txt
   ls, pwd, clear, help`;
 
 export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalProps>(
   function EditorTerminal(
-    { activeFile, files, locale, onRunningChange, projectName },
+    { activeFile, files, locale, onRunningChange, projectName, onUpdateFiles },
     forwardedRef
   ) {
     const ro = locale === "ro";
@@ -75,18 +82,27 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
     const [stdin, setStdin] = useState("");
     const [stdinOpen, setStdinOpen] = useState(false);
     const [running, setRunning] = useState(false);
+    const [sessionPhase, setSessionPhase] = useState<ExecutionSessionStatus["phase"] | null>(null);
+    const [sendingInput, setSendingInput] = useState(false);
+    const sessionRef = useRef<{ token: string; sequence: number } | null>(null);
+    const inputBusy = useRef(false);
+    const executionBusy = useRef(false);
     const [history, setHistory] = useState<string[]>([]);
     const [historyIndex, setHistoryIndex] = useState(-1);
     const nextEntryId = useRef(1);
     const outputRef = useRef<HTMLDivElement | null>(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
     const abortRef = useRef<AbortController | null>(null);
 
     function append(kind: TerminalEntry["kind"], text: string) {
       if (!text) return;
-      setEntries((current) => [
-        ...current.slice(-399),
-        { id: nextEntryId.current++, kind, text },
-      ]);
+      setEntries((current) => {
+        const last = current.at(-1);
+        if (["stdout", "stderr"].includes(kind) && last?.kind === kind && !last.text.endsWith("\n")) {
+          return [...current.slice(0, -1), { ...last, text: last.text + text }];
+        }
+        return [...current.slice(-399), { id: nextEntryId.current++, kind, text }];
+      });
     }
 
     function clear() {
@@ -97,8 +113,78 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
       abortRef.current?.abort();
     }
 
+    async function interactivePython(file: ProjectFile, args: string[], shownCommand: string, mode: "run" | "install" = "run", projectFiles = files) {
+      if (executionBusy.current) return;
+      executionBusy.current = true;
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setRunning(true);
+      setSessionPhase("starting");
+      onRunningChange?.(true);
+      append("command", `$ ${shownCommand}`);
+      let token: string | null = null;
+      try {
+        const started = await startExecutionSession({ language: "python", files: buildCodeRunnerFiles(file, projectFiles), args, stdin }, mode);
+        token = started.token;
+        sessionRef.current = { token, sequence: 0 };
+        const deadline = Date.now() + started.expiresInMs;
+        let after = 0;
+        while (!controller.signal.aborted) {
+          if (Date.now() > deadline) throw new Error(ro ? "Sesiunea de execuție a expirat." : "Execution session expired.");
+          const status = await pollExecutionSession(token, after, controller.signal);
+          setSessionPhase(status.phase);
+          for (const event of status.events) {
+            if (event.seq <= after) continue;
+            append(event.stream, event.text);
+            after = event.seq;
+          }
+          if (status.phase === "exited" || status.phase === "error") {
+            append(status.code === 0 ? "system" : "error", status.message || `${ro ? "Proces încheiat" : "Process exited"}${status.code === null ? "" : ` (${status.code})`}`);
+            break;
+          }
+          await new Promise<void>(resolve => {
+            const finish = () => { clearTimeout(timer); controller.signal.removeEventListener("abort", finish); resolve(); };
+            const timer = setTimeout(finish, 1000);
+            controller.signal.addEventListener("abort", finish, { once: true });
+            if (controller.signal.aborted) finish();
+          });
+        }
+        if (controller.signal.aborted) append("system", ro ? "Proces oprit." : "Process stopped.");
+      } catch (error) {
+        append(controller.signal.aborted ? "system" : "error", controller.signal.aborted
+          ? ro ? "Proces oprit." : "Process stopped."
+          : error instanceof Error ? error.message : "Execution failed");
+      } finally {
+        if (token) void stopExecutionSession(token).catch(() => undefined);
+        sessionRef.current = null;
+        abortRef.current = null;
+        executionBusy.current = false;
+        setRunning(false);
+        setSessionPhase(null);
+        onRunningChange?.(false);
+      }
+    }
+
+    async function submitInput(eof = false) {
+      const session = sessionRef.current;
+      if (!session || sessionPhase !== "running" || inputBusy.current) return;
+      inputBusy.current = true;
+      setSendingInput(true);
+      const text = command;
+      try {
+        await sendExecutionInput(session.token, session.sequence + 1, eof ? "" : `${text}\n`, eof);
+        session.sequence += 1;
+        if (sessionRef.current === session) {
+          setCommand("");
+          append("command", eof ? "[EOF]" : `› ${text}`);
+        }
+      } catch (error) { append("error", error instanceof Error ? error.message : "Input failed"); }
+      finally { inputBusy.current = false; setSendingInput(false); }
+    }
+
     async function execute(file: ProjectFile, args: string[], shownCommand: string) {
       if (running) return;
+      if (file.language === "python") return interactivePython(file, args, shownCommand);
       if (!isCloudRunnableLanguage(file.language)) {
         append("error", ro ? "Fișierul nu are un runtime configurat." : "The file does not have a configured runtime.");
         return;
@@ -155,6 +241,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
     }
 
     async function submitCommand() {
+      if (running) { await submitInput(); return; }
       const source = command.trim();
       if (!source || running) return;
       setCommand("");
@@ -197,6 +284,26 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
         return;
       }
 
+      try {
+        const requirementsFile = files.find(file => file.path.toLowerCase() === "requirements.txt");
+        const install = pythonPackageCommand(source, requirementsFile?.content ?? "");
+        if (install) {
+          if (!requirementsFile && /(?:^|\s)-r(?:\s|$)/.test(source)) throw new Error("requirements.txt does not exist in this project.");
+          if (!onUpdateFiles) throw new Error(ro ? "Proiectul nu permite modificarea dependențelor." : "This project cannot update dependencies.");
+          const pythonFile = files.find(file => file.language === "python");
+          if (!pythonFile) throw new Error(ro ? "Adaugă un fișier Python în proiect." : "Add a Python file to the project first.");
+          const requirementFile = requirementsFile ? { ...requirementsFile, content: install.requirements } : createProjectFile("requirements.txt", install.requirements);
+          const nextFiles = requirementsFile ? files.map(file => file.id === requirementFile.id ? requirementFile : file) : [...files, requirementFile];
+          onUpdateFiles(nextFiles);
+          append("system", ro ? "Dependențele sunt păstrate în requirements.txt și pregătite la fiecare rulare Python." : "Dependencies are saved in requirements.txt and prepared for each Python run.");
+          await interactivePython(pythonFile, [], source, "install", nextFiles);
+          return;
+        }
+      } catch (error) {
+        append("error", error instanceof Error ? error.message : "Invalid package command");
+        return;
+      }
+
       const resolved = resolveTerminalExecution(source, activeFile, files);
       if (!resolved.execution) {
         append("command", `$ ${source}`);
@@ -214,6 +321,9 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
     }, [entries]);
 
     useEffect(() => () => abortRef.current?.abort(), []);
+    useEffect(() => {
+      if (sessionPhase === "running" && inputRef.current?.offsetParent) inputRef.current.focus();
+    }, [sessionPhase]);
 
     return (
       <div className="flex h-full min-h-0 flex-col bg-zinc-950 text-zinc-100">
@@ -306,27 +416,32 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
         <div className="flex h-9 shrink-0 items-center gap-1.5 border-t border-white/10 px-3 font-mono text-xs">
           <ChevronRight className="size-3.5 shrink-0 text-emerald-400" />
           <Input
+            ref={inputRef}
             value={command}
             onChange={(event) => setCommand(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (event.ctrlKey && event.key.toLowerCase() === "c" && running) {
+                event.preventDefault(); stop();
+              } else if (event.ctrlKey && event.key.toLowerCase() === "d" && sessionRef.current) {
+                event.preventDefault(); void submitInput(true);
+              } else if (event.key === "Enter") {
                 event.preventDefault();
                 void submitCommand();
-              } else if (event.key === "ArrowUp") {
+              } else if (event.key === "ArrowUp" && !running) {
                 event.preventDefault();
                 const next = Math.min(history.length - 1, historyIndex + 1);
                 setHistoryIndex(next);
                 setCommand(history[history.length - 1 - next] || "");
-              } else if (event.key === "ArrowDown") {
+              } else if (event.key === "ArrowDown" && !running) {
                 event.preventDefault();
                 const next = Math.max(-1, historyIndex - 1);
                 setHistoryIndex(next);
                 setCommand(next === -1 ? "" : history[history.length - 1 - next] || "");
               }
             }}
-            disabled={running}
-            aria-label={ro ? "Comandă terminal" : "Terminal command"}
-            placeholder={running ? (ro ? "Proces în execuție" : "Process running") : "run"}
+            disabled={sendingInput || running && sessionPhase !== "running"}
+            aria-label={running && sessionPhase === "running" ? ro ? "Input program" : "Program input" : ro ? "Comandă terminal" : "Terminal command"}
+            placeholder={running ? sessionPhase === "running" ? ro ? "Input → Enter · Ctrl+D: EOF" : "Input → Enter · Ctrl+D: EOF" : sessionPhase === "installing" ? ro ? "Se instalează pachetele…" : "Installing packages…" : ro ? "Se pregătește execuția…" : "Preparing execution…" : "run"}
             className="h-7 border-0 bg-transparent px-0 font-mono text-xs text-zinc-100 shadow-none focus-visible:ring-0 dark:bg-transparent"
             autoComplete="off"
             spellCheck={false}

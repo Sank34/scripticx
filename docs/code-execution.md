@@ -81,9 +81,36 @@ stdin 12\n4
 are parsed against an allowlist and converted into sandbox execution requests; they are
 never passed to a host shell.
 
-Piston also exposes an interactive WebSocket endpoint at `/api/v2/connect`. A future
-stateful terminal can use it through a dedicated WebSocket gateway. It should not be
-proxied through a serverless Next.js route handler.
+## Interactive Python and packages
+
+Python terminal runs use `/api/code/session`, which forwards authenticated, user-scoped
+requests to the updated ScripticX Runner's `/api/v2/session` endpoint. The runner keeps
+one disposable Vercel Sandbox alive for each session. Short polling requests stream
+output and separate requests deliver stdin to the same process; input does not restart
+the program. Other languages continue to use batch execution with preconfigured stdin.
+
+While Python runs, type input in the terminal and press Enter. Empty lines are supported.
+Ctrl+D closes stdin and Ctrl+C or the stop button terminates the session. Sessions expire
+after five minutes; user execution is limited to three minutes of wall time and ten CPU
+seconds. Navigating away attempts cleanup; sandbox expiration bounds abandoned sessions.
+
+The editor accepts `pip install requests`, `python -m pip install numpy`, and
+`pip install -r requirements.txt`. These commands update the project's root
+`requirements.txt` and verify installation in an isolated session. Save the project to
+persist the manifest. Each Python execution prepares its dependencies again in a fresh
+sandbox; installed environment files are not shared between projects or persisted.
+
+Up to 16 PyPI requirements, optional extras and version constraints are accepted. URLs,
+local package paths, custom indexes and arbitrary pip flags are rejected. Only binary
+wheels are installed; packages requiring a source build are unsupported. Downloads can
+reach only `pypi.org` and `files.pythonhosted.org`. User programs run without outbound
+network access, including programs using installed networking libraries.
+
+Deploy the updated runner before the platform. In `scripticx-runner`, rerun
+`npm run sandbox:bootstrap` if the existing toolchain lacks `python3 -m pip`, then deploy.
+The existing `CODE_RUNNER_URL` and matching `CODE_RUNNER_TOKEN` remain the configuration;
+no public runner token, WebSocket gateway or database migration is required. Sandbox
+sessions and package preparation use the runner project's Vercel Sandbox quota.
 
 ## Enforced limits
 

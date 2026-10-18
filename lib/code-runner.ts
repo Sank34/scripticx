@@ -94,7 +94,8 @@ export function buildCodeRunnerFiles(activeFile: ProjectFile, files: ProjectFile
   const uniqueNames = new Set<string>();
   const candidates = [
     activeFile,
-    ...files.filter((file) => file.id !== activeFile.id),
+    ...files.filter(file => activeFile.language === "python" && file.path.toLowerCase() === "requirements.txt" && file.id !== activeFile.id),
+    ...files.filter(file => file.id !== activeFile.id && !(activeFile.language === "python" && file.path.toLowerCase() === "requirements.txt")),
   ];
   const result: CodeRunnerFile[] = [];
 

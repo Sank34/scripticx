@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  getProjectLink,
   getBranchHead,
   githubFetch,
   publicProjectLink,
@@ -24,6 +25,19 @@ import { createAdminSupabase } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+export async function GET(request: Request) {
+  try {
+    const { user } = await requireUser(request);
+    const projectId = new URL(request.url).searchParams.get("projectId")?.trim() || "";
+    if (!projectId) throw new HttpError(400, "Project ID is required");
+    await requireOwnedProject(user.id, projectId);
+    const link = await getProjectLink(user.id, projectId);
+    return NextResponse.json({ link: link ? publicProjectLink(link) : null });
+  } catch (error) {
+    return githubRouteError(error, "Could not load project GitHub connection");
+  }
+}
 
 export async function POST(request: Request) {
   try {

@@ -5,6 +5,7 @@ import { useKeyboardShortcuts, useShortcut } from "@/hooks/useKeyboardShortcuts"
 import { formatShortcut } from "@/lib/keyboard-shortcuts";
 
 import {
+  Activity,
   Suspense,
   useCallback,
   useEffect,
@@ -12,6 +13,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { useEditorSessionDraft } from "@/hooks/useEditorSessionDraft";
+import { EDITOR_ACTIVITY_VIEWS, type EditorActivityView } from "@/lib/editor-session-draft";
+import { editorGitHubBranches, editorGitHubProjectLink } from "@/lib/editor-github-cache";
+import { persistEditorProject } from "@/lib/editor-project-persistence";
 import type { OnMount } from "@monaco-editor/react";
 import { useSearchParams } from "next/navigation";
 
@@ -176,13 +181,6 @@ type SnippetItem = {
   created_at: string;
 };
 
-type ProjectPersistenceError = {
-  code?: string;
-  message?: string;
-  details?: string;
-  hint?: string;
-};
-
 type Value = string | number | boolean;
 type ProgramInstruction = ReturnType<typeof parseLine>;
 type MonacoEditorInstance = Parameters<OnMount>[0];
@@ -294,15 +292,6 @@ function encodeGitHubPath(path: string) {
   return path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
 }
 
-type EditorActivityView =
-  | "explorer"
-  | "search"
-  | "run"
-  | "projects"
-  | "live"
-  | "source-control"
-  | "settings";
-
 function EditorContent() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
@@ -338,6 +327,8 @@ END
   const [dirty, setDirty] = useState(false);
   const [projectIsPublic, setProjectIsPublic] = useState(true);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [workspaceGeneration, setWorkspaceGeneration] = useState(0);
+  const [showGitHubForProject, setShowGitHubForProject] = useState<string | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>(() => initialFiles);
   const [directories, setDirectories] = useState<ProjectDirectory[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(
@@ -422,6 +413,48 @@ END
   const lastEditorActionRef = useRef<string | null>(null);
   const lastEditorImportRef = useRef<string | null>(null);
 
+  const sessionDraft = useMemo(() => ({
+    files, directories, activeFileId, openFileIds, title, description,
+    savedId, dirty, projectIsPublic, projectSearch, projectLibrarySearch, output, activityView, activePanel,
+  }), [files, directories, activeFileId, openFileIds, title, description, savedId, dirty, projectIsPublic, projectSearch, projectLibrarySearch, output, activityView, activePanel]);
+  const draftHydrated = useEditorSessionDraft({
+    userId: user?.id ?? null,
+    draft: sessionDraft,
+    skipRestore: searchParams.has("code") || searchParams.has("import") || searchParams.has("live"),
+    enabled: !searchParams.has("live"),
+    onRestore: (draft) => {
+      setFiles(draft.files);
+      setDirectories(draft.directories);
+      setActiveFileId(draft.activeFileId);
+      setOpenFileIds(draft.openFileIds);
+      setTitle(draft.title);
+      setDescription(draft.description);
+      setSavedId(draft.savedId);
+      setDirty(draft.dirty);
+      setProjectIsPublic(draft.projectIsPublic);
+      setProjectSearch(draft.projectSearch);
+      setProjectLibrarySearch(draft.projectLibrarySearch);
+      setOutput(draft.output);
+      if (!searchParams.has("view")) setActivityView(draft.activityView);
+      setActivePanel(draft.activePanel);
+    },
+  });
+  const githubProjectQuery = useQuery({
+    ...editorGitHubProjectLink(user?.id ?? null, savedId),
+    enabled: draftHydrated && Boolean(user && savedId),
+  });
+  useQuery(editorGitHubBranches(user?.id ?? null, savedId, Boolean(githubProjectQuery.data?.link)));
+
+  useEffect(() => {
+    if (!showGitHubForProject || showGitHubForProject !== savedId) return;
+    if (!githubProjectQuery.isSuccess && !githubProjectQuery.isError) return;
+    if (githubProjectQuery.data?.link) {
+      setActivityView("source-control");
+      setSidePanelOpen(true);
+    }
+    setShowGitHubForProject(null);
+  }, [githubProjectQuery.isSuccess, githubProjectQuery.isError, githubProjectQuery.data?.link, savedId, showGitHubForProject]);
+
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
     const synchronize = () => {
@@ -464,6 +497,8 @@ END
     }
 
     const importedFile = createProjectFile(transfer.fileName, transfer.code);
+    setWorkspaceGeneration(current => current + 1);
+    setShowGitHubForProject(null);
     setSavedId(null);
     setProjectIsPublic(true);
     setTitle(transfer.title ?? "");
@@ -508,6 +543,7 @@ END
     if (!githubStatus) return;
 
     if (githubStatus === "connected") {
+      void queryClient.invalidateQueries({ queryKey: ["editor-github", user?.id] });
       toast.success(
         locale === "ro"
           ? "GitHub este conectat. Alege repository-ul proiectului."
@@ -524,7 +560,7 @@ END
     const url = new URL(window.location.href);
     url.searchParams.delete("github");
     window.history.replaceState(null, "", url);
-  }, [locale, searchParams]);
+  }, [locale, searchParams, queryClient, user?.id]);
 
   useEffect(() => {
     const action = searchParams.get("action");
@@ -744,13 +780,14 @@ END
   async function fetchSnippets(): Promise<SnippetItem[]> {
     if (!user) return [];
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("snippets")
       .select("id, title, description, code, files, is_public, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20);
 
+    if (error) throw error;
     return data || [];
   }
 
@@ -758,6 +795,8 @@ END
     queryKey: ["editor-snippets", user?.id],
     queryFn: fetchSnippets,
     enabled: !!user,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
   const visibleProjects = useMemo(() => {
     const query = projectLibrarySearch.trim().toLowerCase();
@@ -968,7 +1007,8 @@ END
   async function saveSnippet(
     silent = false,
     snapshot?: { files: ProjectFile[]; directories: ProjectDirectory[] },
-    visibilityOverride?: boolean
+    visibilityOverride?: boolean,
+    projectIdOverride?: string
   ) {
     if (!user || saving) return;
 
@@ -987,35 +1027,9 @@ END
     };
 
     try {
-      let persistedId: string | null = null;
-      let persistenceError: ProjectPersistenceError | null = null;
-
-      if (savedId) {
-        const response = await supabase
-          .from("snippets")
-          .update(payload)
-          .eq("id", savedId)
-          .eq("user_id", user.id)
-          .select("id")
-          .maybeSingle();
-
-        persistedId = response.data?.id ?? null;
-        persistenceError = response.error;
-      }
-
-      // A project can remain mounted while the active account changes. When
-      // RLS hides that old row, create a project owned by the current account
-      // instead of treating the empty update result as a failed save.
-      if (!persistedId && !persistenceError) {
-        const response = await supabase
-          .from("snippets")
-          .insert([{ user_id: user.id, ...payload }])
-          .select("id")
-          .single();
-
-        persistedId = response.data?.id ?? null;
-        persistenceError = response.error;
-      }
+      const { id: persistedId, error: persistenceError } = await persistEditorProject({
+        userId: user.id, savedId, projectIdOverride, payload,
+      });
 
       if (!persistedId || persistenceError) {
         console.error("Failed to persist editor project", persistenceError);
@@ -1315,7 +1329,7 @@ END
     setGithubImportOpen(true);
   }
 
-  async function applyGitHubRemoteFiles(remoteFiles: GitHubRemoteFile[]) {
+  async function applyGitHubRemoteFiles(remoteFiles: GitHubRemoteFile[], projectId: string) {
     const nextFiles = remoteFiles.map((file) =>
       createProjectFile(file.path, file.content)
     );
@@ -1338,7 +1352,7 @@ END
     const persistedId = await saveSnippet(true, {
       files: nextFiles,
       directories: nextDirectories,
-    });
+    }, undefined, projectId);
     if (!persistedId) {
       throw new Error(
         locale === "ro"
@@ -1573,6 +1587,7 @@ END
       .single();
 
     if (!data) return;
+    setWorkspaceGeneration(current => current + 1);
 
     const nextProject = normalizeProjectEntries(data.files, data.code || "");
     const nextFiles = nextProject.files;
@@ -1585,11 +1600,14 @@ END
     setDescription(data.description || "");
     setProjectIsPublic(data.is_public !== false);
     setSavedId(data.id);
+    setShowGitHubForProject(data.id);
     setDirty(false);
     resetRuntimeState(true);
   }
 
   function createNewProject(templateKey: ProjectTemplateKey) {
+    setWorkspaceGeneration(current => current + 1);
+    setShowGitHubForProject(null);
     const template = createProjectTemplate(templateKey);
     const nextFiles = template.files;
 
@@ -1688,12 +1706,14 @@ END
 
   const terminalPanel = (
     <EditorTerminal
+      key={workspaceGeneration}
       ref={terminalRef}
       activeFile={activeFile}
       files={files}
       locale={locale}
       onRunningChange={setRemoteRunning}
       projectName={projectName}
+      onUpdateFiles={(nextFiles) => { setFiles(nextFiles); setDirty(true); }}
     />
   );
 
@@ -1939,11 +1959,12 @@ END
     window.history.replaceState(null, "", url);
   }
 
-  const sidePanelContent = (() => {
-    if (activityView === "explorer") {
+  const renderSidePanel = (view: EditorActivityView) => {
+    if (view === "explorer") {
       return (
         <div className="h-full min-h-0" data-tour="editor-panel-explorer">
           <ProjectExplorer
+            key={workspaceGeneration}
             activeFileId={activeFile?.id ?? null}
             directories={directories}
             files={files}
@@ -1965,7 +1986,7 @@ END
       );
     }
 
-    if (activityView === "search") {
+    if (view === "search") {
       return (
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex h-9 shrink-0 items-center border-b px-3 text-xs font-semibold">
@@ -2021,7 +2042,7 @@ END
       );
     }
 
-    if (activityView === "run") {
+    if (view === "run") {
       return (
         <div className="flex h-full min-h-0 flex-col">
           <div className="flex h-9 shrink-0 items-center border-b px-3 text-xs font-semibold">
@@ -2070,7 +2091,7 @@ END
       );
     }
 
-    if (activityView === "projects") {
+    if (view === "projects") {
       return (
         <div className="flex h-full min-h-0 flex-col" data-tour="editor-panel-projects">
           <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
@@ -2098,7 +2119,7 @@ END
       );
     }
 
-    if (activityView === "live") {
+    if (view === "live") {
       return (
         <LiveSessionsPanel
           workspace={liveWorkspaceDocument}
@@ -2118,7 +2139,7 @@ END
       );
     }
 
-    if (activityView === "settings") {
+    if (view === "settings") {
       return (
         <EditorSettingsPanel
           locale={locale}
@@ -2130,6 +2151,7 @@ END
 
     return (
       <GitHubSourceControlPanel
+        key={workspaceGeneration}
         dirty={dirty}
         files={files}
         locale={locale}
@@ -2141,7 +2163,16 @@ END
         onOpenPublicImport={() => openGitHubRepository()}
       />
     );
-  })();
+  };
+  const sidePanelContent = (
+    <>
+      {EDITOR_ACTIVITY_VIEWS.map(view => (
+        <Activity key={view} mode={activityView === view ? "visible" : "hidden"}>
+          {renderSidePanel(view)}
+        </Activity>
+      ))}
+    </>
+  );
 
   const editorTabs = (
     <div className="flex h-11 shrink-0 items-center overflow-x-auto border-b bg-muted/30 md:h-9 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -2225,12 +2256,21 @@ END
         </button>
       </div>
       <TabsContent value="console" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">{consolePanel}</TabsContent>
-      <TabsContent value="terminal" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">{terminalPanel}</TabsContent>
+      <TabsContent forceMount value="terminal" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">{terminalPanel}</TabsContent>
       <TabsContent value="debugger" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">{debuggerPanel}</TabsContent>
       <TabsContent value="analysis" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">{analysisPanel}</TabsContent>
       <TabsContent value="visual" className="mt-0 min-h-0 flex-1 data-[state=inactive]:hidden">{visualizationPanel}</TabsContent>
     </Tabs>
   );
+
+  if (!draftHydrated) {
+    return <div role="status" className="p-4 text-sm text-muted-foreground">{locale === "ro" ? "Se restaurează editorul…" : "Restoring editor…"}</div>;
+  }
+  const saveProjectLabel = saving
+    ? locale === "ro" ? "Se salvează" : "Saving"
+    : savedId
+      ? locale === "ro" ? "Actualizează" : "Update"
+      : locale === "ro" ? "Salvează" : "Save";
 
   return (
     <div data-tour="editor-workspace" className={`${focusMode ? "fixed inset-0 z-[100] h-svh w-screen" : "h-full"} flex min-h-0 flex-col overflow-hidden bg-background`}>
@@ -2368,24 +2408,30 @@ END
                   )}
                 </div>
               ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  data-tour="editor-live-share"
-                  onClick={requestLiveShare}
-                  className="h-8 gap-1.5 px-2.5"
-                >
-                  <RadioTower size={14} />
-                  <span className="hidden lg:inline">
-                    {locale === "ro" ? "Pornește Live Share" : "Start Live Share"}
-                  </span>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="outline"
+                      data-tour="editor-live-share"
+                      onClick={requestLiveShare}
+                      aria-label={locale === "ro" ? "Pornește Live Share" : "Start Live Share"}
+                    >
+                      <RadioTower size={14} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{locale === "ro" ? "Pornește Live Share" : "Start Live Share"}</TooltipContent>
+                </Tooltip>
               )}
               {isRunnable && (
-                <Button size="sm" onClick={handleRun} title={formatShortcut(shortcuts.run) || undefined} disabled={(isRunning && !stopped) || remoteRunning} className="h-8 gap-1.5 px-3" data-tour="editor-run">
-                  <Play size={14} />
-                  <span className="hidden sm:inline">{locale === "ro" ? "Rulează" : "Run"}</span>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon-sm" onClick={handleRun} aria-label={locale === "ro" ? "Rulează" : "Run"} disabled={(isRunning && !stopped) || remoteRunning} data-tour="editor-run">
+                      <Play size={14} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{locale === "ro" ? "Rulează" : "Run"}{formatShortcut(shortcuts.run) ? ` (${formatShortcut(shortcuts.run)})` : ""}</TooltipContent>
+                </Tooltip>
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2400,32 +2446,35 @@ END
                 </TooltipTrigger>
                 <TooltipContent>{locale === "ro" ? "Descarcă fișierul" : "Download file"}</TooltipContent>
               </Tooltip>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void saveSnippet(false)}
-                disabled={saving}
-                className="h-8 gap-1.5 px-2.5"
-              >
-                <Save size={14} />
-                <span className="hidden md:inline">
-                  {saving
-                    ? locale === "ro" ? "Se salvează" : "Saving"
-                    : savedId
-                      ? locale === "ro" ? "Actualizează" : "Update"
-                      : locale === "ro" ? "Salvează" : "Save"}
-                </span>
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => void handleShare()}
-                className="h-8 gap-1.5 px-2.5"
-              >
-                <Share2 size={14} />
-                <span className="hidden md:inline">{locale === "ro" ? "Distribuie" : "Share"}</span>
-              </Button>
-              <FocusModeButton active={focusMode} onChange={setFocusMode} locale={locale} />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    onClick={() => void saveSnippet(false)}
+                    disabled={saving}
+                    aria-label={saveProjectLabel}
+                    aria-busy={saving}
+                  >
+                    <Save size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{saveProjectLabel}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon-sm"
+                    variant="secondary"
+                    onClick={() => void handleShare()}
+                    aria-label={locale === "ro" ? "Distribuie" : "Share"}
+                  >
+                    <Share2 size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{locale === "ro" ? "Distribuie" : "Share"}</TooltipContent>
+              </Tooltip>
+              <FocusModeButton iconOnly active={focusMode} onChange={setFocusMode} locale={locale} />
             </div>
           </header>
 
@@ -3066,10 +3115,11 @@ END
 }
 
 export default function EditorPage() {
+  const { user } = useAuth();
   return (
     <RouteGuard requireAuth>
       <Suspense fallback={null}>
-        <EditorContent />
+        <EditorContent key={user?.id ?? "guest"} />
       </Suspense>
     </RouteGuard>
   );

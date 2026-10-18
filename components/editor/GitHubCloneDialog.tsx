@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { editorGitHubRepositories } from "@/lib/editor-github-cache";
 import {
   ArrowDownToLine,
   Check,
@@ -24,12 +27,6 @@ import { Input } from "@/components/ui/input";
 import { githubClientRequest } from "@/lib/github-client";
 import type { GitHubRepository } from "@/lib/github-integration";
 import { cn } from "@/lib/utils";
-
-type RepositoryPayload = {
-  configured: boolean;
-  installations: Array<{ accountLogin: string; id: number; suspended: boolean }>;
-  repositories: GitHubRepository[];
-};
 
 type GitHubCloneDialogProps = {
   dirty: boolean;
@@ -55,36 +52,17 @@ export function GitHubCloneDialog({
   open,
 }: GitHubCloneDialogProps) {
   const ro = locale === "ro";
-  const [payload, setPayload] = useState<RepositoryPayload | null>(null);
+  const { user } = useAuth();
+  const repositoriesQuery = useQuery({
+    ...editorGitHubRepositories(user?.id ?? null),
+    enabled: open && Boolean(user),
+  });
+  const payload = repositoriesQuery.data;
   const [selectedKey, setSelectedKey] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
+  const loading = repositoriesQuery.isPending;
   const [busy, setBusy] = useState<"clone" | "install" | "save" | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setLoading(true);
-    void githubClientRequest<RepositoryPayload>("/api/github/repositories")
-      .then((result) => {
-        if (!cancelled) setPayload(result);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setPayload(null);
-        toast.error(
-          ro ? "Repository-urile nu au putut fi încărcate." : "Repositories could not be loaded.",
-          { description: error instanceof Error ? error.message : undefined }
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, ro]);
 
   const repositories = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -196,6 +174,11 @@ export function GitHubCloneDialog({
             <div className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" />
               {ro ? "Se încarcă repository-urile..." : "Loading repositories..."}
+            </div>
+          ) : repositoriesQuery.isError && !payload ? (
+            <div className="space-y-3 p-4 text-sm" role="alert">
+              <p>{ro ? "Repository-urile nu au putut fi încărcate." : "Repositories could not be loaded."}</p>
+              <Button variant="outline" onClick={() => void repositoriesQuery.refetch()}>{ro ? "Încearcă din nou" : "Try again"}</Button>
             </div>
           ) : !payload?.installations.length ? (
             <div className="flex min-h-56 flex-col items-center justify-center border-y px-6 text-center">

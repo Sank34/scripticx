@@ -35,4 +35,14 @@ describe("code runner contracts", () => {
       { name: "helper.py", content: "VALUE = 1" },
     ]);
   });
+
+  it("includes Python requirements even when the project exceeds the execution file limit", () => {
+    const active = createProjectFile("main.py", "import requests");
+    const requirements = createProjectFile("requirements.txt", "requests\n");
+    const files = [active, ...Array.from({ length: 35 }, (_, index) => createProjectFile(`file-${index}.py`, "")), requirements];
+    const executionFiles = buildCodeRunnerFiles(active, files);
+    expect(executionFiles).toHaveLength(32);
+    expect(executionFiles[0].name).toBe("main.py");
+    expect(executionFiles[1]).toEqual({ name: "requirements.txt", content: "requests\n" });
+  });
 });

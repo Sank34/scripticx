@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -75,12 +75,16 @@ export function ProjectExplorer({
   const tree = useMemo(() => buildProjectTree(files, directories), [directories, files]);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
   const isRo = locale === "ro";
+  const activePath = files.find(file => file.id === activeFileId)?.path;
+  const lastExpandedFile = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    if (lastExpandedFile.current === activePath) return;
+    lastExpandedFile.current = activePath;
     setExpandedPaths((current) => {
       const next = new Set(current);
-      for (const file of files) {
-        const parts = file.path.split("/").slice(0, -1);
+      if (activePath) {
+        const parts = activePath.split("/").slice(0, -1);
         let path = "";
         for (const part of parts) {
           path = path ? `${path}/${part}` : part;
@@ -89,7 +93,7 @@ export function ProjectExplorer({
       }
       return next;
     });
-  }, [files]);
+  }, [activePath]);
 
   function toggleDirectory(path: string) {
     setExpandedPaths((current) => {
