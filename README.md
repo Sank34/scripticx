@@ -86,6 +86,8 @@ npm run build
 npm run start
 ```
 
+For Vercel Hobby deployments, configure the external email and notification schedules described in [Scheduled jobs](docs/scheduled-jobs.md). The repository does not register Vercel Cron Jobs.
+
 ## Project layout
 
 ```text
