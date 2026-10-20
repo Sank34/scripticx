@@ -24,6 +24,6 @@ export async function runnerSessionRequest(userId: string, options: { body?: unk
     });
   } catch { throw new HttpError(502, "Interactive runner is unavailable"); }
   const result = await response.json().catch(() => null);
-  if (!response.ok || !result) throw new HttpError(response.status >= 500 ? 502 : response.status, result?.message || (response.status === 404 ? "Deploy the updated ScripticX Runner to enable interactive Python." : "Interactive execution failed"));
+  if (!response.ok || !result) throw new HttpError(response.status >= 500 ? 502 : response.status, result?.message || (response.status === 404 ? "Deploy the updated ScripticX Runner to enable interactive execution." : "Interactive execution failed"));
   return result;
 }

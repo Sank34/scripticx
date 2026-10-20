@@ -4,6 +4,7 @@ import {
   type EditorLanguageKey,
   type ProjectFile,
 } from "@/lib/editor-project";
+import { isSafeExecutionFilePath } from "@/lib/execution-file-path";
 
 export const CODE_RUNNER_LANGUAGE_MAP = {
   python: "python",
@@ -100,7 +101,8 @@ export function buildCodeRunnerFiles(activeFile: ProjectFile, files: ProjectFile
   const result: CodeRunnerFile[] = [];
 
   for (const file of candidates) {
-    const name = getProjectBaseName(file.path);
+    const name = activeFile.language === "cpp" ? file.path : getProjectBaseName(file.path);
+    if (!isSafeExecutionFilePath(name)) throw new Error(`Invalid execution file path: ${name}`);
     const normalizedName = name.toLowerCase();
     if (!name || uniqueNames.has(normalizedName)) continue;
     uniqueNames.add(normalizedName);

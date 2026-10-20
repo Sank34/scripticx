@@ -45,4 +45,10 @@ describe("code runner contracts", () => {
     expect(executionFiles[0].name).toBe("main.py");
     expect(executionFiles[1]).toEqual({ name: "requirements.txt", content: "requests\n" });
   });
+
+  it("keeps C++ data and source paths, including identical basenames in separate folders", () => {
+    const source = createProjectFile("src/main.cpp", "#include <fstream>");
+    const files = [source, createProjectFile("data/input.txt", "10"), createProjectFile("samples/input.txt", "20"), createProjectFile("input.txt", "30")];
+    expect(buildCodeRunnerFiles(source, files)).toEqual(files.map(file => ({ name: file.path, content: file.content })));
+  });
 });

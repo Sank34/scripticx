@@ -5,6 +5,7 @@ import {
   type CodeRunnerFile,
 } from "@/lib/code-runner";
 import { executeCode } from "@/lib/server/codeRunner";
+import { hasExecutionFileConflict, isSafeExecutionFilePath } from "@/lib/execution-file-path";
 import {
   enforceRateLimit,
   HttpError,
@@ -34,11 +35,11 @@ function executionFiles(value: unknown) {
     const file = jsonObject(candidate);
     const name = stringField(file.name, { min: 1, max: 120 });
     const content = stringField(file.content, { max: MAX_FILE_BYTES, trim: false });
-    if (name.includes("/") || name.includes("\\") || name === "." || name === "..") {
-      throw new HttpError(400, "Invalid execution file name");
+    if (!isSafeExecutionFilePath(name)) {
+      throw new HttpError(400, "Invalid execution file path");
     }
     const normalizedName = name.toLowerCase();
-    if (names.has(normalizedName)) throw new HttpError(400, "Duplicate execution file name");
+    if (hasExecutionFileConflict(names, name)) throw new HttpError(400, "Conflicting execution file paths");
     names.add(normalizedName);
     const fileBytes = new TextEncoder().encode(content).byteLength;
     if (fileBytes > MAX_FILE_BYTES) throw new HttpError(413, "Execution file is too large");

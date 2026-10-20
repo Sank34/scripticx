@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { CODE_RUNNER_LANGUAGE_MAP } from "@/lib/code-runner";
 import { parseCodeExecutionInput } from "@/lib/server/codeExecutionInput";
 import { runnerSessionRequest } from "@/lib/server/codeSessions";
 import { enforceRateLimit, HttpError, jsonObject, readJsonBody, requireUser, stringField } from "@/lib/server/requestSecurity";
@@ -24,8 +25,9 @@ export async function POST(request: Request) {
     if (starting) {
       if (body.mode !== "run" && body.mode !== "install") throw new HttpError(400, "Invalid session mode");
       const execution = parseCodeExecutionInput(body.execution);
-      if (execution.language !== "python") throw new HttpError(400, "Interactive execution currently supports Python");
-      payload = { action: "start", mode: body.mode, execution };
+      if (execution.language !== "python" && execution.language !== "cpp") throw new HttpError(400, "Interactive execution supports Python and C++");
+      if (body.mode === "install" && execution.language !== "python") throw new HttpError(400, "Package installation is only available for Python");
+      payload = { action: "start", mode: body.mode, execution: { ...execution, language: CODE_RUNNER_LANGUAGE_MAP[execution.language] } };
     } else if (body.action === "input") {
       token = tokenFrom(request);
       if (!Number.isInteger(body.sequence) || Number(body.sequence) < 1 || Number(body.sequence) > 1000 || typeof body.eof !== "boolean") throw new HttpError(400, "Invalid terminal input");

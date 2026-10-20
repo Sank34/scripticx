@@ -2,7 +2,7 @@ import { getSupabaseSessionWithTimeout } from "@/lib/supabase-session";
 import type { CodeRunnerFile } from "@/lib/code-runner";
 
 export type ExecutionSessionStatus = {
-  phase: "starting" | "installing" | "ready" | "running" | "exited" | "error";
+  phase: "starting" | "installing" | "compiling" | "ready" | "running" | "exited" | "error";
   code: number | null;
   message?: string;
   events: Array<{ seq: number; stream: "stdout" | "stderr" | "system"; text: string }>;
@@ -23,7 +23,7 @@ async function sessionRequest<T>(options: { body?: unknown; token?: string; afte
   return result as T;
 }
 
-export const startExecutionSession = (execution: { files: CodeRunnerFile[]; args: string[]; stdin: string; language: "python" }, mode: "run" | "install") =>
+export const startExecutionSession = (execution: { files: CodeRunnerFile[]; args: string[]; stdin: string; language: "python" | "cpp" }, mode: "run" | "install") =>
   sessionRequest<{ token: string; expiresInMs: number }>({ body: { action: "start", mode, execution } });
 export const pollExecutionSession = (token: string, after: number, signal?: AbortSignal) => sessionRequest<ExecutionSessionStatus>({ token, after, signal });
 export const sendExecutionInput = (token: string, sequence: number, text: string, eof = false) => sessionRequest<{ ok: boolean }>({ token, body: { action: "input", sequence, text, eof } });

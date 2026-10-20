@@ -113,7 +113,8 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
       abortRef.current?.abort();
     }
 
-    async function interactivePython(file: ProjectFile, args: string[], shownCommand: string, mode: "run" | "install" = "run", projectFiles = files) {
+    async function interactiveExecution(file: ProjectFile, args: string[], shownCommand: string, mode: "run" | "install" = "run", projectFiles = files) {
+      if (file.language !== "python" && file.language !== "cpp") return;
       if (executionBusy.current) return;
       executionBusy.current = true;
       const controller = new AbortController();
@@ -124,7 +125,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
       append("command", `$ ${shownCommand}`);
       let token: string | null = null;
       try {
-        const started = await startExecutionSession({ language: "python", files: buildCodeRunnerFiles(file, projectFiles), args, stdin }, mode);
+        const started = await startExecutionSession({ language: file.language, files: buildCodeRunnerFiles(file, projectFiles), args, stdin }, mode);
         token = started.token;
         sessionRef.current = { token, sequence: 0 };
         const deadline = Date.now() + started.expiresInMs;
@@ -184,7 +185,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
 
     async function execute(file: ProjectFile, args: string[], shownCommand: string) {
       if (running) return;
-      if (file.language === "python") return interactivePython(file, args, shownCommand);
+      if (file.language === "python" || file.language === "cpp") return interactiveExecution(file, args, shownCommand);
       if (!isCloudRunnableLanguage(file.language)) {
         append("error", ro ? "Fișierul nu are un runtime configurat." : "The file does not have a configured runtime.");
         return;
@@ -296,7 +297,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
           const nextFiles = requirementsFile ? files.map(file => file.id === requirementFile.id ? requirementFile : file) : [...files, requirementFile];
           onUpdateFiles(nextFiles);
           if (install.addedPackages.length) append("system", `Added ${install.addedPackages.join(", ")} to the requirements.txt file`);
-          await interactivePython(pythonFile, [], source, "install", nextFiles);
+          await interactiveExecution(pythonFile, [], source, "install", nextFiles);
           return;
         }
       } catch (error) {
@@ -441,7 +442,7 @@ export const EditorTerminal = forwardRef<EditorTerminalHandle, EditorTerminalPro
             }}
             disabled={sendingInput || running && sessionPhase !== "running"}
             aria-label={running && sessionPhase === "running" ? ro ? "Input program" : "Program input" : ro ? "Comandă terminal" : "Terminal command"}
-            placeholder={running ? sessionPhase === "running" ? ro ? "Input → Enter · Ctrl+D: EOF" : "Input → Enter · Ctrl+D: EOF" : sessionPhase === "installing" ? "Preparing packages" : ro ? "Se pregătește execuția…" : "Preparing execution…" : "run"}
+            placeholder={running ? sessionPhase === "running" ? "Input → Enter · Ctrl+D: EOF" : sessionPhase === "installing" ? "Preparing packages" : sessionPhase === "compiling" ? ro ? "Se compilează…" : "Compiling…" : ro ? "Se pregătește execuția…" : "Preparing execution…" : "run"}
             className="h-7 border-0 bg-transparent px-0 font-mono text-xs text-zinc-100 shadow-none focus-visible:ring-0 dark:bg-transparent"
             autoComplete="off"
             spellCheck={false}
