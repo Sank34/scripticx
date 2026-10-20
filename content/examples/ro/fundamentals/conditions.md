@@ -18,6 +18,8 @@ IF temperatura > 25 THEN
 END
 ```
 
+Rezultat așteptat: `Cald`.
+
 ## IF și ELSE
 
 Este executată exact una dintre ramuri.
@@ -32,6 +34,8 @@ ELSE
 END
 ```
 
+Rezultat așteptat: `Promovat`.
+
 ## Par sau impar
 
 `MOD` returnează restul împărțirii.
@@ -39,12 +43,14 @@ END
 ```msp title="par-impar.msp"
 numar = 14
 
-IF numar MOD 2 = 0 THEN
+IF numar MOD 2 == 0 THEN
   PRINT "Par"
 ELSE
   PRINT "Impar"
 END
 ```
+
+Rezultat așteptat: `Par`.
 
 ## Maximul a două valori
 
@@ -59,6 +65,13 @@ ELSE
 END
 ```
 
+Rezultat așteptat: `8`.
+
 :::note
 Testează fiecare condiție cu valori de ambele părți ale limitei și cu o valoare exact pe limită.
 :::
+
+
+## Testează limitele
+
+Pentru promovare testează `49`, `50`, `51`: limita `50` este inclusă. La paritate testează `0`, `1`, `-3`; zero este par. Pentru maxim testează și două valori egale sau ambele negative. Comparația folosește `==`, iar atribuirea `=`. Explicația completă este în [condiții](/docs/conditions).

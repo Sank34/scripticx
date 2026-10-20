@@ -265,6 +265,7 @@ function ProblemContent() {
       const payload = (await response.json()) as {
         bonusAwarded?: boolean;
         bonusPoints?: number;
+        dailyCompleted?: boolean;
         error?: string;
         results?: ProblemTestResult[];
         score?: number;
@@ -279,7 +280,7 @@ function ProblemContent() {
         payload.results.map((result) => ({ status: result.passed ? "passed" : "failed" }))
       );
 
-      if (payload.bonusAwarded) {
+      if (payload.dailyCompleted || payload.bonusAwarded) {
         queryClient.setQueryData<ProblemPageData>(problemQueryKey, (current) =>
           current ? { ...current, dailyCompleted: true } : current
         );
@@ -289,6 +290,9 @@ function ProblemContent() {
       void queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
       void queryClient.invalidateQueries({ queryKey: ["profile"] });
       void queryClient.invalidateQueries({ queryKey: ["rewards-shop"] });
+      void queryClient.invalidateQueries({ queryKey: ["auth", "current"] });
+      void queryClient.invalidateQueries({ queryKey: ["daily-challenge"] });
+      void queryClient.invalidateQueries({ queryKey: ["daily-challenge-completions"] });
       void queryClient.invalidateQueries({ queryKey: submissionsQueryKey });
       window.dispatchEvent(new Event("profile-updated"));
       window.dispatchEvent(new Event("rewards-updated"));
@@ -649,7 +653,7 @@ function ProblemContent() {
         {activePanel === "final-solution" && (
           <div className="space-y-5 p-4 md:p-5">
             {guidance.solutionUnlocked && guidance.solutionCode ? (
-              <div className="overflow-hidden border bg-zinc-950">
+              <div className="overflow-hidden rounded-[var(--sx-radius-card)] border bg-zinc-950">
                 <HighlightedCodeBlock
                   code={guidance.solutionCode}
                   fileName="solution.msp"

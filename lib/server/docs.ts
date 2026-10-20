@@ -9,6 +9,7 @@ import {
 import path from "node:path";
 
 import {
+  flattenDocsNavigation,
   normalizeDocsSlug,
   parseDocsMarkdown,
   type DocsLocale,
@@ -166,6 +167,24 @@ export function getDocsNavigation(locale: DocsLocale) {
   return existsSync(localeRoot)
     ? readNavigationDirectory(locale, localeRoot, localeRoot, "docs")
     : [];
+}
+
+function getSidebarPages(getNavigation: (locale: DocsLocale) => DocsNavigationNode[]) {
+  const en = flattenDocsNavigation(getNavigation("en"));
+  const ro = flattenDocsNavigation(getNavigation("ro"));
+  const withFallback = (preferred: typeof en, fallback: typeof en) => {
+    const translated = new Set(preferred.map((page) => page.href));
+    return [...preferred, ...fallback.filter((page) => !translated.has(page.href))];
+  };
+  return { en: withFallback(en, ro), ro: withFallback(ro, en) };
+}
+
+export function getDocsSidebarPages() {
+  return getSidebarPages(getDocsNavigation);
+}
+
+export function getExamplesSidebarPages() {
+  return getSidebarPages(getExamplesNavigation);
 }
 
 export function getDocsPage(locale: DocsLocale, slug: string) {

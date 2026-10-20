@@ -18,6 +18,8 @@ IF temperature > 25 THEN
 END
 ```
 
+Expected result: `Warm`.
+
 ## IF and ELSE
 
 Exactly one branch runs.
@@ -32,6 +34,8 @@ ELSE
 END
 ```
 
+Expected result: `Passed`.
+
 ## Even or odd
 
 `MOD` returns the remainder after division.
@@ -39,12 +43,14 @@ END
 ```msp title="even-odd.msp"
 number = 14
 
-IF number MOD 2 = 0 THEN
+IF number MOD 2 == 0 THEN
   PRINT "Even"
 ELSE
   PRINT "Odd"
 END
 ```
+
+Expected result: `Even`.
 
 ## Maximum of two values
 
@@ -59,6 +65,13 @@ ELSE
 END
 ```
 
+Expected result: `8`.
+
 :::note
 Test each condition with values on both sides of the boundary and with a value exactly on the boundary.
 :::
+
+
+## Test boundaries
+
+Try scores `49`, `50`, `51`: the passing boundary `50` is included. For parity, test `0`, `1`, `-3`; zero is even. For maximum, try equal inputs and two negative inputs. Equality uses `==`; assignment uses `=`. Read [conditions](/docs/conditions) for the full explanation.

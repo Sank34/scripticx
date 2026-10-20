@@ -25,6 +25,7 @@ import {
 } from "@/lib/note-code-languages";
 import { resolveCodeBlockLanguage } from "@/lib/code-block-language";
 import { cn } from "@/lib/utils";
+import { remarkDocsHeadingIds } from "@/lib/docs-heading-ids";
 
 type MarkdownAstNode = {
   children?: MarkdownAstNode[];
@@ -106,23 +107,15 @@ export function DocsMarkdown({
   sourceTitle?: string;
 }) {
   const { locale } = useLanguage();
-  const headingIds = new Map<string, number>();
-
-  function headingId(children: ReactNode) {
-    const base = slugifyDocsHeading(reactText(children));
-    const occurrence = headingIds.get(base) ?? 0;
-    headingIds.set(base, occurrence + 1);
-    return occurrence === 0 ? base : `${base}-${occurrence + 1}`;
-  }
-
   function Heading({
     children,
     depth,
+    id = slugifyDocsHeading(reactText(children)),
   }: {
     children: ReactNode;
     depth: 1 | 2 | 3 | 4 | 5 | 6;
+    id?: string;
   }) {
-    const id = headingId(children);
     const Tag = `h${depth}` as keyof React.JSX.IntrinsicElements;
     return (
       <Tag
@@ -152,15 +145,15 @@ export function DocsMarkdown({
   return (
     <div className="docs-markdown min-w-0 text-[15px] leading-7 text-foreground/82">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkDocsCodeMetadata]}
+        remarkPlugins={[remarkGfm, remarkDocsCodeMetadata, remarkDocsHeadingIds]}
         urlTransform={defaultUrlTransform}
         components={{
-          h1: ({ children }) => <Heading depth={1}>{children}</Heading>,
-          h2: ({ children }) => <Heading depth={2}>{children}</Heading>,
-          h3: ({ children }) => <Heading depth={3}>{children}</Heading>,
-          h4: ({ children }) => <Heading depth={4}>{children}</Heading>,
-          h5: ({ children }) => <Heading depth={5}>{children}</Heading>,
-          h6: ({ children }) => <Heading depth={6}>{children}</Heading>,
+          h1: ({ children, id }) => <Heading depth={1} id={id}>{children}</Heading>,
+          h2: ({ children, id }) => <Heading depth={2} id={id}>{children}</Heading>,
+          h3: ({ children, id }) => <Heading depth={3} id={id}>{children}</Heading>,
+          h4: ({ children, id }) => <Heading depth={4} id={id}>{children}</Heading>,
+          h5: ({ children, id }) => <Heading depth={5} id={id}>{children}</Heading>,
+          h6: ({ children, id }) => <Heading depth={6} id={id}>{children}</Heading>,
           p: ({ children }) => {
             const kind = reactText(children)
               .trimStart()
@@ -304,7 +297,7 @@ export function DocsMarkdown({
                   languageLabel={
                     languageDefinition?.label || getNoteCodeLanguageLabel(rawLanguage)
                   }
-                  showLineNumbers={options.showLineNumbers && code.includes("\n")}
+                  showLineNumbers={options.showLineNumbers}
                 />
                 {openInEditor && code.trim() && (
                   <div className="mt-2 flex justify-end">

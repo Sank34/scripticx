@@ -3,7 +3,7 @@ export const PERMISSIONS = [
   { key: "admin.live", en: "Manage live rooms", ro: "Administrare camere live", path: null },
   { key: "admin.groups", en: "Group administration (platform tools)", ro: "Administrare grupuri (instrumente platformă)", path: null },
   { key: "admin.analytics", en: "Analytics", ro: "Statistici", path: null },
-  { key: "admin.tasks", en: "Admin to-do list", ro: "Lista de sarcini admin", path: null },
+  { key: "admin.tasks", en: "View and manage tasks (navigation bar)", ro: "Vizualizare și administrare taskuri (bara de navigare)", path: null },
   { key: "admin.users", en: "Manage users", ro: "Administrare utilizatori", path: "/admin/users" },
   { key: "admin.problems", en: "Problems and chapters", ro: "Probleme și capitole", path: "/admin/problems" },
   { key: "admin.competitions", en: "Competitions", ro: "Competiții", path: "/admin/competitions" },

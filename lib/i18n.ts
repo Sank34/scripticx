@@ -1559,6 +1559,8 @@ export const translations = {
           },
           tasks: {
             add: "Add task",
+            loadError: "Tasks could not be loaded.",
+            retry: "Try again",
             createTitle: "New task",
             editTitle: "Edit task",
             actions: {
@@ -3856,6 +3858,8 @@ export const translations = {
           },
           tasks: {
             add: "Adaugă sarcină",
+            loadError: "Sarcinile nu au putut fi încărcate.",
+            retry: "Încearcă din nou",
             createTitle: "Sarcină nouă",
             editTitle: "Editează sarcina",
             actions: {

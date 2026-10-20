@@ -54,7 +54,7 @@ describe.each(["en", "ro"] as const)("public string documentation (%s)", locale 
   it("runs every string guide program and checks its output", () => {
     const page = getDocsPage(locale, "strings")!;
     const blocks = codeBlocks(page.content);
-    expect(blocks).toHaveLength(6);
+    expect(blocks).toHaveLength(12);
     expect(run(blocks[0], [parseMiniScriptInput("i love bananas")])).toEqual([14]);
     expect(run(blocks[0], [parseMiniScriptInput('"00123"')])).toEqual([5]);
     expect(run(blocks[0], [parseMiniScriptInput("")])).toEqual([0]);
@@ -64,6 +64,17 @@ describe.each(["en", "ro"] as const)("public string documentation (%s)", locale 
     expect(run(blocks[3])).toEqual([3]);
     expect(run(blocks[4])).toEqual(["bonana"]);
     expect(run(blocks[5])).toEqual([3, "😀", 259, "ă", "ȘȚABC", "șțabc"]);
+    expect(run(blocks[6])).toEqual([65, 48, "a", " X "]);
+    expect(run(blocks[7])).toEqual([6]);
+    expect(run(blocks[8])).toEqual(["dcba"]);
+    expect(run(blocks[8].replace('"abcd"', '""'))).toEqual([""]);
+    expect(run(blocks[8].replace('"abcd"', '"aă😀"'))).toEqual(["😀ăa"]);
+    expect(run(blocks[9])).toEqual([true]);
+    expect(run(blocks[9].replace('"radar"', '""'))).toEqual([true]);
+    expect(run(blocks[9].replace('"radar"', '"ab"'))).toEqual([false]);
+    expect(run(blocks[10])).toEqual([3]);
+    expect(run(blocks[10].replace('"  Ana  are mere "', '"   "'))).toEqual([0]);
+    expect(run(blocks[11])).toEqual(["abXcd", "abd"]);
     for (const name of Object.keys(STRING_FUNCTIONS)) expect(page.content).toContain(`\`${name}(`);
   });
 

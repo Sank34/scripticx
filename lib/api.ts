@@ -11,6 +11,7 @@ import type { EquippedRewards } from "@/lib/rewards";
 import type { PublicProfileVisibility } from "@/lib/profile-visibility";
 import { getDailyChallengeNotificationContent } from "@/lib/daily-challenge-notification";
 import { GITHUB_AUTH_SCOPES } from "@/lib/github-auth";
+import { getDailyChallengeDate } from "@/lib/daily-challenge-date";
 
 export type ProfileSummary = {
   id: string;
@@ -1695,11 +1696,7 @@ class DailyChallengesApi {
   constructor(private readonly client: SupabaseClient) {}
 
   getTodayKey(date = new Date()) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
+    return getDailyChallengeDate(date);
   }
 
   async getForDate(dateKey = this.getTodayKey()): Promise<DailyChallenge | null> {
@@ -1772,30 +1769,6 @@ class DailyChallengesApi {
     if (error) throw error;
 
     return data || null;
-  }
-
-  async complete(input: {
-    challengeId: string;
-    userId: string;
-    problemId: string;
-    bonusPoints: number;
-  }) {
-    const { data, error } = await this.client
-      .from("daily_challenge_completions")
-      .insert({
-        challenge_id: input.challengeId,
-        user_id: input.userId,
-        problem_id: input.problemId,
-        bonus_points: input.bonusPoints,
-      })
-      .select("id")
-      .single<{ id: string }>();
-
-    if (error?.code === "23505") return null;
-
-    if (error) throw error;
-
-    return data.id;
   }
 
   async schedule(input: {

@@ -92,3 +92,30 @@ PRINT total
 ```
 
 The program reads exactly three values and prints their total.
+
+## Entering console input
+
+Each `INPUT` waits for one complete value. Use two instructions for two numbers and submit them separately. Entering `2 3` at one prompt produces a string, not two numbers. In examples with three reads, enter and submit one number three times.
+
+| Editor console input | Value read | Type |
+| --- | --- | --- |
+| `12` | 12 | Number |
+| `3.5` | 3.5 | Number |
+| `true` | true | Boolean |
+| `Ana has apples` | Ana has apples | String |
+| `"00123"` | 00123 | String |
+| `""` | Empty string | String |
+
+Use a decimal point. Text preserves spaces, including leading and trailing ones. Input is part of execution: once the value is submitted, the program resumes at the following instruction.
+
+## Output for people and graders
+
+Each `PRINT` produces a separate output. Prompts such as “First number:” help in an interactive example. A submitted problem solution must follow the required output format exactly; extra prompts can make an answer incorrect. Labels are not required by the language.
+
+Use `STR` or concatenation when combining text and numbers. For a numeric sum inside a message, write `"Total: " + STR(a + b)` so addition happens before conversion to text.
+
+## Practice
+
+1. Read two rectangle sides and print only the area. Inputs `6` and `4` should produce `24`.
+2. Read identifier `"0007"` and verify its length: `4`.
+3. Read a name with spaces and print it between two `|` characters to observe leading and trailing spaces.

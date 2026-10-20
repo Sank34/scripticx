@@ -41,6 +41,7 @@ import {
 
 import { useEffect, useState, useRef } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useDocsSidebarPages, useExamplesSidebarPages } from "@/components/docs/DocsNavigationProvider";
 import { useGroupActivity } from "@/hooks/useGroupActivity";
 import { useUnreadUpdates } from "@/hooks/useUnreadUpdates";
 import { useAuth } from "@/hooks/useAuth";
@@ -163,8 +164,8 @@ function SubItem({ href, label }: SubItemProps) {
           : "text-muted-foreground"
       }`}
     >
-      <Link href={href}>
-        {label}
+      <Link href={href} aria-current={active ? "page" : undefined} title={label}>
+        <span className="truncate">{label}</span>
       </Link>
     </Button>
   );
@@ -227,6 +228,8 @@ function RecentNoteItem({
 }
 
 export function AppSidebar() {
+  const docsPages = useDocsSidebarPages();
+  const examplePages = useExamplesSidebarPages();
   const pathname = usePathname();
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
@@ -518,15 +521,17 @@ export function AppSidebar() {
 
               {!collapsed && (
                 <div
-                  className={`overflow-hidden transition-all duration-300 ${
-                    openDocs ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+                  inert={!openDocs}
+                  className={`grid transition-[grid-template-rows,opacity] duration-300 motion-reduce:transition-none ${
+                    openDocs ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                   }`}
                 >
-                  <div className="ml-3 pl-3 space-y-1">
-                    <SubItem href="/docs/basics" label={t("learn.basics")} />
-                    <SubItem href="/docs/variables" label={t("learn.variables")} />
-                    <SubItem href="/docs/loops" label={t("learn.loops")} />
-                    <SubItem href="/docs/input-output" label={t("learn.inputOutput")} />
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="ml-3 space-y-1 pl-3">
+                      {docsPages.map((page) => (
+                        <SubItem key={page.href} href={page.href} label={page.title} />
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -543,15 +548,17 @@ export function AppSidebar() {
 
               {!collapsed && (
                 <div
-                  className={`overflow-hidden transition-all duration-300 ${
-                    openExamples ? "max-h-60 opacity-100" : "max-h-0 opacity-0"
+                  inert={!openExamples}
+                  className={`grid transition-[grid-template-rows,opacity] duration-300 motion-reduce:transition-none ${
+                    openExamples ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                   }`}
                 >
-                  <div className="ml-3 pl-3 space-y-1">
-                    <SubItem href="/examples/basics" label={t("examples.basics.title")} />
-                    <SubItem href="/examples/loops" label={t("examples.loops.title")} />
-                    <SubItem href="/examples/conditions" label={t("examples.conditions.title")} />
-                    <SubItem href="/examples/algorithms" label={t("examples.algorithms.title")} />
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="ml-3 space-y-1 pl-3">
+                      {examplePages.map((page) => (
+                        <SubItem key={page.href} href={page.href} label={page.title} />
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

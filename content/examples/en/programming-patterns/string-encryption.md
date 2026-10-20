@@ -2,7 +2,7 @@
 title: Encode text with a key
 description: Read text and a key, then turn each character into a number.
 slug: /string-encryption
-sidebar_position: 3
+sidebar_position: 7
 keywords: [MiniScript+, strings, encoding, key, ORD, CHR]
 ---
 

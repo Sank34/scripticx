@@ -38,6 +38,17 @@ keywords: [MiniScript+ conditions, IF, ELSE]
 - `draft: true` keeps a document out of navigation and static routes.
 - If one locale is missing, the available version is used as a safe fallback.
 
+The main platform sidebar and mobile drawer read their Docs and Examples links
+from the corresponding Markdown collections. No changes to `AppSidebar.tsx`, `MobileDrawer.tsx`, or translation keys
+are needed when adding a page. They use frontmatter titles and category/page
+ordering, and omit drafts. Missing translations appear after the translated pages
+using the available title. All pages expand within the sidebar's main scroll area;
+the Docs and Examples lists have no separate height limit or nested scrollbar.
+
+Content is stored in the repository: add the Markdown files and deploy the new
+commit to publish them. A deployment automatically includes the updated navigation;
+there is no separate sidebar publishing step.
+
 ## Supported Markdown
 
 The renderer supports CommonMark and GitHub Flavored Markdown: all six heading levels, emphasis, strong text, strikethrough, links, images, ordered and unordered lists, task lists, blockquotes, tables, thematic breaks, inline code, and fenced code blocks.

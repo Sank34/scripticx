@@ -27,6 +27,9 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    "/*": ["./content/docs/**/*", "./content/examples/**/*"],
+  },
   async redirects() {
     return [
       {

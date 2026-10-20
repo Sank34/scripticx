@@ -2,7 +2,7 @@
 title: Codificarea textului cu o cheie
 description: Citește un text și o cheie, apoi transformă fiecare caracter într-un număr.
 slug: /string-encryption
-sidebar_position: 3
+sidebar_position: 7
 keywords: [MiniScript+, șiruri, codificare, cheie, ORD, CHR]
 ---
 

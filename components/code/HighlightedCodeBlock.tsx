@@ -284,7 +284,7 @@ export function HighlightedCodeBlock({
                     {lineIndex + 1}
                   </span>
                 )}
-                <span className="whitespace-pre pr-6">{renderLine(line, lineIndex)}</span>
+                <span className={showLineNumbers ? "whitespace-pre pr-6" : "whitespace-pre px-4"}>{renderLine(line, lineIndex)}</span>
               </span>
             ))}
           </code>

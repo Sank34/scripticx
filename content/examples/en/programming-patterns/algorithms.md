@@ -13,10 +13,10 @@ These examples combine variables, conditions, and loops into complete algorithms
 ```msp title="prime.msp"
 n = 7
 divisor = 2
-isPrime = TRUE
+isPrime = n >= 2
 
-WHILE divisor < n
-  IF n MOD divisor = 0 THEN
+WHILE divisor * divisor <= n AND isPrime
+  IF n MOD divisor == 0 THEN
     isPrime = FALSE
   END
   divisor = divisor + 1
@@ -29,6 +29,8 @@ ELSE
 END
 ```
 
+Expected result: `Prime`.
+
 ## Fibonacci sequence
 
 ```msp title="fibonacci.msp"
@@ -36,7 +38,7 @@ count = 5
 first = 0
 second = 1
 
-FOR index = 1 TO count
+FOR index FROM 1 TO count
   PRINT first
   next = first + second
   first = second
@@ -44,24 +46,26 @@ FOR index = 1 TO count
 END
 ```
 
+Expected result: `0, 1, 1, 2, 3`.
+
 ## Greatest common divisor
 
-Euclid's subtraction method repeatedly reduces the larger number.
+Euclid's remainder method preserves the GCD and also handles a zero second argument. Inputs are non-negative integers, not both zero.
 
 ```msp title="gcd.msp"
 first = 12
 second = 8
 
-WHILE first != second
-  IF first > second THEN
-    first = first - second
-  ELSE
-    second = second - first
-  END
+WHILE second != 0
+  remainder = first MOD second
+  first = second
+  second = remainder
 END
 
 PRINT first
 ```
+
+Expected result: `4`.
 
 ## Maximum of three values
 
@@ -81,3 +85,12 @@ END
 
 PRINT maximum
 ```
+
+Expected result: `7`.
+
+
+## Why it works and what to test
+
+Primality excludes `0` and `1`, then tries divisors through the square root, inclusively. Test `1`, `2`, `4`, `49`, `97`. Fibonacci retains just two terms; the temporary value saves their sum before either is overwritten. GCD visits `(12, 8)`, `(8, 4)`, `(4, 0)`; `(12, 0)` immediately prints `12`. Maximum starts with an input value so negative inputs work too.
+
+Read [divisibility](/docs/divisibility) and [numeric sequences](/docs/sequences). Use small inputs within the executor’s step and precision limits.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { queueNotificationEmail } from "@/lib/mail/service";
 import { getDailyChallengeNotificationContent } from "@/lib/daily-challenge-notification";
+import { getDailyChallengeDate } from "@/lib/daily-challenge-date";
 import { deliverQueuedPushNotifications } from "@/lib/push-notifications";
 import { createAdminSupabase } from "@/lib/supabaseServer";
 import {
@@ -228,7 +229,7 @@ export async function POST(request: Request) {
       case "daily_challenge": {
         if (recipientId !== user.id) throw new HttpError(403, "Notification event is not valid");
         const challengeId = metadataId(metadata, "challengeId");
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getDailyChallengeDate();
         const { data: challenge } = await admin
           .from("daily_challenges")
           .select("problem_id, challenge_date, problems(title_i18n)")

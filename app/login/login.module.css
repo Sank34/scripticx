@@ -1,0 +1,27 @@
+.tab[data-state="active"] {
+  background-color: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+}
+
+.panels {
+  margin: -4px;
+  overflow: hidden;
+  padding: 4px;
+  transition: height var(--sx-motion-standard) var(--sx-ease-standard);
+}
+
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.panel[data-state="active"] {
+  animation: panel-enter var(--sx-motion-standard) var(--sx-ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panels { transition: none; }
+  .panel[data-state="active"] { animation: none; }
+}
+

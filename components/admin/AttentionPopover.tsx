@@ -246,8 +246,9 @@ function AttentionEntryRow({
 }
 
 export function AttentionPopover() {
-  const { can } = useAuth();
-  const isAdmin = can("admin.tasks");
+  const { user, can } = useAuth();
+  const canManageTasks = Boolean(user) && can("admin.tasks");
+  const canReadAnalytics = canManageTasks && can("admin.analytics");
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -260,29 +261,29 @@ export function AttentionPopover() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const countsQuery = useQuery({
-    queryKey: ["admin", "counts"],
+    queryKey: ["admin", "counts", user?.id],
     queryFn: fetchAdminCounts,
-    enabled: isAdmin && can("admin.analytics"),
+    enabled: canReadAnalytics,
     staleTime: STALE_TIME,
   });
 
   const overviewQuery = useQuery({
-    queryKey: ["admin", "overview"],
+    queryKey: ["admin", "overview", user?.id],
     queryFn: fetchAdminOverview,
-    enabled: isAdmin && can("admin.analytics"),
+    enabled: canReadAnalytics,
     staleTime: STALE_TIME,
   });
 
   const boardQuery = useQuery({
-    queryKey: ["admin", "tasks"],
+    queryKey: ["admin", "tasks", user?.id],
     queryFn: fetchAdminTaskBoard,
-    enabled: isAdmin,
+    enabled: canManageTasks,
     staleTime: STALE_TIME,
   });
 
   const derived = useMemo(
-    () => buildAttentionItems(countsQuery.data, overviewQuery.data, new Date()),
-    [countsQuery.data, overviewQuery.data]
+    () => canReadAnalytics ? buildAttentionItems(countsQuery.data, overviewQuery.data, new Date()) : [],
+    [canReadAnalytics, countsQuery.data, overviewQuery.data]
   );
 
   const board = useMemo(
@@ -291,7 +292,7 @@ export function AttentionPopover() {
   );
 
   const isLoading =
-    countsQuery.isPending || overviewQuery.isPending || boardQuery.isPending;
+    boardQuery.isPending || (canReadAnalytics && (countsQuery.isPending || overviewQuery.isPending));
   const openCount = board.open.length;
 
   function refreshTasks() {
@@ -374,7 +375,7 @@ export function AttentionPopover() {
     onToggleDone: handleToggleDone,
   };
 
-  if (!isAdmin) return null;
+  if (!canManageTasks) return null;
 
   return (
     <>
@@ -427,7 +428,14 @@ export function AttentionPopover() {
           </div>
 
           <ScrollArea className="h-[min(28rem,calc(100vh-12rem))]">
-            {isLoading ? (
+            {boardQuery.isError ? (
+              <div role="alert" className="space-y-3 p-4 text-sm">
+                <p>{t("admin.overview.attention.tasks.loadError")}</p>
+                <Button variant="outline" size="sm" disabled={boardQuery.isFetching} onClick={() => void boardQuery.refetch()}>
+                  {t("admin.overview.attention.tasks.retry")}
+                </Button>
+              </div>
+            ) : isLoading ? (
               <div className="space-y-3 p-4">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <div key={index} className="flex gap-3">

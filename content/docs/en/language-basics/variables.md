@@ -81,3 +81,39 @@ PRINT points    # prints 25
 Next, use variables to control [loops](/docs/loops).
 
 For length, characters, and parts of text, see [Strings](/docs/strings).
+
+## What does a variable hold?
+
+Values have types: number, string, or Boolean. `12` is a number, `"12"` is text, and `TRUE` is a Boolean. Quotes change meaning: `"12" + 3` produces the string `"123"`, whereas `12 + 3` produces the number `15`.
+
+There is no separate type declaration. A later assignment can replace a value with another type, but changing a variable's role makes a program harder to follow. Keep one clear purpose for each name.
+
+## Assignment is not an equation
+
+In `score = score + 5`, the old score is read first, `5` is added, then the result is stored. Reading a variable before it exists raises an error. After `copy = score`, updating `score` does not automatically update `copy`: assignment copies the current scalar value rather than connecting the variables.
+
+Names are case-sensitive: `total` and `Total` differ. Use ASCII letters, digits after the first character, and `_`; avoid spaces, accented identifiers, and reserved names.
+
+## Swap two values
+
+Save the first value before overwriting it when exchanging two variables.
+
+```msp
+a = 4
+b = 9
+temporary = a
+a = b
+b = temporary
+PRINT a
+PRINT b
+```
+
+The result is `9`, then `4`. Without the temporary variable, `a = b` followed by `b = a` leaves both values at `9`.
+
+## Practice
+
+1. Predict the state after `a = 2`, `b = a`, `a = 7`: `a` is `7`, `b` is `2`.
+2. Store the sides of a rectangle and print its area and perimeter.
+3. Trace the swap program assignment by assignment.
+
+Continue with [operators and expressions](/docs/operators).

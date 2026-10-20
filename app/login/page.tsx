@@ -3,9 +3,11 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
+  type FormEvent,
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
@@ -14,7 +16,9 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { siGithub, siGoogle } from "simple-icons";
 import { toast } from "sonner";
+import styles from "./login.module.css";
 import { api } from "@/lib/api";
+import { readAuthFormCredentials } from "@/lib/auth-form";
 import {
   getRegistrationBirthDate,
 } from "@/lib/birthday";
@@ -277,6 +281,10 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const loginFormRef = useRef<HTMLFormElement>(null);
+  const registerFormRef = useRef<HTMLFormElement>(null);
+  const authPanelsRef = useRef<HTMLDivElement>(null);
+  const [authPanelHeight, setAuthPanelHeight] = useState<number | null>(null);
   const [registration, setRegistration] =
     useState<RegistrationCredentials | null>(null);
   const [registrationDraft, setRegistrationDraft] =
@@ -333,6 +341,28 @@ export default function LoginPage() {
   });
   const verificationCheckInFlightRef = useRef(false);
   const loginTransitionTimerRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const panel = authPanelsRef.current?.querySelector<HTMLElement>('[role="tabpanel"][data-state="active"]');
+    if (!panel) return;
+    const measure = () => setAuthPanelHeight(panel.getBoundingClientRect().height + 8);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [authTab, registration, registrationVerificationEmail]);
+
+  function switchAuthTab(value: string) {
+    if (value !== "login" && value !== "register") return;
+    const currentForm = authTab === "login" ? loginFormRef.current : registerFormRef.current;
+    if (currentForm) {
+      const credentials = readAuthFormCredentials(new FormData(currentForm));
+      setEmail(credentials.email);
+      setPassword(credentials.password);
+      if (authTab === "register") setUsername(credentials.username);
+    }
+    setAuthTab(value);
+  }
 
   useEffect(() => {
     if (authTab !== "register") return;
@@ -575,46 +605,38 @@ export default function LoginPage() {
     registrationVerificationEmail,
   ]);
 
-  async function handleLogin() {
-    if (!email.trim() || !password) return;
-
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (loading || authAction !== null || loginTransitioning) return;
+    const credentials = readAuthFormCredentials(new FormData(event.currentTarget));
+    if (!credentials.email || !credentials.password) return;
+    setEmail(credentials.email);
+    setPassword(credentials.password);
     setAuthAction("login");
-    const { data, error } = await api.auth.signInWithPassword(
-      email.trim(),
-      password
-    );
-    setAuthAction(null);
-
-    if (error) {
-      if (isEmailNotConfirmedError(error)) {
-        storePendingEmailVerification(email.trim(), null);
-        showModal(
-          t("login.modal.verificationRequiredTitle"),
-          t("login.modal.verificationRequiredDescription"),
-          "info",
-          email.trim()
-        );
+    try {
+      const { data, error } = await api.auth.signInWithPassword(credentials.email, credentials.password);
+      if (error) {
+        if (isEmailNotConfirmedError(error)) {
+          storePendingEmailVerification(credentials.email, null);
+          showModal(t("login.modal.verificationRequiredTitle"), t("login.modal.verificationRequiredDescription"), "info", credentials.email);
+        } else {
+          showModal(t("login.modal.loginErrorTitle"), error.message, "error");
+        }
         return;
       }
-
-      showModal(t("login.modal.loginErrorTitle"), error.message, "error");
-      return;
+      if (!isEmailVerified(data.user)) {
+        storePendingEmailVerification(credentials.email, data.user?.id ?? null);
+        await api.auth.signOut();
+        showModal(t("login.modal.verificationRequiredTitle"), t("login.modal.verificationRequiredDescription"), "info", credentials.email);
+        return;
+      }
+      if (data.session) saveAccountSession(data.session);
+      router.replace(getWorkspaceLandingRoute(data.user.user_metadata));
+    } catch (error) {
+      showModal(t("login.modal.loginErrorTitle"), error instanceof Error ? error.message : t("common.error"), "error");
+    } finally {
+      setAuthAction(null);
     }
-
-    if (!isEmailVerified(data.user)) {
-      storePendingEmailVerification(email.trim(), data.user?.id ?? null);
-      await api.auth.signOut();
-      showModal(
-        t("login.modal.verificationRequiredTitle"),
-        t("login.modal.verificationRequiredDescription"),
-        "info",
-        email.trim()
-      );
-      return;
-    }
-
-    if (data.session) saveAccountSession(data.session);
-    router.replace(getWorkspaceLandingRoute(data.user.user_metadata));
   }
 
   async function continueWithSavedAccount(account: SavedScripticXAccount) {
@@ -647,22 +669,28 @@ export default function LoginPage() {
     }
   }
 
-  async function handleRegister() {
-    if (!username.trim()) {
+  function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (loading || authAction !== null || loginTransitioning) return;
+    const credentials = readAuthFormCredentials(new FormData(event.currentTarget));
+    setEmail(credentials.email);
+    setPassword(credentials.password);
+    setUsername(credentials.username);
+    if (!credentials.username) {
       showModal(t("common.error"), t("login.modal.usernameRequired"), "error");
       return;
     }
-    if (!isValidUsername(username.trim().toLowerCase())) {
+    if (!isValidUsername(credentials.username.toLowerCase())) {
       showModal(t("common.error"), "Username: 3-24 caractere, doar litere, cifre, - și _.", "error");
       return;
     }
 
-    if (!email.trim() || !password || loginTransitioning) return;
+    if (!credentials.email || !credentials.password) return;
 
     const nextRegistration = {
-      email: email.trim(),
-      password,
-      username: username.trim(),
+      email: credentials.email,
+      password: credentials.password,
+      username: credentials.username,
     };
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
@@ -931,11 +959,6 @@ export default function LoginPage() {
             </div>
 
             <Card className="relative overflow-hidden shadow-sm" aria-busy={loading}>
-              {loading ? (
-                <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-muted">
-                  <div className="h-full w-full animate-pulse bg-foreground" />
-                </div>
-              ) : null}
               <CardContent className="space-y-5 p-5 sm:p-6">
                 {authTab === "login" && savedAccounts.length ? (
                   <section className="rounded-xl border bg-muted/25 p-2">
@@ -1009,130 +1032,138 @@ export default function LoginPage() {
 
                 <Tabs
                   value={authTab}
-                  onValueChange={(value) =>
-                    setAuthTab(value as "login" | "register")
-                  }
+                  onValueChange={switchAuthTab}
                   className="space-y-5"
                 >
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="login">{t("login.tabs.login")}</TabsTrigger>
-                    <TabsTrigger value="register">{t("login.tabs.register")}</TabsTrigger>
+                    <TabsTrigger value="login" disabled={authAction !== null || loginTransitioning} className={styles.tab}>{t("login.tabs.login")}</TabsTrigger>
+                    <TabsTrigger value="register" disabled={authAction !== null || loginTransitioning} className={styles.tab}>{t("login.tabs.register")}</TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="login" className="space-y-4">
-                    <div className="space-y-2">
-                      <label htmlFor="login-email" className="text-sm font-medium">
-                        {t("login.email")}
-                      </label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        autoComplete="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                      />
-                    </div>
+                  <div ref={authPanelsRef} data-auth-panels className={styles.panels} style={{ height: authPanelHeight ?? undefined }}>
+                    <TabsContent value="login" className={styles.panel}>
+                      <form ref={loginFormRef} onSubmit={handleLogin} className="space-y-4" aria-busy={loading || authAction === "login"}>
+                        <div className="space-y-2">
+                          <label htmlFor="login-email" className="text-sm font-medium">
+                            {t("login.email")}
+                          </label>
+                          <Input
+                            id="login-email"
+                            name="email"
+                            type="email"
+                            autoComplete="username"
+                            required
+                            defaultValue={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                          />
+                        </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <label htmlFor="login-password" className="text-sm font-medium">
-                          {t("login.password")}
-                        </label>
-                        <Link
-                          href="/forgot-password"
-                          className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <label htmlFor="login-password" className="text-sm font-medium">
+                              {t("login.password")}
+                            </label>
+                            <Link
+                              href="/forgot-password"
+                              className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                            >
+                              {t("login.forgotPassword")}
+                            </Link>
+                          </div>
+                          <Input
+                            id="login-password"
+                            name="password"
+                            type="password"
+                            autoComplete="current-password"
+                            required
+                            defaultValue={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                          />
+                        </div>
+
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={loading || authAction !== null || loginTransitioning}
                         >
-                          {t("login.forgotPassword")}
-                        </Link>
-                      </div>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        autoComplete="current-password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") void handleLogin();
-                        }}
-                      />
-                    </div>
+                          {loading || authAction === "login" ? (
+                            <LoaderCircle className="size-4 animate-spin" />
+                          ) : null}
+                          {t("login.loginButton")}
+                        </Button>
 
-                    <Button
-                      onClick={handleLogin}
-                      className="w-full"
-                      disabled={loading || authAction !== null || !email.trim() || !password}
-                    >
-                      {authAction === "login" ? (
-                        <LoaderCircle className="size-4 animate-spin" />
-                      ) : null}
-                      {t("login.loginButton")}
-                    </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="w-full text-muted-foreground hover:text-foreground"
+                          onClick={() => setPasswordlessOpen(true)}
+                          disabled={loading || authAction !== null}
+                        >
+                          <KeyRound className="size-4" />
+                          {t("login.passwordless.open")}
+                        </Button>
+                      </form>
+                    </TabsContent>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-muted-foreground hover:text-foreground"
-                      onClick={() => setPasswordlessOpen(true)}
-                      disabled={loading || authAction !== null}
-                    >
-                      <KeyRound className="size-4" />
-                      {t("login.passwordless.open")}
-                    </Button>
-                  </TabsContent>
-
-                  <TabsContent value="register" className="space-y-4">
-                    <div className="space-y-2">
-                      <label htmlFor="register-email" className="text-sm font-medium">
-                        {t("login.email")}
-                      </label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        autoComplete="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label htmlFor="register-password" className="text-sm font-medium">
-                        {t("login.password")}
-                      </label>
-                      <Input
-                        id="register-password"
-                        type="password"
-                        autoComplete="new-password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label htmlFor="register-username" className="text-sm font-medium">
-                        {t("login.username")}
-                      </label>
-                      <Input
-                        id="register-username"
-                        autoComplete="username"
-                        value={username}
-                        onChange={(event) => setUsername(event.target.value)}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleRegister}
-                      className="w-full"
-                      disabled={
-                        authAction !== null ||
-                        loading ||
-                        !email.trim() ||
-                        !password ||
-                        !username.trim()
-                      }
-                    >
-                      {authAction === "register" ? (
-                        <LoaderCircle className="size-4 animate-spin" />
-                      ) : null}
-                      {t("login.registerButton")}
-                    </Button>
-                  </TabsContent>
+                    <TabsContent value="register" className={styles.panel}>
+                      <form ref={registerFormRef} onSubmit={handleRegister} className="space-y-4" aria-busy={loading || loginTransitioning}>
+                        <div className="space-y-2">
+                          <label htmlFor="register-email" className="text-sm font-medium">
+                            {t("login.email")}
+                          </label>
+                          <Input
+                            id="register-email"
+                            name="email"
+                            type="email"
+                            autoComplete="section-register username"
+                            required
+                            defaultValue={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label htmlFor="register-password" className="text-sm font-medium">
+                            {t("login.password")}
+                          </label>
+                          <Input
+                            id="register-password"
+                            name="password"
+                            type="password"
+                            autoComplete="section-register new-password"
+                            required
+                            defaultValue={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label htmlFor="register-username" className="text-sm font-medium">
+                            {t("login.username")}
+                          </label>
+                          <Input
+                            id="register-username"
+                            name="username"
+                            autoComplete="nickname"
+                            required
+                            defaultValue={username}
+                            onChange={(event) => setUsername(event.target.value)}
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={
+                            authAction !== null ||
+                            loading || loginTransitioning
+                          }
+                        >
+                          {loading || authAction === "register" ? (
+                            <LoaderCircle className="size-4 animate-spin" />
+                          ) : null}
+                          {t("login.registerButton")}
+                        </Button>
+                      </form>
+                    </TabsContent>
+                  </div>
                 </Tabs>
 
                 <div className="flex items-center gap-3" aria-hidden="true">

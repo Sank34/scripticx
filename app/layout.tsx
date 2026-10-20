@@ -10,6 +10,8 @@ import { EmailVerificationAccessGate } from "@/components/account/EmailVerificat
 import { EntrySessionGate } from "@/components/auth/EntrySessionGate";
 import { AppShell } from "@/components/AppShell";
 import { absoluteUrl, siteConfig } from "@/lib/metadata";
+import { DocsNavigationProvider } from "@/components/docs/DocsNavigationProvider";
+import { getDocsSidebarPages, getExamplesSidebarPages } from "@/lib/server/docs";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -137,10 +139,12 @@ export default function RootLayout({
           <AccessibilityProvider>
             <Providers>
               <LanguageProvider>
-                <EmailVerificationAccessGate />
-                <EntrySessionGate>
-                  <AppShell>{children}</AppShell>
-                </EntrySessionGate>
+                <DocsNavigationProvider pages={getDocsSidebarPages()} examples={getExamplesSidebarPages()}>
+                  <EmailVerificationAccessGate />
+                  <EntrySessionGate>
+                    <AppShell>{children}</AppShell>
+                  </EntrySessionGate>
+                </DocsNavigationProvider>
               </LanguageProvider>
             </Providers>
           </AccessibilityProvider>

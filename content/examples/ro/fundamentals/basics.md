@@ -17,6 +17,8 @@ PRINT "Salut"
 PRINT "ScripticX"
 ```
 
+Rezultat așteptat: `Salut, apoi ScripticX`.
+
 ## Stocarea și afișarea unei valori
 
 Prima instrucțiune atribuie numărul, iar a doua îl citește.
@@ -25,6 +27,8 @@ Prima instrucțiune atribuie numărul, iar a doua îl citește.
 scor = 5
 PRINT scor
 ```
+
+Rezultat așteptat: `5`.
 
 ## Calcularea unui rezultat
 
@@ -35,6 +39,8 @@ primul = 5 + 3
 rezultat = primul * 2
 PRINT rezultat
 ```
+
+Rezultat așteptat: `16`.
 
 Rezultatul așteptat:
 
@@ -54,6 +60,13 @@ IF valoare > 5 THEN
 END
 ```
 
+Rezultat așteptat: `Mare`.
+
 :::tip
 Schimbă `valoare` în `3` și rulează din nou. Nu se afișează nimic deoarece condiția devine falsă.
 :::
+
+
+## Ce să modifici
+
+Schimbă valoarea inițială, prezice ieșirea și rulează din nou. O atribuire modifică starea, în timp ce `PRINT` doar afișează o valoare. Dacă programul nu are `INPUT`, toate datele lui sunt deja în cod. Vezi [variabilele](/docs/variables) și [operatorii](/docs/operators).

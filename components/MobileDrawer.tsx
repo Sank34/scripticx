@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
+import { useDocsSidebarPages, useExamplesSidebarPages } from "@/components/docs/DocsNavigationProvider";
 import { WorkspaceSwitcher } from "@/components/workspaces/WorkspaceSwitcher";
 import {
   getTeacherWorkspaceNavigation,
@@ -60,6 +61,8 @@ type MobileNavItem = {
 };
 
 export function MobileDrawer() {
+  const docsPages = useDocsSidebarPages();
+  const examplePages = useExamplesSidebarPages();
   const pathname = usePathname();
   const useHeaderTrigger = pathname === "/editor" || pathname.startsWith("/groups/");
   const { locale, t } = useLanguage();
@@ -192,23 +195,13 @@ export function MobileDrawer() {
           icon: BookOpen,
           label: t("nav.docs"),
           active: (currentPath: string) => currentPath.startsWith("/docs"),
-          children: [
-            { href: "/docs/basics", label: t("learn.basics") },
-            { href: "/docs/variables", label: t("learn.variables") },
-            { href: "/docs/loops", label: t("learn.loops") },
-            { href: "/docs/input-output", label: t("learn.inputOutput") },
-          ],
+          children: docsPages.map((page) => ({ href: page.href, label: page.title })),
         },
         {
           href: "/examples",
           icon: BookOpen,
           label: t("nav.examples"),
-          children: [
-            { href: "/examples/basics", label: t("examples.basics.title") },
-            { href: "/examples/loops", label: t("examples.loops.title") },
-            { href: "/examples/conditions", label: t("examples.conditions.title") },
-            { href: "/examples/algorithms", label: t("examples.algorithms.title") },
-          ],
+          children: examplePages.map((page) => ({ href: page.href, label: page.title })),
         },
       ],
     }];

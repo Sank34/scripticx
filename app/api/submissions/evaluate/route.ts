@@ -84,58 +84,26 @@ export async function POST(request: Request) {
 
     if (submissionError) throw submissionError;
 
-    let completionId: string | null = null;
-    let bonusPoints = 0;
-    let bonusAwarded = false;
-
-    if (evaluation.score === 100) {
-      const today = new Date().toISOString().slice(0, 10);
-      const { data: challenge, error: challengeError } = await admin
-        .from("daily_challenges")
-        .select("id, bonus_points")
-        .eq("problem_id", problem.id)
-        .eq("challenge_date", today)
-        .eq("is_active", true)
-        .maybeSingle<{ id: string; bonus_points: number | null }>();
-
-      if (challengeError) throw challengeError;
-
-      if (challenge) {
-        bonusPoints = Math.max(0, Number(challenge.bonus_points) || 0);
-        const { data: completion, error: completionError } = await admin
-          .from("daily_challenge_completions")
-          .insert({
-            challenge_id: challenge.id,
-            user_id: user.id,
-            problem_id: problem.id,
-            bonus_points: bonusPoints,
-          })
-          .select("id")
-          .single<{ id: string }>();
-
-        if (completionError?.code === "23505") {
-          completionId = null;
-        } else if (completionError) {
-          throw completionError;
-        } else {
-          completionId = completion.id;
-          bonusAwarded = true;
-        }
-      }
-    }
-
     const userClient = createAuthenticatedServerSupabase(accessToken);
     const { data: reward, error: rewardError } = await userClient.rpc(
       "award_submission_reward",
       {
         p_submission_id: submission.id,
-        p_completion_id: completionId,
       }
     );
 
     if (rewardError) {
       console.error("Could not award verified submission:", rewardError);
       throw new HttpError(500, "Submission was evaluated but could not be rewarded");
+    }
+
+    if (
+      !reward ||
+      typeof reward.bonus_awarded !== "boolean" ||
+      typeof reward.bonus_points !== "number"
+    ) {
+      console.error("Submission reward RPC returned an unsupported response");
+      throw new HttpError(503, "Submission was evaluated but rewards are temporarily unavailable");
     }
 
     const { error: achievementError } = await userClient.rpc(
@@ -149,8 +117,9 @@ export async function POST(request: Request) {
       submissionId: submission.id,
       score: evaluation.score,
       results: evaluation.results,
-      bonusAwarded,
-      bonusPoints: bonusAwarded ? bonusPoints : 0,
+      bonusAwarded: reward.bonus_awarded,
+      bonusPoints: reward.bonus_points,
+      dailyCompleted: reward.daily_completed === true,
       reward,
     });
   } catch (error) {

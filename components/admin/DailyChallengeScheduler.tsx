@@ -14,13 +14,14 @@ import { api } from "@/lib/api";
 import { getLocalized } from "@/lib/getLocalized";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { getDailyChallengeDate } from "@/lib/daily-challenge-date";
 function formatDateKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`; }
 function parseDateKey(value: string) { return new Date(value + "T12:00:00"); }
 export function DailyChallengeScheduler() {
   const { user, can } = useAuth();
   const canManageDaily = can("admin.daily");
   const { locale } = useLanguage(); const ro = locale === "ro"; const queryClient = useQueryClient();
-  const todayKey = formatDateKey(new Date());
+  const todayKey = getDailyChallengeDate();
   const [schedulingDaily, setSchedulingDaily] = useState(false);
   const [dailyDate, setDailyDate] = useState(todayKey);
   const [dailyProblemId, setDailyProblemId] = useState("");

@@ -17,6 +17,8 @@ PRINT "Hello"
 PRINT "World"
 ```
 
+Expected result: `Hello, then World`.
+
 ## Store and display a value
 
 The first instruction assigns a number; the second reads it.
@@ -25,6 +27,8 @@ The first instruction assigns a number; the second reads it.
 score = 5
 PRINT score
 ```
+
+Expected result: `5`.
 
 ## Calculate a result
 
@@ -35,6 +39,8 @@ first = 5 + 3
 result = first * 2
 PRINT result
 ```
+
+Expected result: `16`.
 
 Expected output:
 
@@ -54,6 +60,13 @@ IF value > 5 THEN
 END
 ```
 
+Expected result: `Large`.
+
 :::tip
 Change `value` to `3` and run the program again. No message is displayed because the condition becomes false.
 :::
+
+
+## What to change
+
+Change an initial value, predict the output, then run again. Assignment changes state; `PRINT` only displays a value. Without `INPUT`, all data already comes from the code. Read [variables](/docs/variables) and [operators](/docs/operators).

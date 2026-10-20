@@ -2,7 +2,7 @@
 title: Bucle
 description: Repetă instrucțiuni în siguranță cu buclele WHILE și FOR din MiniScript+.
 slug: /loops
-sidebar_position: 2
+sidebar_position: 5
 keywords: [bucle MiniScript+, bucla while, bucla for]
 ---
 
@@ -90,3 +90,33 @@ END
 ```
 
 Buclele imbricate pot executa multe operații, așa că verifică numărul de iterații înainte de a folosi intervale mari.
+
+## Urmărirea unei bucle
+
+Pentru bucla `WHILE` de la începutul lecției, poți construi un tabel înainte să rulezi codul:
+
+| contor înainte | contor < 3 | Ieșire | contor după |
+| --- | --- | --- | --- |
+| 0 | TRUE | 0 | 1 |
+| 1 | TRUE | 1 | 2 |
+| 2 | TRUE | 2 | 3 |
+| 3 | FALSE | — | — |
+
+Condiția se verifică și după ultima iterație. Dacă este falsă de la început, corpul nu rulează deloc. De aceea trebuie să verifici și cazul unei secvențe goale.
+
+## Limitele și pasul lui FOR
+
+Ambele capete ale intervalului sunt incluse. `FOR i FROM 1 TO 5` execută cinci iterații, nu patru. Pentru pas pozitiv și început mai mare decât sfârșitul, sunt zero iterații; pentru numărare descrescătoare trebuie specificat un pas negativ. Un pas zero este eroare.
+
+Începutul, sfârșitul și pasul sunt evaluate o singură dată la intrarea în buclă. Schimbarea unei variabile folosite în expresia limitei nu schimbă automat limita deja calculată. Nu modifica variabila de control din corp. După terminarea normală, ea conține prima valoare care a depășit intervalul: după `1 TO 5`, valoarea este `6`.
+
+Exemplul `10 TO 0 INCR -2` afișează `10, 8, 6, 4, 2, 0`: șase valori. În bucle imbricate folosește nume diferite pentru contoare. O buclă de trei pași în alta de trei pași execută corpul interior de nouă ori.
+
+## Exersează
+
+1. Afișează numerele pare de la `2` la `10`: sunt cinci valori.
+2. Calculează suma de la `1` la `5`, inițializând totalul înainte de buclă: rezultatul este `15`.
+3. Modifică bucla `WHILE` ca să pornească de la `3`. Explică de ce nu afișează nimic.
+4. Corectează exemplul infinit înainte de rulare; limita de pași a editorului detectează execuții prea lungi, dar nu repară algoritmul.
+
+Aplică aceste modele în [sume și numărări](/docs/aggregates) și în [parcurgerea textului](/docs/strings).
