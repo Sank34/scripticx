@@ -896,6 +896,13 @@ export const translations = {
 
     feed: {
       selected: "Selected",
+      ai: {
+        label: "AI-generated",
+        switchLabel: "AI-generated content",
+        description: "Turn on if AI generated or substantially changed the text, code or image. This label is declared by the author.",
+        saved: "AI disclosure updated.",
+        saveError: "Could not save the AI disclosure. Your previous setting is unchanged. Try again.",
+      },
       posts: "posts",
       subtitle: "Discover what others are building with MiniScript+",
       communityLabel: "ScripticX Community",
@@ -3191,6 +3198,13 @@ export const translations = {
 
     feed: {
       posts: "postări",
+      ai: {
+        label: "Generat cu AI",
+        switchLabel: "Conținut generat cu AI",
+        description: "Activează dacă AI a generat sau a modificat substanțial textul, codul ori imaginea. Eticheta este declarată de autor.",
+        saved: "Marcajul AI a fost actualizat.",
+        saveError: "Marcajul AI nu a putut fi salvat. Setarea anterioară rămâne neschimbată. Încearcă din nou.",
+      },
       selected: "Selectat",
       subtitle: "Descoperă ce construiesc alții cu MiniScript+",
       communityLabel: "Comunitatea ScripticX",

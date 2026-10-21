@@ -24,6 +24,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import { MentionText } from "@/components/feed/MentionText";
+import { PostAiEditor, PostAiLabel } from "@/components/feed/PostAiDisclosure";
 import PostComments from "@/components/PostComments";
 import { PostDetailSkeleton } from "@/components/post/PostDetailSkeleton";
 import {
@@ -73,7 +74,7 @@ export default function ClientPost({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("posts")
-        .select("id, user_id, content, code, image_url, created_at")
+        .select("id, user_id, content, code, image_url, created_at, is_ai_generated")
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
@@ -278,6 +279,7 @@ export default function ClientPost({
               </CardHeader>
 
               <CardContent className="space-y-4 px-5 py-5">
+                <PostAiLabel marked={post.is_ai_generated} />
                 <MentionText
                   content={post.content}
                   className="whitespace-pre-wrap text-[15px] leading-6"
@@ -294,6 +296,7 @@ export default function ClientPost({
                 )}
 
                 {post.code && <HighlightedCodeBlock code={post.code} />}
+                {user?.id === post.user_id && <PostAiEditor post={post} />}
               </CardContent>
 
               <div className="grid grid-cols-3 border-t border-border/70 px-3 py-2 text-sm">

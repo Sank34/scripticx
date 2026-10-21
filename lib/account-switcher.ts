@@ -1,4 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
+import { rememberRecentAccount } from "@/lib/recent-accounts";
 
 const ACCOUNT_STORAGE_KEY = "scripticx-saved-accounts-v1";
 export const ACCOUNT_STORAGE_EVENT = "scripticx-saved-accounts-changed";
@@ -111,7 +112,9 @@ export function removeSavedAccountFromList(
 }
 
 function browserStorage() {
-  return typeof window === "undefined" ? null : window.localStorage;
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch { return null; }
 }
 
 function notifyAccountStorage() {
@@ -122,7 +125,9 @@ function notifyAccountStorage() {
 
 export function listSavedAccounts() {
   const storage = browserStorage();
-  return storage ? parseSavedAccounts(storage.getItem(ACCOUNT_STORAGE_KEY)) : [];
+  try {
+    return storage ? parseSavedAccounts(storage.getItem(ACCOUNT_STORAGE_KEY)) : [];
+  } catch { return []; }
 }
 
 export function saveAccountSession(
@@ -134,11 +139,16 @@ export function saveAccountSession(
 
   const current = listSavedAccounts();
   const next = mergeSavedAccount(current, session, details);
+  rememberRecentAccount({ ...next[0], lastUsedAt: next[0].updatedAt });
   const serialized = JSON.stringify(next);
 
-  if (serialized !== storage.getItem(ACCOUNT_STORAGE_KEY)) {
-    storage.setItem(ACCOUNT_STORAGE_KEY, serialized);
-    notifyAccountStorage();
+  try {
+    if (serialized !== storage.getItem(ACCOUNT_STORAGE_KEY)) {
+      storage.setItem(ACCOUNT_STORAGE_KEY, serialized);
+      notifyAccountStorage();
+    }
+  } catch {
+    // A successful sign-in remains valid when browser storage is unavailable.
   }
 
   return next;
@@ -148,7 +158,10 @@ export function removeSavedAccount(userId: string) {
   const storage = browserStorage();
   if (!storage) return [];
 
-  const next = removeSavedAccountFromList(listSavedAccounts(), userId);
+  const accounts = listSavedAccounts();
+  const removed = accounts.find(account => account.userId === userId);
+  if (removed) rememberRecentAccount({ ...removed, lastUsedAt: removed.updatedAt });
+  const next = removeSavedAccountFromList(accounts, userId);
   storage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(next));
   notifyAccountStorage();
   return next;

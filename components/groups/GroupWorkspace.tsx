@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useEffect,
   useLayoutEffect,
@@ -57,6 +57,7 @@ import {
   type StudyGroupWorkspace as StudyGroupWorkspaceData,
 } from "@/lib/api";
 import { resolveAvatarUrl } from "@/lib/avatar";
+import { groupChannelNavigationUrl, groupDocumentTitle } from "@/lib/group-metadata";
 import {
   getInlineStickerToken,
   emojiShortcode,
@@ -567,6 +568,7 @@ function StudyGroupMemberPreview({
 export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const { t, locale } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -583,7 +585,11 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const gifInputRef = useRef<HTMLInputElement | null>(null);
   const [pendingGif, setPendingGif] = useState<string | null>(null);
-  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const activeChannelId = searchParams.get("channel");
+  function selectChannel(channelId: string | null) {
+    if (activeChannelId === channelId) return;
+    window.history.pushState(null, "", groupChannelNavigationUrl(window.location.href, channelId));
+  }
   const [message, setMessage] = useState("");
   const [composerCursor, setComposerCursor] = useState(0);
   const [emojiActiveIndex, setEmojiActiveIndex] = useState(0);
@@ -822,11 +828,20 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
     membersRef.current = members;
   }, [members]);
 
+  const documentGroupName = group?.name;
+  const documentChannelName = activeMembership ? activeChannel?.name : null;
   useEffect(() => {
-    if (!activeChannelId && channels[0]) {
-      setActiveChannelId(channels[0].id);
-    }
-  }, [activeChannelId, channels]);
+    if (!documentGroupName) return;
+    const title = groupDocumentTitle(documentGroupName, documentChannelName);
+    const updateTitle = () => {
+      if (document.title !== title) document.title = title;
+    };
+    updateTitle();
+    // Streamed server metadata can arrive after the active channel has loaded.
+    const observer = new MutationObserver(updateTitle);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [documentGroupName, documentChannelName]);
 
   useEffect(() => {
     if (!group) return;
@@ -1638,7 +1653,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
   }
 
   function openMessageResult(item: StudyGroupMessage) {
-    if (item.channel_id !== activeChannel?.id) setActiveChannelId(item.channel_id);
+    if (item.channel_id !== activeChannel?.id) selectChannel(item.channel_id);
     setContentBrowserOpen(false);
     window.setTimeout(() => jumpToMessage(item.id), item.channel_id === activeChannel?.id ? 0 : 260);
   }
@@ -1654,7 +1669,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
       });
       setNewChannelName("");
       setChannelDialogOpen(false);
-      setActiveChannelId(channel.id);
+      selectChannel(channel.id);
       toast.success(t("groups.toasts.channelCreated"));
       await queryClient.invalidateQueries({ queryKey: ["groups", slug] });
     } catch (error) {
@@ -1677,7 +1692,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
 
       const nextChannel = channels.find((channel) => channel.id !== channelId);
       if (activeChannel?.id === channelId) {
-        setActiveChannelId(nextChannel?.id || null);
+        selectChannel(nextChannel?.id || null);
       }
 
       toast.success(t("groups.toasts.channelDeleted"));
@@ -2113,7 +2128,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                 >
                   <button
                     type="button"
-                    onClick={() => setActiveChannelId(channel.id)}
+                    onClick={() => selectChannel(channel.id)}
                     className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3 py-2 text-left"
                   >
                     <Hash className="size-4 shrink-0" />
@@ -2217,7 +2232,7 @@ export function GroupWorkspace({ slug }: GroupWorkspaceProps) {
                   const unread = unreadByChannel.get(channel.id)?.unread_count || 0;
                   const mentions = groupActivity.mentionCountsByChannel.get(channel.id) || 0;
                   const active = channel.id === activeChannel?.id;
-                  return <Button key={channel.id} variant={active ? "secondary" : "ghost"} aria-current={active ? "page" : undefined} className="mb-1 min-h-12 w-full justify-start gap-3" onClick={() => { setActiveChannelId(channel.id); setMobileChannelsOpen(false); }}>
+                  return <Button key={channel.id} variant={active ? "secondary" : "ghost"} aria-current={active ? "page" : undefined} className="mb-1 min-h-12 w-full justify-start gap-3" onClick={() => { selectChannel(channel.id); setMobileChannelsOpen(false); }}>
                     <Hash className="size-4 shrink-0" /><span className="min-w-0 truncate">{channel.name}</span>
                     <span className="ml-auto flex shrink-0 items-center gap-2">{unread || mentions ? <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground" aria-label={`${unread || mentions} ${locale === "ro" ? "necitite" : "unread"}`}>{Math.min(unread || mentions, 99)}{(unread || mentions) > 99 ? "+" : ""}</span> : groupActivity.activityChannelIds.has(channel.id) ? <span className="size-2 rounded-full bg-primary" aria-label={t("groups.activity.newActivity")} /> : null}{active ? <Check className="size-4" /> : null}</span>
                   </Button>;

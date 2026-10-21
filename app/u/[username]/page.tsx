@@ -5,6 +5,7 @@ import { createServerSupabase } from "@/lib/supabaseServer";
 import PublicProfileHeader from "@/components/PublicProfileHeader";
 import { StatCard } from "@/components/common/StatCard";
 import { AchievementBadgeCard } from "@/components/achievements/AchievementBadgeCard";
+import { PostAiLabel } from "@/components/feed/PostAiDisclosure";
 
 import {
   Card,
@@ -158,7 +159,7 @@ export default async function PublicProfile({
         .eq("user_id", profile.id),
       supabase
         .from("posts")
-        .select("id, content, image_url, created_at")
+        .select("id, content, image_url, created_at, is_ai_generated")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(3),
@@ -465,6 +466,7 @@ export default async function PublicProfile({
           {posts?.map((p: any) => (
             <a key={p.id} href={`/post/${p.id}`} className="block mb-3 last:mb-0">
               <div className="p-3 border rounded hover:bg-muted/50 transition cursor-pointer">
+                {p.is_ai_generated === true && <div className="mb-2"><PostAiLabel marked /></div>}
                 <p className="text-sm line-clamp-2">
                   {p.content}
                 </p>

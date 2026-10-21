@@ -145,6 +145,8 @@ describe("multi-account logout", () => {
     await expect(logoutCurrentAccount("current")).resolves.toBeNull();
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(mocks.removeSavedAccount).toHaveBeenCalledWith("current");
+    expect(mocks.saveAccountSession).toHaveBeenCalledWith(session("current"));
+    expect(mocks.saveAccountSession.mock.invocationCallOrder[0]).toBeLessThan(mocks.signOut.mock.invocationCallOrder[0]);
   });
 
   it("removes a saved account locally even when its session has expired", async () => {

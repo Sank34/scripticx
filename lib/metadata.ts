@@ -32,6 +32,7 @@ type PageMetadataOptions = {
   noIndex?: boolean;
   type?: "website" | "article" | "profile";
   keywords?: string[];
+  section?: string;
 };
 
 export function absoluteUrl(path = "/") {
@@ -46,10 +47,11 @@ export function createPageMetadata({
   noIndex = false,
   type = "website",
   keywords = [],
+  section = siteConfig.name,
 }: PageMetadataOptions): Metadata {
   const canonical = absoluteUrl(path);
   const generatedImage = absoluteUrl(
-    `/api/social-image?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}&section=${encodeURIComponent(siteConfig.name)}&path=${encodeURIComponent(path)}`
+    `/api/social-image?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}&section=${encodeURIComponent(section)}&path=${encodeURIComponent(path)}`
   );
   const images = image
     ? [image.startsWith("http") ? image : absoluteUrl(image)]

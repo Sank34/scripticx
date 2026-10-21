@@ -17,6 +17,7 @@ import { api, type FeedData, type FeedPost } from "@/lib/api";
 import RouteGuard from "@/components/RouteGuard";
 import { EmptyState } from "@/components/common/EmptyState";
 import { FeedPostCard } from "@/components/feed/FeedPostCard";
+import { PostAiSwitch } from "@/components/feed/PostAiDisclosure";
 import { FeedPostSkeleton } from "@/components/feed/FeedPageSkeleton";
 import { MentionTextarea } from "@/components/feed/MentionTextarea";
 import { UserAvatar } from "@/components/user/UserAvatar";
@@ -56,6 +57,7 @@ function FeedContent() {
   const [code, setCode] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [image, setImage] = useState<File | null>(null);
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [postToDelete, setPostToDelete] = useState<FeedPost | null>(null);
   const [deletingPost, setDeletingPost] = useState(false);
 
@@ -115,12 +117,14 @@ function FeedContent() {
         content,
         code,
         image,
+        isAiGenerated,
       });
 
       setContent("");
       setCode("");
       setShowCode(false);
       setImage(null);
+      setIsAiGenerated(false);
       setComposerOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["feed", user.id] });
       toast.success(t("feed.posted"));
@@ -426,7 +430,7 @@ function FeedContent() {
       </div>
 
       <Dialog open={composerOpen} onOpenChange={setComposerOpen}>
-        <DialogContent className="overflow-hidden p-0 sm:max-w-xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto p-0 sm:max-w-xl">
           <div className="space-y-4 p-5">
             <div>
               <DialogTitle>{t("feed.createPost")}</DialogTitle>
@@ -520,6 +524,8 @@ function FeedContent() {
                 onChange={(event) => setImage(event.target.files?.[0] || null)}
               />
             </div>
+
+            <PostAiSwitch checked={isAiGenerated} onCheckedChange={setIsAiGenerated} disabled={posting} />
 
             <Button
               onClick={createPost}

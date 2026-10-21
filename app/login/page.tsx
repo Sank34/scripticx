@@ -13,7 +13,7 @@ import type { User } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, KeyRound, LoaderCircle, LogOut } from "lucide-react";
+import { KeyRound, LoaderCircle } from "lucide-react";
 import { siGithub, siGoogle } from "simple-icons";
 import { toast } from "sonner";
 import styles from "./login.module.css";
@@ -47,20 +47,21 @@ import {
 } from "@/lib/registration-onboarding";
 import {
   saveAccountSession,
-  type SavedScripticXAccount,
 } from "@/lib/account-switcher";
 import {
   activateSavedAccount,
   logoutCurrentAccount,
   logoutSavedAccount,
 } from "@/lib/account-session-manager";
+import { forgetRecentAccount, type RecentAccount } from "@/lib/recent-accounts";
 import { supabase } from "@/lib/supabase";
 import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 import { AppModal } from "@/components/ui/app-modal";
 import { RegistrationVerification } from "@/components/onboarding/RegistrationVerification";
 import { PasswordlessSignInDialog } from "@/components/auth/PasswordlessSignInDialog";
-import { UserAvatar } from "@/components/user/UserAvatar";
+import { RecentAccounts } from "@/components/auth/RecentAccounts";
 import { useSavedAccounts } from "@/hooks/useSavedAccounts";
+import { useRecentAccounts } from "@/hooks/useRecentAccounts";
 
 import {
   Tabs,
@@ -301,22 +302,15 @@ export default function LoginPage() {
   const router = useRouter();
   const { t, locale } = useLanguage();
   const { accounts: savedAccounts } = useSavedAccounts();
+  const recentAccounts = useRecentAccounts();
   const savedAccountsCopy = locale === "ro"
     ? {
-        title: "Conturi salvate",
-        description: "Continuă pe acest dispozitiv fără să introduci parola.",
-        continue: "Continuă cu acest cont",
-        remove: "Deconectează acest cont de pe dispozitiv",
         removed: "Contul a fost eliminat de pe acest dispozitiv.",
-        error: "Contul salvat nu a putut fi activat.",
+        error: "Sesiunea nu a putut fi reluată. Folosește parola sau un link de conectare pentru acest email.",
       }
     : {
-        title: "Saved accounts",
-        description: "Continue on this device without entering your password.",
-        continue: "Continue with this account",
-        remove: "Log this account out on this device",
         removed: "The account was removed from this device.",
-        error: "The saved account could not be activated.",
+        error: "The session could not be resumed. Use your password or a sign-in link for this email.",
       };
   const brandMessages: BrandMessage[] = [
     {
@@ -639,30 +633,55 @@ export default function LoginPage() {
     }
   }
 
-  async function continueWithSavedAccount(account: SavedScripticXAccount) {
+  function selectRecentAccount(account: RecentAccount) {
+    setEmail(account.email);
+    setPassword("");
+    // These inputs are uncontrolled to preserve browser/password-manager autofill.
+    const emailInput = loginFormRef.current?.querySelector<HTMLInputElement>('input[name="email"]');
+    const passwordInput = loginFormRef.current?.querySelector<HTMLInputElement>('input[name="password"]');
+    if (emailInput) emailInput.value = account.email;
+    if (passwordInput) {
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  }
+
+  async function continueWithSavedAccount(recent: RecentAccount) {
     if (savedAccountActionId || authAction) return;
+    const account = savedAccounts.find(item => item.userId === recent.userId);
+    if (!account) {
+      selectRecentAccount(recent);
+      return;
+    }
     setSavedAccountActionId(account.userId);
 
     try {
       const session = await activateSavedAccount(account);
       router.replace(getWorkspaceLandingRoute(session.user.user_metadata));
       router.refresh();
-    } catch (error) {
-      showModal(
-        t("login.modal.loginErrorTitle"),
-        error instanceof Error ? error.message : savedAccountsCopy.error,
-        "error"
-      );
+    } catch {
+      selectRecentAccount(recent);
+      toast.info(savedAccountsCopy.error);
     } finally {
       setSavedAccountActionId(null);
     }
   }
 
-  async function forgetSavedAccount(account: SavedScripticXAccount) {
+  async function forgetSavedAccount(account: RecentAccount) {
     if (savedAccountActionId || savedAccountRemovalId || authAction) return;
     setSavedAccountRemovalId(account.userId);
     try {
-      await logoutSavedAccount(account);
+      const saved = savedAccounts.find(item => item.userId === account.userId);
+      if (saved) await logoutSavedAccount(saved);
+      forgetRecentAccount(account.userId);
+      if (email.trim().toLowerCase() === account.email.toLowerCase()) {
+        setEmail("");
+        setPassword("");
+        const emailInput = loginFormRef.current?.querySelector<HTMLInputElement>('input[name="email"]');
+        const passwordInput = loginFormRef.current?.querySelector<HTMLInputElement>('input[name="password"]');
+        if (emailInput) { emailInput.value = ""; emailInput.focus(); }
+        if (passwordInput) passwordInput.value = "";
+      }
       toast.success(savedAccountsCopy.removed);
     } finally {
       setSavedAccountRemovalId(null);
@@ -960,75 +979,17 @@ export default function LoginPage() {
 
             <Card className="relative overflow-hidden shadow-sm" aria-busy={loading}>
               <CardContent className="space-y-5 p-5 sm:p-6">
-                {authTab === "login" && savedAccounts.length ? (
-                  <section className="rounded-xl border bg-muted/25 p-2">
-                    <div className="px-2 pb-2 pt-1">
-                      <p className="text-sm font-medium">{savedAccountsCopy.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {savedAccountsCopy.description}
-                      </p>
-                    </div>
-                    <div className="max-h-52 space-y-1 overflow-y-auto">
-                      {savedAccounts.map((account) => (
-                        <div
-                          key={account.userId}
-                          className="flex min-w-0 items-center gap-2 rounded-lg bg-background p-2 shadow-sm"
-                        >
-                          <UserAvatar
-                            avatarUrl={account.avatarUrl}
-                            username={account.username}
-                            email={account.email}
-                            className="size-9"
-                          />
-                          <button
-                            type="button"
-                            className="min-w-0 flex-1 text-left"
-                            onClick={() => void continueWithSavedAccount(account)}
-                            disabled={Boolean(savedAccountActionId) || Boolean(savedAccountRemovalId) || authAction !== null}
-                          >
-                            <span className="block truncate text-sm font-medium">
-                              {account.nickname}
-                            </span>
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {account.email}
-                            </span>
-                          </button>
-                          <Button
-                            type="button"
-                            size="icon-sm"
-                            variant="ghost"
-                            title={savedAccountsCopy.continue}
-                            aria-label={savedAccountsCopy.continue}
-                            disabled={Boolean(savedAccountActionId) || Boolean(savedAccountRemovalId) || authAction !== null}
-                            onClick={() => void continueWithSavedAccount(account)}
-                          >
-                            {savedAccountActionId === account.userId ? (
-                              <LoaderCircle className="animate-spin" />
-                            ) : (
-                              <ArrowRight />
-                            )}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon-sm"
-                            variant="ghost"
-                            className="text-muted-foreground hover:text-destructive"
-                            title={savedAccountsCopy.remove}
-                            aria-label={`${savedAccountsCopy.remove}: ${account.nickname}`}
-                            disabled={Boolean(savedAccountActionId) || Boolean(savedAccountRemovalId) || authAction !== null}
-                            onClick={() => void forgetSavedAccount(account)}
-                          >
-                            {savedAccountRemovalId === account.userId ? (
-                              <LoaderCircle className="animate-spin" />
-                            ) : (
-                              <LogOut />
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
+                {authTab === "login" && <RecentAccounts
+                  accounts={recentAccounts}
+                  sessionIds={new Set(savedAccounts.map(account => account.userId))}
+                  selectedEmail={email}
+                  disabled={loading || Boolean(savedAccountActionId) || Boolean(savedAccountRemovalId) || authAction !== null || loginTransitioning}
+                  continuingId={savedAccountActionId}
+                  removingId={savedAccountRemovalId}
+                  onSelect={selectRecentAccount}
+                  onContinue={account => void continueWithSavedAccount(account)}
+                  onForget={account => void forgetSavedAccount(account)}
+                />}
 
                 <Tabs
                   value={authTab}
@@ -1096,7 +1057,10 @@ export default function LoginPage() {
                           type="button"
                           variant="ghost"
                           className="w-full text-muted-foreground hover:text-foreground"
-                          onClick={() => setPasswordlessOpen(true)}
+                          onClick={() => {
+                            if (loginFormRef.current) setEmail(readAuthFormCredentials(new FormData(loginFormRef.current)).email);
+                            setPasswordlessOpen(true);
+                          }}
                           disabled={loading || authAction !== null}
                         >
                           <KeyRound className="size-4" />
@@ -1208,11 +1172,11 @@ export default function LoginPage() {
         </main>
       </div>
 
-      <PasswordlessSignInDialog
+      {passwordlessOpen && <PasswordlessSignInDialog
         initialEmail={email}
         open={passwordlessOpen}
         onOpenChange={setPasswordlessOpen}
-      />
+      />}
 
       <AppModal
         open={modalOpen}

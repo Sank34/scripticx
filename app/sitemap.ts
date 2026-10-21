@@ -9,6 +9,7 @@ const publicRoutes = [
   "/problems",
   "/leaderboard",
   "/community",
+  "/groups",
   "/help",
   "/contact",
   "/updates",
@@ -33,7 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Dynamic entries are an enhancement. A database outage must not block a
     // production build or prevent the static sitemap from being generated.
     const supabase = createServerSupabase({ fetchTimeoutMs: 4_000 });
-    const [problemsResult, updatesResult, profilesResult, postsResult] =
+    const [problemsResult, updatesResult, profilesResult, postsResult, groupsResult] =
       await Promise.all([
         supabase.from("problems").select("id").limit(500),
         supabase.from("updates").select("slug, date").limit(200),
@@ -43,6 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           .select("id, created_at")
           .order("created_at", { ascending: false })
           .limit(500),
+        supabase.from("study_groups").select("slug").eq("visibility", "public").limit(500),
       ]);
 
     const problemEntries: MetadataRoute.Sitemap = (
@@ -89,6 +91,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...updateEntries,
       ...profileEntries,
       ...postEntries,
+      ...(groupsResult.data || []).filter(group => Boolean(group.slug)).map(group => ({
+        url: absoluteUrl(`/groups/${encodeURIComponent(group.slug)}`),
+        changeFrequency: "weekly" as const,
+        priority: 0.6,
+      })),
     ];
   } catch (error) {
     console.warn("Could not build the dynamic sitemap.", error);

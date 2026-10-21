@@ -19,7 +19,7 @@ const getPostPreview = cache(async (id: string): Promise<PostPreview> => {
   const supabase = createServerSupabase();
   const { data: post } = await supabase
     .from("posts")
-    .select("id, user_id, content, code, image_url, created_at")
+    .select("id, user_id, content, code, image_url, created_at, is_ai_generated")
     .eq("id", id)
     .maybeSingle();
 
@@ -49,7 +49,7 @@ export async function generateMetadata({
   if (!post) return createNotFoundMetadata("Post");
 
   const username = profile?.username || "ScripticX member";
-  const title = `Post by ${username}`;
+  const title = `${post.is_ai_generated === true ? "AI-generated post" : "Post"} by ${username}`;
 
   return createPageMetadata({
     title,

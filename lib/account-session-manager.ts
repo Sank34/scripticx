@@ -104,6 +104,7 @@ export async function logoutCurrentAccount(
 ): Promise<LogoutAccountResult> {
   const { data: currentData } = await supabase.auth.getSession();
   const currentSession = currentData.session;
+  if (currentSession?.user.id === currentUserId) saveAccountSession(currentSession);
   const fallbackAccounts = listSavedAccounts().filter(
     (account) => account.userId !== currentUserId
   );

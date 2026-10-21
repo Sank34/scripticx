@@ -42,6 +42,7 @@ export type FeedPost = {
   content: string;
   code?: string | null;
   image_url?: string | null;
+  is_ai_generated?: boolean;
   created_at?: string | null;
   profiles?: ProfileSummary | null;
   [key: string]: unknown;
@@ -420,6 +421,7 @@ type CreatePostInput = {
   content: string;
   code?: string | null;
   image?: File | null;
+  isAiGenerated?: boolean;
 };
 
 type CreateNotificationInput = {
@@ -878,7 +880,8 @@ class FeedApi {
     }
   }
 
-  async createPost({ userId, content, code, image }: CreatePostInput) {
+  async createPost({ userId, content, code, image, isAiGenerated = false }: CreatePostInput) {
+    if (typeof isAiGenerated !== "boolean") throw new Error("Invalid AI disclosure");
     let imageUrl: string | null = null;
 
     if (image) {
@@ -911,8 +914,9 @@ class FeedApi {
         content,
         code: code || null,
         image_url: imageUrl,
+        is_ai_generated: isAiGenerated,
       })
-      .select("id, user_id, content, code, image_url, created_at")
+      .select("id, user_id, content, code, image_url, created_at, is_ai_generated")
       .single<FeedPost>();
 
     if (error) throw error;
@@ -955,6 +959,17 @@ class FeedApi {
     }
 
     return post;
+  }
+
+  async setAiGenerated(postId: string, isAiGenerated: boolean): Promise<boolean> {
+    if (typeof isAiGenerated !== "boolean") throw new Error("Invalid AI disclosure");
+    const { data, error } = await this.client.rpc("set_post_ai_generated", {
+      p_post_id: postId,
+      p_is_ai_generated: isAiGenerated,
+    });
+    if (error) throw error;
+    if (data !== isAiGenerated) throw new Error("AI disclosure was not saved");
+    return data;
   }
 
   async deletePost(postId: string) {

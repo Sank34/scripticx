@@ -7,6 +7,7 @@ import { HighlightedCodeBlock } from "@/components/code/HighlightedCodeBlock";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { MentionText } from "@/components/feed/MentionText";
+import { PostAiLabel } from "@/components/feed/PostAiDisclosure";
 
 type FeedPostCardLabels = {
   comment: string;
@@ -105,6 +106,7 @@ export function FeedPostCard({
         </CardHeader>
 
         <CardContent className="space-y-4 px-5 py-4">
+          <PostAiLabel marked={post.is_ai_generated} />
           <MentionText
             content={post.content}
             className="whitespace-pre-wrap text-[15px] leading-6"
