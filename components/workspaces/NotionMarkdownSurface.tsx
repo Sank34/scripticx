@@ -256,7 +256,7 @@ export function NotionMarkdownSurface({
       MarkdownNoteTableCell,
       MarkdownNoteTableHeader,
       Placeholder.configure({
-        placeholder,
+        placeholder: ({ node }) => node.type.name === "codeBlock" ? "" : placeholder,
         showOnlyWhenEditable: true,
       }),
       Markdown.configure({

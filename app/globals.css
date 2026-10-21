@@ -616,6 +616,7 @@ html.theme-transition::view-transition-new(root) {
   padding: 2.75rem 1.25rem 0.75rem;
   white-space: pre;
 }
+.notion-note-prose .node-codeBlock.is-empty::before,
 .notion-note-prose [data-note-code-block].is-empty::before,
 .notion-note-prose [data-note-code-block] .is-empty::before {
   content: none;
