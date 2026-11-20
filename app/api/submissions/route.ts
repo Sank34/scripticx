@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     });
     const { data, error } = await createAdminSupabase()
       .from("submissions")
-      .select("id, problem_id, code, score, created_at, verified_at")
+      .select("id, problem_id, code, language, score, created_at, verified_at")
       .eq("user_id", user.id)
       .eq("problem_id", problemId)
       .order("created_at", { ascending: false })

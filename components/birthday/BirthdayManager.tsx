@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { ScheduledAnnouncementManager } from "@/components/announcements/ScheduledAnnouncementManager";
 import { BirthdayCelebration } from "@/components/birthday/BirthdayCelebration";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -32,10 +33,11 @@ function localDateKey() {
   ].join("-");
 }
 
-export function BirthdayManager() {
+export function BirthdayManager({ userId }: { userId: string }) {
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const { profile, user } = useAuth();
+  const { profile, user, isBanned } = useAuth();
+
   const [dateKey, setDateKey] = useState(localDateKey);
   const [experienceReadyFor, setExperienceReadyFor] = useState<string | null>(null);
   const [celebration, setCelebration] =
@@ -93,14 +95,11 @@ export function BirthdayManager() {
     () => ["birthday-surprise", user?.id, dateKey] as const,
     [dateKey, user?.id]
   );
+  const eligible = Boolean(user?.id === userId && profile?.id && experienceReadyFor === readinessKey) && !isBanned && !excludedRoutes.has(pathname);
   const birthdayQuery = useQuery({
     queryKey,
     queryFn: claimBirthdaySurprise,
-    enabled:
-      Boolean(user?.id) &&
-      Boolean(profile?.id) &&
-      experienceReadyFor === readinessKey &&
-      !excludedRoutes.has(pathname),
+    enabled: eligible,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
@@ -122,13 +121,22 @@ export function BirthdayManager() {
     console.warn("Birthday surprise check failed:", birthdayQuery.error);
   }, [birthdayQuery.error]);
 
-  if (!celebration) return null;
+  if (!eligible) return null;
+  if (!celebration) {
+    const birthdayPending = birthdayQuery.data?.claimed;
+    return user && birthdayQuery.isSuccess && !birthdayPending
+      ? <ScheduledAnnouncementManager key={user.id} userId={user.id} />
+      : null;
+  }
 
   return (
     <BirthdayCelebration
       profile={profile}
       productIds={celebration.productIds}
-      onDismiss={() => setCelebration(null)}
+      onDismiss={() => {
+        queryClient.setQueryData<BirthdaySurpriseResult>(queryKey, (result) => result ? { ...result, claimed: false } : result);
+        setCelebration(null);
+      }}
     />
   );
 }

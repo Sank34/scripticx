@@ -4,13 +4,14 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/hooks/useAuth";
+import { learningProgressVersion } from "@/lib/learning-progress-version";
 import {
   learningPathEnrollmentEvent,
   readLearningPathEnrollments,
 } from "@/lib/learning-paths";
 
 export function learningPathEnrollmentsQueryKey(userId?: string | null) {
-  return ["roadmap", "path-enrollments", userId ?? "anonymous"] as const;
+  return ["roadmap", "path-enrollments", learningProgressVersion, userId ?? "anonymous"] as const;
 }
 
 export function useLearningPaths() {

@@ -3,10 +3,13 @@ import {
   getLessonRule,
   learnLessons,
   learnSections,
+  archivedFoundationLessonIds,
+  archivedFoundationSectionIds,
   type LearnLesson,
   type LearnSection,
 } from "@/lib/learn-lessons";
 import { supabase } from "@/lib/supabase";
+import { isValidLessonQuiz } from "@/lib/lesson-quiz";
 
 export type RoadmapConfigNode = {
   id: string;
@@ -78,15 +81,12 @@ export type RoadmapConfig = {
   version: 1;
 };
 
-export const roadmapConfigKey = "scripticx.roadmapConfig.v1";
+export const roadmapConfigKey = "scripticx.roadmapConfig.database.v2";
 export const roadmapConfigEvent = "scripticx:roadmap-config";
 export const roadmapConfigId = "default";
 const roadmapMetadataKey = "__roadmap";
 const legacyMiniScriptCategoryId = "miniscript-roadmap";
 const foundationPathSlug = "miniscript-plus";
-const staticLessonById = new Map(
-  learnLessons.map((lesson) => [lesson.id, lesson])
-);
 
 export const defaultRoadmapCategories: RoadmapCategory[] = [
   {
@@ -111,7 +111,7 @@ export const defaultRoadmapCategories: RoadmapCategory[] = [
   },
   {
     accentColor: "#8b5cf6",
-    availability: "published",
+    availability: "draft",
     estimatedHours: 4,
     id: "complexity-analysis",
     icon: "chart",
@@ -274,6 +274,7 @@ type RemoteLearningPathRow = {
 };
 
 type RemoteUnitRoadmapMetadata = {
+  label?: LearnSection["label"];
   frame?: RoadmapSectionFrame;
 };
 
@@ -367,67 +368,6 @@ export function buildDefaultRoadmapConnections(
   );
 }
 
-function mergeDefaultSections(
-  remoteSections: LearnSection[],
-  remoteLessons: LearnLesson[],
-  deletedSectionIds: string[] = []
-) {
-  const remoteSectionIds = new Set(remoteSections.map((section) => section.id));
-  const remoteLessonIds = new Set(remoteLessons.map((lesson) => lesson.id));
-  const deletedSectionIdSet = new Set(deletedSectionIds);
-  const missingSections = learnSections.map((section) => {
-    if (remoteSectionIds.has(section.id) || deletedSectionIdSet.has(section.id)) {
-      return null;
-    }
-
-    return {
-      ...section,
-      lessonIds: section.lessonIds.filter((lessonId) => !remoteLessonIds.has(lessonId)),
-    };
-  });
-
-  return [
-    ...remoteSections,
-    ...missingSections.filter((section): section is LearnSection => Boolean(section)),
-  ];
-}
-
-function mergeDefaultCategories(
-  remoteCategories: RoadmapCategory[],
-  remoteSections: LearnSection[],
-  deletedCategoryIds: string[] = []
-) {
-  const normalizedRemoteCategories = remoteCategories.map((category, index) =>
-    normalizeRoadmapCategory(category, index)
-  );
-  const remoteCategoryIds = new Set(
-    normalizedRemoteCategories.map((category) => category.id)
-  );
-  const remoteSectionIds = new Set(remoteSections.map((section) => section.id));
-  const deletedCategoryIdSet = new Set(deletedCategoryIds);
-  const merged = [...normalizedRemoteCategories];
-
-  for (const defaultCategory of defaultRoadmapCategories) {
-    if (deletedCategoryIdSet.has(defaultCategory.id)) continue;
-    if (remoteCategoryIds.has(defaultCategory.id)) {
-      const category = merged.find((item) => item.id === defaultCategory.id);
-      if (category) {
-        category.sectionIds = Array.from(
-          new Set([
-            ...category.sectionIds,
-            ...defaultCategory.sectionIds.filter((sectionId) => !remoteSectionIds.has(sectionId)),
-          ])
-        );
-      }
-      continue;
-    }
-
-    merged.push(defaultCategory);
-  }
-
-  return merged.sort((a, b) => a.order - b.order);
-}
-
 export function readRoadmapConfig(): RoadmapConfig | null {
   if (typeof window === "undefined") return null;
 
@@ -491,18 +431,19 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
         .from("learning_units")
         .select("id, path_id, slug, title_i18n, description_i18n, order_index")
         .in("path_id", pathRows.map((path) => path.id))
+        .eq("is_published", true)
         .order("order_index", { ascending: true })
         .returns<RemoteUnitRow[]>(),
       supabase
         .from("lessons")
         .select("id, unit_id, slug, title_i18n, summary_i18n, content_i18n, transcript_i18n, youtube_url, example_code, sample_input, quiz, tags, level, estimated_minutes, completion_requirement, requires_correct_quiz, required_problem_codes, order_index, is_published")
+        .eq("is_published", true)
         .order("order_index", { ascending: true })
         .returns<(RemoteLessonRow & { estimated_minutes: number | null })[]>(),
     ]);
 
   if (unitError) throw unitError;
   if (lessonError) throw lessonError;
-  if (!unitRows?.length && !lessonRows?.length) return null;
 
   const categoryIdByPathId = new Map(
     pathRows.map((path) => [path.id, path.slug])
@@ -554,7 +495,7 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     id: unit.slug,
     order: unit.order_index ?? index + 1,
     pathSlug: category?.slug,
-    label: {
+    label: unit.description_i18n?.__roadmap?.label ?? {
       en: unit.title_i18n?.en ?? unit.slug,
       ro: unit.title_i18n?.ro ?? unit.title_i18n?.en ?? unit.slug,
     },
@@ -598,31 +539,6 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     const metadata = (row.content_i18n?.[roadmapMetadataKey] ??
       {}) as RemoteRoadmapMetadata;
     const section = row.unit_id ? sectionByUnitId.get(row.unit_id) : undefined;
-    const staticLesson = staticLessonById.get(row.slug);
-    const isLegacySparseLesson = Boolean(
-      staticLesson &&
-        !row.youtube_url &&
-        !row.example_code?.trim() &&
-        !row.sample_input?.trim() &&
-        !(row.quiz?.length ?? 0) &&
-        !row.transcript_i18n?.en?.trim() &&
-        !row.transcript_i18n?.ro?.trim() &&
-        !(metadata.theory?.length ?? 0)
-    );
-    const fallbackLesson = isLegacySparseLesson ? staticLesson : undefined;
-    const fallbackRequiredProblemCodes =
-      fallbackLesson && row.completion_requirement === "capstone"
-        ? fallbackLesson.recommendedProblems
-            .slice(0, 1)
-            .map((problem) => problem.code)
-            .filter((code): code is number => typeof code === "number")
-        : undefined;
-    const fallbackRequiresCorrectQuiz = fallbackLesson
-      ? (row.completion_requirement === "required" ||
-          row.completion_requirement === "capstone") &&
-        fallbackLesson.quiz.length > 0
-      : undefined;
-
     if (section) section.lessonIds.push(row.slug);
 
     return {
@@ -630,25 +546,22 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
       order: row.order_index ?? index + 1,
       unit: section?.title ?? { en: "Roadmap", ro: "Roadmap" },
       title: {
-        en: fallbackLesson?.title.en ?? row.title_i18n?.en ?? row.slug,
+        en: row.title_i18n?.en ?? row.slug,
         ro:
-          fallbackLesson?.title.ro ??
           row.title_i18n?.ro ??
           row.title_i18n?.en ??
           row.slug,
       },
       summary: {
-        en: fallbackLesson?.summary.en ?? row.summary_i18n?.en ?? "",
+        en: row.summary_i18n?.en ?? "",
         ro:
-          fallbackLesson?.summary.ro ??
           row.summary_i18n?.ro ??
           row.summary_i18n?.en ??
           "",
       },
       transcript: {
-        en: fallbackLesson?.transcript.en ?? row.transcript_i18n?.en ?? "",
+        en: row.transcript_i18n?.en ?? "",
         ro:
-          fallbackLesson?.transcript.ro ??
           row.transcript_i18n?.ro ??
           row.transcript_i18n?.en ??
           "",
@@ -658,27 +571,25 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
             en: content.markdown.en ?? content.markdown.ro ?? "",
             ro: content.markdown.ro ?? content.markdown.en ?? "",
           }
-        : fallbackLesson?.markdown,
-      videoUrl: fallbackLesson?.videoUrl ?? row.youtube_url ?? undefined,
-      tags: fallbackLesson?.tags ?? row.tags ?? [],
-      level: fallbackLesson?.level ?? row.level ?? "beginner",
-      minutes: fallbackLesson?.minutes ?? row.estimated_minutes ?? 8,
-      sampleInput: fallbackLesson?.sampleInput ?? row.sample_input ?? "",
-      code: fallbackLesson?.code ?? row.example_code ?? "",
-      quiz: fallbackLesson?.quiz ?? row.quiz ?? [],
+        : undefined,
+      videoUrl: row.youtube_url ?? undefined,
+      tags: row.tags ?? [],
+      level: row.level ?? "beginner",
+      minutes: row.estimated_minutes ?? 8,
+      sampleInput: row.sample_input ?? "",
+      code: row.example_code ?? "",
+      quiz: row.quiz ?? [],
       recommendedProblems:
-        fallbackLesson?.recommendedProblems ?? metadata.recommendedProblems ?? [],
-      kind: metadata.kind ?? fallbackLesson?.kind,
+        metadata.recommendedProblems ?? [],
+      kind: metadata.kind,
       completionRequirement: row.completion_requirement ?? undefined,
-      theory: fallbackLesson?.theory ?? metadata.theory,
+      theory: metadata.theory,
       unlockRule: {
         ...metadata.unlockRule,
         requiredProblemCodes:
-          fallbackRequiredProblemCodes ??
           row.required_problem_codes?.filter((code) => code > 0) ??
           metadata.unlockRule?.requiredProblemCodes,
         requiresCorrectQuiz:
-          fallbackRequiresCorrectQuiz ??
           row.requires_correct_quiz ??
           metadata.unlockRule?.requiresCorrectQuiz,
       },
@@ -704,16 +615,8 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     );
   });
 
-  const mergedSections = mergeDefaultSections(
-    units,
-    lessons,
-    savedLayout?.deletedSectionIds
-  );
-  const remoteLessonIds = new Set(lessons.map((lesson) => lesson.id));
-  const mergedLessons = [
-    ...lessons,
-    ...learnLessons.filter((lesson) => !remoteLessonIds.has(lesson.id)),
-  ];
+  const mergedSections = units;
+  const mergedLessons = lessons;
 
   const remoteNodeById = new Map(remoteNodes.map((node) => [node.id, node]));
   const sectionByLessonId = new Map<string, string>();
@@ -743,11 +646,7 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
     : buildDefaultRoadmapConnections(nodes, mergedSections);
 
   return {
-    categories: mergeDefaultCategories(
-      categories,
-      units,
-      savedLayout?.deletedCategoryIds
-    ),
+    categories,
     connections,
     lessons: mergedLessons,
     nodes,
@@ -759,6 +658,7 @@ export async function readRemoteRoadmapConfig(): Promise<RoadmapConfig | null> {
 }
 
 export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
+  if (config.lessons.some(lesson => !isValidLessonQuiz(lesson.quiz))) throw new Error("Every published lesson needs a valid bilingual quiz.");
   const { data: existingPaths, error: pathsReadError } = await supabase
     .from("learning_paths")
     .select("id, slug, description_i18n")
@@ -892,6 +792,7 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
         ...section.description,
         [roadmapMetadataKey]: {
           ...(existing?.description_i18n?.[roadmapMetadataKey] ?? {}),
+          label: section.label,
           frame: frameBySectionId.get(section.id),
         },
       },
@@ -979,7 +880,7 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
     ...learnLessons.map((lesson) => lesson.id),
     ...(localConfig?.lessons ?? []).map((lesson) => lesson.id),
   ]);
-  const deletedSlugs = [...removableSlugs].filter((slug) => !savedSlugs.has(slug));
+  const deletedSlugs = [...removableSlugs].filter((slug) => !savedSlugs.has(slug) && !archivedFoundationLessonIds.has(slug));
 
   if (deletedSlugs.length > 0) {
     const { error: deleteError } = await supabase
@@ -998,7 +899,7 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
   const deletedUnitIds = (existingUnits ?? [])
     .filter(
       (unit) =>
-        removableSectionIds.has(unit.slug) && !savedSectionIds.has(unit.slug)
+        removableSectionIds.has(unit.slug) && !savedSectionIds.has(unit.slug) && !archivedFoundationSectionIds.has(unit.slug)
     )
     .map((unit) => unit.id);
 
@@ -1015,7 +916,6 @@ export async function writeRemoteRoadmapConfig(config: RoadmapConfig) {
     config.categories.map((category) => category.slug)
   );
   const removableCategorySlugs = new Set([
-    ...defaultRoadmapCategories.map((category) => category.slug),
     ...(localConfig?.categories ?? []).map((category) => category.slug),
   ]);
   const deletedPathIds = (existingPaths ?? [])
@@ -1043,18 +943,23 @@ export function clearRoadmapConfig() {
   window.dispatchEvent(new CustomEvent(roadmapConfigEvent));
 }
 
-export function getRoadmapConfigData(config?: RoadmapConfig | null) {
-  return {
-    categories: config?.categories?.length
-      ? config.categories.map((category, index) =>
-          normalizeRoadmapCategory(category, index)
-        )
-      : defaultRoadmapCategories,
-    lessons: config?.lessons?.length ? config.lessons : learnLessons,
+export function getRoadmapConfigData(config?: Partial<RoadmapConfig> | null) {
+  const data = {
+    categories: (config?.categories ?? []).map((category, index) => normalizeRoadmapCategory(category, index)),
+    lessons: (config?.lessons?.length ? config.lessons : learnLessons).filter(lesson => !archivedFoundationLessonIds.has(lesson.id)).map((lesson, index) => lesson.order > 0 ? lesson : { ...lesson, order: index + 1 }),
     connections:
       config?.connections ??
       buildDefaultRoadmapConnections(config?.nodes ?? [], config?.sections ?? learnSections),
     sectionFrames: config?.sectionFrames ?? [],
-    sections: config?.sections?.length ? config.sections : learnSections,
+    sections: (config?.sections?.length ? config.sections : learnSections).filter(section => !archivedFoundationSectionIds.has(section.id)),
+  };
+  const lessonIds = new Set(data.lessons.map(lesson => lesson.id));
+  const sectionIds = new Set(data.sections.map(section => section.id));
+  return {
+    ...data,
+    categories: data.categories.map(category => ({ ...category, availability: category.id === "complexity-analysis" && !data.sections.some(section => section.pathSlug === "complexity-analysis") ? "draft" as const : category.availability, sectionIds: category.sectionIds.filter(id => sectionIds.has(id)) })),
+    sections: data.sections.map(section => ({ ...section, lessonIds: section.lessonIds.filter(id => lessonIds.has(id)) })),
+    connections: data.connections.filter(connection => lessonIds.has(connection.sourceId) && lessonIds.has(connection.targetId)),
+    sectionFrames: data.sectionFrames.filter(frame => sectionIds.has(frame.sectionId)),
   };
 }

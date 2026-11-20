@@ -102,12 +102,17 @@ import {
   learnLessons,
   learnSections,
   text,
+  type RecommendedProblem,
   type LearnLesson,
   type LearnSection,
   type LessonCompletionRequirement,
   type LessonRuleKind,
   type LessonLocale,
 } from "@/lib/learn-lessons";
+import { RoadmapProblemPicker } from "@/components/admin/RoadmapProblemPicker";
+import { useAuth } from "@/hooks/useAuth";
+import { roadmapQueryKey } from "@/hooks/useRoadmapConfig";
+import { isValidLessonQuiz } from "@/lib/lesson-quiz";
 import { getLessonMarkdown } from "@/lib/lesson-markdown";
 import {
   buildDefaultRoadmapConnections,
@@ -190,6 +195,7 @@ type ConnectionDraft = Extract<NonNullable<DragState>, { type: "connection" }>;
 type LocalizedDraftText = Record<LessonLocale, string>;
 
 type QuizDraft = {
+  explanation?: LocalizedDraftText;
   answerIndex: number;
   options: LocalizedDraftText[];
   question: LocalizedDraftText;
@@ -204,6 +210,7 @@ type LessonDraft = {
   markdown: LocalizedDraftText;
   minutes: number;
   quiz: QuizDraft[];
+  recommendedProblems: RecommendedProblem[];
   requiredProblemCodes: string;
   requiresCorrectQuiz: boolean;
   sampleInput: string;
@@ -378,6 +385,7 @@ const copy = {
     addQuestion: "Add question",
     requiredQuiz: "Requires correct quiz",
     requiredProblems: "Required problems",
+    invalidQuiz: "Every lesson needs a quiz with questions and options in both languages and a valid correct answer.",
     visualRules: "Unlock rules",
     unlockStatus: "Access",
     ruleKind: "Rule type",
@@ -507,6 +515,7 @@ const copy = {
     addQuestion: "Adaugă întrebare",
     requiredQuiz: "Necesită quiz corect",
     requiredProblems: "Probleme obligatorii",
+    invalidQuiz: "Fiecare lecție are nevoie de quiz, cu întrebări și variante în ambele limbi și un răspuns corect valid.",
     visualRules: "Reguli de deblocare",
     unlockStatus: "Acces",
     ruleKind: "Tip regulă",
@@ -556,10 +565,6 @@ const copy = {
     ruleKinds: { required: "Obligatoriu", bonus: "Bonus", challenge: "Challenge", theory: "Teorie", video: "Video", assessment: "Evaluare" },
   },
 } as const;
-
-function buildInitialSections() {
-  return [...learnSections];
-}
 
 function buildInitialCategories() {
   return defaultRoadmapCategories.map((category) => ({ ...category }));
@@ -683,7 +688,9 @@ function buildInitialDrafts(
             getLessonMarkdown(lesson, "ro")
           ),
           minutes: lesson.minutes,
+          recommendedProblems: lesson.recommendedProblems,
           quiz: lesson.quiz.map((question) => ({
+            explanation: question.explanation,
             answerIndex: question.answerIndex,
             options: question.options.map((option) =>
               toLocalizedDraftText(text(option, "en"), text(option, "ro"))
@@ -780,7 +787,7 @@ function createLessonShell(
     ro: "Configurează obiectivul, conținutul și quiz-ul acestei lecții.",
   } satisfies LocalizedDraftText;
   const hasCode = kind === "challenge" || kind === "interactive";
-  const hasQuiz = kind !== "theory";
+  const hasQuiz = true;
 
   return {
     id,
@@ -868,6 +875,7 @@ function materializeLesson(
     minutes: draft.minutes,
     order,
     quiz: draft.quiz.map((question) => ({
+      explanation: question.explanation,
       answerIndex: Math.min(
         Math.max(question.answerIndex, 0),
         Math.max(question.options.length - 1, 0)
@@ -875,7 +883,7 @@ function materializeLesson(
       options: question.options,
       question: question.question,
     })),
-    recommendedProblems: node.lesson.recommendedProblems ?? [],
+    recommendedProblems: draft.recommendedProblems,
     sampleInput: draft.sampleInput,
     summary: draft.summary,
     tags,
@@ -1004,6 +1012,7 @@ function getHandleClass(side: RoadmapConnectionSide) {
 
 function LessonsAdminContent() {
   const { locale } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
   const c = copy[lessonLocale];
@@ -1119,9 +1128,12 @@ function LessonsAdminContent() {
   const dragRef = useRef<DragState>(null);
   const clipboardRef = useRef<ClipboardNode[]>([]);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const { data: remoteConfig, isError: remoteConfigFailed } = useQuery({
-    queryKey: ["roadmap", "config-raw"],
+  const { data: remoteConfig, isError: remoteConfigFailed, isPending: remoteConfigLoading } = useQuery({
+    queryKey: ["roadmap", "config-raw", "database-v1", user?.id],
+    enabled: !authLoading && Boolean(user),
     queryFn: () => readRemoteRoadmapConfig(),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1413,9 +1425,10 @@ function LessonsAdminContent() {
 
   function resetLayout() {
     clearRoadmapConfig();
-    const initialCategories = buildInitialCategories();
-    const initialSections = buildInitialSections();
-    const initialNodes = buildInitialNodes(initialSections, learnLessons);
+    if (!remoteConfig) return;
+    const initialCategories = remoteConfig.categories;
+    const initialSections = remoteConfig.sections;
+    const initialNodes = buildInitialNodes(initialSections, remoteConfig.lessons);
     const initialConnections = buildDefaultRoadmapConnections(initialNodes, initialSections);
     const initialSectionFrames = buildInitialSectionFrames(initialNodes, initialSections);
     setCategories(initialCategories);
@@ -1423,7 +1436,7 @@ function LessonsAdminContent() {
     setNodes(initialNodes);
     setConnections(initialConnections);
     setSectionFrames(initialSectionFrames);
-    setDrafts(buildInitialDrafts());
+    setDrafts(buildInitialDrafts(remoteConfig.lessons));
     setSelectedId(initialNodes[0]?.id ?? "");
     setSelectedIds(initialNodes[0]?.id ? [initialNodes[0].id] : []);
     setSelectedSectionId(initialNodes[0]?.sectionId ?? initialSections[0]?.id ?? "");
@@ -1437,6 +1450,7 @@ function LessonsAdminContent() {
   }
 
   async function saveRoadmapConfig() {
+    if (remoteConfigLoading || remoteConfigFailed) { toast.error(c.saveError); return; }
     const categoryIds = new Set(categories.map((category) => category.id));
     const categorySlugs = categories.map((category) => category.slug.trim());
     const invalidSlug = categorySlugs.some(
@@ -1542,10 +1556,11 @@ function LessonsAdminContent() {
     };
 
     try {
+      if (config.lessons.some(lesson => !isValidLessonQuiz(lesson.quiz))) { toast.error(c.invalidQuiz); return; }
       await writeRemoteRoadmapConfig(config);
       writeRoadmapConfig(config);
-      queryClient.setQueryData(["roadmap", "config-raw"], config);
-      queryClient.setQueryData(["roadmap", "config"], getRoadmapConfigData(config));
+      queryClient.setQueryData(["roadmap", "config-raw", "database-v1", user?.id], config);
+      queryClient.setQueryData(roadmapQueryKey, getRoadmapConfigData(config));
 
       setNodes((current) =>
         current.map((node) => {
@@ -1923,13 +1938,15 @@ function LessonsAdminContent() {
         completionRequirement: getLessonCompletionRequirement(lesson),
         kind,
         level: lesson.level,
-        locked: kind !== "theory",
+        locked: true,
         markdown: toLocalizedDraftText(
           getLessonMarkdown(lesson, "en"),
           getLessonMarkdown(lesson, "ro")
         ),
         minutes: lesson.minutes,
+        recommendedProblems: lesson.recommendedProblems,
         quiz: lesson.quiz.map((question) => ({
+          explanation: question.explanation,
           answerIndex: question.answerIndex,
           options: question.options.map((option) =>
             toLocalizedDraftText(text(option, "en"), text(option, "ro"))
@@ -1940,7 +1957,7 @@ function LessonsAdminContent() {
           ),
         })),
         requiredProblemCodes: "",
-        requiresCorrectQuiz: kind !== "theory",
+        requiresCorrectQuiz: true,
         sampleInput: lesson.sampleInput,
         summary: toLocalizedDraftText(
           text(lesson.summary, "en"),
@@ -2125,6 +2142,7 @@ function LessonsAdminContent() {
   function cloneDraft(draft: LessonDraft): LessonDraft {
     return {
       ...draft,
+      recommendedProblems: draft.recommendedProblems.map(problem => ({ ...problem, title: { ...problem.title } })),
       markdown: { ...draft.markdown },
       summary: { ...draft.summary },
       title: { ...draft.title },
@@ -2705,7 +2723,7 @@ function LessonsAdminContent() {
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[150]">
                   <SelectItem value="en">{c.english}</SelectItem>
                   <SelectItem value="ro">{c.romanian}</SelectItem>
                 </SelectContent>
@@ -2729,7 +2747,7 @@ function LessonsAdminContent() {
                   </Button>
                 ))}
               </div>
-              <Button type="button" size="sm" onClick={saveRoadmapConfig} disabled={isSaving}>
+              <Button type="button" size="sm" onClick={saveRoadmapConfig} disabled={isSaving || remoteConfigLoading || remoteConfigFailed}>
                 <Save className="h-4 w-4" />
                 {isSaving ? c.saving : c.save}
               </Button>
@@ -3055,7 +3073,7 @@ function LessonsAdminContent() {
                   <EyeOff className="h-4 w-4" />
                 )}
               </Button>
-              <Button size="sm" className="h-9 px-2 sm:px-3" onClick={saveRoadmapConfig} disabled={isSaving} aria-label={isSaving ? c.saving : c.save}>
+              <Button size="sm" className="h-9 px-2 sm:px-3" onClick={saveRoadmapConfig} disabled={isSaving || remoteConfigLoading || remoteConfigFailed} aria-label={isSaving ? c.saving : c.save}>
                 <Save className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{isSaving ? c.saving : c.save}</span>
               </Button>
@@ -4067,6 +4085,7 @@ function LessonsAdminContent() {
                 <TabsContent value="content" className="mt-3 space-y-3">
                   <Card>
                     <CardContent className="space-y-4 p-5">
+                      <RoadmapProblemPicker value={selectedDraft.recommendedProblems} locale={contentLocale} onChange={recommendedProblems => updateDraft(selectedLesson.id, { recommendedProblems })}/>
                       <div className="rounded-xl border bg-muted/45 p-4">
                         <div className="flex items-start gap-3">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm">
@@ -4201,6 +4220,10 @@ function LessonsAdminContent() {
                               }
                               className="min-h-16"
                             />
+                          </label>
+                          <label className="mt-3 flex flex-col gap-2 text-sm font-medium">
+                            {contentLocale === "ro" ? "Explicația răspunsului" : "Answer explanation"}
+                            <Textarea value={question.explanation?.[contentLocale] ?? ""} onChange={event => updateQuizQuestion(questionIndex, { explanation: { en: question.explanation?.en ?? "", ro: question.explanation?.ro ?? "", [contentLocale]: event.target.value } })} className="min-h-20"/>
                           </label>
                           <div className="mt-3 space-y-2">
                             {question.options.map((option, optionIndex) => (

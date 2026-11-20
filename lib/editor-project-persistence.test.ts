@@ -40,6 +40,15 @@ describe("saving a GitHub-connected editor project", () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
+  it("keeps stored visibility when saving files from another editor tab", async () => {
+    db.maybeSingle.mockResolvedValueOnce({ data: { id: "connected-project", is_public: false }, error: null });
+    const result = await persistEditorProject({
+      userId: "alice", savedId: "connected-project", payload: { ...payload, is_public: true }, updateVisibility: false,
+    });
+    expect(db.update.mock.calls[0][0]).not.toHaveProperty("is_public");
+    expect(result.isPublic).toBe(false);
+  });
+
   it("can still save a new standalone project", async () => {
     expect((await persistEditorProject({ userId: "alice", savedId: null, payload })).id).toBe("new-project");
     expect(db.insert).toHaveBeenCalledWith([{ user_id: "alice", ...payload }]);

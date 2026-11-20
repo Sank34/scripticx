@@ -72,6 +72,12 @@ import {
   unlockProblemContent,
   type ProblemGuidance,
 } from "@/lib/problem-guidance";
+import {
+  getAllowedProblemLanguages,
+  isProblemSubmissionLanguage,
+  PROBLEM_SUBMISSION_LANGUAGES,
+  type ProblemSubmissionLanguage,
+} from "@/lib/problem-submission-language";
 import { supabase } from "@/lib/supabase";
 
 type EvaluationStatus = {
@@ -86,6 +92,8 @@ type ProblemPageData = {
   dailyCompleted: boolean;
   guidance: ProblemGuidance;
 };
+
+const CPP_STARTER = "#include <iostream>\n\nint main() {\n  return 0;\n}\n";
 
 function slugify(text: string): string {
   if (!text) return "problem";
@@ -149,7 +157,10 @@ function ProblemContent() {
   const [activePanel, setActivePanel] = useState<ProblemPanel>("description");
   const statementRef = useRef<HTMLDivElement>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [code, setCode] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState<ProblemSubmissionLanguage>("miniscript");
+  const [miniScriptCode, setMiniScriptCode] = useState("");
+  const [pythonCode, setPythonCode] = useState("");
+  const [cppCode, setCppCode] = useState("");
   const [compactLayout, setCompactLayout] = useState(false);
   const [editorLine, setEditorLine] = useState(1);
   const [evaluationStatuses, setEvaluationStatuses] = useState<EvaluationStatus[]>([]);
@@ -205,6 +216,10 @@ function ProblemContent() {
   });
 
   const problem = problemQuery.data?.problem ?? null;
+  const allowedLanguages = getAllowedProblemLanguages(problem?.allowed_languages);
+  const language = allowedLanguages.includes(selectedLanguage)
+    ? selectedLanguage
+    : allowedLanguages[0] ?? "miniscript";
   const authors = useProblemAuthors([problem?.author_id]);
   const dailyChallenge = problemQuery.data?.dailyChallenge ?? null;
   const dailyCompleted = problemQuery.data?.dailyCompleted ?? false;
@@ -225,17 +240,38 @@ function ProblemContent() {
     return () => media.removeEventListener("change", synchronize);
   }, []);
 
-  const draftSync = useProblemEditorDraft({
-    code,
+  const draftContext = { problemId: id, userId: user?.id ?? null };
+  const miniScriptDraft = useProblemEditorDraft({
+    ...draftContext,
+    code: miniScriptCode,
     fallbackCode: problem ? problem.starter_code || "" : null,
-    onHydrate: setCode,
-    problemId: id,
+    onHydrate: setMiniScriptCode,
     scopeKey: "library",
-    userId: user?.id ?? null,
   });
+  const pythonDraft = useProblemEditorDraft({
+    ...draftContext,
+    code: pythonCode,
+    fallbackCode: language === "python" ? "" : null,
+    onHydrate: setPythonCode,
+    scopeKey: "library:python",
+  });
+  const cppDraft = useProblemEditorDraft({
+    ...draftContext,
+    code: cppCode,
+    fallbackCode: language === "cpp" ? CPP_STARTER : null,
+    onHydrate: setCppCode,
+    scopeKey: "library:cpp",
+  });
+  const { code, setCode, draftSync } = {
+    miniscript: { code: miniScriptCode, setCode: setMiniScriptCode, draftSync: miniScriptDraft },
+    python: { code: pythonCode, setCode: setPythonCode, draftSync: pythonDraft },
+    cpp: { code: cppCode, setCode: setCppCode, draftSync: cppDraft },
+  }[language];
+  const languageDefinition = PROBLEM_SUBMISSION_LANGUAGES[language];
+  const submitDisabled = isSubmitting || !allowedLanguages.includes(language) || !draftSync.ready || !code.trim();
 
   async function runCode() {
-    if (!problem || !user || isSubmitting) return;
+    if (!problem || !user || submitDisabled) return;
 
     const testCaseCount = Array.isArray(problem.test_cases) ? problem.test_cases.length : 0;
     setIsSubmitting(true);
@@ -260,16 +296,21 @@ function ProblemContent() {
           Authorization: `Bearer ${sessionData.session.access_token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ problemId: id, code }),
+        body: JSON.stringify({ problemId: id, code, language }),
       });
       const payload = (await response.json()) as {
         bonusAwarded?: boolean;
         bonusPoints?: number;
+        code?: string;
         dailyCompleted?: boolean;
         error?: string;
         results?: ProblemTestResult[];
         score?: number;
       };
+      if (payload.code === "problem_language_not_allowed") {
+        void queryClient.invalidateQueries({ queryKey: problemQueryKey });
+        throw new Error(t("problemPage.editor.languageNotAllowed"));
+      }
       if (!response.ok || typeof payload.score !== "number" || !payload.results) {
         throw new Error(payload.error || "Could not evaluate submission");
       }
@@ -348,7 +389,7 @@ function ProblemContent() {
   }
 
   const { bindings: shortcuts } = useKeyboardShortcuts();
-  useShortcut("submit", () => { void runCode(); }, Boolean(problem && user && !isSubmitting), true);
+  useShortcut("submit", () => { void runCode(); }, Boolean(problem && user && !submitDisabled), true);
 
   const handleEditorMount: OnMount = (editor) => {
     const synchronizeLine = () => setEditorLine(editor.getPosition()?.lineNumber ?? 1);
@@ -386,7 +427,7 @@ function ProblemContent() {
   const localizedTitle = getLocalized(problem.title_i18n, locale);
   const fileName = `${slugify(
     getLocalized(problem.title_i18n, "en") || localizedTitle
-  )}.msp`;
+  )}.${languageDefinition.extension}`;
   const perfectScore = testResults.length > 0 && passedCount === testResults.length;
   const panelItems = [
     {
@@ -592,6 +633,10 @@ function ProblemContent() {
                         shouldHavePrinted: t("problemPage.tests.shouldHavePrinted"),
                         test: t("problemPage.tests.test"),
                         wrong: t("problemPage.tests.wrong"),
+                        compilationError: t("problemPage.tests.compilationError"),
+                        runtimeError: t("problemPage.tests.runtimeError"),
+                        timeLimit: t("problemPage.tests.timeLimit"),
+                        diagnostics: t("problemPage.tests.diagnostics"),
                       }}
                       result={testResult}
                     />
@@ -721,6 +766,7 @@ function ProblemContent() {
                 items={(submissionsQuery.data?.submissions ?? []).map((submission) => ({
                   code: submission.code,
                   id: submission.id,
+                  language: submission.language ?? "miniscript",
                   score: submission.score,
                   submittedAt: submission.created_at,
                 }))}
@@ -778,28 +824,44 @@ function ProblemContent() {
 
   const editorPanel = (
     <section className="flex h-full min-h-0 min-w-0 flex-col bg-background" aria-label={t("problemPage.editor.label")}>
-      <div className="flex h-11 shrink-0 items-center border-b bg-muted/25 md:h-9">
+      <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b bg-muted/25 pr-2 md:h-9">
         <div className="flex h-full min-w-0 items-center border-r border-t-2 border-t-foreground bg-background px-3 text-xs">
           <Code2 className="mr-2 size-3.5 text-muted-foreground" aria-hidden="true" />
           <span className="truncate font-medium">{fileName}</span>
         </div>
+        <Select value={language} disabled={isSubmitting} onValueChange={(value) => {
+          if (!isProblemSubmissionLanguage(value) || !allowedLanguages.includes(value) || value === language) return;
+          setSelectedLanguage(value);
+          setTestResults([]);
+          setEvaluationStatuses([]);
+        }}>
+          <SelectTrigger size="sm" className="shrink-0 text-xs" aria-label={t("problemPage.editor.language")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {allowedLanguages.map((value) => (
+              <SelectItem key={value} value={value}>{PROBLEM_SUBMISSION_LANGUAGES[value].label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <CodeEditorContextMenu
         code={code}
         fileName={fileName}
-        onChange={setCode}
+        onChange={draftSync.ready ? setCode : undefined}
         onSubmit={runCode}
-        submitDisabled={isSubmitting}
+        submitDisabled={submitDisabled}
         submitShortcut={formatShortcut(shortcuts.submit)}
       >
         <div className="min-h-0 flex-1 overflow-hidden">
           <MiniScriptMonacoEditor
             onMount={handleEditorMount}
             height="100%"
-            language="msp"
+            language={languageDefinition.editor}
             path={fileName}
             value={code}
             onChange={setCode}
+            readOnly={!draftSync.ready}
             options={{
               acceptSuggestionOnEnter: "on",
               automaticLayout: true,
@@ -819,7 +881,7 @@ function ProblemContent() {
               snippetSuggestions: "top",
               stickyScroll: { enabled: true },
               suggestOnTriggerCharacters: true,
-              tabSize,
+              tabSize: language === "python" ? 4 : tabSize,
               insertSpaces: true,
               wordBasedSuggestions: "currentDocument",
               wordWrap: "on",
@@ -832,7 +894,9 @@ function ProblemContent() {
         <div className="flex items-center gap-2">
           <span>Ln {editorLine}</span>
           <span>·</span>
-          {draftSync.conflict ? (
+          {!draftSync.ready ? (
+            <span>{t("problemPage.editor.loadingDraft")}</span>
+          ) : draftSync.conflict ? (
             <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
               <span>{locale === "ro" ? "Conflict de ciornă" : "Draft conflict"}</span>
               <button
@@ -861,9 +925,7 @@ function ProblemContent() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {tabSizeControl}
-          <span>·</span>
-          <span>MiniScript+</span>
+          {language === "python" ? <span>4 {t("live.spaces")}</span> : tabSizeControl}
         </div>
       </footer>
     </section>
@@ -914,7 +976,7 @@ function ProblemContent() {
             <Button
               size="sm"
               onClick={() => void runCode()}
-              disabled={isSubmitting}
+              disabled={submitDisabled}
               title={formatShortcut(shortcuts.submit) || undefined}
               className="h-11 gap-1.5 px-3 md:h-8"
               aria-label={isSubmitting ? t("problemPage.actions.submitting") : t("problemPage.actions.submit")}
@@ -964,9 +1026,10 @@ function ProblemContent() {
 }
 
 export default function ProblemPage() {
+  const params = useParams();
   return (
     <RouteGuard requireAuth>
-      <ProblemContent />
+      <ProblemContent key={String(params?.id ?? "")} />
     </RouteGuard>
   );
 }

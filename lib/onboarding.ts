@@ -16,9 +16,9 @@ export const legacyAlphaCohortKey = "scripticx_v1_alpha_onboarding";
 export function shouldShowLegacyAlphaWelcome(user: {
   app_metadata?: Record<string, unknown>;
   user_metadata?: Record<string, unknown>;
-}) {
+}, tourJustCompleted = false) {
   return user.app_metadata?.[legacyAlphaCohortKey] === true
-    && needsOnboarding(user.user_metadata)
+    && (tourJustCompleted || (!needsOnboarding(user.user_metadata) && hasCompletedProductTour(user.user_metadata)))
     && !user.user_metadata?.[onboardingMetadataKeys.legacyWelcomeSeenAt];
 }
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
@@ -366,9 +366,9 @@ export function Topbar() {
                   className="h-10 w-10"
                 />
 
-                <div className="flex flex-col leading-tight">
-                  <span className="font-medium">
-                    {currentSavedAccount?.nickname || profile?.username || "User"}
+                <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="truncate font-medium">
+                    {profile?.username || currentSavedAccount?.username || currentSavedAccount?.nickname || "User"}
                   </span>
 
                   <span className="max-w-[160px] truncate text-xs text-muted-foreground">
@@ -565,7 +565,9 @@ export function Topbar() {
 
       </div>
 
-      <ShellRouteProgress />
+      <Suspense fallback={null}>
+        <ShellRouteProgress />
+      </Suspense>
 
     </header>
   );

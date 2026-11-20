@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
+  getAllowedProblemLanguages,
+  isProblemSubmissionLanguage,
+  type ProblemSubmissionLanguage,
+} from "@/lib/problem-submission-language";
+import { evaluateCloudSubmission } from "@/lib/server/evaluateCloudSubmission";
+import {
   createAdminSupabase,
   createAuthenticatedServerSupabase,
 } from "@/lib/supabaseServer";
@@ -19,6 +25,7 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 240;
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +38,10 @@ export async function POST(request: Request) {
     });
 
     const body = jsonObject(await readJsonBody(request, 32_000));
+    const language = body.language === undefined ? "miniscript" : body.language;
+    if (!isProblemSubmissionLanguage(language)) {
+      throw new HttpError(400, "Unsupported submission language");
+    }
     const problemId = stringField(body.problemId, { min: 1, max: 100 });
     const code = stringField(body.code, {
       min: 1,
@@ -41,9 +52,10 @@ export async function POST(request: Request) {
     const admin = createAdminSupabase();
     const { data: problem, error: problemError } = await admin
       .from("problems")
-      .select("id, test_cases, visibility, publish_at")
+      .select("id, test_cases, visibility, publish_at, allowed_languages")
       .eq("id", problemId)
       .maybeSingle<{
+        allowed_languages: ProblemSubmissionLanguage[] | null;
         id: string;
         publish_at: string | null;
         test_cases: unknown;
@@ -58,15 +70,38 @@ export async function POST(request: Request) {
     ) {
       throw new HttpError(404, "Problem not found");
     }
+    if (!getAllowedProblemLanguages(problem.allowed_languages).includes(language)) {
+      return NextResponse.json({
+        code: "problem_language_not_allowed",
+        error: "This language is not allowed for this problem",
+      }, { status: 403 });
+    }
 
-    let evaluation;
+    let tests;
     try {
-      evaluation = evaluateMiniScript(code, validateTestCases(problem.test_cases));
+      tests = validateTestCases(problem.test_cases);
     } catch (error) {
       throw new HttpError(
         400,
         error instanceof Error ? error.message : "Could not evaluate submission"
       );
+    }
+
+    let evaluation;
+    if (language === "miniscript") {
+      try {
+        evaluation = evaluateMiniScript(code, tests);
+      } catch (error) {
+        throw new HttpError(400, error instanceof Error ? error.message : "Could not evaluate submission");
+      }
+    } else {
+      await enforceRateLimit({
+        key: user.id,
+        action: "submission_cloud_evaluate",
+        limit: 5,
+        windowSeconds: 60,
+      });
+      evaluation = await evaluateCloudSubmission(language, code, tests);
     }
 
     const { data: submission, error: submissionError } = await admin
@@ -75,6 +110,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         problem_id: problem.id,
         code,
+        language,
         score: evaluation.score,
         verified_at: new Date().toISOString(),
         verification_source: "server-v1",
@@ -82,7 +118,10 @@ export async function POST(request: Request) {
       .select("id")
       .single<{ id: string }>();
 
-    if (submissionError) throw submissionError;
+    if (submissionError) {
+      console.error("Could not save evaluated submission:", submissionError);
+      throw new HttpError(503, "Your code was evaluated, but the submission could not be saved. Try again.");
+    }
 
     const userClient = createAuthenticatedServerSupabase(accessToken);
     const { data: reward, error: rewardError } = await userClient.rpc(

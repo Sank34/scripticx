@@ -26,6 +26,7 @@ export function MainWrapper({ children }: { children: React.ReactNode }) {
     pathname?.startsWith("/docs") ||
     pathname?.startsWith("/examples") ||
     pathname === "/admin/lessons" ||
+    pathname?.startsWith("/learn/lesson/") ||
     isStudentWorkspaceImmersive ||
     /^\/competitions\/[^/]+$/.test(pathname || "") ||
     (pathname?.startsWith("/problems/") && pathname !== "/problems") ||

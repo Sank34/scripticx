@@ -15,6 +15,8 @@ export type ServerTestResult = {
   expected: string;
   got: string;
   input: Array<string | number | boolean>;
+  failure?: "compilationError" | "runtimeError" | "timeLimit";
+  diagnostics?: string;
 };
 
 const MAX_CODE_LENGTH = 20_000;
@@ -24,8 +26,12 @@ const MAX_INPUTS_PER_TEST = 100;
 const MAX_EXPECTED_LENGTH = 20_000;
 const MAX_OUTPUT_LENGTH = 20_000;
 
-function normalize(value: string) {
+export function normalizeTestOutput(value: string) {
   return value.trim().replace(/\r\n/g, "\n");
+}
+
+export function scoreTestResults(results: ServerTestResult[]) {
+  return Math.round((results.filter((result) => result.passed).length / results.length) * 100);
 }
 
 export function validateTestCases(value: unknown): ServerTestCase[] {
@@ -107,15 +113,13 @@ export function evaluateMiniScript(
       output.push(`Error: ${error instanceof Error ? error.message : "Execution failed"}`);
     }
 
-    const got = normalize(output.join("\n"));
-    const expected = normalize(test.output);
+    const got = normalizeTestOutput(output.join("\n"));
+    const expected = normalizeTestOutput(test.output);
     return { passed: got === expected, got, expected, input: test.input };
   });
 
   return {
-    score: Math.round(
-      (results.filter((result) => result.passed).length / results.length) * 100
-    ),
+    score: scoreTestResults(results),
     results,
   };
 }

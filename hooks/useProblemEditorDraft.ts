@@ -14,9 +14,12 @@ type DraftRow = {
   user_id: string;
 };
 
-type Conflict = {
-  localCode: string;
-  remote: DraftRow;
+type DraftSession = {
+  key: string;
+  savedCode: string;
+  updatedAt: string | null;
+  pending: Promise<void> | null;
+  blocked: boolean;
 };
 
 export function useProblemEditorDraft({
@@ -35,98 +38,122 @@ export function useProblemEditorDraft({
   userId: string | null;
 }) {
   const [state, setState] = useState<WebProblemDraftState>("synced");
-  const [conflict, setConflict] = useState<Conflict | null>(null);
-  const hydratedKeyRef = useRef<string | null>(null);
-  const lastSavedCodeRef = useRef("");
-  const serverUpdatedAtRef = useRef<string | null>(null);
-  const revisionRef = useRef(0);
+  const [conflict, setConflict] = useState<DraftRow | null>(null);
+  const [draft, setDraft] = useState<DraftSession | null>(null);
+  const currentDraft = useRef<DraftSession | null>(null);
+  const resolvingConflict = useRef(false);
   const key = userId && problemId ? `${userId}:${scopeKey}:${problemId}` : null;
+  const ready = draft !== null && draft.key === key;
+
+  useEffect(() => () => {
+    currentDraft.current = null;
+  }, [key]);
 
   useEffect(() => {
-    if (!key || !userId || fallbackCode === null || hydratedKeyRef.current === key) return;
+    if (!key || !userId || fallbackCode === null || currentDraft.current?.key === key) return;
     let active = true;
+    const hydrate = (remote: DraftRow | null, status: WebProblemDraftState) => {
+      if (!active) return;
+      const initialCode = remote?.code ?? fallbackCode;
+      const session: DraftSession = {
+        key,
+        savedCode: initialCode,
+        updatedAt: remote?.updated_at ?? null,
+        pending: null,
+        blocked: false,
+      };
+      currentDraft.current = session;
+      onHydrate(initialCode);
+      setDraft(session);
+      setConflict(null);
+      setState(status);
+    };
     void fetchDraft(userId, problemId, scopeKey)
-      .then((remote) => {
-        if (!active) return;
-        const initialCode = remote?.code ?? fallbackCode;
-        hydratedKeyRef.current = key;
-        lastSavedCodeRef.current = initialCode;
-        serverUpdatedAtRef.current = remote?.updated_at ?? null;
-        onHydrate(initialCode);
-        setState("synced");
-      })
-      .catch(() => {
-        if (!active) return;
-        hydratedKeyRef.current = key;
-        lastSavedCodeRef.current = fallbackCode;
-        onHydrate(fallbackCode);
-        setState("error");
-      });
+      .then((remote) => hydrate(remote, "synced"))
+      .catch(() => hydrate(null, "error"));
     return () => {
       active = false;
     };
   }, [fallbackCode, key, onHydrate, problemId, scopeKey, userId]);
 
   useEffect(() => {
-    if (!key || !userId || hydratedKeyRef.current !== key || code === lastSavedCodeRef.current) return;
-    const revision = ++revisionRef.current;
+    if (!draft || !ready || !userId || conflict) return;
+    if (code === draft.savedCode && !draft.pending) {
+      setState((previous) => previous === "saving" ? "synced" : previous);
+      return;
+    }
+    let active = true;
     setState("saving");
-    const timeout = window.setTimeout(() => {
-      void saveDraft({
-        baseUpdatedAt: serverUpdatedAtRef.current,
+    const timeout = window.setTimeout(async () => {
+      await draft.pending;
+      if (!active || currentDraft.current !== draft || draft.blocked) return;
+      if (code === draft.savedCode) {
+        setState("synced");
+        return;
+      }
+      draft.pending = saveDraft({
+        baseUpdatedAt: draft.updatedAt,
         code,
         problemId,
         scopeKey,
         userId,
       }).then((result) => {
-        if (revisionRef.current !== revision) return;
+        if (currentDraft.current !== draft) return;
         if (result.conflict) {
-          setConflict({ localCode: code, remote: result.conflict });
+          draft.blocked = true;
+          setConflict(result.conflict);
           setState("conflict");
           return;
         }
-        lastSavedCodeRef.current = result.row.code;
-        serverUpdatedAtRef.current = result.row.updated_at;
-        setConflict(null);
-        setState("synced");
+        draft.savedCode = result.row.code;
+        draft.updatedAt = result.row.updated_at;
+        if (active) setState("synced");
       }).catch(() => {
-        if (revisionRef.current === revision) setState("error");
+        if (active && currentDraft.current === draft) setState("error");
+      }).finally(() => {
+        draft.pending = null;
       });
     }, 700);
-    return () => window.clearTimeout(timeout);
-  }, [code, key, problemId, scopeKey, userId]);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [code, conflict, draft, problemId, ready, scopeKey, userId]);
 
   const resolveConflict = useCallback(async (resolution: "cloud" | "local") => {
-    if (!conflict || !userId) return;
-    setState("saving");
+    if (!conflict || !userId || !draft || !ready || resolvingConflict.current) return;
     if (resolution === "cloud") {
-      serverUpdatedAtRef.current = conflict.remote.updated_at;
-      lastSavedCodeRef.current = conflict.remote.code;
-      onHydrate(conflict.remote.code);
+      draft.updatedAt = conflict.updated_at;
+      draft.savedCode = conflict.code;
+      draft.blocked = false;
+      onHydrate(conflict.code);
       setConflict(null);
       setState("synced");
       return;
     }
-    const result = await supabase
-      .from("problem_editor_drafts")
-      .update({ code: conflict.localCode })
-      .eq("user_id", userId)
-      .eq("problem_id", problemId)
-      .eq("scope_key", scopeKey)
-      .eq("updated_at", conflict.remote.updated_at)
-      .select("*")
-      .maybeSingle<DraftRow>();
-    if (result.error || !result.data) {
-      setState("conflict");
-      throw result.error || new Error("The draft changed again.");
+    resolvingConflict.current = true;
+    setState("saving");
+    try {
+      const result = await saveDraft({ baseUpdatedAt: conflict.updated_at, code, problemId, scopeKey, userId });
+      if (currentDraft.current !== draft) return;
+      if (result.conflict) {
+        setConflict(result.conflict);
+        throw new Error("The draft changed again.");
+      }
+      draft.updatedAt = result.row.updated_at;
+      draft.savedCode = result.row.code;
+      draft.blocked = false;
+      setConflict(null);
+      setState("synced");
+    } catch (error) {
+      if (currentDraft.current === draft) setState("conflict");
+      throw error;
+    } finally {
+      resolvingConflict.current = false;
     }
-    serverUpdatedAtRef.current = result.data.updated_at;
-    lastSavedCodeRef.current = result.data.code;
-    setConflict(null);
-    setState("synced");
-  }, [conflict, onHydrate, problemId, scopeKey, userId]);
+  }, [code, conflict, draft, onHydrate, problemId, ready, scopeKey, userId]);
 
-  return { conflict: Boolean(conflict), resolveConflict, state };
+  return { ready, conflict: ready && Boolean(conflict), resolveConflict, state };
 }
 
 async function saveDraft(input: {
@@ -152,7 +179,13 @@ async function saveDraft(input: {
       })
       .select("*")
       .single<DraftRow>();
-    if (inserted.error) throw inserted.error;
+    if (inserted.error) {
+      if (inserted.error.code === "23505") {
+        const remote = await fetchDraft(input.userId, input.problemId, input.scopeKey);
+        if (remote) return remote.code === input.code ? { row: remote } : { conflict: remote, row: remote };
+      }
+      throw inserted.error;
+    }
     return { row: inserted.data };
   }
 

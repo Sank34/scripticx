@@ -1,10 +1,13 @@
 "use client";
 
-import type { FormEvent, KeyboardEvent } from "react";
+import type { FormEvent } from "react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { buildUsernameSearchPattern } from "@/lib/profile-search";
+import { directorySearchHref, parseSearchScope, searchScopes } from "@/lib/directory-search";
+import { repositoryHref } from "@/lib/repositories";
+import { useDirectorySearch } from "@/hooks/useDirectorySearch";
 import { useRouter, useSearchParams } from "next/navigation";
 import RouteGuard from "@/components/RouteGuard";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -24,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-import { Clock3, Loader2, Search, UserRoundSearch, Users, UserX, X } from "lucide-react";
+import { BookOpen, Clock3, Search, Users, UserX, X } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 
 function SearchContent() {
@@ -35,13 +38,12 @@ function SearchContent() {
   const routeQuery = searchParams.get("q") || "";
 
   const [query, setQuery] = useState(routeQuery);
-  const [debouncedQuery, setDebouncedQuery] = useState(routeQuery.trim());
   const [recent, setRecent] = useState<string[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const scope = parseSearchScope(searchParams.get("type"));
+  const directory = useDirectorySearch(query, scope, 12);
 
   useEffect(() => {
     setQuery(routeQuery);
-    setDebouncedQuery(routeQuery.trim());
   }, [routeQuery]);
 
   useEffect(() => {
@@ -57,14 +59,6 @@ function SearchContent() {
       localStorage.removeItem("recent_searches");
     }
   }, []);
-
-  useEffect(() => {
-    const delay = setTimeout(() => {
-      setDebouncedQuery(query.trim());
-    }, 300);
-
-    return () => clearTimeout(delay);
-  }, [query]);
 
   const {
     data: topUsers = [],
@@ -86,39 +80,6 @@ function SearchContent() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const searchPattern = buildUsernameSearchPattern(debouncedQuery);
-
-  const {
-    data: results = [],
-    isError: resultsError,
-    isFetching,
-    isPending,
-    refetch: refetchResults,
-  } = useQuery({
-    queryKey: ["search", "profiles", searchPattern],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url, bio, total_score, equipped_rewards")
-        .ilike("username", searchPattern ?? "")
-        .limit(10);
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: Boolean(searchPattern),
-    staleTime: 2 * 60 * 1000,
-    placeholderData: (previous) => previous ?? [],
-  });
-
-  useEffect(() => {
-    setSelectedIndex((current) => results.length ? Math.min(current, results.length - 1) : 0);
-  }, [results.length]);
-
-  function handleSearch(value: string) {
-    setQuery(value);
-  }
-
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!query.trim()) return;
@@ -127,34 +88,16 @@ function SearchContent() {
     const updated = [normalizedQuery, ...recent.filter((r) => r !== normalizedQuery)].slice(0, 5);
     setRecent(updated);
     localStorage.setItem("recent_searches", JSON.stringify(updated));
-    setDebouncedQuery(normalizedQuery);
-
-    router.push(`/search?q=${encodeURIComponent(normalizedQuery)}`);
-  }
-
-  function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (!results.length) return;
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setSelectedIndex((current) => (current + 1) % results.length);
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setSelectedIndex((current) => (current - 1 + results.length) % results.length);
-    } else if (event.key === "Enter" && results[selectedIndex]?.username) {
-      event.preventDefault();
-      router.push(`/u/${encodeURIComponent(results[selectedIndex].username)}`);
-    }
+    router.push(directorySearchHref(normalizedQuery, scope));
   }
 
   function selectRecent(value: string) {
     setQuery(value);
-    setDebouncedQuery(value);
-    router.push(`/search?q=${encodeURIComponent(value)}`);
+    router.push(directorySearchHref(value, scope));
   }
 
   function clearSearch() {
     setQuery("");
-    setDebouncedQuery("");
     router.push("/search");
   }
 
@@ -164,7 +107,6 @@ function SearchContent() {
   }
 
   const hasQuery = Boolean(query.trim());
-  const loading = Boolean(searchPattern) && isPending;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -186,8 +128,7 @@ function SearchContent() {
             <Input
               aria-label={t("search.placeholder")}
               value={query}
-              onChange={(event) => handleSearch(event.target.value)}
-              onKeyDown={handleInputKeyDown}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder={t("search.placeholder")}
               className="h-10 pl-9 pr-10"
               autoComplete="off"
@@ -261,7 +202,6 @@ function SearchContent() {
                       rank={index + 1}
                       username={user.username}
                       variant="row"
-                      className={index === selectedIndex ? "bg-accent" : undefined}
                     />
                   ))}
                 </div>
@@ -315,81 +255,90 @@ function SearchContent() {
           </Card>
         </div>
       ) : (
-        <Card>
-          <CardHeader className="border-b">
-            <CardTitle>{t("search.results")}</CardTitle>
-            <CardDescription>{t("search.resultsDescription")}</CardDescription>
-            {!loading && !resultsError ? (
-              <CardAction>
-                <div className="flex items-center gap-2">
-                  {isFetching ? (
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
-                      <Loader2 className="size-3.5 animate-spin" />
-                      {t("search.refreshing")}
-                    </span>
-                  ) : null}
-                  <Badge variant="outline">
-                    {results.length} {results.length === 1 ? t("search.result") : t("search.resultsCount")}
-                  </Badge>
-                </div>
-              </CardAction>
-            ) : null}
-          </CardHeader>
-          <CardContent className="px-2">
-            {loading ? (
-              <div className="space-y-1" aria-label={t("search.refreshing")}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="flex items-center gap-3 px-2 py-2.5">
-                    <Skeleton className="size-10 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-44 max-w-full" />
-                      <Skeleton className="h-3 w-64 max-w-[70%]" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : resultsError ? (
-              <EmptyState
-                className="py-12"
-                icon={<UserX className="size-6" />}
-                title={t("search.loadError")}
-                description={t("search.loadErrorDescription")}
-                action={
-                  <Button variant="outline" onClick={() => void refetchResults()}>
-                    {t("search.retry")}
-                  </Button>
-                }
-              />
-            ) : results.length ? (
-              <div className="divide-y" aria-live="polite">
-                {results.map((user) => (
-                  <UserListItem
-                    key={user.id}
-                    avatarUrl={user.avatar_url}
-                    equippedRewards={user.equipped_rewards}
-                    description={user.bio}
-                    href={`/u/${user.username}`}
-                    meta={`${user.total_score || 0} ${t("search.points")}`}
-                    username={user.username}
-                    variant="row"
-                  />
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                className="py-14"
-                icon={<UserRoundSearch className="size-7" />}
-                title={t("search.noResults")}
-                description={t("search.noResultsDescription")}
-                action={
-                  <Button variant="outline" onClick={clearSearch}>
-                    {t("search.clearSearch")}
-                  </Button>
-                }
-              />
+        <div className="grid items-start gap-5 md:grid-cols-[11rem_minmax(0,1fr)]">
+          <nav aria-label={t("search.filters")} className="flex flex-wrap gap-1 md:flex-col">
+            {searchScopes.map((filter) => (
+              <Button key={filter} variant={scope === filter ? "secondary" : "ghost"} className="min-h-10 justify-start" asChild>
+                <Link href={directorySearchHref(query, filter)} aria-current={scope === filter ? "page" : undefined}>
+                  {t(`search.${filter}`)}
+                </Link>
+              </Button>
+            ))}
+          </nav>
+
+          <div className="min-w-0 space-y-4">
+            {scope !== "users" && (
+              <Card>
+                <CardHeader className="border-b"><h2 className="font-semibold">{t("search.repositories")}</h2></CardHeader>
+                <CardContent>
+                  {directory.waiting || directory.repositories.isPending ? (
+                    <p role="status" className="text-sm text-muted-foreground">{t("search.refreshing")}</p>
+                  ) : directory.repositoryResults.length ? (
+                    <ul className="divide-y">
+                      {directory.repositoryResults.map((repo) => (
+                        <li key={repo.id}>
+                          <Link href={repositoryHref(repo.id)} className="flex min-h-11 gap-3 rounded-md px-2 py-3 hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
+                            <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <div className="min-w-0 wrap-anywhere">
+                              <p className="font-medium">{repo.owner ? `${repo.owner}/` : ""}{repo.title || t("repositories.untitled")}</p>
+                              {repo.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{repo.description}</p>}
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : !directory.repositories.isError && (
+                    <p className="text-sm text-muted-foreground">{t("search.noRepositories")}</p>
+                  )}
+                  {directory.repositories.isError && (
+                    <p role="alert" className="text-sm">{t("search.repositoryError")}</p>
+                  )}
+                  {!directory.waiting && (directory.repositories.hasNextPage || directory.repositories.isError) && (
+                    <Button type="button" variant="outline" className="mt-3" disabled={directory.repositories.isFetching} onClick={() => void (
+                      directory.repositories.hasNextPage ? directory.repositories.fetchNextPage() : directory.repositories.refetch()
+                    )}>
+                      {t(directory.repositories.isError ? "search.retry" : "search.more")}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+            {scope !== "repositories" && (
+              <Card>
+                <CardHeader className="border-b"><h2 className="font-semibold">{t("search.users")}</h2></CardHeader>
+                <CardContent>
+                  {directory.waiting || directory.users.isPending ? (
+                    <p role="status" className="text-sm text-muted-foreground">{t("search.refreshing")}</p>
+                  ) : directory.userResults.length ? (
+                    <div className="divide-y">
+                      {directory.userResults.map((user) => (
+                        <UserListItem
+                          key={user.id}
+                          avatarUrl={user.avatar_url}
+                          equippedRewards={user.equipped_rewards}
+                          description={user.bio}
+                          href={`/u/${encodeURIComponent(user.username)}`}
+                          username={user.username}
+                          variant="row"
+                        />
+                      ))}
+                    </div>
+                  ) : !directory.users.isError && (
+                    <p className="text-sm text-muted-foreground">{t("search.noResults")}</p>
+                  )}
+                  {directory.users.isError && <p role="alert" className="text-sm">{t("search.loadError")}</p>}
+                  {!directory.waiting && (directory.users.hasNextPage || directory.users.isError) && (
+                    <Button type="button" variant="outline" className="mt-3" disabled={directory.users.isFetching} onClick={() => void (
+                      directory.users.hasNextPage ? directory.users.fetchNextPage() : directory.users.refetch()
+                    )}>
+                      {t(directory.users.isError ? "search.retry" : "search.more")}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PROBLEM_SUBMISSION_LANGUAGES, type ProblemSubmissionLanguage } from "@/lib/problem-submission-language";
 import { cn } from "@/lib/utils";
 
 export type SubmissionHistoryItem = {
@@ -22,6 +23,7 @@ export type SubmissionHistoryItem = {
   points?: number;
   maximumPoints?: number;
   label?: string;
+  language?: ProblemSubmissionLanguage;
 };
 
 type SubmissionHistoryProps = {
@@ -40,6 +42,7 @@ export function SubmissionHistory({
     () => items.find((item) => item.id === selectedId) || null,
     [items, selectedId]
   );
+  const selectedLanguage = selected?.language && PROBLEM_SUBMISSION_LANGUAGES[selected.language];
 
   if (!items.length) {
     return (
@@ -87,6 +90,7 @@ export function SubmissionHistory({
                       {new Date(item.submittedAt).toLocaleString(
                         locale === "ro" ? "ro-RO" : "en-US"
                       )}
+                      {item.language && ` · ${PROBLEM_SUBMISSION_LANGUAGES[item.language].label}`}
                     </p>
                   </div>
                 </div>
@@ -123,6 +127,8 @@ export function SubmissionHistory({
           {selected && (
             <HighlightedCodeBlock
               code={selected.code}
+              language={selectedLanguage ? selectedLanguage.editor : undefined}
+              languageLabel={selectedLanguage ? selectedLanguage.label : undefined}
               copyLabel={locale === "ro" ? "Copiază" : "Copy"}
             />
           )}

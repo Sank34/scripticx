@@ -227,6 +227,15 @@ function getLocalizedNotification(
     };
   }
 
+  if (notification.type === "repository_star") {
+    return {
+      title: ro
+        ? `${username} ți-a dat o stea la repozitoriu`
+        : `${username} starred your repository`,
+      body: notification.body,
+    };
+  }
+
   if (notification.type === "post_like") {
     return {
       title: ro

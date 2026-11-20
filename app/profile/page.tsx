@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
@@ -27,6 +29,7 @@ import { getLocalized } from "@/lib/getLocalized";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
 import { ProfileBackground } from "@/components/user/ProfileBackground";
 import { EmailVerificationProfileStatus } from "@/components/account/EmailVerification";
+import { RepositoryList } from "@/components/repositories/RepositoryList";
 import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
 import { AchievementBadgeCard } from "@/components/achievements/AchievementBadgeCard";
 import {
@@ -593,6 +596,18 @@ function ProfileContent() {
       </div>
 
       <ContributionHeatmap data={activity} locale={locale} />
+
+      {user && (
+        <section className="space-y-3" aria-labelledby="profile-repositories-heading">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="profile-repositories-heading" className="text-lg font-semibold">{t("repositories.title")}</h2>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/repos">{t("repositories.title")}</Link>
+            </Button>
+          </div>
+          <RepositoryList ownerId={user.id} own />
+        </section>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 

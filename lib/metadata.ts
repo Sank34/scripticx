@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Locale } from "@/lib/i18n";
 
 export const siteConfig = {
   name: "ScripticX",
@@ -33,6 +34,7 @@ type PageMetadataOptions = {
   type?: "website" | "article" | "profile";
   keywords?: string[];
   section?: string;
+  locale?: Locale;
 };
 
 export function absoluteUrl(path = "/") {
@@ -48,6 +50,7 @@ export function createPageMetadata({
   type = "website",
   keywords = [],
   section = siteConfig.name,
+  locale = "en",
 }: PageMetadataOptions): Metadata {
   const canonical = absoluteUrl(path);
   const generatedImage = absoluteUrl(
@@ -69,7 +72,7 @@ export function createPageMetadata({
       description,
       url: canonical,
       siteName: siteConfig.name,
-      locale: "en_US",
+      locale: locale === "ro" ? "ro_RO" : "en_US",
       type,
       images,
     },

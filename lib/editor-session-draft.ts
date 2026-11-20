@@ -10,8 +10,10 @@ export type EditorSessionDraft = {
   title: string;
   description: string;
   savedId: string | null;
+  templateSourceId?: string;
   dirty: boolean;
   projectIsPublic: boolean;
+  repositoryVisibilityChanged?: boolean;
   activeFileId: string | null;
   openFileIds: string[];
   projectSearch: string;
@@ -43,8 +45,10 @@ export function parseEditorSessionDraft(raw: string | null): EditorSessionDraft 
       title: value.title,
       description: value.description,
       savedId: typeof value.savedId === "string" ? value.savedId : null,
+      ...(typeof value.templateSourceId === "string" ? { templateSourceId: value.templateSourceId } : {}),
       dirty: value.dirty === true,
       projectIsPublic: value.projectIsPublic !== false,
+      ...(value.repositoryVisibilityChanged === true ? { repositoryVisibilityChanged: true } : {}),
       projectSearch: typeof value.projectSearch === "string" ? value.projectSearch : "",
       projectLibrarySearch: typeof value.projectLibrarySearch === "string" ? value.projectLibrarySearch : "",
       output: Array.isArray(value.output) ? value.output.filter((line: unknown) => typeof line === "string").slice(-400) : [],

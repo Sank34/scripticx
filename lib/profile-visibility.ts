@@ -6,6 +6,7 @@ export const PUBLIC_PROFILE_WIDGET_KEYS = [
   "posts",
   "submissions",
   "socialLinks",
+  "repositories",
 ] as const;
 
 export type PublicProfileWidgetKey =
@@ -21,6 +22,7 @@ export const DEFAULT_PUBLIC_PROFILE_VISIBILITY: PublicProfileVisibility = {
   posts: true,
   submissions: true,
   socialLinks: true,
+  repositories: true,
 };
 
 export function normalizePublicProfileVisibility(

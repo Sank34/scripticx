@@ -9,6 +9,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -16,8 +17,13 @@ import {
 import { useEditorSessionDraft } from "@/hooks/useEditorSessionDraft";
 import { EDITOR_ACTIVITY_VIEWS, readEditorSessionDraft, type EditorActivityView, type EditorSessionDraft } from "@/lib/editor-session-draft";
 import { editorGitHubBranches, editorGitHubProjectLink } from "@/lib/editor-github-cache";
+import { repositoryHref } from "@/lib/repositories";
+import { Switch } from "@/components/ui/switch";
 import { persistEditorProject } from "@/lib/editor-project-persistence";
 import type { OnMount } from "@monaco-editor/react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { parseEditorNotebook } from "@/lib/editor-notebook";
 import { useSearchParams } from "next/navigation";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -146,10 +152,12 @@ import {
   type GitHubRemoteFile,
 } from "@/lib/github-integration";
 import {
+  BookOpen,
   ChevronDown,
   MoreHorizontal,
   FileDown,
   FileCode2,
+  ExternalLink,
   Files,
   Gauge,
   GitBranch,
@@ -180,6 +188,7 @@ type SnippetItem = {
   code: string;
   files?: ProjectEntry[] | null;
   is_public?: boolean | null;
+  is_live_workspace?: boolean;
   created_at: string;
 };
 
@@ -294,11 +303,16 @@ function encodeGitHubPath(path: string) {
   return path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
 }
 
+const NotebookEditor = dynamic(() => import("@/components/editor/NotebookEditor").then((module) => module.NotebookEditor));
+
 function EditorContent() {
   const { user, profile } = useAuth();
   const { t, locale } = useLanguage();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const requestedProject = searchParams.get("project");
+  const requestedTemplate = searchParams.get("template");
+  const requestedProjectFile = searchParams.get("file");
   const initialFiles = useMemo(
     () => {
       const directCode = searchParams.get("code");
@@ -328,7 +342,9 @@ END
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [projectIsPublic, setProjectIsPublic] = useState(true);
+  const [repositoryVisibilityChanged, setRepositoryVisibilityChanged] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [templateSourceId, setTemplateSourceId] = useState<string>();
   const [workspaceGeneration, setWorkspaceGeneration] = useState(0);
   const [showGitHubForProject, setShowGitHubForProject] = useState<string | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>(() => initialFiles);
@@ -410,6 +426,8 @@ END
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const [collaborationEditor, setCollaborationEditor] = useState<MonacoEditorInstance | null>(null);
   const terminalRef = useRef<EditorTerminalHandle | null>(null);
+  const notebookInput = useRef<HTMLInputElement>(null);
+  const [notebookSourceId, setNotebookSourceId] = useState<string | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
   const preserveProjectOnLiveLoadRef = useRef(false);
   const lastLiveErrorRef = useRef<string | null>(null);
@@ -423,12 +441,12 @@ END
 
   const sessionDraft = useMemo(() => ({
     files, directories, activeFileId, openFileIds, title, description,
-    savedId, dirty, projectIsPublic, projectSearch, projectLibrarySearch, output, activityView, activePanel,
-  }), [files, directories, activeFileId, openFileIds, title, description, savedId, dirty, projectIsPublic, projectSearch, projectLibrarySearch, output, activityView, activePanel]);
+    savedId, templateSourceId, dirty, projectIsPublic, repositoryVisibilityChanged, projectSearch, projectLibrarySearch, output, activityView, activePanel,
+  }), [files, directories, activeFileId, openFileIds, title, description, savedId, templateSourceId, dirty, projectIsPublic, repositoryVisibilityChanged, projectSearch, projectLibrarySearch, output, activityView, activePanel]);
   const draftHydrated = useEditorSessionDraft({
     userId: user?.id ?? null,
     draft: sessionDraft,
-    skipRestore: searchParams.has("code") || searchParams.has("import") || searchParams.has("live"),
+    skipRestore: searchParams.has("code") || searchParams.has("import") || searchParams.has("live") || Boolean(requestedTemplate),
     enabled: !searchParams.has("live"),
     onRestore: (draft) => {
       setFiles(draft.files);
@@ -438,8 +456,10 @@ END
       setTitle(draft.title);
       setDescription(draft.description);
       setSavedId(draft.savedId);
+      setTemplateSourceId(draft.templateSourceId);
       setDirty(draft.dirty);
       setProjectIsPublic(draft.projectIsPublic);
+      setRepositoryVisibilityChanged(draft.repositoryVisibilityChanged === true);
       setProjectSearch(draft.projectSearch);
       setProjectLibrarySearch(draft.projectLibrarySearch);
       setOutput(draft.output);
@@ -508,7 +528,9 @@ END
     setWorkspaceGeneration(current => current + 1);
     setShowGitHubForProject(null);
     setSavedId(null);
+    setTemplateSourceId(undefined);
     setProjectIsPublic(true);
+    setRepositoryVisibilityChanged(false);
     setTitle(transfer.title ?? "");
     setDescription("");
     setFiles([importedFile]);
@@ -632,7 +654,9 @@ END
     () => openFileIds.flatMap((id) => files.find((file) => file.id === id) ?? []),
     [files, openFileIds]
   );
+  const activeLiveRoomId = searchParams.get("live");
   const code = activeFile?.content ?? "";
+  const showNotebook = activeFile?.language === "notebook" && !activeLiveRoomId && notebookSourceId !== activeFile.id;
   const languageDefinition = getEditorLanguageDefinition(activeFile?.language ?? "text");
   const isMiniScriptRuntime = languageDefinition.runnable;
   const isCloudRuntime = activeFile ? isCloudRunnableLanguage(activeFile.language) : false;
@@ -667,7 +691,6 @@ END
     [user]
   );
   const projectName = title.trim() || (locale === "ro" ? "Proiect fără titlu" : "Untitled project");
-  const activeLiveRoomId = searchParams.get("live");
   useEffect(() => {
     if (activeLiveRoomId && !lastLiveRoomRef.current) {
       personalWorkspaceBeforeLiveRef.current = enteredOnLiveLinkRef.current && user
@@ -686,7 +709,9 @@ END
     setTitle(personal.title);
     setDescription(personal.description);
     setSavedId(personal.savedId);
+    setTemplateSourceId(personal.templateSourceId);
     setProjectIsPublic(personal.projectIsPublic);
+    setRepositoryVisibilityChanged(personal.repositoryVisibilityChanged === true);
     setDirty(personal.dirty);
     setOutput(personal.output);
     setProgram([]);
@@ -713,6 +738,7 @@ END
   );
   const applyRemoteLiveWorkspace = useCallback(
     (workspace: LiveWorkspaceDocument, source: "initial" | "remote", ownedProject?: { isPublic: boolean }) => {
+      if (source === "initial") setRepositoryVisibilityChanged(false);
       if (source === "initial" && preserveProjectOnLiveLoadRef.current) {
         preserveProjectOnLiveLoadRef.current = false;
         if (workspace.project && workspace.project.ownerId === user?.id) {
@@ -759,6 +785,7 @@ END
       setDirty(true);
       if (source === "initial") {
         setSavedId(workspace.project && workspace.project.ownerId === user?.id ? workspace.project.projectId : null);
+        setTemplateSourceId(undefined);
         setProjectIsPublic(ownedProject?.isPublic ?? true);
         preserveProjectOnLiveLoadRef.current = false;
       }
@@ -841,7 +868,7 @@ END
 
     const { data, error } = await supabase
       .from("snippets")
-      .select("id, title, description, code, files, is_public, created_at")
+      .select("id, title, description, code, files, is_public, is_live_workspace, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -1070,7 +1097,6 @@ END
   async function saveSnippet(
     silent = false,
     snapshot?: { files: ProjectFile[]; directories: ProjectDirectory[] },
-    visibilityOverride?: boolean,
     projectIdOverride?: string
   ) {
     if (!user || saving) return;
@@ -1090,12 +1116,15 @@ END
       description,
       code: primaryFile?.content ?? "",
       files: serializeProjectEntries(filesToSave, directoriesToSave),
-      is_public: visibilityOverride ?? projectIsPublic,
+      is_public: projectIsPublic,
     };
 
     try {
-      const { id: persistedId, error: persistenceError } = await persistEditorProject({
+      const { id: persistedId, isPublic, error: persistenceError } = await persistEditorProject({
         userId: user.id, savedId, projectIdOverride, payload,
+        updateVisibility: repositoryVisibilityChanged && !activeLiveRoomId,
+        promoteRepository: !activeLiveRoomId,
+        templateSourceId: projectIdOverride || activeLiveRoomId ? undefined : templateSourceId,
       });
 
       if (!persistedId || persistenceError) {
@@ -1115,12 +1144,12 @@ END
       if (!silent) toast.success(t("editor.toast.snippetSaved"));
       setDirty(false);
       setSavedId(persistedId);
-      if (visibilityOverride !== undefined) {
-        setProjectIsPublic(visibilityOverride);
-      }
+      if (!activeLiveRoomId) setTemplateSourceId(undefined);
+      if (isPublic !== undefined) setProjectIsPublic(isPublic);
+      setRepositoryVisibilityChanged(false);
 
       await queryClient.invalidateQueries({
-        queryKey: ["editor-snippets", user.id],
+        queryKey: ["editor-snippets"],
       });
 
       return persistedId;
@@ -1135,12 +1164,12 @@ END
       return;
     }
     const idToUse =
-      !savedId || dirty || !projectIsPublic
-        ? await saveSnippet(true, undefined, true)
+      !savedId || dirty
+        ? await saveSnippet(true)
         : savedId;
     if (!idToUse) return;
 
-    const url = `${window.location.origin}/editor/${idToUse}${file ? `?file=${encodeURIComponent(file.id)}` : ""}`;
+    const url = window.location.origin + repositoryHref(idToUse, file?.id);
     try {
       await navigator.clipboard.writeText(url);
       toast.success(
@@ -1169,7 +1198,7 @@ END
     }
 
     await queryClient.invalidateQueries({
-      queryKey: ["editor-snippets", user?.id],
+      queryKey: ["editor-snippets"],
     });
 
     if (savedId === id) setSavedId(null);
@@ -1209,7 +1238,13 @@ END
       return;
     }
 
-    const nextFile = createProjectFile(nextPath);
+    const content = getEditorLanguage(nextPath) === "notebook"
+      ? JSON.stringify(parseEditorNotebook(""), null, 2) + "\n"
+      : "";
+    addEditorFile(createProjectFile(nextPath, content));
+  }
+
+  function addEditorFile(nextFile: ProjectFile) {
     setFiles((currentFiles) => [...currentFiles, nextFile]);
     setActiveFileId(nextFile.id);
     setOpenFileIds((current) => [...current.filter((id) => id !== nextFile.id), nextFile.id]);
@@ -1248,6 +1283,24 @@ END
     setDirectories((current) => [...current, createProjectDirectory(nextPath)]);
     setCreateDirectoryOpen(false);
     setDirty(true);
+  }
+
+  async function importNotebook(file: File) {
+    try {
+      const content = await file.text();
+      const path = normalizeProjectPath(newFileParentPath ? `${newFileParentPath}/${file.name}` : file.name);
+      if (getEditorLanguage(path) !== "notebook" || !isValidProjectPath(path) || !content.trim() || !parseEditorNotebook(content)) {
+        setNewFileError(t("editor.notebook.invalidFile"));
+        return;
+      }
+      if (files.some((entry) => entry.path === path) || directories.some((entry) => entry.path === path)) {
+        setNewFileError(t("editor.notebook.importError"));
+        return;
+      }
+      addEditorFile(createProjectFile(path, content));
+    } catch {
+      setNewFileError(t("editor.notebook.importError"));
+    }
   }
 
   async function collectGithubProjectFiles(target: GitHubRepoTarget, branch: string) {
@@ -1423,7 +1476,7 @@ END
     const persistedId = await saveSnippet(true, {
       files: nextFiles,
       directories: nextDirectories,
-    }, undefined, projectId);
+    }, projectId);
     if (!persistedId) {
       throw new Error(
         locale === "ro"
@@ -1436,7 +1489,7 @@ END
 
   async function openClonedGitHubProject(projectId: string) {
     await queryClient.invalidateQueries({
-      queryKey: ["editor-snippets", user?.id],
+      queryKey: ["editor-snippets"],
     });
     await loadSnippet(projectId);
     setGithubCloneOpen(false);
@@ -1650,14 +1703,17 @@ END
     return count === 1 ? "1 file" : `${count} files`;
   }
 
-  async function loadSnippet(id: string) {
-    const { data } = await supabase
-      .from("snippets")
-      .select("*")
-      .eq("id", id)
-      .single();
+  async function loadSnippet(id: string, options?: { fileId: string | null; signal: AbortSignal }) {
+    if (!user) return false;
+    if (options && id === savedId && dirty && !activeLiveRoomId) {
+      if (options.fileId && files.some((file) => file.id === options.fileId)) switchEditorFile(options.fileId);
+      return true;
+    }
 
-    if (!data) return;
+    const query = supabase.from("snippets").select("*").eq("id", id).eq("user_id", user.id);
+    const { data } = await (options ? query.abortSignal(options.signal) : query).maybeSingle();
+
+    if (!data || options?.signal.aborted) return false;
     if (activeLiveRoomId) detachLiveRoom();
     setWorkspaceGeneration(current => current + 1);
 
@@ -1666,16 +1722,83 @@ END
 
     setFiles(nextFiles);
     setDirectories(nextProject.directories);
-    setActiveFileId(nextFiles[0]?.id ?? null);
-    setOpenFileIds(nextFiles[0] ? [nextFiles[0].id] : []);
+    const initialFile = nextFiles.find((file) => file.id === options?.fileId) ?? nextFiles[0];
+    setActiveFileId(initialFile?.id ?? null);
+    setOpenFileIds(initialFile ? [initialFile.id] : []);
     setTitle(data.title || "");
     setDescription(data.description || "");
-    setProjectIsPublic(data.is_public !== false);
+    setProjectIsPublic(data.is_public === true);
+    setRepositoryVisibilityChanged(false);
     setSavedId(data.id);
-    setShowGitHubForProject(data.id);
+    setTemplateSourceId(undefined);
+    setShowGitHubForProject(options && searchParams.get("view") === "projects" ? null : data.id);
     setDirty(false);
     resetRuntimeState(true);
+    return true;
   }
+
+  const openLinkedRepository = useEffectEvent(async (id: string, fileId: string | null, signal: AbortSignal) => {
+    const opened = await loadSnippet(id, { fileId, signal });
+    if (signal.aborted) return;
+    if (!opened) toast.error(t("repositories.openError"));
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("project") !== id) return;
+    url.searchParams.delete("project");
+    url.searchParams.delete("file");
+    window.history.replaceState(null, "", url);
+  });
+
+  useEffect(() => {
+    if (!requestedProject || requestedTemplate || !user?.id || !draftHydrated || activeLiveRoomId) return;
+    const controller = new AbortController();
+    void openLinkedRepository(requestedProject, requestedProjectFile, controller.signal);
+    return () => controller.abort();
+  }, [requestedProject, requestedProjectFile, requestedTemplate, user?.id, draftHydrated, activeLiveRoomId]);
+
+  const openRepositoryTemplate = useEffectEvent(async (id: string, fileId: string | null, signal: AbortSignal) => {
+    const { data } = await supabase.from("snippets").select("id, title, description, code, files")
+      .eq("id", id).eq("is_public", true).abortSignal(signal).maybeSingle();
+    if (signal.aborted) return;
+
+    if (data) {
+      const source = normalizeProjectEntries(data.files, data.code || "");
+      const selectedIndex = source.files.findIndex((file) => file.id === fileId);
+      const copies = source.files.map((file) => createProjectFile(file.path, file.content));
+      const selected = copies[Math.max(0, selectedIndex)];
+      setWorkspaceGeneration((current) => current + 1);
+      setFiles(copies);
+      setDirectories(source.directories.map((directory) => createProjectDirectory(directory.path)));
+      setActiveFileId(selected.id);
+      setOpenFileIds([selected.id]);
+      setTitle(data.title || t("repositories.untitled"));
+      setDescription(data.description || "");
+      setSavedId(null);
+      setTemplateSourceId(data.id);
+      setShowGitHubForProject(null);
+      setProjectIsPublic(false);
+      setRepositoryVisibilityChanged(false);
+      setDirty(true);
+      setActivityView("explorer");
+      setSidePanelOpen(true);
+      resetRuntimeState(true);
+    } else {
+      toast.error(t("repositories.templateUnavailable"));
+    }
+
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("template") !== id) return;
+    url.searchParams.delete("template");
+    url.searchParams.delete("project");
+    url.searchParams.delete("file");
+    window.history.replaceState(null, "", url);
+  });
+
+  useEffect(() => {
+    if (!requestedTemplate || !user?.id || !draftHydrated || activeLiveRoomId) return;
+    const controller = new AbortController();
+    void openRepositoryTemplate(requestedTemplate, requestedProjectFile, controller.signal);
+    return () => controller.abort();
+  }, [requestedTemplate, requestedProjectFile, user?.id, draftHydrated, activeLiveRoomId]);
 
   function createNewProject(templateKey: ProjectTemplateKey) {
     if (activeLiveRoomId) detachLiveRoom();
@@ -1685,7 +1808,9 @@ END
     const nextFiles = template.files;
 
     setSavedId(null);
+    setTemplateSourceId(undefined);
     setProjectIsPublic(true);
+    setRepositoryVisibilityChanged(false);
     setTitle(template.title);
     setDescription("");
     setFiles(nextFiles);
@@ -1758,6 +1883,30 @@ END
           />
         </label>
       </div>
+      {!activeLiveRoomId && (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <label id="editor-project-visibility-label" htmlFor="editor-project-visibility" className="text-xs font-medium">
+              {t("repositories.publicToggle")}
+            </label>
+            <p id="editor-project-visibility-hint" className="text-xs text-muted-foreground">
+              {t(projectIsPublic ? "repositories.publicHint" : "repositories.privateHint")}
+            </p>
+          </div>
+          <Switch
+            id="editor-project-visibility"
+            aria-labelledby="editor-project-visibility-label"
+            aria-describedby="editor-project-visibility-hint"
+            checked={projectIsPublic}
+            disabled={saving}
+            onCheckedChange={(checked) => {
+              setProjectIsPublic(checked);
+              setRepositoryVisibilityChanged(true);
+              setDirty(true);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 
@@ -1916,6 +2065,13 @@ END
                       </span>
                     </span>
                   </button>
+                  {!snippet.is_live_workspace && (
+                    <Button asChild size="icon-xs" variant="ghost" className="shrink-0">
+                      <Link href={repositoryHref(snippet.id)} aria-label={t("repositories.view")} title={t("repositories.view")}>
+                        <ExternalLink size={13} />
+                      </Link>
+                    </Button>
+                  )}
                   <Button
                     size="icon-xs"
                     variant="ghost"
@@ -1970,7 +2126,8 @@ END
           setOpenFileIds(current => { const retained = current.filter(id => restored.files.some(file => file.id === id)); return retained.length ? retained : restored.files[0] ? [restored.files[0].id] : []; });
           setTitle(project.title || "");
           setDescription(project.description || "");
-          setProjectIsPublic(project.is_public !== false);
+          setProjectIsPublic(project.is_public === true);
+          setRepositoryVisibilityChanged(false);
           setSavedId(origin.projectId);
         }
         setDirty(false);
@@ -2217,7 +2374,7 @@ END
         <div className="flex h-full min-h-0 flex-col" data-tour="editor-panel-projects">
           <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
             <div>
-              <span className="block text-xs font-semibold">{locale === "ro" ? "Proiecte" : "Projects"}</span>
+              <Link href="/repos" className="block text-xs font-semibold underline-offset-4 hover:underline">{t("repositories.title")}</Link>
               <span className="block text-[10px] text-muted-foreground">
                 {locale === "ro" ? "Biblioteca ta de cod" : "Your code library"}
               </span>
@@ -2394,7 +2551,7 @@ END
     </Tabs>
   );
 
-  if (!draftHydrated) {
+  if (!draftHydrated || (requestedTemplate && !activeLiveRoomId)) {
     return <div role="status" className="p-4 text-sm text-muted-foreground">{locale === "ro" ? "Se restaurează editorul…" : "Restoring editor…"}</div>;
   }
   const saveProjectLabel = saving
@@ -2439,12 +2596,28 @@ END
                   <DropdownMenuItem onSelect={handleSaveFile}><FileDown />{locale === "ro" ? "Descarcă fișierul" : "Download file"}</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => void handleShare()}><Share2 />{locale === "ro" ? "Distribuie" : "Share"}</DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/repos">
+                      <BookOpen aria-hidden="true" />
+                      {t("repositories.title")}
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => activeLiveRoomId ? selectActivityView("live") : requestLiveShare()}><RadioTower />{activeLiveRoomId ? "Live Share" : locale === "ro" ? "Pornește Live Share" : "Start Live Share"}</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => selectActivityView("settings")}><Settings2 />{locale === "ro" ? "Setările editorului" : "Editor settings"}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
             <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button asChild size="icon-sm" variant="outline">
+                    <Link href="/repos" aria-label={t("repositories.title")}>
+                      <BookOpen aria-hidden="true" />
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("repositories.title")}</TooltipContent>
+              </Tooltip>
               {activeLiveRoomId ? (
                 <div className="flex items-center rounded-md border bg-background p-0.5">
                   <Button
@@ -2715,85 +2888,104 @@ END
                     <ResizablePanel id="editor-surface" defaultSize={!compactLayout && bottomPanelOpen ? "72%" : "100%"} minSize={compactLayout ? "0%" : "240px"}>
                       <main inert={compactLayout && bottomPanelOpen} className="flex h-full min-h-0 min-w-0 flex-col bg-background">
                         {editorTabs}
-                        <CodeEditorContextMenu
-                          code={code}
-                          fileName={activeFile?.path ?? fileName}
-                          onChange={handleCodeChange}
-                          onRun={isRunnable ? handleRun : undefined}
-                          runShortcut={formatShortcut(shortcuts.run)}
-                        >
-                          <div data-tour="editor-code" className="min-h-0 flex-1 overflow-hidden">
-                            <MiniScriptMonacoEditor
-                              key={activeFile?.id}
-                              onMount={handleEditorMount}
-                              height="100%"
-                              language={activeFile?.language ?? "text"}
-                              path={activeFile?.path ?? fileName}
-                              modelScope={activeLiveRoomId ? `live/${activeLiveRoomId}` : `workspace/${user?.id ?? "local"}/${savedId ?? "unsaved"}`}
-                              retainModels
-                              readOnly={Boolean(activeLiveRoomId && (liveCollaboration.status !== "connected" || liveTransitionPending))}
-                              value={code}
-                              liveErrors={editorPreferences.liveErrors}
+                        {showNotebook && activeFile ? (
+                          <NotebookEditor
+                            key={activeFile.id}
+                            file={activeFile}
+                            files={files}
+                            onChange={handleCodeChange}
+                            onShowSource={() => setNotebookSourceId(activeFile.id)}
+                          />
+                        ) : (
+                          <>
+                            {activeFile?.language === "notebook" && !activeLiveRoomId && (
+                              <div className="border-b px-3 py-2">
+                                <Button size="sm" variant="outline" onClick={() => setNotebookSourceId(null)}>
+                                  {t("editor.notebook.open")}
+                                </Button>
+                              </div>
+                            )}
+                            <CodeEditorContextMenu
+                              code={code}
+                              fileName={activeFile?.path ?? fileName}
                               onChange={handleCodeChange}
-                              options={{
-                                contextmenu: false,
-                                padding: { top: 14, bottom: 20 },
-                                smoothScrolling: true,
-                                wordWrap: compactLayout || editorPreferences.wordWrap ? "on" : "off",
-                                automaticLayout: true,
-                                cursorSmoothCaretAnimation: "on",
-                                cursorBlinking: "smooth",
-                                glyphMargin: !compactLayout && isMiniScriptRuntime,
-                                lineNumbersMinChars: compactLayout ? 3 : 5,
-                                folding: !compactLayout,
-                                fontSize: compactLayout ? Math.max(16, editorPreferences.fontSize) : editorPreferences.fontSize,
-                                fontLigatures: editorPreferences.fontLigatures,
-                                minimap: {
-                                  enabled: !compactLayout && editorPreferences.minimap,
-                                  maxColumn: 90,
-                                  showSlider: "mouseover",
-                                  scale: 0.8,
-                                },
-                                stickyScroll: { enabled: editorPreferences.stickyScroll },
-                                bracketPairColorization: {
-                                  enabled: editorPreferences.bracketPairColorization,
-                                },
-                                guides: {
-                                  bracketPairs: editorPreferences.bracketPairColorization,
-                                  indentation: true,
-                                },
-                                formatOnPaste: editorPreferences.formatOnPaste,
-                                formatOnType: editorPreferences.formatOnType,
-                                quickSuggestions: editorPreferences.autoCompletion && editorPreferences.quickSuggestions
-                                  ? { other: true, comments: false, strings: false }
-                                  : false,
-                                quickSuggestionsDelay: 60,
-                                suggestOnTriggerCharacters: editorPreferences.autoCompletion,
-                                snippetSuggestions: editorPreferences.autoCompletion ? "top" : "none",
-                                wordBasedSuggestions: editorPreferences.autoCompletion ? "currentDocument" : "off",
-                                suggest: {
-                                  preview: editorPreferences.autoCompletion && editorPreferences.inlineSuggestions,
-                                  showSnippets: editorPreferences.autoCompletion,
-                                },
-                                inlineSuggest: {
-                                  enabled: editorPreferences.autoCompletion && editorPreferences.inlineSuggestions,
-                                },
-                                parameterHints: {
-                                  enabled: editorPreferences.autoCompletion && editorPreferences.parameterHints,
-                                  cycle: true,
-                                },
-                                acceptSuggestionOnEnter: "on",
-                                scrollbar: {
-                                  verticalScrollbarSize: 9,
-                                  horizontalScrollbarSize: 9,
-                                },
-                                tabSize: editorPreferences.tabSize,
-                                insertSpaces: true,
-                                wrappingIndent: "same",
-                              }}
-                            />
-                          </div>
-                        </CodeEditorContextMenu>
+                              onRun={isRunnable ? handleRun : undefined}
+                              runShortcut={formatShortcut(shortcuts.run)}
+                            >
+                              <div data-tour="editor-code" className="min-h-0 flex-1 overflow-hidden">
+                                <MiniScriptMonacoEditor
+                                  key={activeFile?.id}
+                                  onMount={handleEditorMount}
+                                  height="100%"
+                                  language={activeFile?.language ?? "text"}
+                                  path={activeFile?.path ?? fileName}
+                                  modelScope={activeLiveRoomId ? `live/${activeLiveRoomId}` : `workspace/${user?.id ?? "local"}/${savedId ?? "unsaved"}`}
+                                  retainModels
+                                  readOnly={Boolean(activeLiveRoomId && (liveCollaboration.status !== "connected" || liveTransitionPending))}
+                                  value={code}
+                                  liveErrors={editorPreferences.liveErrors}
+                                  onChange={handleCodeChange}
+                                  options={{
+                                    contextmenu: false,
+                                    padding: { top: 14, bottom: 20 },
+                                    smoothScrolling: true,
+                                    wordWrap: compactLayout || editorPreferences.wordWrap ? "on" : "off",
+                                    automaticLayout: true,
+                                    cursorSmoothCaretAnimation: "on",
+                                    cursorBlinking: "smooth",
+                                    glyphMargin: !compactLayout && isMiniScriptRuntime,
+                                    lineNumbersMinChars: compactLayout ? 3 : 5,
+                                    folding: !compactLayout,
+                                    fontSize: compactLayout ? Math.max(16, editorPreferences.fontSize) : editorPreferences.fontSize,
+                                    fontLigatures: editorPreferences.fontLigatures,
+                                    minimap: {
+                                      enabled: !compactLayout && editorPreferences.minimap,
+                                      maxColumn: 90,
+                                      showSlider: "mouseover",
+                                      scale: 0.8,
+                                    },
+                                    stickyScroll: { enabled: editorPreferences.stickyScroll },
+                                    bracketPairColorization: {
+                                      enabled: editorPreferences.bracketPairColorization,
+                                    },
+                                    guides: {
+                                      bracketPairs: editorPreferences.bracketPairColorization,
+                                      indentation: true,
+                                    },
+                                    formatOnPaste: editorPreferences.formatOnPaste,
+                                    formatOnType: editorPreferences.formatOnType,
+                                    quickSuggestions: editorPreferences.autoCompletion && editorPreferences.quickSuggestions
+                                      ? { other: true, comments: false, strings: false }
+                                      : false,
+                                    quickSuggestionsDelay: 60,
+                                    suggestOnTriggerCharacters: editorPreferences.autoCompletion,
+                                    snippetSuggestions: editorPreferences.autoCompletion ? "top" : "none",
+                                    wordBasedSuggestions: editorPreferences.autoCompletion ? "currentDocument" : "off",
+                                    suggest: {
+                                      preview: editorPreferences.autoCompletion && editorPreferences.inlineSuggestions,
+                                      showSnippets: editorPreferences.autoCompletion,
+                                    },
+                                    inlineSuggest: {
+                                      enabled: editorPreferences.autoCompletion && editorPreferences.inlineSuggestions,
+                                    },
+                                    parameterHints: {
+                                      enabled: editorPreferences.autoCompletion && editorPreferences.parameterHints,
+                                      cycle: true,
+                                    },
+                                    acceptSuggestionOnEnter: "on",
+                                    scrollbar: {
+                                      verticalScrollbarSize: 9,
+                                      horizontalScrollbarSize: 9,
+                                    },
+                                    tabSize: editorPreferences.tabSize,
+                                    insertSpaces: true,
+                                    wrappingIndent: "same",
+                                  }}
+                                />
+                              </div>
+                            </CodeEditorContextMenu>
+                          </>
+                        )}
                       </main>
                     </ResizablePanel>
 
@@ -3079,7 +3271,21 @@ END
             )}
           </form>
 
-          <DialogFooter>
+          <input
+            ref={notebookInput}
+            type="file"
+            accept=".ipynb"
+            hidden
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (file) void importNotebook(file);
+            }}
+          />
+          <DialogFooter className="sm:flex-wrap">
+            <Button type="button" variant="outline" onClick={() => notebookInput.current?.click()}>
+              {t("editor.notebook.import")}
+            </Button>
             <Button
               type="button"
               variant="outline"

@@ -21,6 +21,7 @@ const SUPPORTED_EXTENSIONS = new Set([
   "html",
   "hxx",
   "ipp",
+  "ipynb",
   "java",
   "js",
   "json",

@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/components/LanguageProvider";
+import { BirthdayManager } from "@/components/birthday/BirthdayManager";
 import { LegacyAlphaWelcome } from "./LegacyAlphaWelcome";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,7 @@ export function OnboardingManager() {
           }
           if (!active || currentRevision !== revision) return;
           setProfile(currentProfile);
-          transitionTo(shouldShowLegacyAlphaWelcome(currentUser) ? "welcome" : "setup");
+          transitionTo("setup");
         } catch {
           if (active && currentRevision === revision) transitionTo("error");
         }
@@ -90,11 +91,14 @@ export function OnboardingManager() {
       }
 
       const pendingTour = localStorage.getItem(productTourStorageKey);
-      if ((pendingTour === currentUser.id || pendingTour === "pending") &&
+      const legacyTourPending = currentUser.app_metadata?.[legacyAlphaCohortKey] === true
+        && Boolean(currentUser.user_metadata?.[onboardingMetadataKeys.completedAt])
+        && !currentUser.user_metadata?.[onboardingMetadataKeys.legacyWelcomeSeenAt];
+      if ((pendingTour === currentUser.id || pendingTour === "pending" || legacyTourPending) &&
           !hasCompletedProductTour(currentUser.user_metadata)) {
         transitionTo("preparing");
       } else {
-        transitionTo("idle");
+        transitionTo(shouldShowLegacyAlphaWelcome(currentUser) ? "welcome" : "idle");
       }
     }
 
@@ -126,7 +130,7 @@ export function OnboardingManager() {
         [onboardingMetadataKeys.legacyWelcomeSeenAt]: new Date().toISOString(),
       });
       if (error) throw error;
-      if (activeUserRef.current === userId) transitionTo("setup");
+      if (activeUserRef.current === userId) transitionTo("idle");
     } catch {
       if (activeUserRef.current === userId) toast.error(locale === "ro" ? "Configurarea nu a putut fi pornită. Încearcă din nou." : "Could not start onboarding. Please try again.");
     } finally {
@@ -134,7 +138,8 @@ export function OnboardingManager() {
     }
   }
 
-  if (!user || phase === "idle") return null;
+  if (!user) return null;
+  if (phase === "idle") return <BirthdayManager key={user.id} userId={user.id} />;
 
   if (phase === "loading") return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-background text-muted-foreground">
@@ -170,7 +175,7 @@ export function OnboardingManager() {
   return (
     <ProductTour
       onComplete={() => {
-        transitionTo("idle");
+        transitionTo(shouldShowLegacyAlphaWelcome(user, true) ? "welcome" : "idle");
         window.dispatchEvent(new Event("scripticx-product-tour-completed"));
         router.replace(landingRouteRef.current);
       }}

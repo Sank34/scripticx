@@ -21,6 +21,7 @@ import {
 import { createQueryCacheStorage } from "@/lib/queryCacheStorage";
 import { saveAccountSession } from "@/lib/account-switcher";
 import { getSupabaseSessionWithTimeout } from "@/lib/supabase-session";
+import { AUTH_SESSION_TIMEOUT_MS } from "@/lib/supabase-transport";
 import { NETWORK_RECOVERED_EVENT } from "@/lib/network-recovery";
 
 const realtimeScopesByTable: Record<string, string[]> = {
@@ -125,6 +126,10 @@ function getRealtimeScopes(pathname: string) {
   if (pathname.startsWith("/post")) scopes.add("post");
   if (pathname.startsWith("/profile") || pathname.startsWith("/u/")) {
     scopes.add("profile");
+    scopes.add("editor-snippets");
+  }
+  if (pathname === "/repos" || pathname.startsWith("/repos/")) {
+    scopes.add("editor-snippets");
   }
   if (pathname.startsWith("/leaderboard")) scopes.add("leaderboard");
   if (pathname.startsWith("/problems")) {
@@ -257,7 +262,7 @@ function PlatformAccessSync() {
       inFlight = (async () => {
         let data: Awaited<ReturnType<typeof getSupabaseSessionWithTimeout>>["data"];
         try {
-          ({ data } = await getSupabaseSessionWithTimeout(6_000));
+          ({ data } = await getSupabaseSessionWithTimeout(AUTH_SESSION_TIMEOUT_MS));
         } catch {
           return;
         }
@@ -575,7 +580,7 @@ export default function Providers({
       try {
         // getSession performs Supabase's own recovery/refresh when necessary.
         // Calling refreshSession separately here creates a competing auth lock.
-        await getSupabaseSessionWithTimeout(6_000);
+        await getSupabaseSessionWithTimeout(AUTH_SESSION_TIMEOUT_MS);
         supabase.realtime.connect();
       } catch {
         // A delayed auth refresh must not prevent the rest of the application

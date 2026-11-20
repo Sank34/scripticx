@@ -14,10 +14,11 @@ describe("normalizePublicProfileVisibility", () => {
 
   it("only hides widgets explicitly disabled by the user", () => {
     expect(
-      normalizePublicProfileVisibility({ points: false, posts: false })
+      normalizePublicProfileVisibility({ points: false, posts: false, repositories: false })
     ).toMatchObject({
       points: false,
       posts: false,
+      repositories: false,
       activity: true,
       stats: true,
     });

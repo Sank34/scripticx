@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -11,27 +11,22 @@ import {
   writeRoadmapConfig,
 } from "@/lib/roadmap-config";
 
-const roadmapQueryKey = ["roadmap", "config"] as const;
+export const roadmapQueryKey = ["roadmap", "config", "database-v1"] as const;
 
-export function useRoadmapConfig() {
+export function useRoadmapConfig({ enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: roadmapQueryKey,
+    enabled,
     queryFn: async () => {
-      try {
-        const remoteConfig = await readRemoteRoadmapConfig();
-        if (remoteConfig) {
-          writeRoadmapConfig(remoteConfig);
-          return getRoadmapConfigData(remoteConfig);
-        }
-      } catch (error) {
-        console.error("Could not load the remote roadmap configuration:", error);
-        // The locally saved roadmap remains available while offline.
-      }
-
-      return getRoadmapConfigData(readRoadmapConfig());
+      const remoteConfig = await readRemoteRoadmapConfig();
+      if (remoteConfig) writeRoadmapConfig(remoteConfig);
+      return getRoadmapConfigData(remoteConfig);
     },
-    initialData: () => getRoadmapConfigData(readRoadmapConfig()),
+    initialData: () => {
+      const cached = readRoadmapConfig();
+      return cached ? getRoadmapConfigData(cached) : undefined;
+    },
     initialDataUpdatedAt: 0,
     staleTime: 5 * 60 * 1000,
   });
@@ -48,5 +43,6 @@ export function useRoadmapConfig() {
     return () => window.removeEventListener(roadmapConfigEvent, syncRoadmap);
   }, [queryClient]);
 
-  return query.data;
+  const data = useMemo(() => getRoadmapConfigData(query.data), [query.data]);
+  return { ...data, isLoading: query.isLoading, isError: query.isError, refetch: query.refetch };
 }

@@ -55,6 +55,7 @@ import {
 } from "@/lib/account-session-manager";
 import { forgetRecentAccount, type RecentAccount } from "@/lib/recent-accounts";
 import { supabase } from "@/lib/supabase";
+import { AUTH_SESSION_TIMEOUT_MS } from "@/lib/supabase-transport";
 import { getWorkspaceLandingRoute } from "@/lib/workspaces";
 import { AppModal } from "@/components/ui/app-modal";
 import { RegistrationVerification } from "@/components/onboarding/RegistrationVerification";
@@ -375,7 +376,7 @@ export default function LoginPage() {
   useEffect(() => {
     async function checkUser() {
       try {
-        const { data } = await api.auth.getSessionWithTimeout(6_000);
+        const { data } = await api.auth.getSessionWithTimeout(AUTH_SESSION_TIMEOUT_MS);
 
         if (data.session && isEmailVerified(data.session.user)) {
           clearPendingEmailVerification();

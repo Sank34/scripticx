@@ -27,6 +27,8 @@ describe("custom platform shortcuts", () => {
   it("records physical letters even when Alt changes the produced character", () => {
     expect(bindingFromEvent(event({ key: "€", code: "KeyE", altKey: true, ctrlKey: false }))).toBe("Alt+e");
     expect(formatShortcut("Mod+Shift+Enter")).toBe("Ctrl/⌘ + Shift + Enter");
+    expect(formatShortcut("Mod+Shift+k", "⌘")).toBe("⌘ + Shift + K");
+    expect(formatShortcut("Mod+k", "Ctrl")).toBe("Ctrl + K");
   });
 
   it("preserves disabling and valid custom bindings, and recovers malformed storage", () => {

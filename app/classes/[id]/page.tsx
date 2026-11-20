@@ -33,6 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -118,13 +119,43 @@ export default function ClassPage() {
   const hub = hubQuery.data; const refresh = () => queryClient.invalidateQueries({ queryKey: ["classes", "hub", classId] });
   const [announcementOpen, setAnnouncementOpen] = useState(false); const [announcementTitle, setAnnouncementTitle] = useState(""); const [announcementBody, setAnnouncementBody] = useState("");
   const [resourceOpen, setResourceOpen] = useState(false); const [resourceTitle, setResourceTitle] = useState(""); const [resourceUrl, setResourceUrl] = useState("");
-  const [eventOpen, setEventOpen] = useState(false); const [eventTitle, setEventTitle] = useState(""); const [eventDate, setEventDate] = useState<Date | undefined>(new Date()); const [eventTime, setEventTime] = useState("09:00");
+  const [eventOpen, setEventOpen] = useState(false);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDate, setEventDate] = useState(new Date());
+  const [eventDateOpen, setEventDateOpen] = useState(false);
+  const [eventTime, setEventTime] = useState("09:00");
+  const [creatingEvent, setCreatingEvent] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date()); const [assignmentFilter, setAssignmentFilter] = useState("all"); const [settingsName, setSettingsName] = useState(""); const [settingsDescription, setSettingsDescription] = useState(""); const [settingsSubject, setSettingsSubject] = useState(""); const [settingsYear, setSettingsYear] = useState("");
 
   function featureError(error: { code?: string; message: string } | null) { if (!error) return false; toast.error(["42P01", "42703", "PGRST204", "PGRST205", "PGRST202"].includes(error.code || "") ? c.configurationNeeded : error.message); return true; }
   async function createAnnouncement() { if (!hub || !user || !announcementTitle.trim()) return; const { data, error } = await supabase.from("class_announcements").insert({ class_id: hub.classInfo.id, author_id: user.id, title: announcementTitle.trim(), body: announcementBody.trim(), status: "published", published_at: new Date().toISOString() }).select("id").single(); if (featureError(error)) return; if (data) { try { await api.notifications.createForClassAnnouncement({ actorId: user.id, announcementId: data.id, classId: hub.classInfo.id }); } catch { /* The announcement remains published. */ } } setAnnouncementOpen(false); setAnnouncementTitle(""); setAnnouncementBody(""); await refresh(); }
   async function createResource() { if (!hub || !user || !resourceTitle.trim()) return; const { error } = await supabase.from("class_resources").insert({ class_id: hub.classInfo.id, created_by: user.id, title: resourceTitle.trim(), url: resourceUrl.trim() || null, resource_type: "link" }); if (featureError(error)) return; setResourceOpen(false); setResourceTitle(""); setResourceUrl(""); await refresh(); }
-  async function createEvent() { if (!hub || !user || !eventTitle.trim() || !eventDate) return; const [hours, minutes] = eventTime.split(":").map(Number); const startsAt = new Date(eventDate); startsAt.setHours(hours || 0, minutes || 0, 0, 0); const { data, error } = await supabase.from("class_events").insert({ class_id: hub.classInfo.id, created_by: user.id, title: eventTitle.trim(), starts_at: startsAt.toISOString(), event_type: "event" }).select("id").single(); if (featureError(error)) return; if (data) { try { await api.notifications.createForClassEvent({ actorId: user.id, classId: hub.classInfo.id, eventId: data.id }); } catch { /* The calendar event remains created. */ } } setEventOpen(false); setEventTitle(""); await refresh(); }
+  async function createEvent() {
+    if (!hub || !user || !eventTitle.trim() || creatingEvent) return;
+    const [hours, minutes] = eventTime.split(":").map(Number);
+    const startsAt = new Date(eventDate);
+    startsAt.setHours(hours, minutes, 0, 0);
+    setCreatingEvent(true);
+    try {
+      const { data, error } = await supabase.from("class_events").insert({
+        class_id: hub.classInfo.id,
+        created_by: user.id,
+        title: eventTitle.trim(),
+        starts_at: startsAt.toISOString(),
+        event_type: "event",
+      }).select("id").single();
+      if (featureError(error)) return;
+      if (data) {
+        void api.notifications.createForClassEvent({ actorId: user.id, classId: hub.classInfo.id, eventId: data.id }).catch(() => {});
+      }
+      setSelectedDate(eventDate);
+      setEventOpen(false);
+      setEventTitle("");
+      await refresh();
+    } finally {
+      setCreatingEvent(false);
+    }
+  }
   async function removeMember(memberId: string) { if (!hub) return; const { error } = await supabase.rpc("manage_class_member", { p_class_id: hub.classInfo.id, p_user_id: memberId, p_action: "remove", p_role: "student" }); if (featureError(error)) return; toast.success(c.memberRemoved); await refresh(); }
   async function copyInvite() { if (!hub?.classInfo.invite_code) return; await navigator.clipboard.writeText(hub.classInfo.invite_code); toast.success(c.copied); }
   async function regenerateInvite() { if (!hub) return; const { error } = await supabase.rpc("regenerate_class_invite", { p_class_id: hub.classInfo.id }); if (featureError(error)) return; await refresh(); }
@@ -149,7 +180,103 @@ export default function ClassPage() {
       <TabsContent value="assignments" className="space-y-4"><div className="flex justify-end"><Select value={assignmentFilter} onValueChange={setAssignmentFilter}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{locale === "ro" ? "Toate temele" : "All assignments"}</SelectItem><SelectItem value="active">{c.published}</SelectItem><SelectItem value="scheduled">{c.scheduled}</SelectItem><SelectItem value="overdue">{c.overdue}</SelectItem><SelectItem value="draft">{c.draft}</SelectItem></SelectContent></Select></div><div className="grid gap-3 lg:grid-cols-2">{filteredAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} locale={locale} classId={hub.classInfo.id} />)}{!filteredAssignments.length && <Card className="border-dashed lg:col-span-2"><CardContent className="py-14 text-center text-muted-foreground">{c.noAssignments}</CardContent></Card>}</div></TabsContent>
       <TabsContent value="resources"><Card><CardHeader><div className="flex items-center justify-between"><CardTitle>{c.resourceLibrary}</CardTitle>{hub.canManage && <Dialog open={resourceOpen} onOpenChange={setResourceOpen}><DialogTrigger asChild><Button size="sm"><Plus className="size-4" />{c.addResource}</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>{c.addResource}</DialogTitle></DialogHeader><Input value={resourceTitle} onChange={(event) => setResourceTitle(event.target.value)} placeholder={c.resourceTitle} /><Input type="url" value={resourceUrl} onChange={(event) => setResourceUrl(event.target.value)} placeholder={c.resourceUrl} /><DialogFooter><Button onClick={createResource}>{c.add}</Button></DialogFooter></DialogContent></Dialog>}</div></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">{hub.resources.map((resource) => <a key={resource.id} href={resource.url || "#"} target={resource.url ? "_blank" : undefined} rel="noreferrer" className="sx-interactive flex items-center gap-3 rounded-[var(--sx-radius-control)] border p-4 hover:bg-muted/50"><div className="flex size-9 items-center justify-center rounded-md bg-muted"><Link className="size-4" /></div><div className="min-w-0 flex-1"><p className="truncate font-medium">{resource.title}</p><p className="text-xs text-muted-foreground">{resource.resource_type}</p></div>{resource.url && <ExternalLink className="size-4 text-muted-foreground" />}</a>)}{!hub.resources.length && <p className="py-12 text-center text-sm text-muted-foreground md:col-span-2">{c.noResources}</p>}</CardContent></Card></TabsContent>
       <TabsContent value="people"><Card><CardHeader><CardTitle>{c.studentProgress}</CardTitle></CardHeader><CardContent className="divide-y">{studentMembers.map((member) => <div key={member.id} className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_10rem_9rem_auto] sm:items-center"><div className="flex items-center gap-3"><UserAvatar avatarUrl={member.avatar_url} username={member.username || "Student"} equippedRewards={member.equipped_rewards as never} className="size-9" /><div><p className="font-medium">{member.username}</p><p className="text-xs text-muted-foreground">{member.lastActivityAt ? `${c.lastActivity} ${formatDistanceToNow(new Date(member.lastActivityAt), { addSuffix: true, locale: locale === "ro" ? ro : undefined })}` : c.never}</p></div></div><div><Progress value={member.progress} /><p className="mt-1 text-xs text-muted-foreground">{member.progress}%</p></div><p className="text-sm tabular-nums">{member.completedProblems} / {member.assignedProblems}</p>{hub.canManage && <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon-sm" variant="ghost" aria-label="Member actions"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem variant="destructive" onClick={() => removeMember(member.id)}><Trash2 />{locale === "ro" ? "Elimină elevul" : "Remove student"}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>}</div>)}</CardContent></Card></TabsContent>
-      <TabsContent value="calendar" className="grid gap-4 lg:grid-cols-[auto_1fr]"><Card><CardContent className="p-2"><Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} modifiers={{ hasEvent: hub.events.map((event) => new Date(event.starts_at)) }} modifiersClassNames={{ hasEvent: "font-semibold underline decoration-primary decoration-2 underline-offset-4" }} /></CardContent></Card><Card><CardHeader><div className="flex items-center justify-between"><CardTitle>{c.classCalendar}</CardTitle>{hub.canManage && <Dialog open={eventOpen} onOpenChange={setEventOpen}><DialogTrigger asChild><Button size="sm"><Plus className="size-4" />{c.addEvent}</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>{c.addEvent}</DialogTitle></DialogHeader><Input value={eventTitle} onChange={(event) => setEventTitle(event.target.value)} placeholder={c.eventTitle} /><Calendar mode="single" selected={eventDate} onSelect={setEventDate} /><label className="flex flex-col gap-1"><span className="text-sm font-medium">{c.time}</span><Input type="time" value={eventTime} onChange={(event) => setEventTime(event.target.value)} /></label><DialogFooter><Button onClick={createEvent}>{c.add}</Button></DialogFooter></DialogContent></Dialog>}</div></CardHeader><CardContent className="space-y-2">{dateEvents.map((event: ClassEvent) => <div key={event.id} className="rounded-[var(--sx-radius-control)] border p-4"><p className="font-medium">{event.title}</p><p className="mt-1 text-xs text-muted-foreground">{format(new Date(event.starts_at), "PPp")}</p></div>)}{!dateEvents.length && <p className="py-10 text-center text-sm text-muted-foreground">{c.noEvents}</p>}</CardContent></Card></TabsContent>
+      <TabsContent value="calendar" className="grid gap-4 lg:grid-cols-[auto_1fr]">
+        <Card>
+          <CardContent className="p-2">
+            <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} locale={locale === "ro" ? ro : undefined}
+              modifiers={{ hasEvent: hub.events.map((event) => new Date(event.starts_at)) }}
+              modifiersClassNames={{ hasEvent: "font-semibold underline decoration-primary decoration-2 underline-offset-4" }} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>{c.classCalendar}</CardTitle>
+              {hub.canManage && (
+                <Dialog open={eventOpen} onOpenChange={(open) => {
+                  if (creatingEvent) return;
+                  if (open) setEventDate(selectedDate ?? new Date());
+                  setEventDateOpen(false);
+                  setEventOpen(open);
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm"><Plus aria-hidden="true" />{c.addEvent}</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>{c.addEvent}</DialogTitle>
+                      <DialogDescription>{locale === "ro" ? "Alege când apare evenimentul în calendarul clasei." : "Choose when the event appears on the class calendar."}</DialogDescription>
+                    </DialogHeader>
+                    <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void createEvent(); }}>
+                      <label className="flex flex-col gap-1.5 text-sm font-medium">
+                        {c.eventTitle}
+                        <Input required value={eventTitle} disabled={creatingEvent} onChange={(event) => setEventTitle(event.target.value)} className="h-10" />
+                      </label>
+                      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+                        <div className="space-y-1.5">
+                          <p id="class-event-date-label" className="text-sm font-medium">{locale === "ro" ? "Data" : "Date"}</p>
+                          <Popover open={eventDateOpen} onOpenChange={setEventDateOpen}>
+                            <PopoverTrigger asChild>
+                              <Button type="button" variant="outline" disabled={creatingEvent}
+                                aria-labelledby="class-event-date-label class-event-date-value" className="h-10 w-full justify-start font-normal">
+                                <CalendarDays aria-hidden="true" />
+                                <span id="class-event-date-value" className="truncate">{format(eventDate, "PP", { locale: locale === "ro" ? ro : undefined })}</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="z-[60] w-auto p-0">
+                              <Calendar mode="single" required autoFocus selected={eventDate} defaultMonth={eventDate}
+                                locale={locale === "ro" ? ro : undefined} onSelect={(date) => { setEventDate(date); setEventDateOpen(false); }} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-1.5" role="group" aria-labelledby="class-event-time-label">
+                          <p id="class-event-time-label" className="text-sm font-medium">{c.time}</p>
+                          <div className="flex items-center gap-1.5">
+                            {([0, 1] as const).map((part) => {
+                              const time = eventTime.split(":");
+                              return (
+                                <div key={part} className="flex items-center gap-1.5">
+                                  {part === 1 && <span aria-hidden="true">:</span>}
+                                  <Select disabled={creatingEvent} value={time[part]} onValueChange={(value) => {
+                                    time[part] = value;
+                                    setEventTime(time.join(":"));
+                                  }}>
+                                    <SelectTrigger aria-label={part === 0 ? (locale === "ro" ? "Ora" : "Hour") : (locale === "ro" ? "Minute" : "Minutes")}
+                                      className="data-[size=default]:h-10 w-16 tabular-nums"><SelectValue /></SelectTrigger>
+                                    <SelectContent position="popper" align="start" className="z-[60] max-h-56 min-w-16">
+                                      {Array.from({ length: part === 0 ? 24 : 60 }, (_, index) => {
+                                        const option = String(index).padStart(2, "0");
+                                        return <SelectItem key={option} value={option} className="min-h-8 tabular-nums">{option}</SelectItem>;
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" disabled={creatingEvent} onClick={() => setEventOpen(false)}>{locale === "ro" ? "Anulează" : "Cancel"}</Button>
+                        <Button type="submit" disabled={creatingEvent || !eventTitle.trim()} aria-busy={creatingEvent}>{c.add}</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {dateEvents.map((event: ClassEvent) => (
+              <div key={event.id} className="rounded-[var(--sx-radius-control)] border p-4">
+                <p className="font-medium">{event.title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{format(new Date(event.starts_at), "PPp", { locale: locale === "ro" ? ro : undefined })}</p>
+              </div>
+            ))}
+            {!dateEvents.length && <p className="py-10 text-center text-sm text-muted-foreground">{c.noEvents}</p>}
+          </CardContent>
+        </Card>
+      </TabsContent>
       {hub.canManage && <TabsContent value="analytics" className="grid gap-4 lg:grid-cols-2"><Card><CardHeader><CardTitle>{c.studentProgress}</CardTitle></CardHeader><CardContent className="space-y-4">{studentMembers.slice(0, 8).map((member) => <div key={member.id}><div className="mb-1.5 flex justify-between text-sm"><span>{member.username}</span><span>{member.progress}%</span></div><Progress value={member.progress} /></div>)}</CardContent></Card><Card><CardHeader><CardTitle>{c.assignments}</CardTitle></CardHeader><CardContent className="space-y-4">{hub.assignments.slice(0, 8).map((assignment) => <div key={assignment.id}><div className="mb-1.5 flex justify-between text-sm"><span className="truncate">{assignment.title}</span><span>{assignment.completionRate}%</span></div><Progress value={assignment.completionRate} /></div>)}</CardContent></Card></TabsContent>}
       {hub.canManage && <TabsContent value="settings"><div className="grid gap-4 lg:grid-cols-[1fr_22rem]"><Card><CardHeader><CardTitle>{c.classSettings}</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2"><label className="flex flex-col gap-1.5 sm:col-span-2"><span className="text-sm font-medium">{c.className}</span><Input value={settingsName} onChange={(event) => setSettingsName(event.target.value)} /></label><label className="flex flex-col gap-1.5 sm:col-span-2"><span className="text-sm font-medium">{c.description}</span><Textarea value={settingsDescription} onChange={(event) => setSettingsDescription(event.target.value)} /></label><label className="flex flex-col gap-1.5"><span className="text-sm font-medium">{c.subject}</span><Input value={settingsSubject} onChange={(event) => setSettingsSubject(event.target.value)} /></label><label className="flex flex-col gap-1.5"><span className="text-sm font-medium">{c.schoolYear}</span><Input value={settingsYear} onChange={(event) => setSettingsYear(event.target.value)} /></label><div className="sm:col-span-2"><Button onClick={saveSettings}>{c.save}</Button></div></CardContent></Card><div className="space-y-4"><Card><CardHeader><CardTitle>{c.invitation}</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">{c.invitationHelp}</p><div className="flex gap-2"><Input readOnly value={hub.classInfo.invite_code || "—"} className="font-mono" /><Button size="icon" variant="outline" onClick={copyInvite} aria-label="Copy invitation code"><Copy /></Button></div><Button variant="outline" className="w-full" onClick={regenerateInvite}><RefreshCw className="size-4" />{c.regenerate}</Button></CardContent></Card><Card><CardContent><Button variant="destructive" className="w-full" onClick={archiveClass}><Archive className="size-4" />{c.archive}</Button></CardContent></Card></div></div></TabsContent>}
     </Tabs>

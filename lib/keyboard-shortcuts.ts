@@ -59,8 +59,8 @@ export function shortcutConflict(bindings: ShortcutBindings, id: ShortcutId, bin
   return binding ? shortcutIds.find(other => other !== id && bindings[other] === binding) : undefined;
 }
 
-export function formatShortcut(binding: string | null): string {
-  return binding?.split("+").map(key => key === "Mod" ? "Ctrl/⌘" : key.length === 1 ? key.toUpperCase() : key).join(" + ") ?? "";
+export function formatShortcut(binding: string | null, modifier: "Ctrl" | "⌘" | "Ctrl/⌘" = "Ctrl/⌘"): string {
+  return binding?.split("+").map(key => key === "Mod" ? modifier : key.length === 1 ? key.toUpperCase() : key).join(" + ") ?? "";
 }
 
 export function shortcutStorageKey(userId?: string): string {

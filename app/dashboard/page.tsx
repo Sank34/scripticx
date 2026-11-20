@@ -1,16 +1,19 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import RouteGuard from "@/components/RouteGuard";
 import { WorkspaceAccessGuard } from "@/components/workspaces/WorkspaceAccessGuard";
+import { DashboardResume } from "@/components/dashboard/DashboardResume";
 import { EmptyState } from "@/components/common/EmptyState";
 import { SectionCard } from "@/components/common/SectionCard";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import {
   ArrowUpRight,
+  BookOpen,
 } from "lucide-react";
 import { getLocalized } from "@/lib/getLocalized";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -179,6 +182,7 @@ function DashboardContent() {
   const {
     data: dashboardData,
     isLoading: loading,
+    isPlaceholderData,
   } = useQuery<DashboardData>({
     queryKey: ["dashboard", user?.id, locale],
     queryFn: fetchDashboardData,
@@ -194,6 +198,7 @@ function DashboardContent() {
   };
 
   const recent = dashboardData?.recent || [];
+  const lastProblem = isPlaceholderData ? undefined : recent.find((item) => item.problem_id && item.problems);
   const leaderboard = dashboardData?.leaderboard || [];
   const feed = dashboardData?.feed || [];
   const dailyChallenge = dashboardData?.dailyChallenge || null;
@@ -247,6 +252,12 @@ function DashboardContent() {
                   ? "Urmărește progresul, revino la provocarea zilei și vezi cum evoluează rezolvările tale."
                   : "Track progress, jump back into today's challenge and see how your submissions evolve."}
               </p>
+              <Button asChild variant="outline" className="mt-4 min-h-11">
+                <Link href="/repos">
+                  <BookOpen aria-hidden="true" />
+                  {t("repositories.title")}
+                </Link>
+              </Button>
             </div>
             <div className="grid overflow-hidden rounded-xl border border-border sm:grid-cols-3 sm:divide-x">
               {[
@@ -336,6 +347,11 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </section>
+
+      <DashboardResume key={user.id} userId={user.id} problem={lastProblem ? {
+        id: lastProblem.problem_id,
+        title: getLocalized(lastProblem.problems.title_i18n, locale) || t("dashboard.resume.problem"),
+      } : undefined} />
 
       <DashboardCharts
         scoreDistribution={scoreDistribution}

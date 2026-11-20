@@ -4,6 +4,7 @@ export const EDITOR_LANGUAGES = [
   { key: "typescriptreact", monaco: "typescript", label: "TypeScript React", extensions: ["tsx"], runnable: false },
   { key: "javascript", monaco: "javascript", label: "JavaScript", extensions: ["js", "mjs", "cjs"], runnable: false },
   { key: "javascriptreact", monaco: "javascript", label: "JavaScript React", extensions: ["jsx"], runnable: false },
+  { key: "notebook", monaco: "json", label: "Jupyter Notebook", extensions: ["ipynb"], runnable: false },
   { key: "python", monaco: "python", label: "Python", extensions: ["py", "pyw", "pyi"], runnable: false },
   { key: "cpp", monaco: "cpp", label: "C++", extensions: ["cpp", "cc", "cxx", "hpp", "hh", "hxx", "ipp", "tpp", "cu", "cuh"], runnable: false },
   { key: "c", monaco: "c", label: "C", extensions: ["c", "h"], runnable: false },

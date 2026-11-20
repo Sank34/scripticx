@@ -14,7 +14,16 @@ import {
 describe("onboarding metadata", () => {
   it("welcomes only the server-marked legacy cohort with unfinished onboarding", () => {
     const legacy = { app_metadata: { [legacyAlphaCohortKey]: true }, user_metadata: { [onboardingMetadataKeys.required]: true } };
-    expect(shouldShowLegacyAlphaWelcome(legacy)).toBe(true);
+    expect(shouldShowLegacyAlphaWelcome(legacy)).toBe(false);
+    expect(shouldShowLegacyAlphaWelcome(legacy, true)).toBe(true);
+    expect(shouldShowLegacyAlphaWelcome({
+      ...legacy,
+      user_metadata: {
+        ...legacy.user_metadata,
+        [onboardingMetadataKeys.completedAt]: "2026-09-13",
+        [onboardingMetadataKeys.tourCompletedAt]: "2026-09-13",
+      },
+    })).toBe(true);
     expect(shouldShowLegacyAlphaWelcome({ user_metadata: legacy.user_metadata })).toBe(false);
     expect(shouldShowLegacyAlphaWelcome({ app_metadata: legacy.app_metadata, user_metadata: { ...legacy.user_metadata, [onboardingMetadataKeys.completedAt]: "2026-09-13" } })).toBe(false);
     expect(shouldShowLegacyAlphaWelcome({ app_metadata: legacy.app_metadata, user_metadata: { ...legacy.user_metadata, [onboardingMetadataKeys.legacyWelcomeSeenAt]: "2026-09-13" } })).toBe(false);

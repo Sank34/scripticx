@@ -43,7 +43,7 @@ function NavigationTree({
   level?: number;
 }) {
   return (
-    <div className={cn("space-y-1", level > 0 && "ml-3 border-l border-border/70 pl-3")}>
+    <div className={cn("min-w-0 space-y-1", level > 0 && "ml-3 border-l border-border/70 pl-3")}>
       {nodes.filter((node) => includesQuery(node, query)).map((node) => {
         if (node.type === "doc") {
           const active = pathname === node.href;
@@ -53,24 +53,24 @@ function NavigationTree({
               key={node.href}
               variant="ghost"
               className={cn(
-                "h-auto min-h-9 w-full justify-start rounded-lg px-2.5 py-2 text-left text-[13px] font-medium",
+                "h-auto min-h-9 w-full min-w-0 max-w-full justify-start whitespace-normal rounded-lg px-2.5 py-2 text-left text-[13px] font-medium",
                 active
-                  ? "bg-foreground text-background hover:bg-foreground hover:text-background"
+                  ? "bg-foreground text-background hover:bg-foreground hover:text-background dark:hover:bg-foreground dark:hover:text-background"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <Link aria-current={active ? "page" : undefined} href={node.href} onClick={onNavigate}>
-                {node.title}
+                <span className="min-w-0 [overflow-wrap:anywhere]">{node.title}</span>
               </Link>
             </Button>
           );
         }
 
         return (
-          <details className="group/category" key={`${level}-${node.title}`} open={!node.collapsed || Boolean(query)}>
+          <details className="group/category min-w-0" key={`${level}-${node.title}`} open={!node.collapsed || Boolean(query)}>
             <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between rounded-lg px-2.5 py-2 text-[13px] font-semibold text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-              <span>{node.title}</span>
-              <ChevronRight className="size-3.5 text-muted-foreground transition-transform group-open/category:rotate-90" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{node.title}</span>
+              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open/category:rotate-90" />
             </summary>
             <NavigationTree
               level={level + 1}
@@ -136,7 +136,7 @@ function DocsNavigation({
           />
         </div>
       </div>
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea className="min-h-0 min-w-0 flex-1 [&_[data-slot=scroll-area-viewport]>div]:!block">
         <nav aria-label={locale === "ro" ? "Navigația documentației" : "Documentation navigation"} className="p-3">
           {hasResults ? (
             <NavigationTree nodes={navigation} onNavigate={onNavigate} pathname={pathname} query={query} />
@@ -167,7 +167,7 @@ export function DocsShell({
     : locale === "ro" ? "Documentație" : "Documentation";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-none bg-card">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-none bg-background">
       <div className="flex min-h-14 items-center justify-between border-b border-border px-4 lg:hidden">
         <div>
           <p className="text-sm font-semibold">{title}</p>

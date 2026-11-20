@@ -25,6 +25,7 @@ import { Markdown } from "@/components/Markdown";
 import { MiniScriptMonacoEditor } from "@/components/editor/MiniScriptMonacoEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardAction,
@@ -62,6 +63,12 @@ import {
   DEFAULT_PROBLEM_SOLUTION_COST,
   type ProblemGuidanceAdmin,
 } from "@/lib/problem-guidance";
+import {
+  ALL_PROBLEM_SUBMISSION_LANGUAGES,
+  getAllowedProblemLanguages,
+  PROBLEM_SUBMISSION_LANGUAGES,
+  type ProblemSubmissionLanguage,
+} from "@/lib/problem-submission-language";
 import { supabase } from "@/lib/supabase";
 
 type EditorMode = "edit" | "split" | "preview";
@@ -73,6 +80,7 @@ type ProblemTestCase = {
 };
 
 type ProblemFormData = {
+  allowed_languages?: ProblemSubmissionLanguage[] | null;
   code?: number | string | null;
   description_i18n?: TranslationMap | null;
   difficulty?: string | null;
@@ -258,6 +266,8 @@ export function ProblemForm({
         studioDescription: "Editează și verifică enunțul în contextul paginii publice.",
         options: "Opțiuni",
         problemSettings: "Setările problemei",
+        submissionLanguages: "Limbaje de programare permise",
+        submissionLanguagesDescription: "Alege în ce limbaje se pot trimite soluții. Păstrează cel puțin unul.",
         translation: "Traducere",
         translations: "Traduceri",
         translationDescription: "Fiecare limbă păstrează propriul titlu, enunț și indicație.",
@@ -307,6 +317,8 @@ export function ProblemForm({
         studioDescription: "Edit and verify the statement in the public-page context.",
         options: "Options",
         problemSettings: "Problem settings",
+        submissionLanguages: "Allowed programming languages",
+        submissionLanguagesDescription: "Choose which languages can be used to submit solutions. Keep at least one selected.",
         translation: "Translation",
         translations: "Translations",
         translationDescription: "Each language keeps its own title, statement, and hint.",
@@ -370,6 +382,9 @@ export function ProblemForm({
   const [solutionCost, setSolutionCost] = useState(String(initialData?.guidance?.solution_cost ?? DEFAULT_PROBLEM_SOLUTION_COST));
   const [starterCode, setStarterCode] = useState(initialData?.starter_code || "");
   const [difficulty, setDifficulty] = useState(initialData?.difficulty || "easy");
+  const [allowedLanguages, setAllowedLanguages] = useState(() =>
+    getAllowedProblemLanguages(initialData?.allowed_languages)
+  );
   const [testCases, setTestCases] = useState<ProblemTestCase[]>(() => normalizeTestCases(initialData?.test_cases));
   const [loading, setLoading] = useState(false);
   const [inlineMode, setInlineMode] = useState<EditorMode>("split");
@@ -385,7 +400,7 @@ export function ProblemForm({
   const hasDescription = Object.values(descriptionI18n).some((value) => value.trim());
   const hasHint = Object.values(hintI18n).some((value) => value.trim());
   const hasFinalSolution = finalSolution.trim().length > 0;
-  const canSave = hasTitle && hasDescription && testCases.length > 0 && (!hasFinalSolution || hasHint) && !loading;
+  const canSave = hasTitle && hasDescription && testCases.length > 0 && allowedLanguages.length > 0 && (!hasFinalSolution || hasHint) && !loading;
   const modes = { edit: copy.edit, split: copy.split, preview: copy.preview };
 
   function updateTitle(value: string) {
@@ -455,6 +470,7 @@ export function ProblemForm({
   }
 
   async function handleSubmit() {
+    if (!allowedLanguages.length) return;
     if (!hasTitle || !hasDescription) {
       toast.error(t("admin.problems.form.validation.required"));
       return;
@@ -470,6 +486,9 @@ export function ProblemForm({
       description_i18n: descriptionI18n,
       starter_code: starterCode,
       difficulty,
+      allowed_languages: allowedLanguages.length === ALL_PROBLEM_SUBMISSION_LANGUAGES.length
+        ? null
+        : allowedLanguages,
       test_cases: testCases,
     };
     const guidancePayload = {
@@ -677,6 +696,35 @@ export function ProblemForm({
           </Select>
         </label>
       </section>
+
+      <Separator />
+
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold">{copy.submissionLanguages}</legend>
+        <p className="text-xs leading-5 text-muted-foreground">{copy.submissionLanguagesDescription}</p>
+        <div className="space-y-1">
+          {ALL_PROBLEM_SUBMISSION_LANGUAGES.map((language) => {
+            const checked = allowedLanguages.includes(language);
+            const disabled = loading || (checked && allowedLanguages.length === 1);
+            return (
+              <label key={language} className={cn(
+                "flex min-h-9 items-center gap-3 rounded-md px-2 text-sm",
+                !disabled && "cursor-pointer hover:bg-muted/50"
+              )}>
+                <Checkbox
+                  checked={checked}
+                  disabled={disabled}
+                  onCheckedChange={(next) => setAllowedLanguages((current) => {
+                    if (next === true) return current.includes(language) ? current : [...current, language];
+                    return current.length > 1 ? current.filter((value) => value !== language) : current;
+                  })}
+                />
+                {PROBLEM_SUBMISSION_LANGUAGES[language].label}
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
 
       <Separator />
 

@@ -5,6 +5,8 @@ export type ProblemTestResult = {
   got: string;
   input: unknown[] | string;
   passed: boolean;
+  failure?: "compilationError" | "runtimeError" | "timeLimit";
+  diagnostics?: string;
 };
 
 type TestResultCardLabels = {
@@ -14,6 +16,10 @@ type TestResultCardLabels = {
   shouldHavePrinted: string;
   test: string;
   wrong: string;
+  compilationError?: string;
+  runtimeError?: string;
+  timeLimit?: string;
+  diagnostics?: string;
 };
 
 type TestResultCardProps = {
@@ -40,11 +46,14 @@ export function TestResultCard({ index, labels, result }: TestResultCardProps) {
               : "bg-destructive/10 text-destructive"
           }`}
         >
-          {result.passed ? labels.correct : labels.wrong}
+          {result.passed ? labels.correct : (result.failure && labels[result.failure]) || labels.wrong}
         </span>
       </div>
 
       <div className="space-y-3 p-4">
+        {result.diagnostics && labels.diagnostics && (
+          <TestOutputBlock label={labels.diagnostics} value={result.diagnostics} />
+        )}
         <TestOutputBlock
           label={labels.programRead}
           value={inputDisplay || "-"}

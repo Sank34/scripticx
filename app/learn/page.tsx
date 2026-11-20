@@ -36,6 +36,8 @@ import { useRoadmapConfig } from "@/hooks/useRoadmapConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useLearningPaths } from "@/hooks/useLearningPaths";
 import { refreshLearningPathCompletion } from "@/lib/learning-paths";
+import { learningProgressVersion, lessonProgressStorageKey } from "@/lib/learning-progress-version";
+import { hasPassingLessonQuiz } from "@/lib/lesson-progression";
 import { getCategoryForSection } from "@/lib/roadmap-config";
 
 type StoredProgress = Record<
@@ -47,7 +49,7 @@ type StoredProgress = Record<
   }
 >;
 
-const progressKey = "scripticx.lessonProgress.v1";
+const progressKey = lessonProgressStorageKey;
 
 type LessonRow = {
   id: string;
@@ -251,6 +253,7 @@ export default function LearnRoadmapPage() {
     queryKey: [
       "roadmap",
       "progress",
+      learningProgressVersion,
       user?.id || "anonymous",
       lessons.map((lesson) => lesson.id).join(","),
     ],
@@ -428,11 +431,7 @@ export default function LearnRoadmapPage() {
     return index < 0 ? 0 : index;
   };
   const hasPassingQuiz = (lesson: LearnLesson) => {
-    const rule = getLessonRule(lesson);
-    if (!rule.requiresCorrectQuiz || lesson.quiz.length === 0) return true;
-
-    const score = progress[lesson.id]?.quizScore;
-    return typeof score === "number" && score >= lesson.quiz.length;
+    return hasPassingLessonQuiz(lesson, progress[lesson.id]);
   };
   const hasRequiredPractice = (lesson: LearnLesson) => {
     const requiredProblemCodes = getLessonRule(lesson).requiredProblemCodes;
@@ -480,8 +479,6 @@ export default function LearnRoadmapPage() {
   };
 
   const canOpenLesson = (lesson: LearnLesson) => {
-    if (progress[lesson.id]?.completed) return true;
-
     const lessonIndex = getConfiguredLessonCategoryIndex(lesson);
     if (lessonIndex <= 0) return true;
 
@@ -590,6 +587,10 @@ export default function LearnRoadmapPage() {
       console.error("Could not refresh foundation completion:", error)
     );
   }, [foundationCategory?.databaseId, progressData, user]);
+
+  if (roadmapData.isLoading) return <div role="status" className="flex min-h-[60dvh] items-center justify-center p-6">{lessonLocale === "ro" ? "Se încarcă roadmap-ul…" : "Loading roadmap…"}</div>;
+  if (roadmapData.isError && !lessons.length) return <div className="flex min-h-[60dvh] flex-col items-center justify-center gap-4 p-6"><p role="alert">{lessonLocale === "ro" ? "Roadmap-ul nu a putut fi încărcat." : "Could not load the roadmap."}</p><Button onClick={() => void roadmapData.refetch()}>{lessonLocale === "ro" ? "Încearcă din nou" : "Try again"}</Button></div>;
+  if (!lessons.length) return <div className="flex min-h-[60dvh] items-center justify-center p-6">{lessonLocale === "ro" ? "Nu există lecții publicate încă." : "No lessons have been published yet."}</div>;
 
   return (
     <div className="scroll-smooth">

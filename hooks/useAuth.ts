@@ -7,8 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
 import type { ProfileSummary } from "@/lib/api";
 import { getProfile, getSessionWithTimeout } from "@/lib/auth-client";
-
-const AUTH_TIMEOUT_MS = 6000;
+import { AUTH_SESSION_TIMEOUT_MS } from "@/lib/supabase-transport";
 
 export const authQueryKey = ["auth", "current"] as const;
 
@@ -19,7 +18,7 @@ export type AuthState = {
 };
 
 export async function fetchAuthState(): Promise<AuthState> {
-  const { data } = await getSessionWithTimeout(AUTH_TIMEOUT_MS);
+  const { data } = await getSessionWithTimeout(AUTH_SESSION_TIMEOUT_MS);
   const user = data.session?.user ?? null;
 
   if (!user) return { profile: null, profileResolved: true, user: null };

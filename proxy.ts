@@ -31,6 +31,7 @@ const ALWAYS_AVAILABLE = new Set([
   "/api/social-image",
   "/api/cron/email",
   "/api/platform/status",
+  "/api/platform/health/live-share",
   "/api/cron/competitions",
   "/api/mail/unsubscribe",
   "/api/mail/verification/resend",

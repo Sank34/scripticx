@@ -1,34 +1,36 @@
 import { createClient } from "@supabase/supabase-js";
+import { resilientSupabaseFetch, supabaseAuthLock } from "@/lib/supabase-transport";
 
-const AUTH_FETCH_TIMEOUT_MS = 4_000;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-function resilientSupabaseFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-  const requestUrl =
-    typeof input === "string"
-      ? input
-      : input instanceof URL
-        ? input.toString()
-        : input.url;
-
-  if (!requestUrl.includes("/auth/v1/")) return fetch(input, init);
-
-  const timeoutSignal = AbortSignal.timeout(AUTH_FETCH_TIMEOUT_MS);
-  const signal = init.signal
-    ? AbortSignal.any([init.signal, timeoutSignal])
-    : timeoutSignal;
-  return fetch(input, { ...init, signal });
-}
-
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
+function createSupabaseClient() {
+  return createClient(url, key, {
     global: {
       fetch: resilientSupabaseFetch,
     },
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      lock: supabaseAuthLock,
     },
-  }
-);
+  });
+}
+
+const browserGlobal = globalThis as typeof globalThis & {
+  scripticxSupabaseClient?: {
+    url: string;
+    key: string;
+    client: ReturnType<typeof createSupabaseClient>;
+  };
+};
+const cached = typeof window !== "undefined" ? browserGlobal.scripticxSupabaseClient : undefined;
+
+export const supabase = cached?.url === url && cached.key === key
+  ? cached.client
+  : createSupabaseClient();
+
+if (typeof window !== "undefined") {
+  // Fast Refresh reevaluates modules while the previous client's refresh timer remains active.
+  browserGlobal.scripticxSupabaseClient = { url, key, client: supabase };
+}

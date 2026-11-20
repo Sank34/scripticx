@@ -23,6 +23,7 @@ import { getLocalized } from "@/lib/getLocalized";
 import { translations } from "@/lib/i18n";
 import { ProfileImagePreview } from "@/components/user/ProfileImagePreview";
 import { ProfileBackground } from "@/components/user/ProfileBackground";
+import { RepositoryList } from "@/components/repositories/RepositoryList";
 import { ContributionHeatmap } from "@/components/profile/ContributionHeatmap";
 import {
   getLegacyBadgeRarity,
@@ -369,6 +370,13 @@ export default async function PublicProfile({
           )}
         </div>
       </div>
+
+      {visibility.repositories && (
+        <section className="space-y-3" aria-labelledby="profile-repositories-heading">
+          <h2 id="profile-repositories-heading" className="text-lg font-semibold">{t("repositories.title")}</h2>
+          <RepositoryList ownerId={profile.id} />
+        </section>
+      )}
 
       {visibility.activity && (
         <ContributionHeatmap data={activity} locale={locale} />

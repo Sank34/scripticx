@@ -29,25 +29,19 @@ export function LegacyAlphaWelcome({ onStart, starting }: { onStart: () => void;
         <p className="text-sm leading-relaxed text-muted-foreground">{ro
           ? "Este posibil să mai întâlnești buguri. Le poți raporta oricând din pagina Contact, iar în What’s New poți descoperi toate funcționalitățile noi."
           : "You may still encounter some bugs. You can report them anytime on the Contact page and explore all the new features in What’s New."}</p>
-        <div className="space-y-2 rounded-xl border bg-muted/30 p-4">
-          <p className="text-sm font-medium">{ro ? "Acum, hai să-l configurăm pentru tine." : "Now, let’s make it yours."}</p>
-          <p className="text-sm leading-relaxed text-muted-foreground">{ro
-            ? "Contul tău a fost creat înainte să existe onboarding-ul. Pentru a continua, alege limba, interesele și modul în care vrei să folosești platforma. După configurare, îți arătăm și ce găsești în workspace-ul tău."
-            : "Your account was created before onboarding was available. To continue, choose your language, interests and how you want to use the platform. After setup, we’ll show you around your workspace."}</p>
-        </div>
         <div className="flex items-start gap-3 rounded-xl border p-4">
           <Gift className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium">{ro ? "Un cadou pentru tine" : "A gift for you"}</p>
             <p className="text-sm leading-relaxed text-muted-foreground">{ro
-              ? "Fundalul MiniScript+ este acum în inventarul tău, gratuit. Îl poți activa după configurare, când dorești."
-              : "MiniScript+ Background is now in your inventory, free of charge. You can equip it after setup, whenever you like."}</p>
+              ? "Fundalul MiniScript+ este acum în inventarul tău, gratuit. Îl poți activa oricând."
+              : "MiniScript+ Background is now in your inventory, free of charge. You can equip it whenever you like."}</p>
           </div>
         </div>
         <p className="text-xs leading-relaxed text-muted-foreground">{ro ? "Progresul, punctele și munca ta rămân în cont." : "Your progress, points and work stay in your account."}</p>
         <Button onClick={onStart} disabled={starting} className="mt-1 w-full gap-2">
           {starting ? <LoaderCircle className="size-4 animate-spin" /> : null}
-          {starting ? (ro ? "Se pregătește…" : "Getting ready…") : (ro ? "Începe configurarea" : "Start onboarding")}
+          {starting ? (ro ? "Se pregătește…" : "Getting ready…") : (ro ? "Continuă" : "Continue")}
           {!starting && <ArrowRight className="size-4" />}
         </Button>
       </DialogContent>

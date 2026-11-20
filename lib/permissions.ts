@@ -9,7 +9,7 @@ export const PERMISSIONS = [
   { key: "admin.competitions", en: "Competitions", ro: "Competiții", path: "/admin/competitions" },
   { key: "admin.lessons", en: "Lessons", ro: "Lecții", path: "/admin/lessons" },
   { key: "admin.workshops", en: "Workshops", ro: "Workshopuri", path: "/admin/workshops" },
-  { key: "admin.shop", en: "Rewards shop", ro: "Magazin de recompense", path: "/admin/shop" },
+  { key: "admin.shop", en: "Rewards Shop", ro: "Rewards Shop", path: "/admin/shop" },
   { key: "admin.badges", en: "Badges", ro: "Insigne", path: "/admin/badges" },
   { key: "admin.updates", en: "Platform updates", ro: "Noutăți platformă", path: "/admin/updates" },
   { key: "admin.announcements", en: "Announcements", ro: "Anunțuri", path: "/admin/announcements" },

@@ -22,7 +22,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getLessonById, text, type LessonLocale } from "@/lib/learn-lessons";
+import { text, type LessonLocale } from "@/lib/learn-lessons";
+import { useRoadmapConfig } from "@/hooks/useRoadmapConfig";
 import { cn } from "@/lib/utils";
 
 type Crumb = {
@@ -50,6 +51,7 @@ export function TopbarBreadcrumbs() {
   );
   const lessonLocale = (locale === "ro" ? "ro" : "en") as LessonLocale;
   const segments = pathname.split("/").filter(Boolean);
+  const roadmap = useRoadmapConfig({ enabled: segments[0] === "learn" && segments[1] === "lesson" });
 
   useEffect(() => {
     setMounted(true);
@@ -63,6 +65,7 @@ export function TopbarBreadcrumbs() {
     dashboard: t("nav.dashboard"),
     "design-system": locale === "ro" ? "Sistem de design" : "Design system",
     editor: t("nav.editor"),
+    repos: t("repositories.title"),
     email: t("admin.emailCenter.cardTitle"),
     examples: t("nav.examples"),
     feed: t("nav.feed"),
@@ -107,7 +110,7 @@ export function TopbarBreadcrumbs() {
 
   if (segments[0] === "learn" && segments[1] === "lesson") {
     const lessonId = segments[2] ? decodeURIComponent(segments[2]) : "";
-    const lesson = getLessonById(lessonId);
+    const lesson = roadmap.lessons.find(item => item.id === lessonId);
 
     crumbs.push({
       href: "/learn",

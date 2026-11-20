@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { api, type FeedData, type FeedPost } from "@/lib/api";
 import RouteGuard from "@/components/RouteGuard";
 import { EmptyState } from "@/components/common/EmptyState";
+import { FeedRepositories } from "@/components/feed/FeedRepositories";
 import { FeedPostCard } from "@/components/feed/FeedPostCard";
 import { PostAiSwitch } from "@/components/feed/PostAiDisclosure";
 import { FeedPostSkeleton } from "@/components/feed/FeedPageSkeleton";
@@ -51,6 +52,7 @@ function FeedContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [feedTab, setFeedTab] = useState<"posts" | "repositories">("posts");
   const [content, setContent] = useState("");
   const [posting, setPosting] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -197,8 +199,24 @@ function FeedContent() {
         }
       />
 
+      <div role="group" aria-label={t("feed.contentFilter")} className="flex flex-wrap gap-2">
+        {(["posts", "repositories"] as const).map((tab) => (
+          <Button
+            key={tab}
+            type="button"
+            variant={feedTab === tab ? "secondary" : "ghost"}
+            aria-pressed={feedTab === tab}
+            className="min-h-10"
+            onClick={() => setFeedTab(tab)}
+          >
+            {t(tab === "posts" ? "feed.postsTab" : "feed.repositories")}
+          </Button>
+        ))}
+      </div>
+
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="min-w-0 space-y-5" aria-label={t("feed.latest")}>
+        {feedTab === "repositories" && user && <FeedRepositories viewerId={user.id} />}
+        <section hidden={feedTab !== "posts"} className="min-w-0 space-y-5" aria-label={t("feed.latest")}>
           <Card className="gap-0 overflow-hidden rounded-2xl py-0 shadow-none ring-border/80">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -344,88 +362,91 @@ function FeedContent() {
             ))}
         </section>
 
-        <aside className="hidden space-y-4 xl:sticky xl:top-6 xl:block">
-          <Card className="rounded-2xl shadow-none ring-border/80">
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted">
-                  <UsersRound className="size-4" />
-                </span>
+        <aside className={`space-y-4 xl:sticky xl:top-6 xl:block ${feedTab === "posts" ? "hidden" : ""}`}>
+          {user && <FeedRepositories viewerId={user.id} popular />}
+          <div className="hidden space-y-4 xl:block">
+            <Card className="rounded-2xl shadow-none ring-border/80">
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted">
+                    <UsersRound className="size-4" />
+                  </span>
+                  <div>
+                    <h2 className="font-semibold">{t("feed.suggestedUsers")}</h2>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {t("feed.suggestedSubtitle")}
+                    </p>
+                  </div>
+                </div>
+
+                {suggested.length === 0 && (
+                  <p className="rounded-xl bg-muted/50 p-3 text-sm text-muted-foreground">
+                    {t("feed.noSuggestions")}
+                  </p>
+                )}
+
+                <div className="space-y-1">
+                  {suggested.slice(0, 5).map((suggestion) => {
+                    const username = suggestion.username || t("user.user");
+
+                    return (
+                      <div
+                        key={suggestion.id}
+                        className="flex items-center gap-2 rounded-xl p-2 transition-colors hover:bg-accent/70"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => suggestion.username && router.push(`/u/${suggestion.username}`)}
+                          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                        >
+                          <UserAvatar
+                            avatarUrl={suggestion.avatar_url}
+                            username={username}
+                            equippedRewards={suggestion.equipped_rewards}
+                            className="size-9"
+                          />
+                          <span className="truncate text-sm font-medium">{username}</span>
+                        </button>
+
+                        <Button
+                          size="sm"
+                          variant={following.has(suggestion.id) ? "secondary" : "outline"}
+                          onClick={() => followUser(suggestion.id)}
+                          className="h-7 rounded-full px-2.5 text-xs"
+                        >
+                          {following.has(suggestion.id) ? t("feed.unfollow") : t("feed.follow")}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl bg-muted/35 shadow-none ring-border/70">
+              <CardContent className="space-y-4">
                 <div>
-                  <h2 className="font-semibold">{t("feed.suggestedUsers")}</h2>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {t("feed.suggestedSubtitle")}
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <Sparkles className="size-4" />
+                    {t("feed.communityActivity")}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {t("feed.communityDescription")}
                   </p>
                 </div>
-              </div>
-
-              {suggested.length === 0 && (
-                <p className="rounded-xl bg-muted/50 p-3 text-sm text-muted-foreground">
-                  {t("feed.noSuggestions")}
-                </p>
-              )}
-
-              <div className="space-y-1">
-                {suggested.slice(0, 5).map((suggestion) => {
-                  const username = suggestion.username || t("user.user");
-
-                  return (
-                    <div
-                      key={suggestion.id}
-                      className="flex items-center gap-2 rounded-xl p-2 transition-colors hover:bg-accent/70"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => suggestion.username && router.push(`/u/${suggestion.username}`)}
-                        className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                      >
-                        <UserAvatar
-                          avatarUrl={suggestion.avatar_url}
-                          username={username}
-                          equippedRewards={suggestion.equipped_rewards}
-                          className="size-9"
-                        />
-                        <span className="truncate text-sm font-medium">{username}</span>
-                      </button>
-
-                      <Button
-                        size="sm"
-                        variant={following.has(suggestion.id) ? "secondary" : "outline"}
-                        onClick={() => followUser(suggestion.id)}
-                        className="h-7 rounded-full px-2.5 text-xs"
-                      >
-                        {following.has(suggestion.id) ? t("feed.unfollow") : t("feed.follow")}
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl bg-muted/35 shadow-none ring-border/70">
-            <CardContent className="space-y-4">
-              <div>
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Sparkles className="size-4" />
-                  {t("feed.communityActivity")}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-border bg-background/70 p-3">
+                    <p className="text-xl font-semibold">{posts.length}</p>
+                    <p className="text-xs text-muted-foreground">{t("feed.posts")}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background/70 p-3">
+                    <p className="text-xl font-semibold">{codeShareCount}</p>
+                    <p className="text-xs text-muted-foreground">{t("feed.codeShares")}</p>
+                  </div>
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {t("feed.communityDescription")}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-border bg-background/70 p-3">
-                  <p className="text-xl font-semibold">{posts.length}</p>
-                  <p className="text-xs text-muted-foreground">{t("feed.posts")}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/70 p-3">
-                  <p className="text-xl font-semibold">{codeShareCount}</p>
-                  <p className="text-xs text-muted-foreground">{t("feed.codeShares")}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </aside>
       </div>
 

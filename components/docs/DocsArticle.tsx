@@ -85,22 +85,22 @@ export function DocsArticle({
 
         <nav aria-label={locale === "ro" ? "Paginare documentație" : "Documentation pagination"} className="mt-16 grid grid-cols-1 gap-3 border-t border-border pt-8 sm:grid-cols-2">
           {previous ? (
-            <Button asChild className="h-auto min-h-16 justify-start px-4 py-3" variant="outline">
+            <Button asChild className="h-auto min-h-16 min-w-0 max-w-full justify-start whitespace-normal px-4 py-3" variant="outline">
               <Link href={previous.href}>
                 <ArrowLeft className="size-4 shrink-0" />
                 <span className="min-w-0 text-left">
                   <span className="block text-xs font-normal text-muted-foreground">{locale === "ro" ? "Anterior" : "Previous"}</span>
-                  <span className="block truncate text-sm font-semibold">{previous.title}</span>
+                  <span className="block text-sm font-semibold [overflow-wrap:anywhere]">{previous.title}</span>
                 </span>
               </Link>
             </Button>
           ) : <span />}
           {next && (
-            <Button asChild className="h-auto min-h-16 justify-end px-4 py-3 sm:col-start-2" variant="outline">
+            <Button asChild className="h-auto min-h-16 min-w-0 max-w-full justify-end whitespace-normal px-4 py-3 sm:col-start-2" variant="outline">
               <Link href={next.href}>
                 <span className="min-w-0 text-right">
                   <span className="block text-xs font-normal text-muted-foreground">{locale === "ro" ? "Următorul" : "Next"}</span>
-                  <span className="block truncate text-sm font-semibold">{next.title}</span>
+                  <span className="block text-sm font-semibold [overflow-wrap:anywhere]">{next.title}</span>
                 </span>
                 <ArrowRight className="size-4 shrink-0" />
               </Link>

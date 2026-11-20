@@ -1,4 +1,5 @@
 import type { CompetitionPhase } from "@/lib/competitions";
+import type { ProblemSubmissionLanguage } from "@/lib/problem-submission-language";
 
 export type CompetitionSummary = {
   id: string;
@@ -78,6 +79,7 @@ export type StandardSubmission = {
   id: string;
   problem_id: string;
   code: string;
+  language?: ProblemSubmissionLanguage;
   score: number;
   created_at: string;
   verified_at?: string | null;

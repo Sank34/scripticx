@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const NAVIGATION_PROGRESS_EVENT = "scripticx:navigation-progress";
 
@@ -13,13 +13,31 @@ export function startShellRouteProgress() {
 
 export function ShellRouteProgress() {
   const pathname = usePathname();
-  const firstPathname = useRef(true);
+  const searchParams = useSearchParams();
   const currentPageKeyRef = useRef<string | null>(null);
   const intervalRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
   const failSafeTimerRef = useRef<number | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  const finishProgress = useCallback(() => {
+    if (intervalRef.current === null) return;
+
+    window.clearInterval(intervalRef.current);
+    intervalRef.current = null;
+    if (failSafeTimerRef.current !== null) {
+      window.clearTimeout(failSafeTimerRef.current);
+      failSafeTimerRef.current = null;
+    }
+
+    setProgress(100);
+    hideTimerRef.current = window.setTimeout(() => {
+      hideTimerRef.current = null;
+      setIsVisible(false);
+      setProgress(0);
+    }, 280);
+  }, []);
 
   useEffect(() => {
     function clearTimers() {
@@ -58,13 +76,7 @@ export function ShellRouteProgress() {
         });
       }, 120);
 
-      failSafeTimerRef.current = window.setTimeout(() => {
-        setProgress(100);
-        hideTimerRef.current = window.setTimeout(() => {
-          setIsVisible(false);
-          setProgress(0);
-        }, 260);
-      }, 8000);
+      failSafeTimerRef.current = window.setTimeout(finishProgress, 8000);
     }
 
     function handleClick(event: MouseEvent) {
@@ -114,32 +126,12 @@ export function ShellRouteProgress() {
       window.removeEventListener("popstate", handlePopState);
       document.removeEventListener("click", handleClick, true);
     };
-  }, []);
+  }, [finishProgress]);
 
   useEffect(() => {
-    if (firstPathname.current) {
-      firstPathname.current = false;
-      return;
-    }
-
     currentPageKeyRef.current = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-
-    if (intervalRef.current) {
-      window.clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    if (failSafeTimerRef.current) {
-      window.clearTimeout(failSafeTimerRef.current);
-      failSafeTimerRef.current = null;
-    }
-
-    setProgress(100);
-    hideTimerRef.current = window.setTimeout(() => {
-      setIsVisible(false);
-      setProgress(0);
-    }, 280);
-  }, [pathname]);
+    finishProgress();
+  }, [pathname, searchParams, finishProgress]);
 
   return (
     <div

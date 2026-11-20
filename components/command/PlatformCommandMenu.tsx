@@ -1,5 +1,8 @@
 "use client";
 import { useAuth } from "@/hooks/useAuth";
+import { useDirectorySearch } from "@/hooks/useDirectorySearch";
+import { directorySearchHref } from "@/lib/directory-search";
+import { repositoryHref } from "@/lib/repositories";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -79,10 +82,18 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
   const router = useRouter();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const term = search.trim();
+  const directory = useDirectorySearch(search, "all", 4, open && Boolean(user));
   const [isSafari, setIsSafari] = useState(false);
+  const [searchModifier, setSearchModifier] = useState<"Ctrl" | "⌘" | null>(null);
   const [viewportHeight, setViewportHeight] = useState(720);
   const { bindings } = useKeyboardShortcuts();
-  useShortcut("search", () => setOpen(value => !value));
+  useShortcut("search", () => {
+    if (open) setSearch("");
+    setOpen(!open);
+  });
+  const placeholder = t(user ? "search.commandPlaceholder" : "command.placeholder");
 
   const { data: liveCodeData } = useQuery<LiveCodeData>({
     queryKey: ["command-menu", "livecode", user?.id],
@@ -108,6 +119,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
     }
 
     setIsSafari(safari);
+    setSearchModifier(/Mac|iPhone|iPad|iPod/i.test(navigator.platform || userAgent) ? "⌘" : "Ctrl");
     updateViewport();
     window.addEventListener("resize", updateViewport);
 
@@ -379,6 +391,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
 
   const runCommand = useCallback((href: string) => {
     setOpen(false);
+    setSearch("");
     startShellRouteProgress();
     router.push(href);
   }, [router]);
@@ -420,14 +433,17 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
       >
         <span className="flex min-w-0 items-center gap-2">
           <Search className="h-4 w-4 shrink-0" />
-          <span className="truncate">{t("command.placeholder")}</span>
+          <span className="truncate">{placeholder}</span>
         </span>
-        {bindings.search && <ShortcutKeys shortcut={formatShortcut(bindings.search)} />}
+        {searchModifier && bindings.search && <ShortcutKeys shortcut={formatShortcut(bindings.search, searchModifier)} />}
       </button>
 
       <CommandDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setSearch("");
+        }}
         title={t("command.title")}
         description={t("command.description")}
         className={`max-w-xl border-border bg-popover/95 text-popover-foreground shadow-2xl backdrop-blur-xl ${
@@ -441,7 +457,7 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
           className={isSafari ? "" : "max-h-[calc(100vh-4rem)]"}
           style={isSafari ? { maxHeight: safariDialogMaxHeight } : undefined}
         >
-          <CommandInput placeholder={t("command.placeholder")} />
+          <CommandInput value={search} onValueChange={setSearch} placeholder={placeholder} />
           <CommandList
             className={`overflow-y-auto ${
               isSafari ? "" : "max-h-[calc(100vh-9rem)]"
@@ -449,6 +465,45 @@ export function PlatformCommandMenu({ isAdmin, user }: PlatformCommandMenuProps)
             style={isSafari ? { maxHeight: safariListMaxHeight } : undefined}
           >
             <CommandEmpty>{t("command.empty")}</CommandEmpty>
+
+            {user && term && (
+              <>
+                <CommandGroup heading={t("search.directory")}>
+                  <CommandMenuItem
+                    command={{ href: directorySearchHref(term), icon: Search, label: t("search.searchFor", { query: term }), keywords: [term] }}
+                    onSelect={runCommand}
+                  />
+                </CommandGroup>
+                {directory.repositoryResults.length > 0 && (
+                  <CommandGroup heading={t("search.repositories")}>
+                    {directory.repositoryResults.map((repo) => (
+                      <CommandMenuItem
+                        key={repo.id}
+                        command={{
+                          href: repositoryHref(repo.id),
+                          icon: BookOpen,
+                          label: `${repo.owner ? `${repo.owner}/` : ""}${repo.title || t("repositories.untitled")}`,
+                          keywords: [term],
+                        }}
+                        onSelect={runCommand}
+                      />
+                    ))}
+                  </CommandGroup>
+                )}
+                {directory.userResults.length > 0 && (
+                  <CommandGroup heading={t("search.users")}>
+                    {directory.userResults.map((profile) => (
+                      <CommandMenuItem
+                        key={profile.id}
+                        command={{ href: `/u/${encodeURIComponent(profile.username)}`, icon: User, label: profile.username, keywords: [term] }}
+                        onSelect={runCommand}
+                      />
+                    ))}
+                  </CommandGroup>
+                )}
+                <CommandSeparator />
+              </>
+            )}
 
             <CommandGroup heading={t("command.groups.navigation")}>
               {pageCommands.map((command) => (
@@ -580,10 +635,10 @@ function CommandMenuItem({
 
 function ShortcutKeys({ shortcut }: { shortcut: string }) {
   return (
-    <KbdGroup>
+    <KbdGroup className="shrink-0 whitespace-nowrap">
       {shortcut.split(" + ").map((key) => (
         <Kbd key={key}>
-          {key === "⌘" ? <CommandIcon className="h-3 w-3" /> : key}
+          {key === "⌘" ? <CommandIcon className="h-3 w-3" role="img" aria-label="Command" /> : key}
         </Kbd>
       ))}
     </KbdGroup>

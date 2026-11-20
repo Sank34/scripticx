@@ -24,6 +24,7 @@ type PistonStage = {
 
 type PistonResponse = {
   compile?: PistonStage;
+  error?: string;
   language?: string;
   message?: string;
   run?: PistonStage;
@@ -31,6 +32,12 @@ type PistonResponse = {
 };
 
 const MAX_STAGE_OUTPUT = 100_000;
+
+export class CodeExecutionTimeout extends HttpError {
+  constructor(message: string) {
+    super(504, message);
+  }
+}
 
 function runnerExecuteUrl() {
   const configured = process.env.CODE_RUNNER_URL?.trim();
@@ -119,6 +126,9 @@ export async function executeCode(input: {
   }
 
   const payload = (await response.json().catch(() => null)) as PistonResponse | null;
+  if (response.status === 504 && payload?.error === "execution_timeout") {
+    throw new CodeExecutionTimeout("Code execution timed out");
+  }
   if (!response.ok || !payload?.run) {
     const message = payload?.message?.slice(0, 500);
     throw new HttpError(response.status >= 500 ? 502 : 422, message || "Code execution failed");
