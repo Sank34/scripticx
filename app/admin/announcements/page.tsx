@@ -55,13 +55,13 @@ export default function AdminAnnouncementsPage() {
             <CardDescription>{ro ? "Mesajul apare imediat în inboxul tuturor utilizatorilor." : "The message appears immediately in every user’s inbox."}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <label className="block space-y-1 text-sm">{ro ? "Titlu" : "Title"}
+            <label className="flex flex-col gap-1 text-sm">{ro ? "Titlu" : "Title"}
               <Input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} />
             </label>
-            <label className="block space-y-1 text-sm">{ro ? "Mesaj" : "Message"}
+            <label className="flex flex-col gap-1 text-sm">{ro ? "Mesaj" : "Message"}
               <Textarea value={body} onChange={(event) => setBody(event.target.value)} rows={6} maxLength={2000} />
             </label>
-            <label className="block space-y-1 text-sm">{ro ? "Link opțional" : "Optional link"}
+            <label className="flex flex-col gap-1 text-sm">{ro ? "Link opțional" : "Optional link"}
               <Input value={href} onChange={(event) => setHref(event.target.value)} placeholder="/updates" maxLength={500} />
             </label>
             <Button onClick={() => void send()} disabled={busy || title.trim().length < 2 || body.trim().length < 2}>

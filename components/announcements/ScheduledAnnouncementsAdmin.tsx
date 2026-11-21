@@ -135,8 +135,8 @@ export function ScheduledAnnouncementsAdmin() {
         <CardHeader><CardTitle>{text.title}</CardTitle></CardHeader>
         <CardContent>
           <form className="space-y-5" onSubmit={submit}>
-            <label className="block space-y-1 text-sm font-medium">{text.heading}<Input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required /></label>
-            <label className="block space-y-1 text-sm font-medium">{text.message}<Textarea value={body} onChange={(event) => setBody(event.target.value)} rows={5} maxLength={2000} required /></label>
+            <label className="flex flex-col gap-1 text-sm font-medium">{text.heading}<Input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required /></label>
+            <label className="flex flex-col gap-1 text-sm font-medium">{text.message}<Textarea value={body} onChange={(event) => setBody(event.target.value)} rows={5} maxLength={2000} required /></label>
             <div className="grid gap-3 sm:grid-cols-2">
               <div role="group" aria-label={text.start} className="space-y-1"><p className="text-sm font-medium">{text.start}</p>
                 <DateTimePicker value={start} onChange={setStart} locale={locale} placeholder={text.chooseDate} timeLabel={text.time} />
@@ -154,8 +154,8 @@ export function ScheduledAnnouncementsAdmin() {
               <legend className="pr-2 text-sm font-medium">{text.images} ({images.length}/{announcementItemLimit})</legend>
               {images.map((image, index) => (
                 <div key={index} className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                  <label className="space-y-1 text-sm">{text.imageUrl}<Input type="url" maxLength={500} value={image.src} onChange={(event) => setImages((current) => current.map((item, i) => i === index ? { ...item, src: event.target.value } : item))} /></label>
-                  <label className="space-y-1 text-sm">{text.alt}<Input value={image.alt} maxLength={160} onChange={(event) => setImages((current) => current.map((item, i) => i === index ? { ...item, alt: event.target.value } : item))} /></label>
+                  <label className="flex flex-col gap-1 text-sm">{text.imageUrl}<Input type="url" maxLength={500} value={image.src} onChange={(event) => setImages((current) => current.map((item, i) => i === index ? { ...item, src: event.target.value } : item))} /></label>
+                  <label className="flex flex-col gap-1 text-sm">{text.alt}<Input value={image.alt} maxLength={160} onChange={(event) => setImages((current) => current.map((item, i) => i === index ? { ...item, alt: event.target.value } : item))} /></label>
                   <Button type="button" variant="outline" onClick={() => setImages((current) => current.filter((_, i) => i !== index))}>{text.remove}</Button>
                 </div>
               ))}
@@ -177,8 +177,8 @@ export function ScheduledAnnouncementsAdmin() {
               <p className="text-xs text-muted-foreground">{text.defaultButton}</p>
               {buttons.map((button, index) => (
                 <div key={index} className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                  <label className="space-y-1 text-sm">{text.buttonLabel}<Input maxLength={48} value={button.label} onChange={(event) => setButtons((current) => current.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} /></label>
-                  <label className="space-y-1 text-sm">{text.buttonUrl}<Input maxLength={500} value={button.href} onChange={(event) => setButtons((current) => current.map((item, i) => i === index ? { ...item, href: event.target.value } : item))} /></label>
+                  <label className="flex flex-col gap-1 text-sm">{text.buttonLabel}<Input maxLength={48} value={button.label} onChange={(event) => setButtons((current) => current.map((item, i) => i === index ? { ...item, label: event.target.value } : item))} /></label>
+                  <label className="flex flex-col gap-1 text-sm">{text.buttonUrl}<Input maxLength={500} value={button.href} onChange={(event) => setButtons((current) => current.map((item, i) => i === index ? { ...item, href: event.target.value } : item))} /></label>
                   <Button type="button" variant="outline" onClick={() => setButtons((current) => current.filter((_, i) => i !== index))}>{text.remove}</Button>
                 </div>
               ))}
