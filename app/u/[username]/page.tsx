@@ -249,7 +249,7 @@ export default async function PublicProfile({
     isPartOf: {
       "@type": "WebSite",
       "@id": `${siteConfig.url}/#website`,
-      name: siteConfig.name,
+      name: "ScripticX Platform",
       url: siteConfig.url,
     },
     mainEntity: {
@@ -261,11 +261,6 @@ export default async function PublicProfile({
       image: profile.avatar_url || undefined,
       description: profile.bio || undefined,
       sameAs: sameAs.length > 0 ? sameAs : undefined,
-      memberOf: {
-        "@type": "Organization",
-        name: siteConfig.name,
-        url: siteConfig.url,
-      },
     },
   };
 
