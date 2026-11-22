@@ -9,7 +9,7 @@ import Providers from "@/components/Providers";
 import { EmailVerificationAccessGate } from "@/components/account/EmailVerificationAccessGate";
 import { EntrySessionGate } from "@/components/auth/EntrySessionGate";
 import { AppShell } from "@/components/AppShell";
-import { absoluteUrl, siteConfig } from "@/lib/metadata";
+import { absoluteUrl, organization, siteConfig } from "@/lib/metadata";
 import { DocsNavigationProvider } from "@/components/docs/DocsNavigationProvider";
 import { getDocsSidebarPages, getExamplesSidebarPages } from "@/lib/server/docs";
 
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   keywords: [...siteConfig.keywords],
-  authors: [{ name: "ScripticX Team", url: siteConfig.url }],
+  authors: [{ name: "ScripticX Team", url: organization.url }],
   creator: "ScripticX",
   publisher: "ScripticX",
   category: "education",
@@ -108,29 +108,53 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": "WebApplication",
-              name: siteConfig.name,
-              alternateName: "ScripticX Learning Platform",
-              url: siteConfig.url,
-              description: siteConfig.description,
-              applicationCategory: "EducationalApplication",
-              operatingSystem: "Any",
-              browserRequirements: "Requires a modern web browser",
-              inLanguage: "en",
-              image: absoluteUrl(siteConfig.socialImage),
-              logo: absoluteUrl(siteConfig.logo),
-              offers: {
-                "@type": "Offer",
-                price: "0",
-                priceCurrency: "RON",
-              },
-              featureList: [
-                "MiniScript+ code editor",
-                "Step-by-step execution",
-                "Automatic code evaluation",
-                "Complexity analysis",
-                "AST and flowchart visualization",
-                "Real-time collaborative programming",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": organization.id,
+                  name: organization.name,
+                  url: organization.url,
+                  logo: organization.logo,
+                  sameAs: organization.sameAs,
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": `${siteConfig.url}/#website`,
+                  name: "ScripticX Platform",
+                  url: siteConfig.url,
+                  inLanguage: ["ro", "en"],
+                  publisher: { "@id": organization.id },
+                },
+                {
+                  "@type": "WebApplication",
+                  "@id": organization.platformId,
+                  name: "ScripticX Platform",
+                  alternateName: ["ScripticX Learning Platform", "Platforma ScripticX"],
+                  url: siteConfig.url,
+                  description: siteConfig.description,
+                  applicationCategory: "EducationalApplication",
+                  operatingSystem: "Any",
+                  browserRequirements: "Requires a modern web browser",
+                  inLanguage: ["ro", "en"],
+                  image: absoluteUrl(siteConfig.socialImage),
+                  logo: absoluteUrl(siteConfig.logo),
+                  publisher: { "@id": organization.id },
+                  creator: { "@id": organization.id },
+                  isPartOf: { "@id": `${siteConfig.url}/#website` },
+                  offers: {
+                    "@type": "Offer",
+                    price: "0",
+                    priceCurrency: "RON",
+                  },
+                  featureList: [
+                    "MiniScript+ code editor",
+                    "Step-by-step execution",
+                    "Automatic code evaluation",
+                    "Complexity analysis",
+                    "AST and flowchart visualization",
+                    "Real-time collaborative programming",
+                  ],
+                },
               ],
             }).replace(/</g, "\\u003c"),
           }}

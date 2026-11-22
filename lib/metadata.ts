@@ -25,6 +25,25 @@ export const siteConfig = {
   ],
 } as const;
 
+// The organization is defined on the main site; these @ids must match
+// scripticx-landing/lib/structured-data.tsx so Google merges both into one entity.
+const mainSiteUrl = "https://www.scripticx.org";
+
+export const organization = {
+  id: `${mainSiteUrl}/#organization`,
+  platformId: `${mainSiteUrl}/#platform`,
+  name: "ScripticX",
+  url: mainSiteUrl,
+  logo: `${mainSiteUrl}/icons/notification-icon-512.png`,
+  sameAs: [
+    "https://github.com/Sank34/scripticx",
+    "https://www.youtube.com/@scripticx",
+    "https://www.youtube.com/@ScripticXLessons",
+    "https://www.linkedin.com/company/scripticx/",
+    "https://www.instagram.com/scripticx/",
+  ],
+} as const;
+
 type PageMetadataOptions = {
   title: string;
   description: string;
