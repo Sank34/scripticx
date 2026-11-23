@@ -23,6 +23,7 @@ import { saveAccountSession } from "@/lib/account-switcher";
 import { getSupabaseSessionWithTimeout } from "@/lib/supabase-session";
 import { AUTH_SESSION_TIMEOUT_MS } from "@/lib/supabase-transport";
 import { NETWORK_RECOVERED_EVENT } from "@/lib/network-recovery";
+import { getMaintenanceRedirect } from "@/lib/maintenanceAccess";
 
 const realtimeScopesByTable: Record<string, string[]> = {
   live_rooms: ["livecode", "command-menu", "groups"],
@@ -239,15 +240,8 @@ function PlatformAccessSync() {
       return;
     }
 
-    if (
-      status?.lockdownEnabled &&
-      status.lockdownMode !== "competition" &&
-      !status.maintenanceBypass &&
-      status.role !== "admin" &&
-      pathname !== "/lockdown"
-    ) {
-      router.replace(`/lockdown?next=${encodeURIComponent(pathname)}`);
-    }
+    const maintenanceRedirect = getMaintenanceRedirect(pathname, status);
+    if (maintenanceRedirect) router.replace(maintenanceRedirect);
   }, [pathname, router]);
 
   useEffect(() => {
@@ -296,11 +290,11 @@ function PlatformAccessSync() {
               lockdownMode: status.lockdownMode,
             };
             const currentPathname = pathnameRef.current;
-            if (status.lockdownEnabled && status.lockdownMode !== "competition" && currentPathname !== "/lockdown") {
-              router.replace(
-                `/lockdown?next=${encodeURIComponent(currentPathname)}`
-              );
-            }
+            const maintenanceRedirect = getMaintenanceRedirect(
+              currentPathname,
+              lastStatusRef.current
+            );
+            if (maintenanceRedirect) router.replace(maintenanceRedirect);
           } else {
             lastStatusRef.current = null;
           }
@@ -336,17 +330,8 @@ function PlatformAccessSync() {
           return;
         }
 
-        if (
-          status.lockdownEnabled &&
-          status.lockdownMode !== "competition" &&
-          !status.maintenanceBypass &&
-          status.role !== "admin" &&
-          currentPathname !== "/lockdown"
-        ) {
-          router.replace(
-            `/lockdown?next=${encodeURIComponent(currentPathname)}`
-          );
-        }
+        const maintenanceRedirect = getMaintenanceRedirect(currentPathname, status);
+        if (maintenanceRedirect) router.replace(maintenanceRedirect);
       })().finally(() => {
         inFlight = null;
       });
